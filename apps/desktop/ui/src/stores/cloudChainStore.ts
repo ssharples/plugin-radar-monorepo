@@ -19,6 +19,7 @@ interface CloudChain {
   author?: { name?: string; avatarUrl?: string };
   authorId?: string;
   forkedFrom?: string;
+  targetInputLufs?: number;
 }
 
 interface CloudChainState {
@@ -57,6 +58,7 @@ interface CloudChainActions {
       category?: string;
       tags?: string[];
       isPublic?: boolean;
+      targetInputLufs?: number;
     }
   ) => Promise<{ slug?: string; shareCode?: string; error?: string }>;
   fetchDetailedCompatibility: (chainId: string) => Promise<void>;

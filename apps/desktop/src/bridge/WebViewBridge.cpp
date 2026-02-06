@@ -1,6 +1,7 @@
 #include "WebViewBridge.h"
 #include "ResourceProvider.h"
 #include "../core/ChainNode.h"
+#include "../core/ParameterDiscovery.h"
 #include "../audio/WaveformCapture.h"
 #include "../audio/GainProcessor.h"
 #include "../audio/AudioMeter.h"
@@ -378,6 +379,24 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                                                             juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             juce::ignoreUnused(args);
             completion(getPluginWindowState());
+        })
+        // ============================================
+        // Parameter Discovery / Auto-Mapping
+        // ============================================
+        .withNativeFunction("discoverPluginParameters", [this](const juce::Array<juce::var>& args,
+                                                                juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+            {
+                int nodeId = static_cast<int>(args[0]);
+                completion(discoverPluginParameters(nodeId));
+            }
+            else
+            {
+                auto* result = new juce::DynamicObject();
+                result->setProperty("success", false);
+                result->setProperty("error", "Missing nodeId argument");
+                completion(juce::var(result));
+            }
         })
         // ============================================
         // Parameter Translation / Plugin Swap
@@ -1637,6 +1656,48 @@ juce::var WebViewBridge::calculateGainMatch()
         result->setProperty("success", false);
         result->setProperty("error", "Gain processor or meters not available");
     }
+
+    return juce::var(result);
+}
+
+//==============================================================================
+// Parameter Discovery
+//==============================================================================
+
+juce::var WebViewBridge::discoverPluginParameters(int nodeId)
+{
+    auto* result = new juce::DynamicObject();
+
+    auto* processor = chainProcessor.getNodeProcessor(nodeId);
+    if (!processor)
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "No processor found for node " + juce::String(nodeId));
+        return juce::var(result);
+    }
+
+    // Get plugin name and manufacturer from the chain node's PluginDescription
+    juce::String pluginName = processor->getName();
+    juce::String manufacturer;
+
+    // Look up the ChainNode to get the PluginDescription
+    {
+        const auto& rootNode = chainProcessor.getRootNode();
+        const auto* chainNode = ChainNodeHelpers::findById(rootNode, nodeId);
+        if (chainNode && chainNode->isPlugin())
+        {
+            const auto& desc = chainNode->getPlugin().description;
+            if (desc.name.isNotEmpty())
+                pluginName = desc.name;
+            manufacturer = desc.manufacturerName;
+        }
+    }
+
+    // Run discovery
+    auto discoveredMap = ParameterDiscovery::discoverParameterMap(processor, pluginName, manufacturer);
+
+    result->setProperty("success", true);
+    result->setProperty("map", ParameterDiscovery::toJson(discoveredMap));
 
     return juce::var(result);
 }

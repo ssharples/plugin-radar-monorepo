@@ -373,6 +373,7 @@ export const saveChain = mutation({
       notes: v.optional(v.string()),
     })),
     isPublic: v.boolean(),
+    targetInputLufs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -421,6 +422,7 @@ export const saveChain = mutation({
       likes: 0,
       isPublic: args.isPublic,
       shareCode,
+      targetInputLufs: args.targetInputLufs,
       createdAt: now,
       updatedAt: now,
     });

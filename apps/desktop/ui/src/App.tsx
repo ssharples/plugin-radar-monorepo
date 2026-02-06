@@ -5,7 +5,6 @@ import { WaveformDisplay } from './components/WaveformDisplay';
 import { SpectrumAnalyzer } from './components/SpectrumAnalyzer';
 import { PresetModal } from './components/PresetBrowser';
 import { Footer } from './components/Footer';
-import { CloudSync } from './components/CloudSync';
 import { usePresetStore } from './stores/presetStore';
 import { useSyncStore } from './stores/syncStore';
 import { useOfflineStore, startRetryLoop } from './stores/offlineStore';
@@ -94,7 +93,6 @@ function App() {
             <div className="w-px h-4 bg-plugin-border" />
             <span className="text-xxs text-plugin-muted font-mono">v1.0</span>
           </div>
-          <CloudSync />
         </header>
 
         {/* Main content - horizontal split */}

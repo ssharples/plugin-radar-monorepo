@@ -1,16 +1,31 @@
 import { ChevronDown, ChevronRight, Layers, GitBranch, X } from 'lucide-react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useChainStore } from '../../stores/chainStore';
 import type { GroupNodeUI, ChainNodeUI } from '../../api/types';
 import { ChainNodeList } from './ChainNodeList';
+import { GripVertical } from 'lucide-react';
 
 interface GroupContainerProps {
   node: GroupNodeUI;
   depth: number;
+  parentId: number;
   onNodeSelect?: (e: React.MouseEvent, nodeId: number) => void;
   selectedIds?: Set<number>;
+  isDragActive?: boolean;
+  draggedNodeId?: number | null;
+  shiftHeld?: boolean;
 }
 
-export function GroupContainer({ node, depth, onNodeSelect, selectedIds }: GroupContainerProps) {
+export function GroupContainer({
+  node,
+  depth,
+  parentId: _parentId,
+  onNodeSelect,
+  selectedIds,
+  isDragActive = false,
+  draggedNodeId = null,
+  shiftHeld = false,
+}: GroupContainerProps) {
   const {
     setGroupMode,
     setGroupDryWet,
@@ -19,19 +34,76 @@ export function GroupContainer({ node, depth, onNodeSelect, selectedIds }: Group
     toggleGroupCollapsed,
   } = useChainStore();
 
+  // Make the group draggable
+  const {
+    attributes: dragAttributes,
+    listeners: dragListeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: `drag:${node.id}`,
+    data: {
+      type: 'group',
+      nodeId: node.id,
+      node: node,
+    },
+  });
+
+  // Make the group a drop target (drop onto group = append to end)
+  const {
+    isOver: isGroupDropOver,
+    setNodeRef: setDropRef,
+  } = useDroppable({
+    id: `group:${node.id}`,
+    data: {
+      type: 'group-target',
+      groupId: node.id,
+    },
+  });
+
   const isSerial = node.mode === 'serial';
   const isParallel = node.mode === 'parallel';
   const borderColor = isSerial ? 'border-blue-500/30' : 'border-orange-500/30';
   const bgColor = isSerial ? 'bg-blue-500/5' : 'bg-orange-500/5';
   const childCount = countNodes(node.children);
 
+  // Highlight states for drop target
+  const dropHighlightBorder = isGroupDropOver && isDragActive
+    ? (isParallel ? 'border-orange-500/70' : 'border-blue-500/70')
+    : borderColor;
+  const dropHighlightBg = isGroupDropOver && isDragActive
+    ? (isParallel ? 'bg-orange-500/15' : 'bg-blue-500/15')
+    : bgColor;
+
+  // Combine refs for both draggable and droppable
+  const setRef = (el: HTMLElement | null) => {
+    setDragRef(el);
+    setDropRef(el);
+  };
+
   return (
     <div
-      className={`rounded-lg border ${borderColor} ${bgColor} overflow-hidden`}
+      ref={setRef}
+      className={`
+        rounded-lg border transition-all duration-200
+        ${dropHighlightBorder} ${dropHighlightBg}
+        ${isDragging ? 'opacity-30 scale-[0.98]' : ''}
+        overflow-hidden
+      `}
       style={{ marginLeft: depth > 0 ? 8 : 0 }}
     >
       {/* Group Header */}
       <div className="flex items-center gap-2 px-3 py-2">
+        {/* Drag handle */}
+        <button
+          {...dragAttributes}
+          {...dragListeners}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-shrink-0 p-0.5 rounded hover:bg-plugin-border/50 cursor-grab active:cursor-grabbing text-plugin-muted"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+
         {/* Collapse toggle */}
         <button
           onClick={() => toggleGroupCollapsed(node.id)}
@@ -125,16 +197,22 @@ export function GroupContainer({ node, depth, onNodeSelect, selectedIds }: Group
       {!node.collapsed && (
         <div className="px-2 pb-2">
           {node.children.length === 0 ? (
-            <div className="px-3 py-2 text-xxs text-plugin-muted italic">
-              Empty group
-            </div>
+            <EmptyGroupDropZone
+              groupId={node.id}
+              isParallel={isParallel}
+              isDragActive={isDragActive}
+            />
           ) : (
             <ChainNodeList
               nodes={node.children}
               depth={depth + 1}
+              parentId={node.id}
               isParallelParent={isParallel}
               onNodeSelect={onNodeSelect}
               selectedIds={selectedIds}
+              isDragActive={isDragActive}
+              draggedNodeId={draggedNodeId}
+              shiftHeld={shiftHeld}
             />
           )}
         </div>
@@ -146,6 +224,59 @@ export function GroupContainer({ node, depth, onNodeSelect, selectedIds }: Group
           {childCount} plugin{childCount !== 1 ? 's' : ''}
         </div>
       )}
+
+      {/* Drop target overlay when dragging over */}
+      {isGroupDropOver && isDragActive && !isDragging && (
+        <div
+          className={`
+            absolute inset-0 rounded-lg pointer-events-none z-10
+            ${isParallel ? 'ring-2 ring-orange-500/40' : 'ring-2 ring-blue-500/40'}
+          `}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Empty group placeholder with drop target.
+ */
+function EmptyGroupDropZone({
+  groupId,
+  isParallel,
+  isDragActive,
+}: {
+  groupId: number;
+  isParallel: boolean;
+  isDragActive: boolean;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `drop:${groupId}:0`,
+  });
+
+  const borderColor = isParallel ? 'border-orange-500/40' : 'border-blue-500/40';
+  const bgColor = isParallel ? 'bg-orange-500/10' : 'bg-blue-500/10';
+  const textColor = isParallel ? 'text-orange-400' : 'text-blue-400';
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`
+        mx-1 rounded-lg border-2 border-dashed transition-all duration-200
+        ${isOver && isDragActive
+          ? `${borderColor} ${bgColor} py-4`
+          : 'border-plugin-border/40 py-3'
+        }
+        flex items-center justify-center gap-2 cursor-pointer
+        hover:border-plugin-border/60
+      `}
+    >
+      <span className={`text-xs ${isOver && isDragActive ? textColor : 'text-plugin-muted'}`}>
+        {isOver && isDragActive
+          ? 'Drop plugin here'
+          : 'Drop a plugin here or click to browse'
+        }
+      </span>
     </div>
   );
 }

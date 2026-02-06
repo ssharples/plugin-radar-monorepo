@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { ChainSlot, ChainNodeUI, ChainStateV2 } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
+import { usePluginStore } from './pluginStore';
+import { uploadDiscoveredParameterMap, getParameterMapByName } from '../api/convex-client';
 
 // ============================================
 // Undo/Redo snapshot type
@@ -24,6 +26,11 @@ interface ChainStoreState {
   openEditors: Set<number>;  // keyed by node ID
   loading: boolean;
   error: string | null;
+
+  // LUFS target — the recommended input level for the currently loaded chain
+  targetInputLufs: number | null;
+  // Current chain name (for header display / rename)
+  chainName: string;
 
   // Undo/Redo stacks
   history: ChainSnapshot[];
@@ -64,6 +71,10 @@ interface ChainActions {
 
   // Backward compat alias
   selectSlot: (slotIndex: number | null) => void;
+
+  // LUFS target
+  setTargetInputLufs: (lufs: number | null) => void;
+  setChainName: (name: string) => void;
 
   // Undo/Redo
   undo: () => Promise<void>;
@@ -106,6 +117,53 @@ function toggleCollapsed(nodes: ChainNodeUI[], groupId: number): ChainNodeUI[] {
   });
 }
 
+/**
+ * Auto-discover plugin parameters and upload to Convex (fire-and-forget).
+ * Only uploads if no existing map exists or the new one is better.
+ * Minimum confidence of 30 required to upload.
+ */
+async function autoDiscoverAndUpload(
+  nodeId: number,
+  pluginName: string,
+  matchedPluginId?: string
+): Promise<void> {
+  try {
+    // Skip if no matched plugin ID — we need it for Convex storage
+    if (!matchedPluginId) {
+      console.log('[AutoDiscovery] Skipping — plugin not matched to catalog:', pluginName);
+      return;
+    }
+
+    // Check if map already exists (don't waste time discovering if we have a good one)
+    const existingMap = await getParameterMapByName(pluginName);
+    if (existingMap && (existingMap.source === 'manual' || existingMap.confidence >= 80)) {
+      console.log('[AutoDiscovery] Skipping — high-quality map already exists for:', pluginName);
+      return;
+    }
+
+    // Run JUCE discovery
+    const discoveryResult = await juceBridge.discoverPluginParameters(nodeId);
+    if (!discoveryResult.success || !discoveryResult.map) {
+      console.warn('[AutoDiscovery] Discovery failed for:', pluginName, discoveryResult.error);
+      return;
+    }
+
+    const { map } = discoveryResult;
+
+    // Skip if confidence too low
+    if (map.confidence < 30) {
+      console.log('[AutoDiscovery] Skipping upload — confidence too low:', map.confidence, 'for', pluginName);
+      return;
+    }
+
+    // Upload to Convex
+    const result = await uploadDiscoveredParameterMap(map, matchedPluginId);
+    console.log('[AutoDiscovery] Upload result for', pluginName, ':', result);
+  } catch (err) {
+    console.warn('[AutoDiscovery] Error for', pluginName, ':', err);
+  }
+}
+
 const initialState: ChainStoreState = {
   nodes: [],
   slots: [],
@@ -114,6 +172,8 @@ const initialState: ChainStoreState = {
   openEditors: new Set<number>(),
   loading: false,
   error: null,
+  targetInputLufs: null,
+  chainName: 'Untitled Chain',
   history: [],
   future: [],
   _undoRedoInProgress: false,
@@ -243,6 +303,33 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
               recordCoUsage(newPlugin.uid, slot.uid);
               recordCoUsage(slot.uid, newPlugin.uid);
             }
+          });
+        }
+
+        // Fire-and-forget: auto-discover parameter map and upload to Convex
+        // Find the node ID for the newly added plugin from the tree state
+        const newNodes = newState.nodes;
+        const findLastPluginNodeId = (nodes: ChainNodeUI[]): number | null => {
+          let lastId: number | null = null;
+          for (const node of nodes) {
+            if (node.type === 'plugin' && node.name === newPlugin?.name) {
+              lastId = node.id;
+            }
+            if (node.type === 'group') {
+              const found = findLastPluginNodeId(node.children);
+              if (found !== null) lastId = found;
+            }
+          }
+          return lastId;
+        };
+        const newNodeId = newPlugin ? findLastPluginNodeId(newNodes) : null;
+        if (newNodeId !== null && newPlugin) {
+          // Look up matched Convex plugin ID from enrichment data
+          const enrichedData = usePluginStore.getState().enrichedData;
+          const enriched = enrichedData.get(newPlugin.uid);
+          const matchedPluginId = enriched?._id;
+          autoDiscoverAndUpload(newNodeId, newPlugin.name, matchedPluginId).catch(() => {
+            // Silently ignore — auto-discovery is best-effort
           });
         }
 
@@ -543,6 +630,15 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   toggleGroupCollapsed: (groupId: number) => {
     const { nodes } = get();
     set({ nodes: toggleCollapsed(nodes, groupId) });
+  },
+
+  // LUFS target
+  setTargetInputLufs: (lufs: number | null) => {
+    set({ targetInputLufs: lufs });
+  },
+
+  setChainName: (name: string) => {
+    set({ chainName: name });
   },
 }));
 

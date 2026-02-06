@@ -3,3 +3,5 @@ export { ChainSlot } from './ChainSlot';
 export { ChainNodeList } from './ChainNodeList';
 export { GroupContainer } from './GroupContainer';
 export { ParallelBranchControls } from './ParallelBranchControls';
+export { DropZone } from './DropZone';
+export { DragPreview } from './DragPreview';

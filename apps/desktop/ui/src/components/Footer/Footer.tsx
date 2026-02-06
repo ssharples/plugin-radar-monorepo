@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Folder, Link2, Cloud, Download, CloudOff, RefreshCw, AlertTriangle, Check } from 'lucide-react';
+import { Folder, Link2, CloudOff, RefreshCw, AlertTriangle, Check } from 'lucide-react';
 import { Knob } from '../Knob';
 import { MeterDisplay } from '../MeterDisplay';
 import { LufsDisplay } from '../LufsDisplay';
-import { SaveChainModal, LoadChainModal } from '../CloudSync';
 import { juceBridge } from '../../api/juce-bridge';
-import { useSyncStore } from '../../stores/syncStore';
 import { useChainStore } from '../../stores/chainStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import type { MeterData, GainSettings } from '../../api/types';
@@ -21,11 +19,8 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
   const [meterData, setMeterData] = useState<MeterData | null>(null);
   const [matchLocked, setMatchLocked] = useState(false);
   const [matchLockWarning, setMatchLockWarning] = useState<string | null>(null);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [showLoadModal, setShowLoadModal] = useState(false);
 
-  const { isLoggedIn } = useSyncStore();
-  const { slots } = useChainStore();
+  const { targetInputLufs } = useChainStore();
   const { syncStatus, pendingWrites, online } = useOfflineStore();
 
   // Load initial gain settings and match lock state
@@ -92,6 +87,7 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
         <LufsDisplay
           lufs={meterData?.inputLufs ?? -100}
           compact
+          target={targetInputLufs}
         />
         <MeterDisplay
           peakL={meterData?.inputPeakL ?? 0}
@@ -135,30 +131,15 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
           )}
         </div>
 
-        {/* Cloud Save */}
-        <button
-          onClick={() => setShowSaveModal(true)}
-          disabled={!isLoggedIn || slots.length === 0}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded text-xxs font-medium transition-all ${
-            isLoggedIn && slots.length > 0
-              ? 'bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 text-purple-300'
-              : 'bg-plugin-border text-plugin-dim cursor-not-allowed'
-          }`}
-          title={!isLoggedIn ? "Login to save chains" : slots.length === 0 ? "Add plugins to save" : "Save chain to cloud"}
-        >
-          <Cloud className="w-3 h-3" />
-          <span>Save</span>
-        </button>
-
-        {/* Cloud Browse */}
-        <button
-          onClick={() => setShowLoadModal(true)}
-          className="flex items-center gap-1 px-2.5 py-1 rounded text-xxs font-medium bg-plugin-border-bright hover:bg-plugin-accent/20 text-plugin-muted hover:text-plugin-text transition-all"
-          title="Browse community chains"
-        >
-          <Download className="w-3 h-3" />
-          <span>Browse</span>
-        </button>
+        {/* Target LUFS indicator (when a target is set) */}
+        {targetInputLufs !== null && (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/20 border border-plugin-border">
+            <span className="text-[9px] text-plugin-dim">Target:</span>
+            <span className="text-[10px] font-mono font-medium text-plugin-accent">
+              {targetInputLufs} LUFS
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Divider */}
@@ -221,44 +202,17 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Preset Button */}
-      <button
-        onClick={onPresetClick}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xxs hover:bg-plugin-border-bright transition-colors group"
-      >
-        <Folder className="w-3.5 h-3.5 text-plugin-accent group-hover:scale-110 transition-transform" />
-        <span className="text-plugin-muted group-hover:text-plugin-text transition-colors font-medium">
-          Presets
-        </span>
-        {currentPresetName && (
-          <>
-            <span className="text-plugin-dim mx-0.5">|</span>
-            <span className="text-plugin-text font-medium max-w-24 truncate">
-              {currentPresetName}
-            </span>
-          </>
-        )}
-      </button>
-
-      {/* Cloud Modals */}
-      {showSaveModal && (
-        <SaveChainModal
-          slots={slots}
-          onClose={() => setShowSaveModal(false)}
-          onSaved={() => setShowSaveModal(false)}
-        />
-      )}
-      {showLoadModal && (
-        <LoadChainModal
-          onClose={() => setShowLoadModal(false)}
-          onLoad={async (chainData) => {
-            const result = await juceBridge.importChain(chainData);
-            if (!result.success) {
-              console.error('Failed to import chain:', result.error);
-            }
-            setShowLoadModal(false);
-          }}
-        />
+      {/* Preset name (from header) */}
+      {currentPresetName && (
+        <button
+          onClick={onPresetClick}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xxs hover:bg-plugin-border-bright transition-colors group"
+        >
+          <Folder className="w-3.5 h-3.5 text-plugin-accent group-hover:scale-110 transition-transform" />
+          <span className="text-plugin-text font-medium max-w-24 truncate">
+            {currentPresetName}
+          </span>
+        </button>
       )}
     </div>
   );

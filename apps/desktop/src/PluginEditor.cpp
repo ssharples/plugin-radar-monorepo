@@ -61,7 +61,25 @@ void PluginChainManagerEditor::paint(juce::Graphics& g)
 
 void PluginChainManagerEditor::resized()
 {
-    // WebView takes full bounds
     if (webBrowser)
-        webBrowser->setBounds(getLocalBounds());
+    {
+        auto bounds = getLocalBounds();
+
+        // Leave a small margin at the edges so the JUCE resize handles
+        // remain reachable (WebBrowserComponent can intercept mouse events
+        // at window borders, especially in Ableton Live and other DAWs).
+        // Bottom-right corner needs more space for the corner resizer.
+        constexpr int edgeMargin = 2;
+        constexpr int cornerSize = 12;
+
+        webBrowser->setBounds(bounds.reduced(edgeMargin));
+
+        // Ensure the corner resizer (if present) stays on top of the WebView
+        for (int i = getNumChildComponents() - 1; i >= 0; --i)
+        {
+            auto* child = getChildComponent(i);
+            if (child != webBrowser.get())
+                child->toFront(false);
+        }
+    }
 }
