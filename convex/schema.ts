@@ -987,6 +987,9 @@ export default defineSchema({
     // Forking
     forkedFrom: v.optional(v.id("pluginChains")),
 
+    // LUFS target — recommended input level for this chain
+    targetInputLufs: v.optional(v.number()),
+
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),

@@ -27,6 +27,11 @@ interface ChainStoreState {
   loading: boolean;
   error: string | null;
 
+  // LUFS target — the recommended input level for the currently loaded chain
+  targetInputLufs: number | null;
+  // Current chain name (for header display / rename)
+  chainName: string;
+
   // Undo/Redo stacks
   history: ChainSnapshot[];
   future: ChainSnapshot[];
@@ -66,6 +71,10 @@ interface ChainActions {
 
   // Backward compat alias
   selectSlot: (slotIndex: number | null) => void;
+
+  // LUFS target
+  setTargetInputLufs: (lufs: number | null) => void;
+  setChainName: (name: string) => void;
 
   // Undo/Redo
   undo: () => Promise<void>;
@@ -163,6 +172,8 @@ const initialState: ChainStoreState = {
   openEditors: new Set<number>(),
   loading: false,
   error: null,
+  targetInputLufs: null,
+  chainName: 'Untitled Chain',
   history: [],
   future: [],
   _undoRedoInProgress: false,
@@ -619,6 +630,15 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   toggleGroupCollapsed: (groupId: number) => {
     const { nodes } = get();
     set({ nodes: toggleCollapsed(nodes, groupId) });
+  },
+
+  // LUFS target
+  setTargetInputLufs: (lufs: number | null) => {
+    set({ targetInputLufs: lufs });
+  },
+
+  setChainName: (name: string) => {
+    set({ chainName: name });
   },
 }));
 

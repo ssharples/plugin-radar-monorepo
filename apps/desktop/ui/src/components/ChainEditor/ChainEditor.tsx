@@ -17,6 +17,7 @@ import { Link2, Layers, GitBranch, Undo2, Redo2, Power, AppWindow } from 'lucide
 import { useChainStore } from '../../stores/chainStore';
 import { juceBridge } from '../../api/juce-bridge';
 import { ChainNodeList } from './ChainNodeList';
+import { HeaderMenu } from '../HeaderMenu';
 
 export function ChainEditor() {
   const {
@@ -158,11 +159,14 @@ export function ChainEditor() {
 
   return (
     <div className="flex flex-col h-full bg-plugin-surface rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-plugin-border">
+      {/* Unified Header Menu */}
+      <HeaderMenu />
+
+      {/* Chain Toolbar */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-plugin-border">
         <div className="flex items-center gap-2">
-          <Link2 className="w-4 h-4 text-plugin-accent" />
-          <h2 className="text-sm font-semibold text-plugin-text">Plugin Chain</h2>
+          <Link2 className="w-3.5 h-3.5 text-plugin-accent" />
+          <span className="text-xs font-medium text-plugin-muted">Chain</span>
         </div>
         <div className="flex items-center gap-1">
           {/* Undo/Redo buttons */}

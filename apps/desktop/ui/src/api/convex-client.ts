@@ -456,6 +456,7 @@ export async function saveChain(
     category?: string;
     tags?: string[];
     isPublic?: boolean;
+    targetInputLufs?: number;
   } = {}
 ): Promise<{
   chainId?: string;
@@ -483,6 +484,7 @@ export async function saveChain(
         tags: options.tags ?? [],
         description: options.description,
         isPublic: options.isPublic ?? false,
+        targetInputLufs: options.targetInputLufs,
       })
     );
     // Cache the cloud result with the proper slug
