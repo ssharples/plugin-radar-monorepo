@@ -1,25 +1,24 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, type RefObject } from 'react';
 import { useChainStore } from '../stores/chainStore';
 
 interface KeyboardShortcutOptions {
-  onOpenSearch: () => void;
-  isSearchOpen: boolean;
+  /** Ref to the PluginBrowser search input element */
+  searchInputRef: RefObject<HTMLInputElement | null>;
+  /** Whether the search input is currently focused */
+  isSearchFocused: boolean;
 }
 
 /**
- * Central keyboard shortcut handler for the chain editor.
+ * Central keyboard shortcut handler for the desktop UI.
  *
  * Handles:
- * - Cmd/Ctrl+F → open quick search (prevents browser find)
+ * - Cmd/Ctrl+F → focus the PluginBrowser search input
  * - Backspace / Delete → remove selected node from chain
- * - Undo / Redo already handled in ChainEditor's own effect
+ * - Escape → blur search input and clear query
  */
-export function useKeyboardShortcuts({ onOpenSearch, isSearchOpen }: KeyboardShortcutOptions) {
-  const onOpenSearchRef = useRef(onOpenSearch);
-  onOpenSearchRef.current = onOpenSearch;
-
-  const isSearchOpenRef = useRef(isSearchOpen);
-  isSearchOpenRef.current = isSearchOpen;
+export function useKeyboardShortcuts({ searchInputRef, isSearchFocused }: KeyboardShortcutOptions) {
+  const isSearchFocusedRef = useRef(isSearchFocused);
+  isSearchFocusedRef.current = isSearchFocused;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const isMod = e.metaKey || e.ctrlKey;
@@ -29,16 +28,20 @@ export function useKeyboardShortcuts({ onOpenSearch, isSearchOpen }: KeyboardSho
       target.tagName === 'TEXTAREA' ||
       target.isContentEditable;
 
-    // Cmd/Ctrl+F → open quick search
+    // Cmd/Ctrl+F → focus the existing PluginBrowser search input
     if (isMod && e.key === 'f') {
       e.preventDefault();
       e.stopPropagation();
-      onOpenSearchRef.current();
+      const input = searchInputRef.current;
+      if (input) {
+        input.focus();
+        input.select();
+      }
       return;
     }
 
-    // Don't process delete shortcuts when search is open or input focused
-    if (isSearchOpenRef.current || isInputFocused) return;
+    // Don't process delete shortcuts when any input is focused
+    if (isInputFocused) return;
 
     // Backspace / Delete → remove selected node
     if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -50,11 +53,9 @@ export function useKeyboardShortcuts({ onOpenSearch, isSearchOpen }: KeyboardSho
       // Find index in flat slots for focus management
       const slotIndex = slots.findIndex((s) => s.index === selectedNodeId || s.uid === selectedNodeId);
 
-      // Remove via tree API
       removeNode(selectedNodeId).then((success) => {
         if (!success) return;
 
-        // Move focus to adjacent node
         const { nodes: newNodes } = useChainStore.getState();
         const newSlots = useChainStore.getState().slots;
 
@@ -63,19 +64,17 @@ export function useKeyboardShortcuts({ onOpenSearch, isSearchOpen }: KeyboardSho
           return;
         }
 
-        // Try previous, then next, then first
-        if (slotIndex > 0 && newSlots[slotIndex - 1]) {
-          // If slots use index as id
+        // Move focus to previous node, or first if deleted was first
+        if (slotIndex > 0 && newNodes.length > 0) {
           selectNode(newNodes[Math.min(slotIndex - 1, newNodes.length - 1)]?.id ?? null);
         } else if (newNodes.length > 0) {
-          // Select the first available node
           selectNode(findFirstPluginId(newNodes));
         } else {
           selectNode(null);
         }
       });
     }
-  }, []);
+  }, [searchInputRef]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, true);

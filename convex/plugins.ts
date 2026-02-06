@@ -551,6 +551,37 @@ export const getEnrichmentOptions = query({
 });
 
 // ============================================
+// BATCH QUERIES (Desktop enrichment)
+// ============================================
+
+/**
+ * Get multiple plugins by their IDs.
+ * Used by the desktop app to pull enrichment data for matched scanned plugins.
+ */
+export const getByIds = query({
+  args: {
+    ids: v.array(v.id("plugins")),
+  },
+  handler: async (ctx, args) => {
+    const plugins = await Promise.all(
+      args.ids.map(async (id) => {
+        const plugin = await ctx.db.get(id);
+        if (!plugin) return null;
+
+        // Resolve image URL from storage if available
+        let resolvedImageUrl: string | null | undefined = plugin.imageUrl;
+        if (plugin.imageStorageId) {
+          resolvedImageUrl = await ctx.storage.getUrl(plugin.imageStorageId);
+        }
+
+        return { ...plugin, resolvedImageUrl };
+      })
+    );
+    return plugins.filter(Boolean);
+  },
+});
+
+// ============================================
 // MUTATIONS
 // ============================================
 

@@ -314,6 +314,115 @@ export async function syncPlugins(
   }
 }
 
+// ============================================
+// ENRICHMENT DATA
+// ============================================
+
+/**
+ * Enriched plugin data from the Convex catalog.
+ * Merged with scanned plugins in the desktop UI.
+ */
+export interface EnrichedPluginData {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  shortDescription?: string;
+  category: string;
+  subcategory?: string;
+  effectType?: string;
+  circuitEmulation?: string;
+  tonalCharacter?: string[];
+  tags: string[];
+  worksWellOn?: string[];
+  useCases?: string[];
+  genreSuitability?: string[];
+  sonicCharacter?: string[];
+  comparableTo?: string[];
+  skillLevel?: string;
+  cpuUsage?: string;
+  keyFeatures?: string[];
+  imageUrl?: string;
+  resolvedImageUrl?: string;
+  isFree: boolean;
+  currentPrice?: number;
+  msrp?: number;
+  currency: string;
+  hasDemo: boolean;
+  hasTrial: boolean;
+  productUrl: string;
+  formats: string[];
+  platforms: string[];
+  licenseType?: string;
+  learningCurve?: string;
+  isIndustryStandard?: boolean;
+}
+
+// In-memory cache for enriched data to avoid re-fetching
+let enrichedDataCache: Map<string, EnrichedPluginData> = new Map();
+let enrichedDataTimestamp: number = 0;
+const ENRICHMENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch enrichment data for matched scanned plugins.
+ * Calls the getByIds query to get full plugin details from the catalog.
+ */
+export async function fetchEnrichedPluginData(
+  pluginIds: string[]
+): Promise<EnrichedPluginData[]> {
+  if (pluginIds.length === 0) return [];
+
+  // Check cache freshness
+  const now = Date.now();
+  if (now - enrichedDataTimestamp < ENRICHMENT_CACHE_TTL) {
+    const cached = pluginIds
+      .map((id) => enrichedDataCache.get(id))
+      .filter((d): d is EnrichedPluginData => d !== undefined);
+    // If all requested IDs are cached, return from cache
+    if (cached.length === pluginIds.length) {
+      return cached;
+    }
+  }
+
+  // Find which IDs are not cached
+  const uncachedIds = pluginIds.filter(
+    (id) => !enrichedDataCache.has(id) || now - enrichedDataTimestamp >= ENRICHMENT_CACHE_TTL
+  );
+
+  if (uncachedIds.length > 0) {
+    try {
+      // Batch in chunks of 50 to stay within limits
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < uncachedIds.length; i += BATCH_SIZE) {
+        const batch = uncachedIds.slice(i, i + BATCH_SIZE);
+        const results = await convex.query(api.plugins.getByIds, {
+          ids: batch as any,
+        });
+        for (const plugin of results) {
+          if (plugin) {
+            enrichedDataCache.set(plugin._id, plugin as unknown as EnrichedPluginData);
+          }
+        }
+      }
+      enrichedDataTimestamp = now;
+    } catch (err) {
+      console.error("[ConvexClient] Failed to fetch enrichment data:", err);
+    }
+  }
+
+  return pluginIds
+    .map((id) => enrichedDataCache.get(id))
+    .filter((d): d is EnrichedPluginData => d !== undefined);
+}
+
+/**
+ * Clear the enrichment cache (e.g., after re-sync).
+ */
+export function clearEnrichmentCache() {
+  enrichedDataCache.clear();
+  enrichedDataTimestamp = 0;
+}
+
 /**
  * Get user's synced plugins with match data
  */

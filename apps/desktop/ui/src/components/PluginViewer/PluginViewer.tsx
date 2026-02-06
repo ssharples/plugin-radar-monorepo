@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -15,10 +15,270 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Link2, Power, X, ExternalLink } from 'lucide-react';
+import {
+  Link2, Power, X, ExternalLink, ChevronDown, ChevronUp,
+  Music, Sliders, Cpu, GraduationCap, Tag, Globe, Zap, Heart,
+} from 'lucide-react';
 import { useChainStore } from '../../stores/chainStore';
+import { usePluginStore } from '../../stores/pluginStore';
 import { juceBridge } from '../../api/juce-bridge';
 import type { ChainSlot } from '../../api/types';
+import type { EnrichedPluginData } from '../../api/convex-client';
+
+// Category color mapping
+const CATEGORY_COLORS: Record<string, string> = {
+  eq: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  compressor: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  limiter: 'bg-red-500/20 text-red-300 border-red-500/30',
+  reverb: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  delay: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  saturation: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  modulation: 'bg-green-500/20 text-green-300 border-green-500/30',
+  'stereo-imaging': 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  'gate-expander': 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  'de-esser': 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+  filter: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  'channel-strip': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  metering: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+  'noise-reduction': 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+  multiband: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+  utility: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
+};
+
+function formatPrice(cents: number | undefined, currency: string = 'USD'): string {
+  if (cents === undefined || cents === null) return '';
+  const dollars = cents / 100;
+  if (currency === 'USD') return `$${dollars.toFixed(2)}`;
+  if (currency === 'EUR') return `€${dollars.toFixed(2)}`;
+  if (currency === 'GBP') return `£${dollars.toFixed(2)}`;
+  return `${dollars.toFixed(2)} ${currency}`;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// =======================================
+// Enrichment Detail Panel
+// =======================================
+
+function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const tonalChars = [...(enriched.tonalCharacter ?? []), ...(enriched.sonicCharacter ?? [])];
+  const categoryColor = CATEGORY_COLORS[enriched.category] ?? CATEGORY_COLORS.utility;
+
+  return (
+    <div className="mt-1.5 border-t border-plugin-border/50 pt-1.5 space-y-1.5">
+      {/* Category + Effect Type + Circuit */}
+      <div className="flex flex-wrap items-center gap-1">
+        <span className={`px-1.5 py-0.5 text-[9px] rounded border font-medium ${categoryColor}`}>
+          {capitalize(enriched.category)}
+        </span>
+        {enriched.effectType && (
+          <span className="px-1.5 py-0.5 text-[9px] rounded bg-plugin-bg text-plugin-text border border-plugin-border">
+            {enriched.effectType}
+          </span>
+        )}
+        {enriched.circuitEmulation && (
+          <span className="px-1.5 py-0.5 text-[9px] rounded bg-plugin-bg text-plugin-dim border border-plugin-border italic">
+            {enriched.circuitEmulation}
+          </span>
+        )}
+        {enriched.isFree && (
+          <span className="px-1.5 py-0.5 text-[9px] rounded bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
+            Free
+          </span>
+        )}
+        {!enriched.isFree && enriched.currentPrice !== undefined && (
+          <span className="px-1.5 py-0.5 text-[9px] rounded bg-plugin-bg text-plugin-text border border-plugin-border font-mono">
+            {formatPrice(enriched.currentPrice, enriched.currency)}
+            {enriched.msrp && enriched.currentPrice !== enriched.msrp && (
+              <span className="line-through text-plugin-dim ml-1">
+                {formatPrice(enriched.msrp, enriched.currency)}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+
+      {/* Tonal character */}
+      {tonalChars.length > 0 && (
+        <div className="flex flex-wrap items-center gap-0.5">
+          <Zap className="w-2.5 h-2.5 text-plugin-dim flex-shrink-0" />
+          {tonalChars.map((char) => (
+            <span
+              key={char}
+              className="px-1 py-px text-[8px] rounded bg-plugin-accent/10 text-plugin-accent border border-plugin-accent/20 capitalize"
+            >
+              {char}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Short description */}
+      {enriched.shortDescription && (
+        <p className="text-[10px] text-plugin-muted leading-snug">
+          {enriched.shortDescription}
+        </p>
+      )}
+
+      {/* Expand/collapse for full details */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+        className="flex items-center gap-0.5 text-[9px] text-plugin-accent hover:text-plugin-accent/80 transition-colors"
+      >
+        {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        {expanded ? 'Less' : 'More details'}
+      </button>
+
+      {expanded && (
+        <div className="space-y-2 pt-1">
+          {/* Full description */}
+          {enriched.description && (
+            <div>
+              <p className="text-[10px] text-plugin-text leading-snug">{enriched.description}</p>
+            </div>
+          )}
+
+          {/* Works Well On */}
+          {enriched.worksWellOn && enriched.worksWellOn.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <Music className="w-2.5 h-2.5 text-plugin-dim" />
+                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Works Well On</span>
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {enriched.worksWellOn.map((w) => (
+                  <span key={w} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                    {w.replace('-', ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Use Cases */}
+          {enriched.useCases && enriched.useCases.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <Sliders className="w-2.5 h-2.5 text-plugin-dim" />
+                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Use Cases</span>
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {enriched.useCases.map((u) => (
+                  <span key={u} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                    {u.replace('-', ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Genre Suitability */}
+          {enriched.genreSuitability && enriched.genreSuitability.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <Globe className="w-2.5 h-2.5 text-plugin-dim" />
+                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Genre</span>
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {enriched.genreSuitability.map((g) => (
+                  <span key={g} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                    {g.replace('-', ' ').replace('&', '&')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Comparable To */}
+          {enriched.comparableTo && enriched.comparableTo.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <Heart className="w-2.5 h-2.5 text-plugin-dim" />
+                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Comparable To</span>
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {enriched.comparableTo.map((c) => (
+                  <span key={c} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Key Features */}
+          {enriched.keyFeatures && enriched.keyFeatures.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <Tag className="w-2.5 h-2.5 text-plugin-dim" />
+                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Key Features</span>
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {enriched.keyFeatures.map((f) => (
+                  <span key={f} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                    {f.replace('-', ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Skill Level + CPU Usage */}
+          <div className="flex items-center gap-3">
+            {enriched.skillLevel && (
+              <div className="flex items-center gap-1">
+                <GraduationCap className="w-2.5 h-2.5 text-plugin-dim" />
+                <span className="text-[9px] text-plugin-muted capitalize">{enriched.skillLevel}</span>
+              </div>
+            )}
+            {enriched.cpuUsage && (
+              <div className="flex items-center gap-1">
+                <Cpu className="w-2.5 h-2.5 text-plugin-dim" />
+                <span className="text-[9px] text-plugin-muted capitalize">{enriched.cpuUsage} CPU</span>
+              </div>
+            )}
+            {enriched.isIndustryStandard && (
+              <span className="text-[9px] text-yellow-400 font-medium">⭐ Industry Standard</span>
+            )}
+          </div>
+
+          {/* Price info */}
+          {!enriched.isFree && (
+            <div className="flex items-center gap-2 text-[9px]">
+              {enriched.currentPrice !== undefined && (
+                <span className="text-plugin-text font-medium">
+                  {formatPrice(enriched.currentPrice, enriched.currency)}
+                </span>
+              )}
+              {enriched.msrp !== undefined && enriched.currentPrice !== enriched.msrp && (
+                <span className="text-plugin-dim line-through">
+                  MSRP {formatPrice(enriched.msrp, enriched.currency)}
+                </span>
+              )}
+              {enriched.licenseType && (
+                <span className="text-plugin-dim capitalize">({enriched.licenseType})</span>
+              )}
+              {enriched.hasDemo && (
+                <span className="text-green-400">Demo available</span>
+              )}
+              {enriched.hasTrial && (
+                <span className="text-green-400">Trial available</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =======================================
+// Slot Item (sortable chain slot)
+// =======================================
 
 function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpenUI }: {
   slot: ChainSlot;
@@ -43,6 +303,9 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Get enriched data for this slot's plugin
+  const enriched = usePluginStore((s) => s.getEnrichedDataForPlugin(slot.uid));
+
   return (
     <div
       ref={setNodeRef}
@@ -54,7 +317,7 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
         onDoubleClick={onOpenUI}
         {...attributes}
         {...listeners}
-        className={`flex items-center gap-2 px-2.5 py-2 rounded cursor-grab active:cursor-grabbing transition-all border ${
+        className={`flex items-start gap-2 px-2.5 py-2 rounded cursor-grab active:cursor-grabbing transition-all border ${
           isSelected
             ? 'bg-plugin-accent/10 border-plugin-accent/60 shadow-glow-accent'
             : slot.bypassed
@@ -63,13 +326,13 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
         }`}
       >
         {/* Number badge */}
-        <span className={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-xxs font-bold ${
+        <span className={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-xxs font-bold mt-0.5 ${
           isSelected ? 'bg-plugin-accent text-black' : slot.bypassed ? 'bg-plugin-border/50 text-plugin-dim' : 'bg-plugin-border text-plugin-muted'
         }`}>
           {slot.index + 1}
         </span>
 
-        {/* Plugin name */}
+        {/* Plugin name + enrichment */}
         <div className="flex-1 min-w-0">
           <div className={`text-xs font-medium truncate ${
             slot.bypassed ? 'line-through text-plugin-dim' : isSelected ? 'text-plugin-text' : 'text-plugin-text'
@@ -79,10 +342,27 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
           <div className="text-xxs text-plugin-dim truncate leading-tight">
             {slot.manufacturer}
           </div>
+
+          {/* Enrichment detail (shown when selected) */}
+          {isSelected && enriched && (
+            <EnrichmentDetail enriched={enriched} />
+          )}
+
+          {/* Minimal enrichment info when not selected */}
+          {!isSelected && enriched && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className={`px-1 py-px text-[8px] rounded border font-medium ${CATEGORY_COLORS[enriched.category] ?? CATEGORY_COLORS.utility}`}>
+                {capitalize(enriched.category)}
+              </span>
+              {enriched.effectType && (
+                <span className="text-[8px] text-plugin-dim">{enriched.effectType}</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Quick actions */}
-        <div className={`flex items-center gap-0.5 transition-opacity ${
+        <div className={`flex items-center gap-0.5 transition-opacity mt-0.5 ${
           isDragging ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'
         }`}>
           <button
@@ -120,6 +400,10 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
     </div>
   );
 }
+
+// =======================================
+// Plugin Viewer (Chain View)
+// =======================================
 
 export function PluginViewer() {
   const {

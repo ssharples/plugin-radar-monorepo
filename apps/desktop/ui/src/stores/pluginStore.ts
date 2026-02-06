@@ -2,9 +2,16 @@ import { create } from 'zustand';
 import type { PluginDescription, ScanProgress } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
+import {
+  getScannedPlugins,
+  fetchEnrichedPluginData,
+  clearEnrichmentCache,
+  type EnrichedPluginData,
+} from '../api/convex-client';
 
 type TypeFilter = 'all' | 'instruments' | 'effects';
 type SortBy = 'name' | 'manufacturer' | 'most-used' | 'recent';
+type PriceFilter = 'all' | 'free' | 'paid';
 
 interface PluginState {
   plugins: PluginDescription[];
@@ -18,6 +25,17 @@ interface PluginState {
   currentlyScanning: string;
   loading: boolean;
   error: string | null;
+
+  // Enrichment data
+  enrichedData: Map<number, EnrichedPluginData>; // keyed by plugin UID
+  enrichmentLoading: boolean;
+  enrichmentLoaded: boolean;
+
+  // Enrichment-based filters
+  categoryFilter: string | null;
+  effectTypeFilter: string | null;
+  tonalCharacterFilter: string[];
+  priceFilter: PriceFilter;
 }
 
 interface PluginActions {
@@ -27,7 +45,16 @@ interface PluginActions {
   setFormatFilter: (format: string | null) => void;
   setTypeFilter: (type: TypeFilter) => void;
   setSortBy: (sort: SortBy) => void;
+  setCategoryFilter: (category: string | null) => void;
+  setEffectTypeFilter: (effectType: string | null) => void;
+  setTonalCharacterFilter: (chars: string[]) => void;
+  toggleTonalCharacter: (char: string) => void;
+  setPriceFilter: (filter: PriceFilter) => void;
+  clearAllFilters: () => void;
   applyFilters: () => void;
+  loadEnrichmentData: () => Promise<void>;
+  getEnrichedDataForPlugin: (uid: number) => EnrichedPluginData | undefined;
+  hasActiveFilters: () => boolean;
 }
 
 const initialState: PluginState = {
@@ -42,6 +69,15 @@ const initialState: PluginState = {
   currentlyScanning: '',
   loading: false,
   error: null,
+
+  enrichedData: new Map(),
+  enrichmentLoading: false,
+  enrichmentLoaded: false,
+
+  categoryFilter: null,
+  effectTypeFilter: null,
+  tonalCharacterFilter: [],
+  priceFilter: 'all',
 };
 
 export const usePluginStore = create<PluginState & PluginActions>((set, get) => ({
@@ -53,6 +89,8 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
       const plugins = await juceBridge.getPluginList();
       set({ plugins, loading: false });
       get().applyFilters();
+      // Auto-load enrichment data after fetching plugins
+      get().loadEnrichmentData();
     } catch (err) {
       set({ error: String(err), loading: false });
     }
@@ -87,20 +125,162 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
     get().applyFilters();
   },
 
+  setCategoryFilter: (category: string | null) => {
+    // Reset effect type when category changes
+    set({ categoryFilter: category, effectTypeFilter: null });
+    get().applyFilters();
+  },
+
+  setEffectTypeFilter: (effectType: string | null) => {
+    set({ effectTypeFilter: effectType });
+    get().applyFilters();
+  },
+
+  setTonalCharacterFilter: (chars: string[]) => {
+    set({ tonalCharacterFilter: chars });
+    get().applyFilters();
+  },
+
+  toggleTonalCharacter: (char: string) => {
+    const current = get().tonalCharacterFilter;
+    const next = current.includes(char)
+      ? current.filter((c) => c !== char)
+      : [...current, char];
+    set({ tonalCharacterFilter: next });
+    get().applyFilters();
+  },
+
+  setPriceFilter: (filter: PriceFilter) => {
+    set({ priceFilter: filter });
+    get().applyFilters();
+  },
+
+  clearAllFilters: () => {
+    set({
+      searchQuery: '',
+      formatFilter: null,
+      typeFilter: 'all',
+      categoryFilter: null,
+      effectTypeFilter: null,
+      tonalCharacterFilter: [],
+      priceFilter: 'all',
+    });
+    get().applyFilters();
+  },
+
+  hasActiveFilters: () => {
+    const s = get();
+    return (
+      s.categoryFilter !== null ||
+      s.effectTypeFilter !== null ||
+      s.tonalCharacterFilter.length > 0 ||
+      s.priceFilter !== 'all'
+    );
+  },
+
+  loadEnrichmentData: async () => {
+    const { enrichmentLoading } = get();
+    if (enrichmentLoading) return;
+
+    set({ enrichmentLoading: true });
+    try {
+      // Get user's scanned plugins with match data from Convex
+      const scannedPlugins = await getScannedPlugins();
+      if (!scannedPlugins || scannedPlugins.length === 0) {
+        set({ enrichmentLoading: false, enrichmentLoaded: true });
+        return;
+      }
+
+      // Collect matched plugin IDs
+      const matchedIds: string[] = [];
+      const uidToPluginId: Map<number, string> = new Map();
+
+      for (const sp of scannedPlugins) {
+        if (sp.matchedPlugin) {
+          matchedIds.push(sp.matchedPlugin);
+          uidToPluginId.set(sp.uid, sp.matchedPlugin);
+        }
+      }
+
+      if (matchedIds.length === 0) {
+        set({ enrichmentLoading: false, enrichmentLoaded: true });
+        return;
+      }
+
+      // Fetch enrichment data for all matched plugins
+      const enriched = await fetchEnrichedPluginData([...new Set(matchedIds)]);
+
+      // Build UID → EnrichedData map
+      const enrichedMap = new Map<number, EnrichedPluginData>();
+      const idToEnriched = new Map<string, EnrichedPluginData>();
+      for (const e of enriched) {
+        idToEnriched.set(e._id, e);
+      }
+      for (const [uid, pluginId] of uidToPluginId) {
+        const data = idToEnriched.get(pluginId);
+        if (data) enrichedMap.set(uid, data);
+      }
+
+      set({
+        enrichedData: enrichedMap,
+        enrichmentLoading: false,
+        enrichmentLoaded: true,
+      });
+      // Re-apply filters so enrichment-based filters work
+      get().applyFilters();
+    } catch (err) {
+      console.error('[pluginStore] Failed to load enrichment data:', err);
+      set({ enrichmentLoading: false, enrichmentLoaded: true });
+    }
+  },
+
+  getEnrichedDataForPlugin: (uid: number) => {
+    return get().enrichedData.get(uid);
+  },
+
   applyFilters: () => {
-    const { plugins, searchQuery, formatFilter, typeFilter, sortBy } = get();
+    const {
+      plugins,
+      searchQuery,
+      formatFilter,
+      typeFilter,
+      sortBy,
+      enrichedData,
+      categoryFilter,
+      effectTypeFilter,
+      tonalCharacterFilter,
+      priceFilter,
+    } = get();
     const usagePlugins = useUsageStore.getState().plugins;
     let filtered = [...plugins];
 
-    // Text search
+    // Text search — also searches enriched fields
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
+      filtered = filtered.filter((p) => {
+        // Basic fields
+        if (
           p.name.toLowerCase().includes(query) ||
           p.manufacturer.toLowerCase().includes(query) ||
           p.category.toLowerCase().includes(query)
-      );
+        ) {
+          return true;
+        }
+        // Enriched fields
+        const ed = enrichedData.get(p.uid);
+        if (ed) {
+          if (ed.description?.toLowerCase().includes(query)) return true;
+          if (ed.shortDescription?.toLowerCase().includes(query)) return true;
+          if (ed.effectType?.toLowerCase().includes(query)) return true;
+          if (ed.circuitEmulation?.toLowerCase().includes(query)) return true;
+          if (ed.tags?.some((t) => t.toLowerCase().includes(query))) return true;
+          if (ed.tonalCharacter?.some((t) => t.toLowerCase().includes(query))) return true;
+          if (ed.sonicCharacter?.some((t) => t.toLowerCase().includes(query))) return true;
+          if (ed.worksWellOn?.some((t) => t.toLowerCase().includes(query))) return true;
+          if (ed.comparableTo?.some((t) => t.toLowerCase().includes(query))) return true;
+        }
+        return false;
+      });
     }
 
     // Format filter
@@ -113,6 +293,45 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
       filtered = filtered.filter((p) =>
         typeFilter === 'instruments' ? p.isInstrument : !p.isInstrument
       );
+    }
+
+    // Category filter (from enriched data)
+    if (categoryFilter) {
+      filtered = filtered.filter((p) => {
+        const ed = enrichedData.get(p.uid);
+        return ed?.category === categoryFilter;
+      });
+    }
+
+    // Effect type filter
+    if (effectTypeFilter) {
+      filtered = filtered.filter((p) => {
+        const ed = enrichedData.get(p.uid);
+        return ed?.effectType === effectTypeFilter;
+      });
+    }
+
+    // Tonal character filter (AND: all selected characters must be present)
+    if (tonalCharacterFilter.length > 0) {
+      filtered = filtered.filter((p) => {
+        const ed = enrichedData.get(p.uid);
+        if (!ed) return false;
+        const chars = [...(ed.tonalCharacter ?? []), ...(ed.sonicCharacter ?? [])];
+        return tonalCharacterFilter.every((c) => chars.includes(c));
+      });
+    }
+
+    // Price filter
+    if (priceFilter === 'free') {
+      filtered = filtered.filter((p) => {
+        const ed = enrichedData.get(p.uid);
+        return ed?.isFree === true;
+      });
+    } else if (priceFilter === 'paid') {
+      filtered = filtered.filter((p) => {
+        const ed = enrichedData.get(p.uid);
+        return ed ? ed.isFree === false : true; // Show unmatched as "paid" by default
+      });
     }
 
     // Sort
@@ -143,17 +362,21 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
 // Set up event listeners
 juceBridge.onPluginListChanged((plugins) => {
   console.log('pluginListChanged received, plugins count:', plugins?.length);
-  // Don't change scanning state here - let scanProgress handle it
-  // This allows plugins to appear in real-time during scanning
   usePluginStore.setState({ plugins: plugins || [] });
   usePluginStore.getState().applyFilters();
 });
 
 juceBridge.onScanProgress((progress: ScanProgress) => {
   console.log('scanProgress received:', progress);
+  const wasScanningBefore = usePluginStore.getState().scanning;
   usePluginStore.setState({
     scanning: progress.scanning ?? true,
     scanProgress: progress.progress ?? 0,
     currentlyScanning: progress.currentPlugin ?? '',
   });
+  // Reload enrichment data when scanning completes
+  if (wasScanningBefore && !(progress.scanning ?? true)) {
+    clearEnrichmentCache();
+    usePluginStore.getState().loadEnrichmentData();
+  }
 });

@@ -191,15 +191,6 @@ export function ChainEditor() {
             <Redo2 className="w-3.5 h-3.5" />
           </button>
 
-          {/* Quick Search button */}
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="p-1 rounded transition-colors text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50"
-            title="Quick Add Plugin (Ctrl+F)"
-          >
-            <Search className="w-3.5 h-3.5" />
-          </button>
-
           {/* Separator */}
           {totalPlugins > 0 && (
             <div className="w-px h-4 bg-plugin-border mx-1" />
@@ -347,11 +338,6 @@ export function ChainEditor() {
         </div>
       )}
 
-      {/* Quick Search overlay */}
-      <QuickSearch
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-      />
     </div>
   );
 }
