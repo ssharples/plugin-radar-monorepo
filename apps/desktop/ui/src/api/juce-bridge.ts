@@ -358,6 +358,49 @@ class JuceBridge {
   }
 
   // ============================================
+  // Parameter Discovery / Auto-Mapping
+  // ============================================
+
+  /**
+   * Discover and semantically classify all parameters of a loaded plugin.
+   * Returns a parameter map with semantic IDs, units, curves, and a confidence score.
+   * Used for auto-generating parameter maps that can be uploaded to Convex.
+   */
+  async discoverPluginParameters(nodeId: number): Promise<{
+    success: boolean;
+    map?: {
+      pluginName: string;
+      manufacturer: string;
+      category: string;
+      confidence: number;
+      matchedCount: number;
+      totalCount: number;
+      eqBandCount: number;
+      eqBandParameterPattern: string;
+      compHasParallelMix: boolean;
+      compHasAutoMakeup: boolean;
+      compHasLookahead: boolean;
+      source: string;
+      parameters: Array<{
+        juceParamId: string;
+        juceParamIndex: number;
+        semantic: string;
+        physicalUnit: string;
+        mappingCurve: string;
+        minValue: number;
+        maxValue: number;
+        defaultValue: number;
+        numSteps: number;
+        label: string;
+        matched: boolean;
+      }>;
+    };
+    error?: string;
+  }> {
+    return this.callNative('discoverPluginParameters', nodeId);
+  }
+
+  // ============================================
   // Parameter Translation / Plugin Swap
   // ============================================
 

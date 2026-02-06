@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeftRight, Dice5, X, Loader2 } from 'lucide-react';
-import { findCompatibleSwaps, translateParameters } from '../../api/convex-client';
+import { ArrowLeftRight, Dice5, X, Loader2, ScanLine } from 'lucide-react';
+import { findCompatibleSwaps, translateParameters, getParameterMap, uploadDiscoveredParameterMap } from '../../api/convex-client';
 import { juceBridge } from '../../api/juce-bridge';
 
 interface SwapCandidate {
@@ -33,11 +33,75 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
   }
 }
 
+type MapSource = 'manual' | 'juce-scanned' | 'ai-analyzed' | 'none';
+
+function MapSourceIndicator({
+  source,
+  confidence,
+  onScan,
+  scanning,
+}: {
+  source: MapSource;
+  confidence?: number;
+  onScan?: () => void;
+  scanning?: boolean;
+}) {
+  switch (source) {
+    case 'manual':
+      return (
+        <div className="flex items-center gap-1.5 text-[10px] text-green-400">
+          <span className="w-2 h-2 rounded-full bg-green-500" />
+          Manual map{confidence ? ` (${confidence}%)` : ''}
+        </div>
+      );
+    case 'juce-scanned':
+      return (
+        <div className="flex items-center gap-1.5 text-[10px] text-yellow-400">
+          <span className="w-2 h-2 rounded-full bg-yellow-500" />
+          Auto-discovered{confidence ? ` (${confidence}%)` : ''}
+        </div>
+      );
+    case 'ai-analyzed':
+      return (
+        <div className="flex items-center gap-1.5 text-[10px] text-blue-400">
+          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          AI-analyzed{confidence ? ` (${confidence}%)` : ''}
+        </div>
+      );
+    case 'none':
+      return (
+        <div className="flex items-center gap-1.5 text-[10px] text-plugin-muted">
+          <span className="w-2 h-2 rounded-full bg-neutral-600" />
+          No map yet
+          {onScan && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onScan();
+              }}
+              disabled={scanning}
+              className="ml-1 px-1.5 py-0.5 rounded bg-plugin-accent/20 text-plugin-accent hover:bg-plugin-accent/30 transition-colors disabled:opacity-50"
+            >
+              {scanning ? (
+                <Loader2 className="w-3 h-3 animate-spin inline" />
+              ) : (
+                <>
+                  <ScanLine className="w-3 h-3 inline mr-0.5" />
+                  Scan
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      );
+  }
+}
+
 export function PluginSwapMenu({
   nodeId,
-  pluginName,
+  pluginName: _pluginName,
   matchedPluginId,
-  pluginUid,
+  pluginUid: _pluginUid,
   onSwapComplete,
   onClose,
 }: PluginSwapMenuProps) {
@@ -45,8 +109,12 @@ export function PluginSwapMenu({
   const [loading, setLoading] = useState(true);
   const [swapping, setSwapping] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mapSource, setMapSource] = useState<MapSource>('none');
+  const [mapConfidence, setMapConfidence] = useState<number | undefined>();
+  const [scanning, setScanning] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Fetch swaps and map source
   useEffect(() => {
     if (!matchedPluginId) {
       setLoading(false);
@@ -54,6 +122,7 @@ export function PluginSwapMenu({
       return;
     }
 
+    // Fetch compatible swaps
     findCompatibleSwaps(matchedPluginId).then((results) => {
       setSwaps(results);
       setLoading(false);
@@ -61,7 +130,48 @@ export function PluginSwapMenu({
       setError(String(err));
       setLoading(false);
     });
+
+    // Fetch map source info
+    getParameterMap(matchedPluginId).then((map) => {
+      if (map) {
+        setMapSource((map.source || 'manual') as MapSource);
+        setMapConfidence(map.confidence);
+      } else {
+        setMapSource('none');
+      }
+    }).catch(() => {
+      setMapSource('none');
+    });
   }, [matchedPluginId]);
+
+  // Handle manual scan
+  const handleScanParameters = useCallback(async () => {
+    if (!matchedPluginId) return;
+    setScanning(true);
+    try {
+      const result = await juceBridge.discoverPluginParameters(nodeId);
+      if (result.success && result.map) {
+        if (result.map.confidence >= 30) {
+          const uploadResult = await uploadDiscoveredParameterMap(result.map, matchedPluginId);
+          if (uploadResult.success) {
+            setMapSource('juce-scanned');
+            setMapConfidence(result.map.confidence);
+            // Refresh swaps list since we now have a map
+            const newSwaps = await findCompatibleSwaps(matchedPluginId);
+            setSwaps(newSwaps);
+          }
+        } else {
+          setError(`Scan found only ${result.map.matchedCount}/${result.map.totalCount} params — confidence too low`);
+        }
+      } else {
+        setError(result.error || 'Scan failed');
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setScanning(false);
+    }
+  }, [nodeId, matchedPluginId]);
 
   // Close on click outside
   useEffect(() => {
@@ -163,28 +273,39 @@ export function PluginSwapMenu({
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-plugin-border bg-plugin-bg/80">
-        <div className="flex items-center gap-2">
-          <ArrowLeftRight className="w-4 h-4 text-plugin-accent" />
-          <span className="text-sm font-medium text-plugin-text">Swap Plugin</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {swaps.length > 0 && (
+      <div className="px-3 py-2 border-b border-plugin-border bg-plugin-bg/80">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ArrowLeftRight className="w-4 h-4 text-plugin-accent" />
+            <span className="text-sm font-medium text-plugin-text">Swap Plugin</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {swaps.length > 0 && (
+              <button
+                onClick={handleRandomize}
+                disabled={!!swapping}
+                className="p-1 rounded hover:bg-plugin-accent/20 text-plugin-muted hover:text-plugin-accent transition-colors"
+                title="Random swap"
+              >
+                <Dice5 className="w-4 h-4" />
+              </button>
+            )}
             <button
-              onClick={handleRandomize}
-              disabled={!!swapping}
-              className="p-1 rounded hover:bg-plugin-accent/20 text-plugin-muted hover:text-plugin-accent transition-colors"
-              title="Random swap"
+              onClick={onClose}
+              className="p-1 rounded hover:bg-plugin-border text-plugin-muted hover:text-plugin-text transition-colors"
             >
-              <Dice5 className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
-          )}
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-plugin-border text-plugin-muted hover:text-plugin-text transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          </div>
+        </div>
+        {/* Map source indicator */}
+        <div className="mt-1">
+          <MapSourceIndicator
+            source={mapSource}
+            confidence={mapConfidence}
+            onScan={mapSource === 'none' ? handleScanParameters : undefined}
+            scanning={scanning}
+          />
         </div>
       </div>
 

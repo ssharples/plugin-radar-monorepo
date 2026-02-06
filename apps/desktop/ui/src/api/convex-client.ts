@@ -963,3 +963,106 @@ export async function getParameterMap(pluginId: string): Promise<any | null> {
     return null;
   }
 }
+
+/**
+ * Get parameter map by plugin name (for auto-discovery lookups when we don't have the Convex ID)
+ */
+export async function getParameterMapByName(pluginName: string): Promise<any | null> {
+  try {
+    return await convex.query(api.parameterTranslation.getParameterMapByName, {
+      pluginName,
+    });
+  } catch (err) {
+    console.error("Failed to get parameter map by name:", err);
+    return null;
+  }
+}
+
+/**
+ * Upload a discovered parameter map to Convex.
+ * Respects existing manual maps (won't overwrite higher-confidence maps).
+ *
+ * @param discoveredMap - The parameter map from JUCE auto-discovery
+ * @param pluginId - The Convex plugin ID (if matched to catalog)
+ */
+export async function uploadDiscoveredParameterMap(
+  discoveredMap: {
+    pluginName: string;
+    manufacturer: string;
+    category: string;
+    confidence: number;
+    eqBandCount?: number;
+    eqBandParameterPattern?: string;
+    compHasParallelMix?: boolean;
+    compHasAutoMakeup?: boolean;
+    compHasLookahead?: boolean;
+    parameters: Array<{
+      juceParamId: string;
+      juceParamIndex?: number;
+      semantic: string;
+      physicalUnit: string;
+      mappingCurve: string;
+      minValue: number;
+      maxValue: number;
+      defaultValue?: number;
+    }>;
+  },
+  pluginId: string
+): Promise<{ success: boolean; action?: string; error?: string }> {
+  try {
+    // Check if a map already exists
+    const existing = await convex.query(api.parameterTranslation.getParameterMap, {
+      pluginId: pluginId as any,
+    });
+
+    if (existing) {
+      // Don't overwrite manual maps or higher-confidence maps
+      if (existing.source === "manual" || existing.confidence > discoveredMap.confidence) {
+        return { success: true, action: "skipped_higher_confidence" };
+      }
+
+      // Don't overwrite if previous auto-discovered map has more matched params
+      if (existing.source === "juce-scanned") {
+        const existingMatchedCount = existing.parameters.filter(
+          (p: any) => p.semantic !== "unknown"
+        ).length;
+        const newMatchedCount = discoveredMap.parameters.filter(
+          (p) => p.semantic !== "unknown"
+        ).length;
+
+        if (existingMatchedCount >= newMatchedCount) {
+          return { success: true, action: "skipped_same_or_better" };
+        }
+      }
+    }
+
+    // Upload the map
+    await convex.mutation(api.parameterTranslation.upsertParameterMap, {
+      plugin: pluginId as any,
+      pluginName: discoveredMap.pluginName,
+      category: discoveredMap.category,
+      parameters: discoveredMap.parameters.map((p) => ({
+        juceParamId: p.juceParamId,
+        juceParamIndex: p.juceParamIndex,
+        semantic: p.semantic,
+        physicalUnit: p.physicalUnit,
+        mappingCurve: p.mappingCurve,
+        minValue: p.minValue,
+        maxValue: p.maxValue,
+        defaultValue: p.defaultValue,
+      })),
+      eqBandCount: discoveredMap.eqBandCount,
+      eqBandParameterPattern: discoveredMap.eqBandParameterPattern,
+      compHasAutoMakeup: discoveredMap.compHasAutoMakeup,
+      compHasParallelMix: discoveredMap.compHasParallelMix,
+      compHasLookahead: discoveredMap.compHasLookahead,
+      confidence: discoveredMap.confidence,
+      source: "juce-scanned",
+    });
+
+    return { success: true, action: existing ? "updated" : "created" };
+  } catch (err) {
+    console.error("[ConvexClient] Failed to upload discovered parameter map:", err);
+    return { success: false, error: String(err) };
+  }
+}

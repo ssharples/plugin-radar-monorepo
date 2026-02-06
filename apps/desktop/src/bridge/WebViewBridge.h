@@ -4,6 +4,7 @@
 #include "../core/PluginManager.h"
 #include "../core/ChainProcessor.h"
 #include "../core/PresetManager.h"
+#include "../core/ParameterDiscovery.h"
 #include <atomic>
 
 class WaveformCapture;
@@ -99,6 +100,9 @@ private:
     juce::var calculateGainMatch();
     void setMatchLock(bool enabled);
     bool getMatchLockState() const { return matchLockEnabled.load(std::memory_order_relaxed); }
+
+    // Parameter discovery
+    juce::var discoverPluginParameters(int nodeId);
 
     PluginManager& pluginManager;
     ChainProcessor& chainProcessor;
