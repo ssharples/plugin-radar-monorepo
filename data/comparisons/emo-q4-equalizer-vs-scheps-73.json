@@ -1,0 +1,67 @@
+{
+  "slug": "emo-q4-equalizer-vs-scheps-73",
+  "title": "Scheps 73 vs eMo Q4 Equalizer",
+  "metaDescription": "Compare Scheps 73 by Waves with eMo Q4 Equalizer by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx7a58cxmxe16636xfh81y3vj180g0dn",
+    "name": "Scheps 73",
+    "slug": "scheps-73",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Classic 1073 EQ emulation, created with Andrew Scheps",
+    "price": "$40",
+    "priceRaw": 3999,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/scheps-73.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/scheps-73",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx76st6bp7685smsn0ethkqj5x80gdnw",
+    "name": "eMo Q4 Equalizer",
+    "slug": "emo-q4-equalizer",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "4-band paragraphic EQ optimized for the stage",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/emo-q4-equalizer.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/emo-q4-equalizer",
+    "trendingScore": 161,
+    "mentions7d": 18
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289519
+}

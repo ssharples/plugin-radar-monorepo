@@ -1,0 +1,26 @@
+{
+  "manufacturer": "jh76jmn8bzbpkgnzwxjeks62r580gp5a",
+  "manufacturerSlug": "cableguys",
+  "plugins": [
+    {"name": "ShaperBox 3", "slug": "shaperbox-3", "description": "11 Shaper effects — the ultimate plugin for modern mixes and infinite inspiration", "price": 379, "salePrice": 99, "category": "bundle", "productUrl": "https://www.cableguys.com/shaperbox"},
+    {"name": "Cableguys Bundle", "slug": "cableguys-bundle", "description": "ShaperBox 3 plus Snapback, FilterShaper XL, Curve 2, HalfTime and MidiShaper", "price": 697, "salePrice": 179, "category": "bundle", "productUrl": "https://www.cableguys.com/cableguys-bundle"},
+    {"name": "PitchShaper", "slug": "pitchshaper", "description": "Pitchshifting reimagined. For modern melodies and future FX", "price": 39, "category": "effect", "productUrl": "https://www.cableguys.com/pitchshaper"},
+    {"name": "Snapback", "slug": "snapback", "description": "The instant drum layering effect. For beats that hit different", "price": 49, "category": "effect", "productUrl": "https://www.cableguys.com/snapback"},
+    {"name": "HalfTime", "slug": "halftime", "description": "Enter a world of spaced-out, slowed-down sound with the only plugin 100% dedicated to half-speed effects", "price": 12, "category": "effect", "productUrl": "https://www.cableguys.com/halftime"},
+    {"name": "VolumeShaper", "slug": "volumeshaper", "description": "Shape levels in pinpoint detail with a deeply editable volume LFO across three bands", "price": 29, "category": "effect", "productUrl": "https://www.cableguys.com/volumeshaper"},
+    {"name": "Kickstart 2", "slug": "kickstart-2", "description": "The fastest way to get that signature sidechain ducking sound", "price": 16, "category": "effect", "productUrl": "https://www.kickstart-plugin.com/"},
+    {"name": "TimeShaper", "slug": "timeshaper", "description": "Warp time to create everything from essential ear-candy FX to mental multiband transformations", "price": 29, "category": "effect", "productUrl": "https://www.cableguys.com/timeshaper"},
+    {"name": "FilterShaper XL", "slug": "filtershaper-xl", "description": "A massively modulatable dual filter, takes a giant leap into unconventional sound design", "price": 79, "category": "effect", "productUrl": "https://www.cableguys.com/filtershaper-xl"},
+    {"name": "ReverbShaper", "slug": "reverbshaper", "description": "Unlock the hidden rhythm of reverb with amazing spaces that move, groove and flow along with your music", "price": 39, "category": "reverb", "productUrl": "https://www.cableguys.com/reverbshaper"},
+    {"name": "NoiseShaper", "slug": "noiseshaper", "description": "Get the secret sauce for lo-fi beats and exciting mixes: noise!", "price": 39, "category": "effect", "productUrl": "https://www.cableguys.com/noiseshaper"},
+    {"name": "DriveShaper", "slug": "driveshaper", "description": "The ultimate distortion toolkit. Set 12 algorithms in motion with drawable LFOs and reactive envelopes across 3 bands", "price": 39, "category": "saturator", "productUrl": "https://www.cableguys.com/driveshaper"},
+    {"name": "FilterShaper Core", "slug": "filtershaper-core", "description": "Experience all the richness, warmth and intricacy of a high-quality analogue filter", "price": 39, "category": "effect", "productUrl": "https://www.cableguys.com/filtershaper-core"},
+    {"name": "LiquidShaper", "slug": "liquidshaper", "description": "Wild jet-plane flanging and deep, lush phasing in one multiband Shaper effect", "price": 29, "category": "effect", "productUrl": "https://www.cableguys.com/liquidshaper"},
+    {"name": "CrushShaper", "slug": "crushshaper", "description": "From lo-fi vibes to hi-fi excitement, a multiband, LFO-driven bitcrusher like no other", "price": 39, "category": "effect", "productUrl": "https://www.cableguys.com/crushshaper"},
+    {"name": "PanShaper", "slug": "panshaper", "description": "Take stereo control to a new level with regular and delay-based Haas panning", "price": 29, "category": "utility", "productUrl": "https://www.cableguys.com/panshaper"},
+    {"name": "WidthShaper", "slug": "widthshaper", "description": "Define your stereo image in ultimate detail with multiband mid/side modulation", "price": 29, "category": "utility", "productUrl": "https://www.cableguys.com/widthshaper"},
+    {"name": "Curve 2", "slug": "curve-2", "description": "A software synthesizer with an irresistible waveform editor, huge sound library and slick interface", "price": 129, "category": "synth", "productUrl": "https://www.cableguys.com/curve"},
+    {"name": "MidiShaper", "slug": "midishaper", "description": "Powerful LFOs and envelopes to all your favorite synthesizers and effects", "price": 49, "category": "utility", "productUrl": "https://www.cableguys.com/midishaper"},
+    {"name": "PanCake 2", "slug": "pancake-2", "description": "PanShaper's little sibling allows you to create flexible stereo modulations", "price": 0, "isFree": true, "category": "utility", "productUrl": "https://www.cableguys.com/pancake"}
+  ]
+}

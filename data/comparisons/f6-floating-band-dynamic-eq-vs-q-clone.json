@@ -1,0 +1,67 @@
+{
+  "slug": "f6-floating-band-dynamic-eq-vs-q-clone",
+  "title": "F6 Floating-Band Dynamic EQ vs Q-Clone",
+  "metaDescription": "Compare F6 Floating-Band Dynamic EQ by Waves with Q-Clone by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx736gk88py8ky1k4q2s1nn05x80hvg7",
+    "name": "F6 Floating-Band Dynamic EQ",
+    "slug": "f6-floating-band-dynamic-eq",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Surgical dynamic equalizer with 6 fully adjustable bands",
+    "price": "$40",
+    "priceRaw": 3999,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/f6-floating-band-dynamic-eq.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/f6-floating-band-dynamic-eq",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx70txf7q8e88f5qg4kqe7q9v180hwcv",
+    "name": "Q-Clone",
+    "slug": "q-clone",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Convert any hardware EQ curve into a plugin preset",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/q-clone.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/q-clone",
+    "trendingScore": 182,
+    "mentions7d": 17
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289521
+}

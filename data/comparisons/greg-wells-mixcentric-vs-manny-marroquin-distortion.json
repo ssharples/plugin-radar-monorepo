@@ -1,0 +1,67 @@
+{
+  "slug": "greg-wells-mixcentric-vs-manny-marroquin-distortion",
+  "title": "Greg Wells MixCentric vs Manny Marroquin Distortion",
+  "metaDescription": "Compare Greg Wells MixCentric by Waves with Manny Marroquin Distortion by Waves. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx72nx1s92yk51hfvn7sw3a03580hc2w",
+    "name": "Greg Wells MixCentric",
+    "slug": "greg-wells-mixcentric",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Mix bus finalizer: EQ, compression, saturation combined in one knob",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/greg-wells-mixcentric.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/greg-wells-mixcentric",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7crf5bpytm94mvq3y29rqmed80hvqv",
+    "name": "Manny Marroquin Distortion",
+    "slug": "manny-marroquin-distortion",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Parallel distortion with compression and 4-band EQ",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/manny-marroquin-distortion.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/manny-marroquin-distortion",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289512
+}

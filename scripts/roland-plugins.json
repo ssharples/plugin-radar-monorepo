@@ -1,0 +1,23 @@
+{
+  "manufacturer": "jh72mgfh6b9dtx6279wyfbwfnh80gcaa",
+  "manufacturerSlug": "roland",
+  "plugins": [
+    {"name": "Roland Cloud Complete", "slug": "roland-cloud-complete", "description": "Access to all Roland Cloud instruments and effects - subscription service", "price": 199, "category": "bundle", "productUrl": "https://www.roland.com/global/products/roland_cloud/", "currency": "USD"},
+    {"name": "ZENOLOGY Pro", "slug": "zenology-pro", "description": "Flagship software synthesizer with ZEN-Core sound engine", "price": 299, "category": "synth", "productUrl": "https://www.roland.com/global/products/zenology/", "currency": "USD"},
+    {"name": "JUPITER-8", "slug": "roland-jupiter-8", "description": "Legendary polyphonic synthesizer emulation", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_jupiter-8/", "currency": "USD"},
+    {"name": "JUNO-106", "slug": "roland-juno-106", "description": "Classic analog polyphonic synthesizer emulation", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_juno-106/", "currency": "USD"},
+    {"name": "JD-800", "slug": "roland-jd-800", "description": "Digital synthesizer with hands-on control emulation", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_jd-800/", "currency": "USD"},
+    {"name": "SH-101", "slug": "roland-sh-101", "description": "Monophonic synthesizer - classic basslines and leads", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_sh-101/", "currency": "USD"},
+    {"name": "TB-303", "slug": "roland-tb-303", "description": "The legendary acid bassline machine", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_tb-303/", "currency": "USD"},
+    {"name": "TR-808", "slug": "roland-tr-808", "description": "Legendary rhythm composer drum machine", "price": 149, "category": "instrument", "productUrl": "https://www.roland.com/global/products/rc_tr-808/", "currency": "USD"},
+    {"name": "TR-909", "slug": "roland-tr-909", "description": "Rhythm composer - the foundation of electronic music", "price": 149, "category": "instrument", "productUrl": "https://www.roland.com/global/products/rc_tr-909/", "currency": "USD"},
+    {"name": "D-50", "slug": "roland-d-50", "description": "Linear arithmetic synthesizer emulation", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_d-50/", "currency": "USD"},
+    {"name": "JV-1080", "slug": "roland-jv-1080", "description": "64-voice expandable synthesizer workstation", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_jv-1080/", "currency": "USD"},
+    {"name": "XV-5080", "slug": "roland-xv-5080", "description": "128-voice synthesizer module with SRX-ready expansion", "price": 149, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_xv-5080/", "currency": "USD"},
+    {"name": "SRX ELECTRIC PIANO", "slug": "srx-electric-piano", "description": "Premium electric piano expansion", "price": 99, "category": "instrument", "productUrl": "https://www.roland.com/global/products/rc_srx_electric_piano/", "currency": "USD"},
+    {"name": "SRX STRINGS", "slug": "srx-strings", "description": "Premium orchestral strings expansion", "price": 99, "category": "instrument", "productUrl": "https://www.roland.com/global/products/rc_srx_strings/", "currency": "USD"},
+    {"name": "SRX BRASS", "slug": "srx-brass", "description": "Premium brass section expansion", "price": 99, "category": "instrument", "productUrl": "https://www.roland.com/global/products/rc_srx_brass/", "currency": "USD"},
+    {"name": "FANTOM", "slug": "roland-fantom", "description": "Modern workstation with advanced ZEN-Core synthesis", "price": 199, "category": "synth", "productUrl": "https://www.roland.com/global/products/rc_fantom/", "currency": "USD"},
+    {"name": "VS ANTHOLOGY", "slug": "vs-anthology", "description": "Collection of vintage synth sounds", "price": 149, "category": "bundle", "productUrl": "https://www.roland.com/global/products/rc_vs_anthology/", "currency": "USD"}
+  ]
+}

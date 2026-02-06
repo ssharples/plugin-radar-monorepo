@@ -1,0 +1,28 @@
+{
+  "name": "plugin-radar-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PluginRadar — Audio plugin database, price tracker, and chain manager",
+  "author": "Scott Sharples",
+  "license": "MIT",
+  "scripts": {
+    "dev:convex": "npx convex dev",
+    "deploy": "npx convex deploy",
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build",
+    "dev:desktop-ui": "pnpm --filter desktop-ui dev",
+    "build:desktop-ui": "pnpm --filter desktop-ui build",
+    "install:all": "pnpm install"
+  },
+  "dependencies": {
+    "convex": "^1.31.7"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8"
+  }
+}

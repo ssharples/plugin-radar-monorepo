@@ -1,0 +1,67 @@
+{
+  "slug": "audiotrack-vs-ssl-e-channel",
+  "title": "SSL E-Channel vs AudioTrack",
+  "metaDescription": "Compare SSL E-Channel by Waves with AudioTrack by Waves. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx78n2xznvwq595acbf7dbd38580hfrb",
+    "name": "SSL E-Channel",
+    "slug": "ssl-e-channel",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "The classic SSL console sound: 4-band EQ, compressor/limiter, expander/gate",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/ssl-e-channel.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/ssl-e-channel",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx72g8nrkb5tqmnsc3nge0f94n80gern",
+    "name": "AudioTrack",
+    "slug": "audiotrack",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Channel strip with 4-band EQ, compressor, gate",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/audiotrack.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/audiotrack",
+    "trendingScore": 108,
+    "mentions7d": 8
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289521
+}

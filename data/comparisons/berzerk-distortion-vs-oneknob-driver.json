@@ -1,0 +1,67 @@
+{
+  "slug": "berzerk-distortion-vs-oneknob-driver",
+  "title": "OneKnob Driver vs Berzerk Distortion",
+  "metaDescription": "Compare OneKnob Driver by Waves with Berzerk Distortion by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7a1r9v4g7y356s4qknh92nss80h9fm",
+    "name": "OneKnob Driver",
+    "slug": "oneknob-driver",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Saturate your tracks, from light overdrive to full-on distortion",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/oneknob-driver.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/oneknob-driver",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7f7ejmpbbaj9kneyq3nq5nfs80gy40",
+    "name": "Berzerk Distortion",
+    "slug": "berzerk-distortion",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Intense over-the-top distortion playground",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/berzerk-distortion.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/berzerk-distortion",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "a",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289506
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "bb-tubes-vs-greg-wells-tonecentric",
+  "title": "BB Tubes vs Greg Wells ToneCentric",
+  "metaDescription": "Compare BB Tubes by Waves with Greg Wells ToneCentric by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7f111a5rs17q8ky1hhj0s9v580hbth",
+    "name": "BB Tubes",
+    "slug": "bb-tubes",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Beautiful to Beastly Tube Saturation",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/bb-tubes.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/bb-tubes",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7885x189221zhtn7ce5xzsb980g17w",
+    "name": "Greg Wells ToneCentric",
+    "slug": "greg-wells-tonecentric",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Add rich analog tone with tube-based harmonic enhancement",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/greg-wells-tonecentric.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/greg-wells-tonecentric",
+    "trendingScore": 188,
+    "mentions7d": 18
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289521
+}

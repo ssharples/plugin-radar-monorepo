@@ -1,0 +1,67 @@
+{
+  "slug": "abbey-road-reverb-plates-vs-lofi-space",
+  "title": "Abbey Road Reverb Plates vs Lofi Space",
+  "metaDescription": "Compare Abbey Road Reverb Plates by Waves with Lofi Space by Waves. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx741hbs2sp9g1zvad5f0q6mp180gh6p",
+    "name": "Abbey Road Reverb Plates",
+    "slug": "abbey-road-reverb-plates",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Classic bright reverb with sound that “blooms”",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/abbey-road-reverb-plates.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/abbey-road-reverb-plates",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx770y73q7jf940z7mbenf2q2580hab7",
+    "name": "Lofi Space",
+    "slug": "lofi-space",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Lofi-style reverb and delay plugin",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/lofi-space.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/lofi-space",
+    "trendingScore": 125,
+    "mentions7d": 11
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "a",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289518
+}

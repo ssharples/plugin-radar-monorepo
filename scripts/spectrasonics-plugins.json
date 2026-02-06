@@ -1,0 +1,10 @@
+{
+  "manufacturer": "jh7bwcbdsvqg61s13p3cqkrtvd80hc45",
+  "manufacturerSlug": "spectrasonics",
+  "plugins": [
+    {"name": "Omnisphere 2", "slug": "omnisphere-2", "description": "Flagship power synth - the most versatile synthesizer in the world with massive sound library and synthesis capabilities", "price": 499, "category": "synth", "productUrl": "https://www.spectrasonics.net/products/omnisphere/", "currency": "USD", "formats": ["VST", "AU", "AAX"]},
+    {"name": "Keyscape", "slug": "keyscape", "description": "Premier keyboard instrument collection - acoustic and electric pianos, organs, and keyboard sounds", "price": 399, "category": "instrument", "productUrl": "https://www.spectrasonics.net/products/keyscape/", "currency": "USD", "formats": ["VST", "AU", "AAX"]},
+    {"name": "Trilian", "slug": "trilian", "description": "Total bass module - acoustic, electric, and synth basses with unparalleled expression", "price": 299, "category": "instrument", "productUrl": "https://www.spectrasonics.net/products/trilian/", "currency": "USD", "formats": ["VST", "AU", "AAX"]},
+    {"name": "Stylus RMX", "slug": "stylus-rmx", "description": "Xpanded groove module - breakthrough groove-based virtual instrument with realtime groove control", "price": 299, "category": "sampler", "productUrl": "https://www.spectrasonics.net/products/stylusrmx/", "currency": "USD", "formats": ["VST", "AU", "AAX"]}
+  ]
+}

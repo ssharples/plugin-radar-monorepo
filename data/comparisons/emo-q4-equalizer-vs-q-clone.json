@@ -1,0 +1,67 @@
+{
+  "slug": "emo-q4-equalizer-vs-q-clone",
+  "title": "eMo Q4 Equalizer vs Q-Clone",
+  "metaDescription": "Compare eMo Q4 Equalizer by Waves with Q-Clone by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx76st6bp7685smsn0ethkqj5x80gdnw",
+    "name": "eMo Q4 Equalizer",
+    "slug": "emo-q4-equalizer",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "4-band paragraphic EQ optimized for the stage",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/emo-q4-equalizer.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/emo-q4-equalizer",
+    "trendingScore": 161,
+    "mentions7d": 18
+  },
+  "pluginB": {
+    "id": "jx70txf7q8e88f5qg4kqe7q9v180hwcv",
+    "name": "Q-Clone",
+    "slug": "q-clone",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Convert any hardware EQ curve into a plugin preset",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/q-clone.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/q-clone",
+    "trendingScore": 182,
+    "mentions7d": 17
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289503
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "audiotrack-vs-v-comp",
+  "title": "AudioTrack vs V-Comp",
+  "metaDescription": "Compare AudioTrack by Waves with V-Comp by Waves. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx72g8nrkb5tqmnsc3nge0f94n80gern",
+    "name": "AudioTrack",
+    "slug": "audiotrack",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Channel strip with 4-band EQ, compressor, gate",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/audiotrack.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/audiotrack",
+    "trendingScore": 108,
+    "mentions7d": 8
+  },
+  "pluginB": {
+    "id": "jx750kzmy3zce7mhytjhrc1wpd80g2hb",
+    "name": "V-Comp",
+    "slug": "v-comp",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "2254-type analog-modeled compressor with vintage transformer sound",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/v-comp-v2.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/v-comp",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289505
+}

@@ -1,0 +1,768 @@
+import { v } from "convex/values";
+import { mutation, query, action } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+
+// ============================================
+// PLUGIN SYNC FROM PLUGIN-DIRECTORY APP
+// ============================================
+
+/**
+ * Sync scanned plugins from the JUCE plugin-directory app
+ * Called after a scan completes with all discovered plugins
+ */
+export const syncScannedPlugins = mutation({
+  args: {
+    userId: v.id("users"),
+    plugins: v.array(v.object({
+      name: v.string(),
+      manufacturer: v.string(),
+      format: v.string(),
+      uid: v.number(),
+      fileOrIdentifier: v.string(),
+      isInstrument: v.boolean(),
+      numInputChannels: v.number(),
+      numOutputChannels: v.number(),
+      version: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const results = {
+      synced: 0,
+      created: 0,
+      updated: 0,
+      matched: 0,
+    };
+
+    for (const plugin of args.plugins) {
+      // Check if we already have this plugin for this user (by UID)
+      const existing = await ctx.db
+        .query("scannedPlugins")
+        .withIndex("by_user_uid", (q) => 
+          q.eq("user", args.userId).eq("uid", plugin.uid)
+        )
+        .first();
+
+      if (existing) {
+        // Update lastSeenAt
+        await ctx.db.patch(existing._id, {
+          lastSeenAt: now,
+          version: plugin.version,
+        });
+        results.updated++;
+      } else {
+        // Try to match to our database
+        const match = await matchPlugin(ctx, plugin.name, plugin.manufacturer);
+
+        // Create new scanned plugin record
+        await ctx.db.insert("scannedPlugins", {
+          user: args.userId,
+          name: plugin.name,
+          manufacturer: plugin.manufacturer,
+          format: plugin.format,
+          uid: plugin.uid,
+          fileOrIdentifier: plugin.fileOrIdentifier,
+          isInstrument: plugin.isInstrument,
+          numInputChannels: plugin.numInputChannels,
+          numOutputChannels: plugin.numOutputChannels,
+          version: plugin.version,
+          matchedPlugin: match?.pluginId,
+          matchConfidence: match?.confidence,
+          matchMethod: match?.method,
+          firstSeenAt: now,
+          lastSeenAt: now,
+        });
+        results.created++;
+
+        if (match) {
+          results.matched++;
+          
+          // Also add to ownedPlugins if matched and not already there
+          if (match.pluginId) {
+            const alreadyOwned = await ctx.db
+              .query("ownedPlugins")
+              .withIndex("by_user_plugin", (q) =>
+                q.eq("user", args.userId).eq("plugin", match.pluginId!)
+              )
+              .first();
+            
+            if (!alreadyOwned) {
+              await ctx.db.insert("ownedPlugins", {
+                user: args.userId,
+                plugin: match.pluginId,
+                addedAt: now,
+              });
+            }
+          }
+        }
+      }
+      results.synced++;
+    }
+
+    return results;
+  },
+});
+
+/**
+ * Match a plugin name/manufacturer to our database
+ */
+async function matchPlugin(
+  ctx: any,
+  name: string,
+  manufacturer: string
+): Promise<{ pluginId: Id<"plugins">; confidence: number; method: string } | null> {
+  
+  // Normalize for matching
+  const normName = normalizeName(name);
+  const normManufacturer = normalizeName(manufacturer);
+
+  // 1. Try exact search first
+  const exactResults = await ctx.db
+    .query("plugins")
+    .withSearchIndex("search_name", (q: any) => q.search("name", name))
+    .take(10);
+
+  for (const plugin of exactResults) {
+    const pluginManufacturer = await ctx.db.get(plugin.manufacturer);
+    if (!pluginManufacturer) continue;
+
+    // Exact match
+    if (
+      plugin.name.toLowerCase() === name.toLowerCase() &&
+      pluginManufacturer.name.toLowerCase() === manufacturer.toLowerCase()
+    ) {
+      return { pluginId: plugin._id, confidence: 100, method: "exact" };
+    }
+
+    // Normalized match (handles "Pro-Q 3" vs "Pro Q 3")
+    if (
+      normalizeName(plugin.name) === normName &&
+      normalizeName(pluginManufacturer.name) === normManufacturer
+    ) {
+      return { pluginId: plugin._id, confidence: 95, method: "normalized" };
+    }
+  }
+
+  // 2. Try fuzzy matching with manufacturer filter
+  const manufacturerDoc = await ctx.db
+    .query("manufacturers")
+    .withSearchIndex("search_name", (q: any) => q.search("name", manufacturer))
+    .first();
+
+  if (manufacturerDoc) {
+    // Get all plugins from this manufacturer
+    const manufacturerPlugins = await ctx.db
+      .query("plugins")
+      .withIndex("by_manufacturer", (q: any) => q.eq("manufacturer", manufacturerDoc._id))
+      .collect();
+
+    for (const plugin of manufacturerPlugins) {
+      const similarity = calculateSimilarity(normName, normalizeName(plugin.name));
+      if (similarity >= 0.8) {
+        return { 
+          pluginId: plugin._id, 
+          confidence: Math.round(similarity * 100), 
+          method: "fuzzy" 
+        };
+      }
+    }
+  }
+
+  // 3. Broad fuzzy search (slower, last resort)
+  const allResults = await ctx.db
+    .query("plugins")
+    .withSearchIndex("search_name", (q: any) => q.search("name", name.split(" ")[0]))
+    .take(20);
+
+  for (const plugin of allResults) {
+    const pluginManufacturer = await ctx.db.get(plugin.manufacturer);
+    if (!pluginManufacturer) continue;
+
+    const nameSimilarity = calculateSimilarity(normName, normalizeName(plugin.name));
+    const mfgSimilarity = calculateSimilarity(normManufacturer, normalizeName(pluginManufacturer.name));
+    
+    // Both name and manufacturer should be somewhat similar
+    if (nameSimilarity >= 0.7 && mfgSimilarity >= 0.6) {
+      const combined = (nameSimilarity * 0.7 + mfgSimilarity * 0.3);
+      return { 
+        pluginId: plugin._id, 
+        confidence: Math.round(combined * 100), 
+        method: "fuzzy" 
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Normalize plugin name for matching
+ */
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")  // Remove special chars
+    .replace(/\d+$/, "");        // Remove trailing version numbers
+}
+
+/**
+ * Calculate Levenshtein similarity (0-1)
+ */
+function calculateSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.length === 0 || b.length === 0) return 0;
+
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  const distance = matrix[b.length][a.length];
+  const maxLen = Math.max(a.length, b.length);
+  return 1 - distance / maxLen;
+}
+
+// ============================================
+// QUERIES FOR PLUGIN-DIRECTORY APP
+// ============================================
+
+/**
+ * Get user's scanned plugins with match status
+ */
+export const getUserScannedPlugins = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const scanned = await ctx.db
+      .query("scannedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .collect();
+
+    // Enrich with matched plugin data
+    const enriched = await Promise.all(
+      scanned.map(async (sp) => {
+        let matchedPluginData = null;
+        if (sp.matchedPlugin) {
+          const plugin = await ctx.db.get(sp.matchedPlugin);
+          if (plugin) {
+            const manufacturer = await ctx.db.get(plugin.manufacturer);
+            matchedPluginData = {
+              id: plugin._id,
+              name: plugin.name,
+              slug: plugin.slug,
+              manufacturer: manufacturer?.name,
+              imageUrl: plugin.imageUrl,
+              currentPrice: plugin.currentPrice,
+              isFree: plugin.isFree,
+            };
+          }
+        }
+        return {
+          ...sp,
+          matchedPluginData,
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
+
+/**
+ * Get unmatched plugins for a user (for manual matching UI)
+ */
+export const getUnmatchedPlugins = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("scannedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .filter((q) => q.eq(q.field("matchedPlugin"), undefined))
+      .collect();
+  },
+});
+
+/**
+ * Manually match a scanned plugin to a PluginRadar plugin
+ */
+export const manualMatchPlugin = mutation({
+  args: {
+    scannedPluginId: v.id("scannedPlugins"),
+    pluginId: v.id("plugins"),
+  },
+  handler: async (ctx, args) => {
+    const scanned = await ctx.db.get(args.scannedPluginId);
+    if (!scanned) throw new Error("Scanned plugin not found");
+
+    await ctx.db.patch(args.scannedPluginId, {
+      matchedPlugin: args.pluginId,
+      matchConfidence: 100,
+      matchMethod: "manual",
+    });
+
+    // Also add to ownedPlugins
+    if (scanned.user) {
+      const alreadyOwned = await ctx.db
+        .query("ownedPlugins")
+        .withIndex("by_user_plugin", (q) =>
+          q.eq("user", scanned.user!).eq("plugin", args.pluginId)
+        )
+        .first();
+
+      if (!alreadyOwned) {
+        await ctx.db.insert("ownedPlugins", {
+          user: scanned.user,
+          plugin: args.pluginId,
+          addedAt: Date.now(),
+        });
+      }
+    }
+
+    return { success: true };
+  },
+});
+
+// ============================================
+// CHAIN MANAGEMENT
+// ============================================
+
+/**
+ * Save a plugin chain
+ */
+export const saveChain = mutation({
+  args: {
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    category: v.string(),
+    tags: v.array(v.string()),
+    genre: v.optional(v.string()),
+    useCase: v.optional(v.string()),
+    slots: v.array(v.object({
+      position: v.number(),
+      pluginName: v.string(),
+      manufacturer: v.string(),
+      format: v.optional(v.string()),
+      uid: v.optional(v.number()),
+      version: v.optional(v.string()),
+      presetName: v.optional(v.string()),
+      presetData: v.optional(v.string()),
+      presetSizeBytes: v.optional(v.number()),
+      bypassed: v.boolean(),
+      notes: v.optional(v.string()),
+    })),
+    isPublic: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    
+    // Generate slug
+    const baseSlug = args.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+    
+    // Check for existing slug and make unique
+    let slug = baseSlug;
+    let counter = 1;
+    while (await ctx.db.query("pluginChains").withIndex("by_slug", (q) => q.eq("slug", slug)).first()) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    // Try to match each slot's plugin
+    const enrichedSlots = await Promise.all(
+      args.slots.map(async (slot) => {
+        const match = await matchPlugin(ctx, slot.pluginName, slot.manufacturer);
+        return {
+          ...slot,
+          matchedPlugin: match?.pluginId,
+        };
+      })
+    );
+
+    // Generate share code
+    const shareCode = generateShareCode();
+
+    const chainId = await ctx.db.insert("pluginChains", {
+      user: args.userId,
+      name: args.name,
+      slug,
+      description: args.description,
+      category: args.category,
+      tags: args.tags,
+      genre: args.genre,
+      useCase: args.useCase,
+      slots: enrichedSlots,
+      pluginCount: enrichedSlots.length,
+      views: 0,
+      downloads: 0,
+      likes: 0,
+      isPublic: args.isPublic,
+      shareCode,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { chainId, slug, shareCode };
+  },
+});
+
+function generateShareCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I, O, 0, 1 for clarity
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+/**
+ * Get a chain by slug (public) or share code (private)
+ */
+export const getChain = query({
+  args: {
+    slug: v.optional(v.string()),
+    shareCode: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let chain;
+    
+    if (args.slug) {
+      chain = await ctx.db
+        .query("pluginChains")
+        .withIndex("by_slug", (q) => q.eq("slug", args.slug!))
+        .first();
+    } else if (args.shareCode) {
+      chain = await ctx.db
+        .query("pluginChains")
+        .withIndex("by_share_code", (q) => q.eq("shareCode", args.shareCode!))
+        .first();
+    }
+
+    if (!chain) return null;
+
+    // Get author info
+    const author = await ctx.db.get(chain.user);
+
+    // Enrich slots with plugin data
+    const enrichedSlots = await Promise.all(
+      chain.slots.map(async (slot) => {
+        let pluginData = null;
+        if (slot.matchedPlugin) {
+          const plugin = await ctx.db.get(slot.matchedPlugin);
+          if (plugin) {
+            const manufacturer = await ctx.db.get(plugin.manufacturer);
+            pluginData = {
+              id: plugin._id,
+              name: plugin.name,
+              slug: plugin.slug,
+              manufacturer: manufacturer?.name,
+              imageUrl: plugin.imageUrl,
+              currentPrice: plugin.currentPrice,
+              isFree: plugin.isFree,
+              productUrl: plugin.productUrl,
+            };
+          }
+        }
+        return { ...slot, pluginData };
+      })
+    );
+
+    return {
+      ...chain,
+      slots: enrichedSlots,
+      author: author ? { name: author.name, avatarUrl: author.avatarUrl } : null,
+    };
+  },
+});
+
+/**
+ * Check if user can load a chain (has all plugins)
+ */
+export const checkChainCompatibility = query({
+  args: {
+    chainId: v.id("pluginChains"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const chain = await ctx.db.get(args.chainId);
+    if (!chain) throw new Error("Chain not found");
+
+    // Get user's owned plugins
+    const owned = await ctx.db
+      .query("ownedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .collect();
+    
+    const ownedPluginIds = new Set(owned.map((o) => o.plugin.toString()));
+
+    // Check each slot
+    const slotStatus = chain.slots.map((slot) => ({
+      position: slot.position,
+      pluginName: slot.pluginName,
+      manufacturer: slot.manufacturer,
+      matchedPlugin: slot.matchedPlugin,
+      owned: slot.matchedPlugin ? ownedPluginIds.has(slot.matchedPlugin.toString()) : false,
+    }));
+
+    const ownedCount = slotStatus.filter((s) => s.owned).length;
+    const missingCount = chain.pluginCount - ownedCount;
+
+    return {
+      canFullyLoad: missingCount === 0,
+      ownedCount,
+      missingCount,
+      totalCount: chain.pluginCount,
+      percentage: Math.round((ownedCount / chain.pluginCount) * 100),
+      slots: slotStatus,
+    };
+  },
+});
+
+/**
+ * Browse public chains
+ */
+export const browseChains = query({
+  args: {
+    category: v.optional(v.string()),
+    sortBy: v.optional(v.string()), // "popular", "recent", "downloads", "rating"
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 20;
+
+    let chains;
+    if (args.category) {
+      chains = await ctx.db
+        .query("pluginChains")
+        .withIndex("by_category", (q) => q.eq("category", args.category!))
+        .filter((q) => q.eq(q.field("isPublic"), true))
+        .take(limit * 2);  // Get extra for sorting
+    } else {
+      chains = await ctx.db
+        .query("pluginChains")
+        .withIndex("by_public", (q) => q.eq("isPublic", true))
+        .take(limit * 2);
+    }
+
+    // Sort
+    if (args.sortBy === "rating") {
+      // Compute average ratings for each chain
+      const chainsWithRating = await Promise.all(
+        chains.map(async (chain) => {
+          const ratings = await ctx.db
+            .query("chainRatings")
+            .withIndex("by_chain_user", (q) => q.eq("chainId", chain._id))
+            .collect();
+          const avg =
+            ratings.length > 0
+              ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+              : 0;
+          return { chain, avgRating: avg, ratingCount: ratings.length };
+        })
+      );
+      chainsWithRating.sort((a, b) => b.avgRating - a.avgRating || b.ratingCount - a.ratingCount);
+      chains = chainsWithRating.map((c) => c.chain);
+    } else if (args.sortBy === "downloads") {
+      chains.sort((a, b) => b.downloads - a.downloads);
+    } else if (args.sortBy === "popular") {
+      chains.sort((a, b) => b.likes - a.likes);
+    } else {
+      chains.sort((a, b) => b.createdAt - a.createdAt);
+    }
+
+    // Get author info for each chain
+    const enriched = await Promise.all(
+      chains.slice(0, limit).map(async (chain) => {
+        const author = await ctx.db.get(chain.user);
+        return {
+          ...chain,
+          author: author ? { name: author.name, avatarUrl: author.avatarUrl } : null,
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
+
+/**
+ * Record a chain download
+ */
+export const downloadChain = mutation({
+  args: {
+    chainId: v.id("pluginChains"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const chain = await ctx.db.get(args.chainId);
+    if (!chain) throw new Error("Chain not found");
+
+    // Check compatibility
+    const owned = await ctx.db
+      .query("ownedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .collect();
+    
+    const ownedPluginIds = new Set(owned.map((o) => o.plugin.toString()));
+    const ownedCount = chain.slots.filter(
+      (s) => s.matchedPlugin && ownedPluginIds.has(s.matchedPlugin.toString())
+    ).length;
+
+    // Record download
+    await ctx.db.insert("chainDownloads", {
+      chain: args.chainId,
+      user: args.userId,
+      ownedPluginCount: ownedCount,
+      missingPluginCount: chain.pluginCount - ownedCount,
+      createdAt: Date.now(),
+    });
+
+    // Increment download count
+    await ctx.db.patch(args.chainId, {
+      downloads: chain.downloads + 1,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Like/unlike a chain
+ */
+export const toggleChainLike = mutation({
+  args: {
+    chainId: v.id("pluginChains"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const chain = await ctx.db.get(args.chainId);
+    if (!chain) throw new Error("Chain not found");
+
+    const existingLike = await ctx.db
+      .query("chainLikes")
+      .withIndex("by_user_chain", (q) => 
+        q.eq("user", args.userId).eq("chain", args.chainId)
+      )
+      .first();
+
+    if (existingLike) {
+      // Unlike
+      await ctx.db.delete(existingLike._id);
+      await ctx.db.patch(args.chainId, {
+        likes: Math.max(0, chain.likes - 1),
+      });
+      return { liked: false };
+    } else {
+      // Like
+      await ctx.db.insert("chainLikes", {
+        chain: args.chainId,
+        user: args.userId,
+        createdAt: Date.now(),
+      });
+      await ctx.db.patch(args.chainId, {
+        likes: chain.likes + 1,
+      });
+      return { liked: true };
+    }
+  },
+});
+
+// ============================================
+// USER PROFILE QUERIES
+// ============================================
+
+/**
+ * Get chains by a specific user.
+ * If sessionToken is provided and matches the userId, returns all chains.
+ * Otherwise, returns only public chains.
+ */
+export const getChainsByUser = query({
+  args: {
+    userId: v.id("users"),
+    sessionToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const chains = await ctx.db
+      .query("pluginChains")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .collect();
+
+    // Determine if the requester is the chain owner
+    let isOwner = false;
+    if (args.sessionToken) {
+      const session = await ctx.db
+        .query("sessions")
+        .withIndex("by_token", (q) => q.eq("token", args.sessionToken!))
+        .first();
+      if (session && session.expiresAt >= Date.now() && session.userId === args.userId) {
+        isOwner = true;
+      }
+    }
+
+    // Filter to public only if not the owner
+    const filtered = isOwner ? chains : chains.filter((c) => c.isPublic);
+
+    // Sort by most recent
+    filtered.sort((a, b) => b.createdAt - a.createdAt);
+
+    // Enrich with author info
+    const user = await ctx.db.get(args.userId);
+    return filtered.map((chain) => ({
+      ...chain,
+      author: user ? { name: user.name, avatarUrl: user.avatarUrl } : null,
+    }));
+  },
+});
+
+/**
+ * Get aggregated stats for a user profile
+ */
+export const getUserStats = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Count public chains
+    const chains = await ctx.db
+      .query("pluginChains")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .filter((q) => q.eq(q.field("isPublic"), true))
+      .collect();
+
+    const chainCount = chains.length;
+    const totalLikes = chains.reduce((sum, c) => sum + c.likes, 0);
+    const totalDownloads = chains.reduce((sum, c) => sum + c.downloads, 0);
+
+    // Count followers
+    const followers = await ctx.db
+      .query("userFollows")
+      .withIndex("by_followed", (q) => q.eq("followedId", args.userId))
+      .collect();
+
+    return {
+      chainCount,
+      totalLikes,
+      totalDownloads,
+      followerCount: followers.length,
+    };
+  },
+});

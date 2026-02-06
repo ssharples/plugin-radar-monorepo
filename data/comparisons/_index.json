@@ -1,0 +1,1402 @@
+[
+  {
+    "slug": "eddie-kramer-effects-channel-vs-lofi-space",
+    "title": "Eddie Kramer Effects Channel vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "eddie-kramer-effects-channel",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-ir-l-convolution-reverb",
+    "title": "Eddie Kramer Effects Channel vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "eddie-kramer-effects-channel",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-oneknob-wetter",
+    "title": "Eddie Kramer Effects Channel vs OneKnob Wetter",
+    "category": "reverb",
+    "pluginA": "eddie-kramer-effects-channel",
+    "pluginB": "oneknob-wetter"
+  },
+  {
+    "slug": "greg-wells-tonecentric-vs-multimod-rack",
+    "title": "MultiMod Rack vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "multimod-rack",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "multimod-rack-vs-oneknob-driver",
+    "title": "MultiMod Rack vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "multimod-rack",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "berzerk-distortion-vs-multimod-rack",
+    "title": "MultiMod Rack vs Berzerk Distortion",
+    "category": "saturator",
+    "pluginA": "multimod-rack",
+    "pluginB": "berzerk-distortion"
+  },
+  {
+    "slug": "enigma-vs-supertap",
+    "title": "SuperTap vs Enigma",
+    "category": "delay",
+    "pluginA": "supertap",
+    "pluginB": "enigma"
+  },
+  {
+    "slug": "manny-marroquin-delay-vs-supertap",
+    "title": "SuperTap vs Manny Marroquin Delay",
+    "category": "delay",
+    "pluginA": "supertap",
+    "pluginB": "manny-marroquin-delay"
+  },
+  {
+    "slug": "h-delay-hybrid-delay-vs-supertap",
+    "title": "SuperTap vs H-Delay Hybrid Delay",
+    "category": "delay",
+    "pluginA": "supertap",
+    "pluginB": "h-delay-hybrid-delay"
+  },
+  {
+    "slug": "emo-generator-vs-flow-motion-fm-synth",
+    "title": "eMo Generator vs Flow Motion FM Synth",
+    "category": "synth",
+    "pluginA": "emo-generator",
+    "pluginB": "flow-motion-fm-synth"
+  },
+  {
+    "slug": "emo-generator-vs-jjp-bass",
+    "title": "eMo Generator vs JJP Bass",
+    "category": "synth",
+    "pluginA": "emo-generator",
+    "pluginB": "jjp-bass"
+  },
+  {
+    "slug": "element-2-0-virtual-analog-synth-vs-emo-generator",
+    "title": "eMo Generator vs Element 2.0 Virtual Analog Synth",
+    "category": "synth",
+    "pluginA": "emo-generator",
+    "pluginB": "element-2-0-virtual-analog-synth"
+  },
+  {
+    "slug": "spherix-immersive-compressor-limiter-vs-standard-audio-level-or",
+    "title": "Spherix Immersive Compressor & Limiter vs Standard Audio Level-Or",
+    "category": "compressor",
+    "pluginA": "spherix-immersive-compressor-limiter",
+    "pluginB": "standard-audio-level-or"
+  },
+  {
+    "slug": "shadow-hills-mastering-compressor-vs-spherix-immersive-compressor-limiter",
+    "title": "Spherix Immersive Compressor & Limiter vs Shadow Hills Mastering Compressor",
+    "category": "compressor",
+    "pluginA": "spherix-immersive-compressor-limiter",
+    "pluginB": "shadow-hills-mastering-compressor"
+  },
+  {
+    "slug": "lindell-354e-vs-spherix-immersive-compressor-limiter",
+    "title": "Spherix Immersive Compressor & Limiter vs Lindell Audio 354E",
+    "category": "compressor",
+    "pluginA": "spherix-immersive-compressor-limiter",
+    "pluginB": "lindell-354e"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-v-eq3",
+    "title": "V-EQ3 vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "v-eq3",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "q-clone-vs-v-eq3",
+    "title": "V-EQ3 vs Q-Clone",
+    "category": "eq",
+    "pluginA": "v-eq3",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "manny-marroquin-eq-vs-v-eq3",
+    "title": "V-EQ3 vs Manny Marroquin EQ",
+    "category": "eq",
+    "pluginA": "v-eq3",
+    "pluginB": "manny-marroquin-eq"
+  },
+  {
+    "slug": "greg-wells-tonecentric-vs-oneknob-driver",
+    "title": "Greg Wells ToneCentric vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "greg-wells-tonecentric",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "berzerk-distortion-vs-greg-wells-tonecentric",
+    "title": "Greg Wells ToneCentric vs Berzerk Distortion",
+    "category": "saturator",
+    "pluginA": "greg-wells-tonecentric",
+    "pluginB": "berzerk-distortion"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-lofi-space",
+    "title": "Lofi Space vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "lofi-space",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "lofi-space-vs-oneknob-wetter",
+    "title": "Lofi Space vs OneKnob Wetter",
+    "category": "reverb",
+    "pluginA": "lofi-space",
+    "pluginB": "oneknob-wetter"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-oneknob-wetter",
+    "title": "IR-L Convolution Reverb vs OneKnob Wetter",
+    "category": "reverb",
+    "pluginA": "ir-l-convolution-reverb",
+    "pluginB": "oneknob-wetter"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-q-clone",
+    "title": "eMo Q4 Equalizer vs Q-Clone",
+    "category": "eq",
+    "pluginA": "emo-q4-equalizer",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-manny-marroquin-eq",
+    "title": "eMo Q4 Equalizer vs Manny Marroquin EQ",
+    "category": "eq",
+    "pluginA": "emo-q4-equalizer",
+    "pluginB": "manny-marroquin-eq"
+  },
+  {
+    "slug": "audiotrack-vs-v-comp",
+    "title": "AudioTrack vs V-Comp",
+    "category": "compressor",
+    "pluginA": "audiotrack",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "audiotrack-vs-manny-marroquin-distortion",
+    "title": "AudioTrack vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "audiotrack",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "audiotrack-vs-bss-dpr-402",
+    "title": "AudioTrack vs BSS DPR-402",
+    "category": "compressor",
+    "pluginA": "audiotrack",
+    "pluginB": "bss-dpr-402"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-ir360-convolution-reverb",
+    "title": "IR360 Convolution Reverb vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "ir360-convolution-reverb",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "ir360-convolution-reverb-vs-lofi-space",
+    "title": "IR360 Convolution Reverb vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "ir360-convolution-reverb",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-ir360-convolution-reverb",
+    "title": "IR360 Convolution Reverb vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "ir360-convolution-reverb",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "manny-marroquin-eq-vs-q-clone",
+    "title": "Q-Clone vs Manny Marroquin EQ",
+    "category": "eq",
+    "pluginA": "q-clone",
+    "pluginB": "manny-marroquin-eq"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-v-comp",
+    "title": "V-Comp vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "v-comp",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "bss-dpr-402-vs-v-comp",
+    "title": "V-Comp vs BSS DPR-402",
+    "category": "compressor",
+    "pluginA": "v-comp",
+    "pluginB": "bss-dpr-402"
+  },
+  {
+    "slug": "enigma-vs-manny-marroquin-delay",
+    "title": "Enigma vs Manny Marroquin Delay",
+    "category": "delay",
+    "pluginA": "enigma",
+    "pluginB": "manny-marroquin-delay"
+  },
+  {
+    "slug": "enigma-vs-h-delay-hybrid-delay",
+    "title": "Enigma vs H-Delay Hybrid Delay",
+    "category": "delay",
+    "pluginA": "enigma",
+    "pluginB": "h-delay-hybrid-delay"
+  },
+  {
+    "slug": "berzerk-distortion-vs-oneknob-driver",
+    "title": "OneKnob Driver vs Berzerk Distortion",
+    "category": "saturator",
+    "pluginA": "oneknob-driver",
+    "pluginB": "berzerk-distortion"
+  },
+  {
+    "slug": "bss-dpr-402-vs-manny-marroquin-distortion",
+    "title": "Manny Marroquin Distortion vs BSS DPR-402",
+    "category": "compressor",
+    "pluginA": "manny-marroquin-distortion",
+    "pluginB": "bss-dpr-402"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-ir-live-convolution-reverb",
+    "title": "IR-Live Convolution Reverb vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "ir-live-convolution-reverb",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "ir-live-convolution-reverb-vs-lofi-space",
+    "title": "IR-Live Convolution Reverb vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "ir-live-convolution-reverb",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-ir-live-convolution-reverb",
+    "title": "IR-Live Convolution Reverb vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "ir-live-convolution-reverb",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "flow-motion-fm-synth-vs-jjp-bass",
+    "title": "Flow Motion FM Synth vs JJP Bass",
+    "category": "synth",
+    "pluginA": "flow-motion-fm-synth",
+    "pluginB": "jjp-bass"
+  },
+  {
+    "slug": "element-2-0-virtual-analog-synth-vs-flow-motion-fm-synth",
+    "title": "Flow Motion FM Synth vs Element 2.0 Virtual Analog Synth",
+    "category": "synth",
+    "pluginA": "flow-motion-fm-synth",
+    "pluginB": "element-2-0-virtual-analog-synth"
+  },
+  {
+    "slug": "element-2-0-virtual-analog-synth-vs-jjp-bass",
+    "title": "JJP Bass vs Element 2.0 Virtual Analog Synth",
+    "category": "synth",
+    "pluginA": "jjp-bass",
+    "pluginB": "element-2-0-virtual-analog-synth"
+  },
+  {
+    "slug": "abbey-road-rs56-passive-eq-vs-v-eq3",
+    "title": "Abbey Road RS56 Passive EQ vs V-EQ3",
+    "category": "eq",
+    "pluginA": "abbey-road-rs56-passive-eq",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "abbey-road-rs56-passive-eq-vs-emo-q4-equalizer",
+    "title": "Abbey Road RS56 Passive EQ vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "abbey-road-rs56-passive-eq",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "abbey-road-rs56-passive-eq-vs-q-clone",
+    "title": "Abbey Road RS56 Passive EQ vs Q-Clone",
+    "category": "eq",
+    "pluginA": "abbey-road-rs56-passive-eq",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "linear-phase-eq-vs-v-eq3",
+    "title": "Linear Phase EQ vs V-EQ3",
+    "category": "eq",
+    "pluginA": "linear-phase-eq",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-linear-phase-eq",
+    "title": "Linear Phase EQ vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "linear-phase-eq",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "linear-phase-eq-vs-q-clone",
+    "title": "Linear Phase EQ vs Q-Clone",
+    "category": "eq",
+    "pluginA": "linear-phase-eq",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "h-delay-hybrid-delay-vs-manny-marroquin-delay",
+    "title": "Manny Marroquin Delay vs H-Delay Hybrid Delay",
+    "category": "delay",
+    "pluginA": "manny-marroquin-delay",
+    "pluginB": "h-delay-hybrid-delay"
+  },
+  {
+    "slug": "mdmx-distortion-modules-vs-multimod-rack",
+    "title": "MDMX Distortion Modules vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "mdmx-distortion-modules",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "greg-wells-tonecentric-vs-mdmx-distortion-modules",
+    "title": "MDMX Distortion Modules vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "mdmx-distortion-modules",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "mdmx-distortion-modules-vs-oneknob-driver",
+    "title": "MDMX Distortion Modules vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "mdmx-distortion-modules",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "renaissance-channel-vs-v-eq3",
+    "title": "Renaissance Channel vs V-EQ3",
+    "category": "eq",
+    "pluginA": "renaissance-channel",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-renaissance-channel",
+    "title": "Renaissance Channel vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "renaissance-channel",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "q-clone-vs-renaissance-channel",
+    "title": "Renaissance Channel vs Q-Clone",
+    "category": "eq",
+    "pluginA": "renaissance-channel",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-ir1-convolution-reverb",
+    "title": "IR1 Convolution Reverb vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "ir1-convolution-reverb",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "ir1-convolution-reverb-vs-lofi-space",
+    "title": "IR1 Convolution Reverb vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "ir1-convolution-reverb",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-ir1-convolution-reverb",
+    "title": "IR1 Convolution Reverb vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "ir1-convolution-reverb",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "audiotrack-vs-h-comp-hybrid-compressor",
+    "title": "H-Comp Hybrid Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "h-comp-hybrid-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "h-comp-hybrid-compressor-vs-v-comp",
+    "title": "H-Comp Hybrid Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "h-comp-hybrid-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "h-comp-hybrid-compressor-vs-manny-marroquin-distortion",
+    "title": "H-Comp Hybrid Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "h-comp-hybrid-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "codex-wavetable-synth-vs-emo-generator",
+    "title": "Codex Wavetable Synth vs eMo Generator",
+    "category": "synth",
+    "pluginA": "codex-wavetable-synth",
+    "pluginB": "emo-generator"
+  },
+  {
+    "slug": "codex-wavetable-synth-vs-flow-motion-fm-synth",
+    "title": "Codex Wavetable Synth vs Flow Motion FM Synth",
+    "category": "synth",
+    "pluginA": "codex-wavetable-synth",
+    "pluginB": "flow-motion-fm-synth"
+  },
+  {
+    "slug": "codex-wavetable-synth-vs-jjp-bass",
+    "title": "Codex Wavetable Synth vs JJP Bass",
+    "category": "synth",
+    "pluginA": "codex-wavetable-synth",
+    "pluginB": "jjp-bass"
+  },
+  {
+    "slug": "h-eq-hybrid-equalizer-vs-v-eq3",
+    "title": "H-EQ Hybrid Equalizer vs V-EQ3",
+    "category": "eq",
+    "pluginA": "h-eq-hybrid-equalizer",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-h-eq-hybrid-equalizer",
+    "title": "H-EQ Hybrid Equalizer vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "h-eq-hybrid-equalizer",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "h-eq-hybrid-equalizer-vs-q-clone",
+    "title": "H-EQ Hybrid Equalizer vs Q-Clone",
+    "category": "eq",
+    "pluginA": "h-eq-hybrid-equalizer",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "audiotrack-vs-kramer-pie-compressor",
+    "title": "Kramer PIE Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "kramer-pie-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "kramer-pie-compressor-vs-v-comp",
+    "title": "Kramer PIE Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "kramer-pie-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "kramer-pie-compressor-vs-manny-marroquin-distortion",
+    "title": "Kramer PIE Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "kramer-pie-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "audiotrack-vs-greg-wells-mixcentric",
+    "title": "Greg Wells MixCentric vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "greg-wells-mixcentric",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "greg-wells-mixcentric-vs-v-comp",
+    "title": "Greg Wells MixCentric vs V-Comp",
+    "category": "compressor",
+    "pluginA": "greg-wells-mixcentric",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "greg-wells-mixcentric-vs-manny-marroquin-distortion",
+    "title": "Greg Wells MixCentric vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "greg-wells-mixcentric",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-manny-marroquin-reverb",
+    "title": "Manny Marroquin Reverb vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "manny-marroquin-reverb",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "lofi-space-vs-manny-marroquin-reverb",
+    "title": "Manny Marroquin Reverb vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "manny-marroquin-reverb",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-manny-marroquin-reverb",
+    "title": "Manny Marroquin Reverb vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "manny-marroquin-reverb",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "q10-equalizer-vs-v-eq3",
+    "title": "Q10 Equalizer vs V-EQ3",
+    "category": "eq",
+    "pluginA": "q10-equalizer",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-q10-equalizer",
+    "title": "Q10 Equalizer vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "q10-equalizer",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "q-clone-vs-q10-equalizer",
+    "title": "Q10 Equalizer vs Q-Clone",
+    "category": "eq",
+    "pluginA": "q10-equalizer",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "audiotrack-vs-linear-phase-multiband-compressor",
+    "title": "Linear Phase Multiband Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "linear-phase-multiband-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "linear-phase-multiband-compressor-vs-v-comp",
+    "title": "Linear Phase Multiband Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "linear-phase-multiband-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "linear-phase-multiband-compressor-vs-manny-marroquin-distortion",
+    "title": "Linear Phase Multiband Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "linear-phase-multiband-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "metaflanger-vs-multimod-rack",
+    "title": "MetaFlanger vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "metaflanger",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "greg-wells-tonecentric-vs-metaflanger",
+    "title": "MetaFlanger vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "metaflanger",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "metaflanger-vs-oneknob-driver",
+    "title": "MetaFlanger vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "metaflanger",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "audiotrack-vs-c1-compressor",
+    "title": "C1 Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "c1-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "c1-compressor-vs-v-comp",
+    "title": "C1 Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "c1-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "c1-compressor-vs-manny-marroquin-distortion",
+    "title": "C1 Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "c1-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "geq-graphic-equalizer-vs-v-eq3",
+    "title": "GEQ Graphic Equalizer vs V-EQ3",
+    "category": "eq",
+    "pluginA": "geq-graphic-equalizer",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-geq-graphic-equalizer",
+    "title": "GEQ Graphic Equalizer vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "geq-graphic-equalizer",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "geq-graphic-equalizer-vs-q-clone",
+    "title": "GEQ Graphic Equalizer vs Q-Clone",
+    "category": "eq",
+    "pluginA": "geq-graphic-equalizer",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "ssl-g-equalizer-vs-v-eq3",
+    "title": "SSL G-Equalizer vs V-EQ3",
+    "category": "eq",
+    "pluginA": "ssl-g-equalizer",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-ssl-g-equalizer",
+    "title": "SSL G-Equalizer vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "ssl-g-equalizer",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "q-clone-vs-ssl-g-equalizer",
+    "title": "SSL G-Equalizer vs Q-Clone",
+    "category": "eq",
+    "pluginA": "ssl-g-equalizer",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-magma-springs",
+    "title": "Magma Springs vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "magma-springs",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "lofi-space-vs-magma-springs",
+    "title": "Magma Springs vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "magma-springs",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-magma-springs",
+    "title": "Magma Springs vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "magma-springs",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "renaissance-equalizer-vs-v-eq3",
+    "title": "Renaissance Equalizer vs V-EQ3",
+    "category": "eq",
+    "pluginA": "renaissance-equalizer",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-renaissance-equalizer",
+    "title": "Renaissance Equalizer vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "renaissance-equalizer",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "q-clone-vs-renaissance-equalizer",
+    "title": "Renaissance Equalizer vs Q-Clone",
+    "category": "eq",
+    "pluginA": "renaissance-equalizer",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "audiotrack-vs-renaissance-axx",
+    "title": "Renaissance Axx vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "renaissance-axx",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "renaissance-axx-vs-v-comp",
+    "title": "Renaissance Axx vs V-Comp",
+    "category": "compressor",
+    "pluginA": "renaissance-axx",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-renaissance-axx",
+    "title": "Renaissance Axx vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "renaissance-axx",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "api-560-vs-v-eq3",
+    "title": "API 560 vs V-EQ3",
+    "category": "eq",
+    "pluginA": "api-560",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "api-560-vs-emo-q4-equalizer",
+    "title": "API 560 vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "api-560",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "api-560-vs-q-clone",
+    "title": "API 560 vs Q-Clone",
+    "category": "eq",
+    "pluginA": "api-560",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-trueverb",
+    "title": "TrueVerb vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "trueverb",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "lofi-space-vs-trueverb",
+    "title": "TrueVerb vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "trueverb",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-trueverb",
+    "title": "TrueVerb vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "trueverb",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "abbey-road-rs124-compressor-vs-audiotrack",
+    "title": "Abbey Road RS124 Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "abbey-road-rs124-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "abbey-road-rs124-compressor-vs-v-comp",
+    "title": "Abbey Road RS124 Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "abbey-road-rs124-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "abbey-road-rs124-compressor-vs-manny-marroquin-distortion",
+    "title": "Abbey Road RS124 Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "abbey-road-rs124-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "magma-tube-channel-strip-vs-multimod-rack",
+    "title": "Magma Tube Channel Strip vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "magma-tube-channel-strip",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "greg-wells-tonecentric-vs-magma-tube-channel-strip",
+    "title": "Magma Tube Channel Strip vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "magma-tube-channel-strip",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "magma-tube-channel-strip-vs-oneknob-driver",
+    "title": "Magma Tube Channel Strip vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "magma-tube-channel-strip",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "audiotrack-vs-l1-ultramaximizer",
+    "title": "L1 Ultramaximizer vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "l1-ultramaximizer",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "l1-ultramaximizer-vs-v-comp",
+    "title": "L1 Ultramaximizer vs V-Comp",
+    "category": "compressor",
+    "pluginA": "l1-ultramaximizer",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "l1-ultramaximizer-vs-manny-marroquin-distortion",
+    "title": "L1 Ultramaximizer vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "l1-ultramaximizer",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "abbey-road-chambers-vs-eddie-kramer-effects-channel",
+    "title": "Abbey Road Chambers vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "abbey-road-chambers",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "abbey-road-chambers-vs-lofi-space",
+    "title": "Abbey Road Chambers vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "abbey-road-chambers",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "abbey-road-chambers-vs-ir-l-convolution-reverb",
+    "title": "Abbey Road Chambers vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "abbey-road-chambers",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "audiotrack-vs-cla-3a-compressor-limiter",
+    "title": "CLA-3A Compressor / Limiter vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "cla-3a-compressor-limiter",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "cla-3a-compressor-limiter-vs-v-comp",
+    "title": "CLA-3A Compressor / Limiter vs V-Comp",
+    "category": "compressor",
+    "pluginA": "cla-3a-compressor-limiter",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "cla-3a-compressor-limiter-vs-manny-marroquin-distortion",
+    "title": "CLA-3A Compressor / Limiter vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "cla-3a-compressor-limiter",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "audiotrack-vs-c4-multiband-compressor",
+    "title": "C4 Multiband Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "c4-multiband-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "c4-multiband-compressor-vs-v-comp",
+    "title": "C4 Multiband Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "c4-multiband-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "c4-multiband-compressor-vs-manny-marroquin-distortion",
+    "title": "C4 Multiband Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "c4-multiband-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "audiotrack-vs-puigchild-compressor",
+    "title": "PuigChild Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "puigchild-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "puigchild-compressor-vs-v-comp",
+    "title": "PuigChild Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "puigchild-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-puigchild-compressor",
+    "title": "PuigChild Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "puigchild-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "audiotrack-vs-ssl-g-channel",
+    "title": "SSL G-Channel vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "ssl-g-channel",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "ssl-g-channel-vs-v-comp",
+    "title": "SSL G-Channel vs V-Comp",
+    "category": "compressor",
+    "pluginA": "ssl-g-channel",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-ssl-g-channel",
+    "title": "SSL G-Channel vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "ssl-g-channel",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-renaissance-reverb",
+    "title": "Renaissance Reverb vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "renaissance-reverb",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "lofi-space-vs-renaissance-reverb",
+    "title": "Renaissance Reverb vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "renaissance-reverb",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "ir-l-convolution-reverb-vs-renaissance-reverb",
+    "title": "Renaissance Reverb vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "renaissance-reverb",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "abbey-road-reverb-plates-vs-eddie-kramer-effects-channel",
+    "title": "Abbey Road Reverb Plates vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "abbey-road-reverb-plates",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "abbey-road-reverb-plates-vs-lofi-space",
+    "title": "Abbey Road Reverb Plates vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "abbey-road-reverb-plates",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "abbey-road-reverb-plates-vs-ir-l-convolution-reverb",
+    "title": "Abbey Road Reverb Plates vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "abbey-road-reverb-plates",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "kramer-master-tape-vs-multimod-rack",
+    "title": "Kramer Master Tape vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "kramer-master-tape",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "greg-wells-tonecentric-vs-kramer-master-tape",
+    "title": "Kramer Master Tape vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "kramer-master-tape",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "kramer-master-tape-vs-oneknob-driver",
+    "title": "Kramer Master Tape vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "kramer-master-tape",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "audiotrack-vs-mv2",
+    "title": "MV2 vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "mv2",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "mv2-vs-v-comp",
+    "title": "MV2 vs V-Comp",
+    "category": "compressor",
+    "pluginA": "mv2",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-mv2",
+    "title": "MV2 vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "mv2",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "eddie-kramer-effects-channel-vs-h-reverb-hybrid-reverb",
+    "title": "H-Reverb Hybrid Reverb vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "h-reverb-hybrid-reverb",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "h-reverb-hybrid-reverb-vs-lofi-space",
+    "title": "H-Reverb Hybrid Reverb vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "h-reverb-hybrid-reverb",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "h-reverb-hybrid-reverb-vs-ir-l-convolution-reverb",
+    "title": "H-Reverb Hybrid Reverb vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "h-reverb-hybrid-reverb",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "audiotrack-vs-l2-ultramaximizer",
+    "title": "L2 Ultramaximizer vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "l2-ultramaximizer",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "l2-ultramaximizer-vs-v-comp",
+    "title": "L2 Ultramaximizer vs V-Comp",
+    "category": "compressor",
+    "pluginA": "l2-ultramaximizer",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "l2-ultramaximizer-vs-manny-marroquin-distortion",
+    "title": "L2 Ultramaximizer vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "l2-ultramaximizer",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "scheps-73-vs-v-eq3",
+    "title": "Scheps 73 vs V-EQ3",
+    "category": "eq",
+    "pluginA": "scheps-73",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-scheps-73",
+    "title": "Scheps 73 vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "scheps-73",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "q-clone-vs-scheps-73",
+    "title": "Scheps 73 vs Q-Clone",
+    "category": "eq",
+    "pluginA": "scheps-73",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "cla-epic-vs-eddie-kramer-effects-channel",
+    "title": "CLA Epic vs Eddie Kramer Effects Channel",
+    "category": "reverb",
+    "pluginA": "cla-epic",
+    "pluginB": "eddie-kramer-effects-channel"
+  },
+  {
+    "slug": "cla-epic-vs-lofi-space",
+    "title": "CLA Epic vs Lofi Space",
+    "category": "reverb",
+    "pluginA": "cla-epic",
+    "pluginB": "lofi-space"
+  },
+  {
+    "slug": "cla-epic-vs-ir-l-convolution-reverb",
+    "title": "CLA Epic vs IR-L Convolution Reverb",
+    "category": "reverb",
+    "pluginA": "cla-epic",
+    "pluginB": "ir-l-convolution-reverb"
+  },
+  {
+    "slug": "emo-generator-vs-sibilance",
+    "title": "Sibilance vs eMo Generator",
+    "category": "synth",
+    "pluginA": "sibilance",
+    "pluginB": "emo-generator"
+  },
+  {
+    "slug": "flow-motion-fm-synth-vs-sibilance",
+    "title": "Sibilance vs Flow Motion FM Synth",
+    "category": "synth",
+    "pluginA": "sibilance",
+    "pluginB": "flow-motion-fm-synth"
+  },
+  {
+    "slug": "jjp-bass-vs-sibilance",
+    "title": "Sibilance vs JJP Bass",
+    "category": "synth",
+    "pluginA": "sibilance",
+    "pluginB": "jjp-bass"
+  },
+  {
+    "slug": "abbey-road-saturator-vs-multimod-rack",
+    "title": "Abbey Road Saturator vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "abbey-road-saturator",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "abbey-road-saturator-vs-greg-wells-tonecentric",
+    "title": "Abbey Road Saturator vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "abbey-road-saturator",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "abbey-road-saturator-vs-oneknob-driver",
+    "title": "Abbey Road Saturator vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "abbey-road-saturator",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "api-2500-vs-audiotrack",
+    "title": "API 2500 vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "api-2500",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "api-2500-vs-v-comp",
+    "title": "API 2500 vs V-Comp",
+    "category": "compressor",
+    "pluginA": "api-2500",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "api-2500-vs-manny-marroquin-distortion",
+    "title": "API 2500 vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "api-2500",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "abbey-road-reel-adt-vs-multimod-rack",
+    "title": "Abbey Road Reel ADT vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "abbey-road-reel-adt",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "abbey-road-reel-adt-vs-greg-wells-tonecentric",
+    "title": "Abbey Road Reel ADT vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "abbey-road-reel-adt",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "abbey-road-reel-adt-vs-oneknob-driver",
+    "title": "Abbey Road Reel ADT vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "abbey-road-reel-adt",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "clarity-vx-dereverb-pro-vs-ssl-native-flexverb",
+    "title": "Clarity™ Vx DeReverb Pro vs SSL Native FlexVerb",
+    "category": "reverb",
+    "pluginA": "clarity-vx-dereverb-pro",
+    "pluginB": "ssl-native-flexverb"
+  },
+  {
+    "slug": "clarity-vx-dereverb-pro-vs-vocal-reverb",
+    "title": "Clarity™ Vx DeReverb Pro vs Vocal Reverb",
+    "category": "reverb",
+    "pluginA": "clarity-vx-dereverb-pro",
+    "pluginB": "vocal-reverb"
+  },
+  {
+    "slug": "clarity-vx-dereverb-pro-vs-rev-spring-636",
+    "title": "Clarity™ Vx DeReverb Pro vs Rev SPRING-636",
+    "category": "reverb",
+    "pluginA": "clarity-vx-dereverb-pro",
+    "pluginB": "rev-spring-636"
+  },
+  {
+    "slug": "audiotrack-vs-wlm-plus-loudness-meter",
+    "title": "WLM Plus Loudness Meter vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "wlm-plus-loudness-meter",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "v-comp-vs-wlm-plus-loudness-meter",
+    "title": "WLM Plus Loudness Meter vs V-Comp",
+    "category": "compressor",
+    "pluginA": "wlm-plus-loudness-meter",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-wlm-plus-loudness-meter",
+    "title": "WLM Plus Loudness Meter vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "wlm-plus-loudness-meter",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "audiotrack-vs-renaissance-compressor",
+    "title": "Renaissance Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "renaissance-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "renaissance-compressor-vs-v-comp",
+    "title": "Renaissance Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "renaissance-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-renaissance-compressor",
+    "title": "Renaissance Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "renaissance-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "emo-generator-vs-ovox-vocal-resynthesis",
+    "title": "OVox Vocal ReSynthesis vs eMo Generator",
+    "category": "synth",
+    "pluginA": "ovox-vocal-resynthesis",
+    "pluginB": "emo-generator"
+  },
+  {
+    "slug": "flow-motion-fm-synth-vs-ovox-vocal-resynthesis",
+    "title": "OVox Vocal ReSynthesis vs Flow Motion FM Synth",
+    "category": "synth",
+    "pluginA": "ovox-vocal-resynthesis",
+    "pluginB": "flow-motion-fm-synth"
+  },
+  {
+    "slug": "jjp-bass-vs-ovox-vocal-resynthesis",
+    "title": "OVox Vocal ReSynthesis vs JJP Bass",
+    "category": "synth",
+    "pluginA": "ovox-vocal-resynthesis",
+    "pluginB": "jjp-bass"
+  },
+  {
+    "slug": "audiotrack-vs-ssl-e-channel",
+    "title": "SSL E-Channel vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "ssl-e-channel",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "ssl-e-channel-vs-v-comp",
+    "title": "SSL E-Channel vs V-Comp",
+    "category": "compressor",
+    "pluginA": "ssl-e-channel",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "manny-marroquin-distortion-vs-ssl-e-channel",
+    "title": "SSL E-Channel vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "ssl-e-channel",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "bb-tubes-vs-multimod-rack",
+    "title": "BB Tubes vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "bb-tubes",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "bb-tubes-vs-greg-wells-tonecentric",
+    "title": "BB Tubes vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "bb-tubes",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "bb-tubes-vs-oneknob-driver",
+    "title": "BB Tubes vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "bb-tubes",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "audiotrack-vs-c6-multiband-compressor",
+    "title": "C6 Multiband Compressor vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "c6-multiband-compressor",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "c6-multiband-compressor-vs-v-comp",
+    "title": "C6 Multiband Compressor vs V-Comp",
+    "category": "compressor",
+    "pluginA": "c6-multiband-compressor",
+    "pluginB": "v-comp"
+  },
+  {
+    "slug": "c6-multiband-compressor-vs-manny-marroquin-distortion",
+    "title": "C6 Multiband Compressor vs Manny Marroquin Distortion",
+    "category": "compressor",
+    "pluginA": "c6-multiband-compressor",
+    "pluginB": "manny-marroquin-distortion"
+  },
+  {
+    "slug": "f6-floating-band-dynamic-eq-vs-v-eq3",
+    "title": "F6 Floating-Band Dynamic EQ vs V-EQ3",
+    "category": "eq",
+    "pluginA": "f6-floating-band-dynamic-eq",
+    "pluginB": "v-eq3"
+  },
+  {
+    "slug": "emo-q4-equalizer-vs-f6-floating-band-dynamic-eq",
+    "title": "F6 Floating-Band Dynamic EQ vs eMo Q4 Equalizer",
+    "category": "eq",
+    "pluginA": "f6-floating-band-dynamic-eq",
+    "pluginB": "emo-q4-equalizer"
+  },
+  {
+    "slug": "f6-floating-band-dynamic-eq-vs-q-clone",
+    "title": "F6 Floating-Band Dynamic EQ vs Q-Clone",
+    "category": "eq",
+    "pluginA": "f6-floating-band-dynamic-eq",
+    "pluginB": "q-clone"
+  },
+  {
+    "slug": "abbey-road-j37-tape-vs-multimod-rack",
+    "title": "Abbey Road J37 Tape vs MultiMod Rack",
+    "category": "saturator",
+    "pluginA": "abbey-road-j37-tape",
+    "pluginB": "multimod-rack"
+  },
+  {
+    "slug": "abbey-road-j37-tape-vs-greg-wells-tonecentric",
+    "title": "Abbey Road J37 Tape vs Greg Wells ToneCentric",
+    "category": "saturator",
+    "pluginA": "abbey-road-j37-tape",
+    "pluginB": "greg-wells-tonecentric"
+  },
+  {
+    "slug": "abbey-road-j37-tape-vs-oneknob-driver",
+    "title": "Abbey Road J37 Tape vs OneKnob Driver",
+    "category": "saturator",
+    "pluginA": "abbey-road-j37-tape",
+    "pluginB": "oneknob-driver"
+  },
+  {
+    "slug": "audiotrack-vs-cla-76-compressor-limiter",
+    "title": "CLA-76 Compressor / Limiter vs AudioTrack",
+    "category": "compressor",
+    "pluginA": "cla-76-compressor-limiter",
+    "pluginB": "audiotrack"
+  },
+  {
+    "slug": "cla-76-compressor-limiter-vs-v-comp",
+    "title": "CLA-76 Compressor / Limiter vs V-Comp",
+    "category": "compressor",
+    "pluginA": "cla-76-compressor-limiter",
+    "pluginB": "v-comp"
+  }
+]

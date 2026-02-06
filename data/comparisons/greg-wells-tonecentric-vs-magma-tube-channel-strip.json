@@ -1,0 +1,67 @@
+{
+  "slug": "greg-wells-tonecentric-vs-magma-tube-channel-strip",
+  "title": "Magma Tube Channel Strip vs Greg Wells ToneCentric",
+  "metaDescription": "Compare Magma Tube Channel Strip by Waves with Greg Wells ToneCentric by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx76w64szswcmrarbhymstyc1d80gf1b",
+    "name": "Magma Tube Channel Strip",
+    "slug": "magma-tube-channel-strip",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Sculpt your tracks with the rich analog Magma sound",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/magma-tube-channel-strip.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/magma-tube-channel-strip",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7885x189221zhtn7ce5xzsb980g17w",
+    "name": "Greg Wells ToneCentric",
+    "slug": "greg-wells-tonecentric",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Add rich analog tone with tube-based harmonic enhancement",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/greg-wells-tonecentric.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/greg-wells-tonecentric",
+    "trendingScore": 188,
+    "mentions7d": 18
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "a",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289517
+}

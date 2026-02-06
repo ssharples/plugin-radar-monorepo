@@ -1,0 +1,67 @@
+{
+  "slug": "ir-l-convolution-reverb-vs-ir1-convolution-reverb",
+  "title": "IR1 Convolution Reverb vs IR-L Convolution Reverb",
+  "metaDescription": "Compare IR1 Convolution Reverb by Waves with IR-L Convolution Reverb by Waves. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx7c0t6erxbnr2kjv8y2acey8s80hefa",
+    "name": "IR1 Convolution Reverb",
+    "slug": "ir1-convolution-reverb",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Reproduce the acoustic environments of world-famous venues",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/ir1-convolution-reverb.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/ir1-convolution-reverb",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7dh1bz3ek14g2r7jj1mjcmj580hv4y",
+    "name": "IR-L Convolution Reverb",
+    "slug": "ir-l-convolution-reverb",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Streamlined convolution reverb with impulse library",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/ir-l-convolution-reverb.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/ir-l-convolution-reverb",
+    "trendingScore": 81,
+    "mentions7d": 6
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289509
+}

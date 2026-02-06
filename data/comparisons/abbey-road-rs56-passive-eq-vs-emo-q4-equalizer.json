@@ -1,0 +1,67 @@
+{
+  "slug": "abbey-road-rs56-passive-eq-vs-emo-q4-equalizer",
+  "title": "Abbey Road RS56 Passive EQ vs eMo Q4 Equalizer",
+  "metaDescription": "Compare Abbey Road RS56 Passive EQ by Waves with eMo Q4 Equalizer by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx7e20622ekjygg2fh12191wmh80gvrm",
+    "name": "Abbey Road RS56 Passive EQ",
+    "slug": "abbey-road-rs56-passive-eq",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "The original mastering EQ from Abbey Road Studios—reborn for creative mixing",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/rs56.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/rs56",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx76st6bp7685smsn0ethkqj5x80gdnw",
+    "name": "eMo Q4 Equalizer",
+    "slug": "emo-q4-equalizer",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "4-band paragraphic EQ optimized for the stage",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/emo-q4-equalizer.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/emo-q4-equalizer",
+    "trendingScore": 161,
+    "mentions7d": 18
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289507
+}

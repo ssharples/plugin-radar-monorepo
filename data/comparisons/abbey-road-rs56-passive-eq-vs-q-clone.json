@@ -1,0 +1,67 @@
+{
+  "slug": "abbey-road-rs56-passive-eq-vs-q-clone",
+  "title": "Abbey Road RS56 Passive EQ vs Q-Clone",
+  "metaDescription": "Compare Abbey Road RS56 Passive EQ by Waves with Q-Clone by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx7e20622ekjygg2fh12191wmh80gvrm",
+    "name": "Abbey Road RS56 Passive EQ",
+    "slug": "abbey-road-rs56-passive-eq",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "The original mastering EQ from Abbey Road Studios—reborn for creative mixing",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/rs56.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/rs56",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx70txf7q8e88f5qg4kqe7q9v180hwcv",
+    "name": "Q-Clone",
+    "slug": "q-clone",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Convert any hardware EQ curve into a plugin preset",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/q-clone.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/q-clone",
+    "trendingScore": 182,
+    "mentions7d": 17
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289507
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "abbey-road-j37-tape-vs-oneknob-driver",
+  "title": "Abbey Road J37 Tape vs OneKnob Driver",
+  "metaDescription": "Compare Abbey Road J37 Tape by Waves with OneKnob Driver by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7c9b1jebej95g06hvnthd9n980h20w",
+    "name": "Abbey Road J37 Tape",
+    "slug": "abbey-road-j37-tape",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Valve Analog Tape Sound from Abbey Road Studios",
+    "price": "$40",
+    "priceRaw": 3999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/j37-tape.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/j37-tape",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7a1r9v4g7y356s4qknh92nss80h9fm",
+    "name": "OneKnob Driver",
+    "slug": "oneknob-driver",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Saturate your tracks, from light overdrive to full-on distortion",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/oneknob-driver.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/oneknob-driver",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289521
+}

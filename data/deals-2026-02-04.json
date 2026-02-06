@@ -1,0 +1,270 @@
+{
+  "scrapedAt": "2026-02-04T15:45:00Z",
+  "source": "pluginboutique.com/deals",
+  "deals": [
+    {
+      "name": "SSL Native X-Saturator",
+      "manufacturer": "Solid State Logic",
+      "category": "Saturation",
+      "originalPrice": 44.00,
+      "salePrice": 7.99,
+      "discount": 81,
+      "endDate": "2026-02-15",
+      "url": "/product/2-Effects/44-Saturation/8667-SSL-Native-X-Saturator",
+      "rating": 4.7
+    },
+    {
+      "name": "AmpliTube 5",
+      "manufacturer": "IK Multimedia",
+      "category": "Amp Simulator",
+      "originalPrice": 188.00,
+      "salePrice": 49.99,
+      "discount": 73,
+      "endDate": "2026-03-02",
+      "url": "/product/2-Effects/18-Amp-Simulator/12669-AmpliTube-5",
+      "rating": 4.6
+    },
+    {
+      "name": "DANDY",
+      "manufacturer": "UJAM",
+      "category": "Virtual Instruments",
+      "originalPrice": 104.00,
+      "salePrice": 10.00,
+      "discount": 90,
+      "endDate": "2026-02-08",
+      "url": "/product/1-Instruments/64-Virtual-Instruments/6618-DANDY",
+      "rating": 4.7
+    },
+    {
+      "name": "Xpand!2",
+      "manufacturer": "AIR Music Technology",
+      "category": "Virtual Instruments",
+      "originalPrice": 99.00,
+      "salePrice": 26.00,
+      "discount": 73,
+      "endDate": "2026-02-14",
+      "url": "/product/1-Instruments/64-Virtual-Instruments/1560-Xpand-2",
+      "rating": 4.6
+    },
+    {
+      "name": "Excite Audio Bundle",
+      "manufacturer": "Excite Audio",
+      "category": "Complete Collection",
+      "originalPrice": 638.00,
+      "salePrice": 309.00,
+      "discount": 51,
+      "endDate": "2026-03-01",
+      "url": "/product/81-Bundles/89-Complete-Collection/9866-Excite-Audio-Bundle",
+      "rating": null
+    },
+    {
+      "name": "Scaler 3",
+      "manufacturer": "Scaler Music",
+      "category": "Music Theory Tools",
+      "originalPrice": 99.00,
+      "salePrice": 79.00,
+      "discount": 20,
+      "endDate": "2026-03-01",
+      "url": "/product/3-Studio-Tools/93-Music-Theory-Tools/14563-Scaler-3",
+      "rating": 4.7
+    },
+    {
+      "name": "Bloom Drum Machine",
+      "manufacturer": "Excite Audio",
+      "category": "Virtual Instruments",
+      "originalPrice": 59.00,
+      "salePrice": 39.00,
+      "discount": 33,
+      "endDate": "2026-03-01",
+      "url": "/product/1-Instruments/64-Virtual-Instruments/13548-Bloom-Drum-Machine",
+      "rating": 4.7
+    },
+    {
+      "name": "MODO BASS 2",
+      "manufacturer": "IK Multimedia",
+      "category": "Virtual Instruments",
+      "originalPrice": 188.00,
+      "salePrice": 49.99,
+      "discount": 73,
+      "endDate": "2026-03-02",
+      "url": "/product/1-Instruments/64-Virtual-Instruments/12454-MODO-BASS-2",
+      "rating": 4.8
+    },
+    {
+      "name": "SPARKLE 2",
+      "manufacturer": "UJAM",
+      "category": "Virtual Instruments",
+      "originalPrice": 113.00,
+      "salePrice": 10.00,
+      "discount": 91,
+      "endDate": "2026-02-12",
+      "url": "/product/1-Instruments/64-Virtual-Instruments/9807-SPARKLE-2",
+      "rating": 4.7
+    },
+    {
+      "name": "VISION 4X",
+      "manufacturer": "Excite Audio",
+      "category": "Spectral Analysis",
+      "originalPrice": 89.00,
+      "salePrice": 49.00,
+      "discount": 44,
+      "endDate": "2026-03-01",
+      "url": "/product/2-Effects/25-Spectral-Analysis/9301-VISION-4X",
+      "rating": 4.7
+    },
+    {
+      "name": "UAD Studio Classics Bundle",
+      "manufacturer": "Universal Audio",
+      "category": "Mix & Master",
+      "originalPrice": 599.00,
+      "salePrice": 52.00,
+      "discount": 91,
+      "endDate": "2026-03-01",
+      "url": "/product/81-Bundles/84-Mix-Master/14593-UAD-Studio-Classics-Bundle",
+      "rating": 4.8
+    },
+    {
+      "name": "UAD Build Your Own Bundle Winter Mix Tape",
+      "manufacturer": "Universal Audio",
+      "category": "Effects Bundles",
+      "originalPrice": 265.00,
+      "salePrice": 87.00,
+      "discount": 67,
+      "endDate": "2026-02-26",
+      "url": "/product/81-Bundles/39-Effects-Bundles/16130-UAD-Build-Your-Own-Bundle-Winter-Mix-Tape",
+      "rating": 4.8
+    },
+    {
+      "name": "Weiss MM-1",
+      "manufacturer": "Softube",
+      "category": "Mastering",
+      "originalPrice": 168.00,
+      "salePrice": 60.00,
+      "discount": 64,
+      "endDate": "2026-02-15",
+      "url": "/product/2-Effects/50-Mastering-/4181-Weiss-MM-1",
+      "rating": 4.7
+    },
+    {
+      "name": "Super VHS",
+      "manufacturer": "Baby Audio",
+      "category": "Multi-Effect",
+      "originalPrice": 55.00,
+      "salePrice": 17.00,
+      "discount": 69,
+      "endDate": "2026-02-15",
+      "url": "/product/2-Effects/53-Multi-Effect-/5900-Super-VHS",
+      "rating": 4.6
+    },
+    {
+      "name": "Pigments 7",
+      "manufacturer": "Arturia",
+      "category": "Synth",
+      "originalPrice": 179.00,
+      "salePrice": 89.00,
+      "discount": 50,
+      "endDate": "2026-02-04",
+      "url": "/product/1-Instruments/4-Synth/11867-Pigments-7",
+      "rating": 4.8
+    },
+    {
+      "name": "Empirical Labs EL8 Distressor Compressor",
+      "manufacturer": "Universal Audio",
+      "category": "Compressor",
+      "originalPrice": 176.00,
+      "salePrice": 43.00,
+      "discount": 75,
+      "endDate": "2026-02-16",
+      "url": "/product/2-Effects/8-Compressor/11502-Empirical-Labs-EL8-Distressor-Compressor",
+      "rating": 4.8
+    },
+    {
+      "name": "Soundbox Instruments Bundle",
+      "manufacturer": "Audiomodern",
+      "category": "Instrument Bundles",
+      "originalPrice": 85.00,
+      "salePrice": 59.50,
+      "discount": 30,
+      "endDate": "2026-03-01",
+      "url": "/product/81-Bundles/58-Instrument-Bundles/13347-Soundbox-Instruments-Bundle",
+      "rating": null
+    },
+    {
+      "name": "Unfiltered Audio BYOME",
+      "manufacturer": "Plugin Alliance",
+      "category": "Multi-Effect",
+      "originalPrice": 113.00,
+      "salePrice": 18.00,
+      "discount": 84,
+      "endDate": "2026-03-31",
+      "url": "/product/2-Effects/53-Multi-Effect-/14942-Unfiltered-Audio-BYOME",
+      "rating": 4.4
+    },
+    {
+      "name": "Melody Sauce 2",
+      "manufacturer": "EVAbeat",
+      "category": "Music Theory Tools",
+      "originalPrice": 49.00,
+      "salePrice": 21.00,
+      "discount": 57,
+      "endDate": "2026-02-23",
+      "url": "/product/3-Studio-Tools/93-Music-Theory-Tools/8877-Melody-Sauce-2",
+      "rating": 4.5
+    },
+    {
+      "name": "Spire",
+      "manufacturer": "Reveal Sound",
+      "category": "Synth",
+      "originalPrice": 199.96,
+      "salePrice": 79.96,
+      "discount": 60,
+      "endDate": "2026-02-13",
+      "url": "/product/1-Instruments/4-Synth/3187-Spire",
+      "rating": 4.8
+    },
+    {
+      "name": "Platinum Bundle",
+      "manufacturer": "Waves",
+      "category": "Mix & Master",
+      "originalPrice": 1885.00,
+      "salePrice": 99.00,
+      "discount": 94,
+      "endDate": "2026-02-12",
+      "url": "/product/81-Bundles/84-Mix-Master/12542-Platinum-Bundle",
+      "rating": 4.7
+    },
+    {
+      "name": "UAD Sound City Studios Plugin",
+      "manufacturer": "Universal Audio",
+      "category": "Channel Strip",
+      "originalPrice": 221.00,
+      "salePrice": 34.00,
+      "discount": 84,
+      "endDate": "2026-02-16",
+      "url": "/product/2-Effects/21-Channel-Strip/11503-UAD-Sound-City-Studios-Plugin",
+      "rating": 4.7
+    },
+    {
+      "name": "UAD Essentials Edition",
+      "manufacturer": "Universal Audio",
+      "category": "Effects Bundles",
+      "originalPrice": 132.00,
+      "salePrice": 43.00,
+      "discount": 67,
+      "endDate": "2026-02-26",
+      "url": "/product/81-Bundles/39-Effects-Bundles/11347-UAD-Essentials-Edition",
+      "rating": 4.8
+    },
+    {
+      "name": "BFD 3.5",
+      "manufacturer": "BFD",
+      "category": "Virtual Instruments",
+      "originalPrice": 199.00,
+      "salePrice": 35.00,
+      "discount": 82,
+      "endDate": "2026-02-14",
+      "url": "/product/1-Instruments/64-Virtual-Instruments/848-BFD-3-5",
+      "rating": 4.5
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "renaissance-compressor-vs-v-comp",
+  "title": "Renaissance Compressor vs V-Comp",
+  "metaDescription": "Compare Renaissance Compressor by Waves with V-Comp by Waves. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx7br2ntgpb4ex3sffvnqgfv1n80h8h8",
+    "name": "Renaissance Compressor",
+    "slug": "renaissance-compressor",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Classic, multi-application compressor and expander",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/renaissance-compressor.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/renaissance-compressor",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx750kzmy3zce7mhytjhrc1wpd80g2hb",
+    "name": "V-Comp",
+    "slug": "v-comp",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "2254-type analog-modeled compressor with vintage transformer sound",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/v-comp-v2.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/v-comp",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289520
+}

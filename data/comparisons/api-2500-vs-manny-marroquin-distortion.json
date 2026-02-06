@@ -1,0 +1,67 @@
+{
+  "slug": "api-2500-vs-manny-marroquin-distortion",
+  "title": "API 2500 vs Manny Marroquin Distortion",
+  "metaDescription": "Compare API 2500 by Waves with Manny Marroquin Distortion by Waves. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx761t9j94n54dvx45k98vajan80gr27",
+    "name": "API 2500",
+    "slug": "api-2500",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Versatile vintage compressor with switchable topologies",
+    "price": "$40",
+    "priceRaw": 3999,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/api-2500.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/api-2500",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7crf5bpytm94mvq3y29rqmed80hvqv",
+    "name": "Manny Marroquin Distortion",
+    "slug": "manny-marroquin-distortion",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Parallel distortion with compression and 4-band EQ",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/manny-marroquin-distortion.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/manny-marroquin-distortion",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289519
+}

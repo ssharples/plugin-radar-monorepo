@@ -1,0 +1,67 @@
+{
+  "slug": "ir-l-convolution-reverb-vs-ir-live-convolution-reverb",
+  "title": "IR-Live Convolution Reverb vs IR-L Convolution Reverb",
+  "metaDescription": "Compare IR-Live Convolution Reverb by Waves with IR-L Convolution Reverb by Waves. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx79frkn53qzhmacb2skn98qq580g483",
+    "name": "IR-Live Convolution Reverb",
+    "slug": "ir-live-convolution-reverb",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Authentic reverb capturing real-world acoustic spaces, for both studio production and live sound",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/ir-live-convolution-reverb-v2.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/ir-live-convolution-reverb",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7dh1bz3ek14g2r7jj1mjcmj580hv4y",
+    "name": "IR-L Convolution Reverb",
+    "slug": "ir-l-convolution-reverb",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Streamlined convolution reverb with impulse library",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/ir-l-convolution-reverb.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/ir-l-convolution-reverb",
+    "trendingScore": 81,
+    "mentions7d": 6
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289506
+}

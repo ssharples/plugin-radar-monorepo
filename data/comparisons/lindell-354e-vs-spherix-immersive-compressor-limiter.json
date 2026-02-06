@@ -1,0 +1,69 @@
+{
+  "slug": "lindell-354e-vs-spherix-immersive-compressor-limiter",
+  "title": "Spherix Immersive Compressor & Limiter vs Lindell Audio 354E",
+  "metaDescription": "Compare Spherix Immersive Compressor & Limiter by Waves with Lindell Audio 354E by Plugin Alliance. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx710gws1z01vhrkbt3vhmjjth80h101",
+    "name": "Spherix Immersive Compressor & Limiter",
+    "slug": "spherix-immersive-compressor-limiter",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Dynamics designed for 7.1.4/7.1.2 mixing",
+    "price": "$199",
+    "priceRaw": 19900,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/spherix-immersive-compressor-limiter.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/spherix-immersive-compressor-limiter",
+    "trendingScore": 56,
+    "mentions7d": 3
+  },
+  "pluginB": {
+    "id": "jx7f32adaqfm3gatz4xd8zgavh80hzwd",
+    "name": "Lindell Audio 354E",
+    "slug": "lindell-354e",
+    "manufacturer": "Plugin Alliance",
+    "manufacturerSlug": "plugin-alliance",
+    "description": "Neve 33609 compressor emulation.",
+    "price": "$149",
+    "priceRaw": 14900,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [
+      "neve"
+    ],
+    "imageUrl": "http://www.plugin-alliance.com/cdn/shop/files/productimage-300289_fadcef28-689f-493c-b1ae-a695928bf0a1.png?v=1745586764",
+    "productUrl": "https://www.plugin-alliance.com/en/products/lindell_354e.html",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289503
+}

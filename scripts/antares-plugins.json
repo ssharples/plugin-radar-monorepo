@@ -1,0 +1,19 @@
+{
+  "manufacturer": "jh7bnnx5yy172t3p1dvj7rkfx580g5vx",
+  "manufacturerSlug": "antares",
+  "plugins": [
+    {"name": "Auto-Tune Pro 11", "slug": "auto-tune-pro-11", "description": "The Professional Standard for Pitch Correction - Auto Mode, Graph Mode, 4-part Harmony Player, ARA2 support", "price": 409, "category": "effect", "productUrl": "https://www.antarestech.com/products/auto-tune/pro", "currency": "GBP", "hasTrial": true},
+    {"name": "Auto-Tune 2026", "slug": "auto-tune-2026", "description": "The essential workflow and premium sound of AutoTune in a CPU-friendly package", "price": 199, "category": "effect", "productUrl": "https://www.antarestech.com/products/auto-tune/at2026", "currency": "GBP", "hasTrial": true},
+    {"name": "Auto-Tune Hybrid", "slug": "auto-tune-hybrid", "description": "Designed for Avid Hybrid Engine for moving between DSP and native processing", "price": 599, "category": "effect", "productUrl": "https://www.antarestech.com/products/auto-tune/hybrid", "currency": "GBP"},
+    {"name": "AutoKey", "slug": "autokey", "description": "Automatic key, scale, and tempo detection for enhancing your AutoTune workflow", "price": 49, "category": "utility", "productUrl": "https://www.antarestech.com/products/auto-tune/auto-key", "currency": "GBP"},
+    {"name": "Auto-Tune EFX+", "slug": "auto-tune-efx-plus", "description": "Pitch correction with creative vocal effects like doubling, harmony, and Auto-Motion", "price": 149, "category": "effect", "productUrl": "https://www.antarestech.com/products/creative-vocal-effects/efx", "currency": "GBP"},
+    {"name": "Harmony Engine", "slug": "harmony-engine", "description": "Real-time vocal harmony generation with up to 4 voices", "price": 199, "category": "effect", "productUrl": "https://www.antarestech.com/products/creative-vocal-effects/harmony-engine", "currency": "GBP"},
+    {"name": "Vocodist", "slug": "vocodist", "description": "Vintage vocoder sounds with modern controls", "price": 99, "category": "effect", "productUrl": "https://www.antarestech.com/products/creative-vocal-effects/vocodist", "currency": "GBP"},
+    {"name": "Mic Mod", "slug": "mic-mod", "description": "Microphone modeling plugin that transforms your mic's sound", "price": 199, "category": "effect", "productUrl": "https://www.antarestech.com/products/creative-vocal-effects/mic-mod", "currency": "GBP"},
+    {"name": "Vocal Prep", "slug": "vocal-prep", "description": "AI-powered noise elimination and vocal cleanup", "price": 99, "category": "utility", "productUrl": "https://www.antarestech.com/products/ai-powered-vocal-chain/vocal-prep", "currency": "GBP"},
+    {"name": "Vocal EQ", "slug": "vocal-eq", "description": "AI-powered EQ engineered specifically for vocals", "price": 99, "category": "eq", "productUrl": "https://www.antarestech.com/products/ai-powered-vocal-chain/vocal-eq", "currency": "GBP"},
+    {"name": "Vocal Compressor", "slug": "vocal-compressor", "description": "Intelligent vocal dynamics control", "price": 99, "category": "compressor", "productUrl": "https://www.antarestech.com/products/ai-powered-vocal-chain/vocal-compressor", "currency": "GBP"},
+    {"name": "Vocal Reverb", "slug": "vocal-reverb", "description": "Reverb designed specifically for vocal tracks", "price": 99, "category": "reverb", "productUrl": "https://www.antarestech.com/products/ai-powered-vocal-chain/vocal-reverb", "currency": "GBP"},
+    {"name": "Auto-Tune Unlimited", "slug": "auto-tune-unlimited", "description": "Premium subscription bundle - all AutoTune versions, all vocal effects, free updates", "price": 190, "category": "bundle", "productUrl": "https://www.antarestech.com/products/subscriptions/unlimited", "currency": "GBP"}
+  ]
+}

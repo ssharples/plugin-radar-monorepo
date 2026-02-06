@@ -1,0 +1,67 @@
+{
+  "slug": "abbey-road-rs124-compressor-vs-manny-marroquin-distortion",
+  "title": "Abbey Road RS124 Compressor vs Manny Marroquin Distortion",
+  "metaDescription": "Compare Abbey Road RS124 Compressor by Waves with Manny Marroquin Distortion by Waves. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx7bxnawmx9b6tbb6m88g4xcwx80g7y4",
+    "name": "Abbey Road RS124 Compressor",
+    "slug": "abbey-road-rs124-compressor",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "One-of-a-kind compressor heard on Beatles to Beyoncé",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/abbey-road-rs124-compressor-v2.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/abbey-road-rs124-compressor",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7crf5bpytm94mvq3y29rqmed80hvqv",
+    "name": "Manny Marroquin Distortion",
+    "slug": "manny-marroquin-distortion",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Parallel distortion with compression and 4-band EQ",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/manny-marroquin-distortion.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/manny-marroquin-distortion",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "a",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289517
+}

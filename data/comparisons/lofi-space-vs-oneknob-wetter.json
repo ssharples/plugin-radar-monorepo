@@ -1,0 +1,67 @@
+{
+  "slug": "lofi-space-vs-oneknob-wetter",
+  "title": "Lofi Space vs OneKnob Wetter",
+  "metaDescription": "Compare Lofi Space by Waves with OneKnob Wetter by Waves. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx770y73q7jf940z7mbenf2q2580hab7",
+    "name": "Lofi Space",
+    "slug": "lofi-space",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Lofi-style reverb and delay plugin",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/lofi-space.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/lofi-space",
+    "trendingScore": 125,
+    "mentions7d": 11
+  },
+  "pluginB": {
+    "id": "jx730b8hded4zmwwnpwchpw98d80gggz",
+    "name": "OneKnob Wetter",
+    "slug": "oneknob-wetter",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Dial in quick reverb for instant depth and dimension",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/oneknob-wetter.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/oneknob-wetter",
+    "trendingScore": 112,
+    "mentions7d": 9
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289503
+}

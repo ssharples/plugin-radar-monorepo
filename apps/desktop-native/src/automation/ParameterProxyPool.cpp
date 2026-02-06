@@ -1,0 +1,67 @@
+#include "ParameterProxyPool.h"
+#include "ProxyParameter.h"
+#include "../core/ChainProcessor.h"
+
+void ParameterProxyPool::createAndRegister(juce::AudioProcessor& processor)
+{
+    proxies.reserve(static_cast<size_t>(kMaxSlots * kMaxParamsPerSlot));
+
+    for (int slot = 0; slot < kMaxSlots; ++slot)
+    {
+        for (int param = 0; param < kMaxParamsPerSlot; ++param)
+        {
+            auto* proxy = new ProxyParameter(slot, param);
+            proxies.push_back(proxy);
+            processor.addParameter(proxy); // processor takes ownership
+        }
+    }
+}
+
+void ParameterProxyPool::bindSlot(int slotIndex, juce::AudioProcessor* childProcessor)
+{
+    if (slotIndex < 0 || slotIndex >= kMaxSlots)
+        return;
+
+    int baseIndex = slotIndex * kMaxParamsPerSlot;
+
+    // Unbind all proxies for this slot first
+    for (int i = 0; i < kMaxParamsPerSlot; ++i)
+        proxies[static_cast<size_t>(baseIndex + i)]->unbind();
+
+    if (childProcessor == nullptr)
+        return;
+
+    auto& childParams = childProcessor->getParameters();
+    int numChildParams = juce::jmin(childParams.size(), kMaxParamsPerSlot);
+
+    for (int i = 0; i < numChildParams; ++i)
+        proxies[static_cast<size_t>(baseIndex + i)]->bind(childParams[i]);
+}
+
+void ParameterProxyPool::unbindSlot(int slotIndex)
+{
+    bindSlot(slotIndex, nullptr);
+}
+
+void ParameterProxyPool::rebindAll(ChainProcessor& chain)
+{
+    // Use DFS-flattened plugin list from tree model
+    auto plugins = chain.getFlatPluginList();
+    int numPlugins = static_cast<int>(plugins.size());
+
+    for (int i = 0; i < kMaxSlots; ++i)
+    {
+        if (i < numPlugins)
+        {
+            auto& leaf = *plugins[static_cast<size_t>(i)];
+            if (auto node = chain.getNodeForId(leaf.graphNodeId))
+                bindSlot(i, node->getProcessor());
+            else
+                unbindSlot(i);
+        }
+        else
+        {
+            unbindSlot(i);
+        }
+    }
+}

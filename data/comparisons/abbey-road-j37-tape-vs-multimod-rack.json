@@ -1,0 +1,72 @@
+{
+  "slug": "abbey-road-j37-tape-vs-multimod-rack",
+  "title": "Abbey Road J37 Tape vs MultiMod Rack",
+  "metaDescription": "Compare Abbey Road J37 Tape by Waves with MultiMod Rack by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7c9b1jebej95g06hvnthd9n980h20w",
+    "name": "Abbey Road J37 Tape",
+    "slug": "abbey-road-j37-tape",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Valve Analog Tape Sound from Abbey Road Studios",
+    "price": "$40",
+    "priceRaw": 3999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/j37-tape.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/j37-tape",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7afv6gf7t2k7spz5cya48f6d80h5ab",
+    "name": "MultiMod Rack",
+    "slug": "multimod-rack",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "MultiMod Rack by Waves is a versatile virtual effects rack designed primarily for distortion and modulation processing.",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [
+      "eq",
+      "compressor",
+      "reverb",
+      "delay"
+    ],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/multimod-rack.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/multimod-rack",
+    "trendingScore": 88,
+    "mentions7d": 11
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289521
+}

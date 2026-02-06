@@ -1,0 +1,22 @@
+{
+  "manufacturer": "jh776t9hxsaks9nvq3sfrmwxz980hdsz",
+  "manufacturerSlug": "output",
+  "plugins": [
+    {"name": "Instruments Bundle", "slug": "output-instruments-bundle", "description": "7 Instruments, 18 Expansions", "price": 520, "category": "bundle", "productUrl": "https://output.com/products/instruments-bundle", "currency": "USD"},
+    {"name": "FX Bundle", "slug": "output-fx-bundle", "description": "3 Engines, 5 Expansions", "price": 420, "category": "bundle", "productUrl": "https://output.com/products/output-fx", "currency": "USD"},
+    {"name": "FX + Instruments Bundle", "slug": "output-fx-instruments-bundle", "description": "10 Engines, 23 Expansions", "price": 900, "category": "bundle", "productUrl": "https://output.com/products/output-bundle", "currency": "USD"},
+    {"name": "Thermal", "slug": "thermal", "description": "Interactive Distortion Plugin", "price": 149, "category": "saturator", "productUrl": "https://output.com/products/thermal", "currency": "USD"},
+    {"name": "Portal", "slug": "portal", "description": "Granular FX Plugin", "price": 149, "category": "effect", "productUrl": "https://output.com/products/portal", "currency": "USD"},
+    {"name": "Movement", "slug": "movement", "description": "Your Sounds, Powerful Rhythms - rhythm-based effect engine", "price": 149, "category": "effect", "productUrl": "https://output.com/products/movement", "currency": "USD"},
+    {"name": "Analog Brass & Winds", "slug": "analog-brass-winds", "description": "Next Level Air - modern brass and wind instrument engine", "price": 199, "category": "instrument", "productUrl": "https://output.com/products/analog-brass-and-winds", "currency": "USD", "formats": ["Kontakt"]},
+    {"name": "Analog Strings", "slug": "output-analog-strings", "description": "Modern Strings Engine", "price": 199, "category": "instrument", "productUrl": "https://output.com/products/analog-strings", "currency": "USD", "formats": ["Kontakt"]},
+    {"name": "Substance", "slug": "substance", "description": "Powerful Bass Engine", "price": 199, "category": "instrument", "productUrl": "https://output.com/products/substance", "currency": "USD", "formats": ["Kontakt"]},
+    {"name": "Exhale", "slug": "exhale", "description": "The First Truly Modern Vocal Engine", "price": 199, "category": "instrument", "productUrl": "https://output.com/products/exhale", "currency": "USD", "formats": ["Kontakt"]},
+    {"name": "Rev X-Loops", "slug": "rev-x-loops", "description": "A World Of Modern Sound", "price": 99, "category": "instrument", "productUrl": "https://output.com/products/rev-x-loops", "currency": "USD", "formats": ["Kontakt"]},
+    {"name": "Signal", "slug": "signal", "description": "The World's Most Powerful Pulse Engine", "price": 199, "category": "instrument", "productUrl": "https://output.com/products/signal", "currency": "USD", "formats": ["Kontakt"]},
+    {"name": "Rev", "slug": "output-rev", "description": "A New World In Reverse", "price": 199, "category": "instrument", "productUrl": "https://output.com/products/rev", "currency": "USD", "formats": ["Kontakt"]},
+    {"name": "Arcade", "slug": "arcade", "description": "Creative loop synthesizer with massive sound library", "price": 120, "category": "sampler", "productUrl": "https://output.com/products/arcade", "currency": "USD"},
+    {"name": "Co-Producer", "slug": "co-producer", "description": "AI-powered music production assistant", "price": 199, "category": "utility", "productUrl": "https://output.com/products/co-producer", "currency": "USD"},
+    {"name": "Pack Generator", "slug": "pack-generator", "description": "Free tool to create sample packs", "price": 0, "isFree": true, "category": "utility", "productUrl": "https://output.com/products/pack-generator", "currency": "USD"}
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "renaissance-equalizer-vs-v-eq3",
+  "title": "Renaissance Equalizer vs V-EQ3",
+  "metaDescription": "Compare Renaissance Equalizer by Waves with V-EQ3 by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx7905anp4fxv4a328maphmfr980gd6m",
+    "name": "Renaissance Equalizer",
+    "slug": "renaissance-equalizer",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "6-band equalizer with multiple curve options",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/renaissance-equalizer.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/renaissance-equalizer",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7apb917rpa437ebvtmy5nmch80g33y",
+    "name": "V-EQ3",
+    "slug": "v-eq3",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Vintage EQ with rich analog tone, modeled from 1066 and 1073 consoles",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/v-eq3-v2.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/v-eq3",
+    "trendingScore": 65,
+    "mentions7d": 6
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289517
+}

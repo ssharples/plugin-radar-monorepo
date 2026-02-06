@@ -1,0 +1,73 @@
+{
+  "slug": "eddie-kramer-effects-channel-vs-oneknob-wetter",
+  "title": "Eddie Kramer Effects Channel vs OneKnob Wetter",
+  "metaDescription": "Compare Eddie Kramer Effects Channel by Waves with OneKnob Wetter by Waves. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx7erse9khnhwmjby55chdw90580gq96",
+    "name": "Eddie Kramer Effects Channel",
+    "slug": "eddie-kramer-effects-channel",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "The Eddie Kramer Effects Channel by Waves is a plugin that emulates the vintage tape delay and plate reverb effects developed by legendary producer and engineer Eddie Kramer.",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [
+      "eq",
+      "reverb",
+      "delay",
+      "analog-modeling",
+      "mixing"
+    ],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/eddie-kramer-effects-channel.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/eddie-kramer-effects-channel",
+    "trendingScore": 134,
+    "mentions7d": 15
+  },
+  "pluginB": {
+    "id": "jx730b8hded4zmwwnpwchpw98d80gggz",
+    "name": "OneKnob Wetter",
+    "slug": "oneknob-wetter",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Dial in quick reverb for instant depth and dimension",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/oneknob-wetter.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/oneknob-wetter",
+    "trendingScore": 112,
+    "mentions7d": 9
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289499
+}

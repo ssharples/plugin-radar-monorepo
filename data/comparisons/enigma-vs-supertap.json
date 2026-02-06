@@ -1,0 +1,67 @@
+{
+  "slug": "enigma-vs-supertap",
+  "title": "SuperTap vs Enigma",
+  "metaDescription": "Compare SuperTap by Waves with Enigma by Waves. See pricing, features, formats, and which delay plugin is right for you.",
+  "pluginA": {
+    "id": "jx74487gygakvchq3hqh7e5n6s80hzyz",
+    "name": "SuperTap",
+    "slug": "supertap",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Flexible delays inspired by analog tape echo",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "delay",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/supertap-1.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/supertap",
+    "trendingScore": 50,
+    "mentions7d": 4
+  },
+  "pluginB": {
+    "id": "jx7c05hvd78t66ke31v4e5ybdn80hnw6",
+    "name": "Enigma",
+    "slug": "enigma",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Time delay, frequency-shift, and filtering effects",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "delay",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/enigma-1.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/enigma",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "delay",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289499
+}

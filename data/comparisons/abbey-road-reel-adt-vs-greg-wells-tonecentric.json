@@ -1,0 +1,67 @@
+{
+  "slug": "abbey-road-reel-adt-vs-greg-wells-tonecentric",
+  "title": "Abbey Road Reel ADT vs Greg Wells ToneCentric",
+  "metaDescription": "Compare Abbey Road Reel ADT by Waves with Greg Wells ToneCentric by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx762fsdjkemnqp4bt2z748ben80gkqe",
+    "name": "Abbey Road Reel ADT",
+    "slug": "abbey-road-reel-adt",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Tape-based vocal doubling from Abbey Road",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/reel-adt.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/reel-adt",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7885x189221zhtn7ce5xzsb980g17w",
+    "name": "Greg Wells ToneCentric",
+    "slug": "greg-wells-tonecentric",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Add rich analog tone with tube-based harmonic enhancement",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/greg-wells-tonecentric.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/greg-wells-tonecentric",
+    "trendingScore": 188,
+    "mentions7d": 18
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "a",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289520
+}

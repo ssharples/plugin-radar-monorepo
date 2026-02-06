@@ -1,0 +1,67 @@
+{
+  "slug": "audiotrack-vs-l1-ultramaximizer",
+  "title": "L1 Ultramaximizer vs AudioTrack",
+  "metaDescription": "Compare L1 Ultramaximizer by Waves with AudioTrack by Waves. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx70zg4wcng9z64esx13gepfg580g187",
+    "name": "L1 Ultramaximizer",
+    "slug": "l1-ultramaximizer",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Mono/stereo limiter with refined resolution control",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/l1-ultramaximizer.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/l1-ultramaximizer",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx72g8nrkb5tqmnsc3nge0f94n80gern",
+    "name": "AudioTrack",
+    "slug": "audiotrack",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Channel strip with 4-band EQ, compressor, gate",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/audiotrack.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/audiotrack",
+    "trendingScore": 108,
+    "mentions7d": 8
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289518
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "emo-q4-equalizer-vs-linear-phase-eq",
+  "title": "Linear Phase EQ vs eMo Q4 Equalizer",
+  "metaDescription": "Compare Linear Phase EQ by Waves with eMo Q4 Equalizer by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx70nfsybb3z7b50e0jqtx0y4h80gv7h",
+    "name": "Linear Phase EQ",
+    "slug": "linear-phase-eq",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "EQ your masters and buses without phase issues",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/linear-phase-eq.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/linear-phase-eq",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx76st6bp7685smsn0ethkqj5x80gdnw",
+    "name": "eMo Q4 Equalizer",
+    "slug": "emo-q4-equalizer",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "4-band paragraphic EQ optimized for the stage",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/emo-q4-equalizer.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/emo-q4-equalizer",
+    "trendingScore": 161,
+    "mentions7d": 18
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289507
+}

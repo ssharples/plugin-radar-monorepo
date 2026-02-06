@@ -1,0 +1,67 @@
+{
+  "slug": "enigma-vs-h-delay-hybrid-delay",
+  "title": "Enigma vs H-Delay Hybrid Delay",
+  "metaDescription": "Compare Enigma by Waves with H-Delay Hybrid Delay by Waves. See pricing, features, formats, and which delay plugin is right for you.",
+  "pluginA": {
+    "id": "jx7c05hvd78t66ke31v4e5ybdn80hnw6",
+    "name": "Enigma",
+    "slug": "enigma",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Time delay, frequency-shift, and filtering effects",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "delay",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/enigma-1.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/enigma",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx73s92abs6mc2e26g2mm1zf5580hha5",
+    "name": "H-Delay Hybrid Delay",
+    "slug": "h-delay-hybrid-delay",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "The complete toolbox for classic delay effects",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "delay",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/h-delay-hybrid-delay.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/h-delay-hybrid-delay",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "delay",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289505
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "clarity-vx-dereverb-pro-vs-rev-spring-636",
+  "title": "Clarity™ Vx DeReverb Pro vs Rev SPRING-636",
+  "metaDescription": "Compare Clarity™ Vx DeReverb Pro by Waves with Rev SPRING-636 by Arturia. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx72j38h3phff7p4vqagg9gjsx80gqeh",
+    "name": "Clarity™ Vx DeReverb Pro",
+    "slug": "clarity-vx-dereverb-pro",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Advanced AI reverb removal for dialogue & vocals",
+    "price": "$149",
+    "priceRaw": 14900,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/clarity-vx-dereverb-pro.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/clarity-vx-dereverb-pro",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx73466p81pk24dex9933jag1d80h2zh",
+    "name": "Rev SPRING-636",
+    "slug": "rev-spring-636",
+    "manufacturer": "Arturia",
+    "manufacturerSlug": "arturia",
+    "description": "Physically modelled reverb effect",
+    "price": "$99",
+    "priceRaw": 9900,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://medias.arturia.net/images/products/rev-spring636/content-6.jpg",
+    "productUrl": "https://www.arturia.com/products/software-effects/rev-spring636/overview",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289520
+}

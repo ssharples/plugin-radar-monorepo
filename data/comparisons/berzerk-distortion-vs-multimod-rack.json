@@ -1,0 +1,72 @@
+{
+  "slug": "berzerk-distortion-vs-multimod-rack",
+  "title": "MultiMod Rack vs Berzerk Distortion",
+  "metaDescription": "Compare MultiMod Rack by Waves with Berzerk Distortion by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7afv6gf7t2k7spz5cya48f6d80h5ab",
+    "name": "MultiMod Rack",
+    "slug": "multimod-rack",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "MultiMod Rack by Waves is a versatile virtual effects rack designed primarily for distortion and modulation processing.",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [
+      "eq",
+      "compressor",
+      "reverb",
+      "delay"
+    ],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/multimod-rack.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/multimod-rack",
+    "trendingScore": 88,
+    "mentions7d": 11
+  },
+  "pluginB": {
+    "id": "jx7f7ejmpbbaj9kneyq3nq5nfs80gy40",
+    "name": "Berzerk Distortion",
+    "slug": "berzerk-distortion",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Intense over-the-top distortion playground",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/berzerk-distortion.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/berzerk-distortion",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289499
+}

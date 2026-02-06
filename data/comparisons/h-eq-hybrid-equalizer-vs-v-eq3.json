@@ -1,0 +1,67 @@
+{
+  "slug": "h-eq-hybrid-equalizer-vs-v-eq3",
+  "title": "H-EQ Hybrid Equalizer vs V-EQ3",
+  "metaDescription": "Compare H-EQ Hybrid Equalizer by Waves with V-EQ3 by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx7594ae4s7q5c8xdawcseeg6h80hm47",
+    "name": "H-EQ Hybrid Equalizer",
+    "slug": "h-eq-hybrid-equalizer",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "7-band EQ with vintage tone and surgical abilities",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/h-eq-hybrid-equalizer.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/h-eq-hybrid-equalizer",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7apb917rpa437ebvtmy5nmch80g33y",
+    "name": "V-EQ3",
+    "slug": "v-eq3",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Vintage EQ with rich analog tone, modeled from 1066 and 1073 consoles",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/v-eq3-v2.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/v-eq3",
+    "trendingScore": 65,
+    "mentions7d": 6
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289511
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "lofi-space-vs-magma-springs",
+  "title": "Magma Springs vs Lofi Space",
+  "metaDescription": "Compare Magma Springs by Waves with Lofi Space by Waves. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx74v8hdwm2ra32atc7q7bzghx80h8b9",
+    "name": "Magma Springs",
+    "slug": "magma-springs",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Spring reverb – 7 types, endless style.",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/magma-springs.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/magma-springs",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx770y73q7jf940z7mbenf2q2580hab7",
+    "name": "Lofi Space",
+    "slug": "lofi-space",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Lofi-style reverb and delay plugin",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/lofi-space.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/lofi-space",
+    "trendingScore": 125,
+    "mentions7d": 11
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289515
+}

@@ -1,0 +1,72 @@
+{
+  "slug": "kramer-master-tape-vs-multimod-rack",
+  "title": "Kramer Master Tape vs MultiMod Rack",
+  "metaDescription": "Compare Kramer Master Tape by Waves with MultiMod Rack by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7a0pjan2xhqwc07pqr3yv1z980gcsn",
+    "name": "Kramer Master Tape",
+    "slug": "kramer-master-tape",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Classic American analog tape saturation",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/kramer-master-tape.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/kramer-master-tape",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7afv6gf7t2k7spz5cya48f6d80h5ab",
+    "name": "MultiMod Rack",
+    "slug": "multimod-rack",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "MultiMod Rack by Waves is a versatile virtual effects rack designed primarily for distortion and modulation processing.",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [
+      "eq",
+      "compressor",
+      "reverb",
+      "delay"
+    ],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/multimod-rack.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/multimod-rack",
+    "trendingScore": 88,
+    "mentions7d": 11
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289518
+}

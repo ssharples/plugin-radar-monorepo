@@ -1,0 +1,67 @@
+{
+  "slug": "element-2-0-virtual-analog-synth-vs-emo-generator",
+  "title": "eMo Generator vs Element 2.0 Virtual Analog Synth",
+  "metaDescription": "Compare eMo Generator by Waves with Element 2.0 Virtual Analog Synth by Waves. See pricing, features, formats, and which synth plugin is right for you.",
+  "pluginA": {
+    "id": "jx7cgaq7k58s35r7gv4mftybc980hq9z",
+    "name": "eMo Generator",
+    "slug": "emo-generator",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Analyze, synthesize, test, set up, ring out, and mix",
+    "price": "$25",
+    "priceRaw": 2499,
+    "isFree": false,
+    "category": "synth",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/emo-generator.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/emo-generator",
+    "trendingScore": 116,
+    "mentions7d": 11
+  },
+  "pluginB": {
+    "id": "jx73qbsa18c1p26jpna3xrnqn580hweq",
+    "name": "Element 2.0 Virtual Analog Synth",
+    "slug": "element-2-0-virtual-analog-synth",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Subtractive analog synth with effects and sequencer",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "synth",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/element.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/element",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "synth",
+    "priceWinner": "a",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289500
+}

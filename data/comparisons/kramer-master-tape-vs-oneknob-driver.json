@@ -1,0 +1,67 @@
+{
+  "slug": "kramer-master-tape-vs-oneknob-driver",
+  "title": "Kramer Master Tape vs OneKnob Driver",
+  "metaDescription": "Compare Kramer Master Tape by Waves with OneKnob Driver by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7a0pjan2xhqwc07pqr3yv1z980gcsn",
+    "name": "Kramer Master Tape",
+    "slug": "kramer-master-tape",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Classic American analog tape saturation",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/kramer-master-tape.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/kramer-master-tape",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7a1r9v4g7y356s4qknh92nss80h9fm",
+    "name": "OneKnob Driver",
+    "slug": "oneknob-driver",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Saturate your tracks, from light overdrive to full-on distortion",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/oneknob-driver.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/oneknob-driver",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289518
+}

@@ -1,0 +1,72 @@
+{
+  "slug": "spherix-immersive-compressor-limiter-vs-standard-audio-level-or",
+  "title": "Spherix Immersive Compressor & Limiter vs Standard Audio Level-Or",
+  "metaDescription": "Compare Spherix Immersive Compressor & Limiter by Waves with Standard Audio Level-Or by Safari Pedals. See pricing, features, formats, and which compressor plugin is right for you.",
+  "pluginA": {
+    "id": "jx710gws1z01vhrkbt3vhmjjth80h101",
+    "name": "Spherix Immersive Compressor & Limiter",
+    "slug": "spherix-immersive-compressor-limiter",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Dynamics designed for 7.1.4/7.1.2 mixing",
+    "price": "$199",
+    "priceRaw": 19900,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/spherix-immersive-compressor-limiter.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/spherix-immersive-compressor-limiter",
+    "trendingScore": 56,
+    "mentions7d": 3
+  },
+  "pluginB": {
+    "id": "jx7cp89jyj2zta33gtgg6rpzfn80gh6z",
+    "name": "Standard Audio Level-Or",
+    "slug": "standard-audio-level-or",
+    "manufacturer": "Safari Pedals",
+    "manufacturerSlug": "safari-pedals",
+    "description": "Leveling Amplifier",
+    "price": "$129",
+    "priceRaw": 12900,
+    "isFree": false,
+    "category": "compressor",
+    "formats": [
+      "VST3",
+      "VST",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [
+      "leveling",
+      "analog-modeling",
+      "mastering"
+    ],
+    "imageUrl": "http://safaripedals.com/cdn/shop/files/standard-audio-level-or-123632.png?v=1750340111",
+    "productUrl": "https://safaripedals.com/products/standard-audio-level-or",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "compressor",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, VST, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289503
+}

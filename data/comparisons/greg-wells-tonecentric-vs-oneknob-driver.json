@@ -1,0 +1,67 @@
+{
+  "slug": "greg-wells-tonecentric-vs-oneknob-driver",
+  "title": "Greg Wells ToneCentric vs OneKnob Driver",
+  "metaDescription": "Compare Greg Wells ToneCentric by Waves with OneKnob Driver by Waves. See pricing, features, formats, and which saturator plugin is right for you.",
+  "pluginA": {
+    "id": "jx7885x189221zhtn7ce5xzsb980g17w",
+    "name": "Greg Wells ToneCentric",
+    "slug": "greg-wells-tonecentric",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Add rich analog tone with tube-based harmonic enhancement",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/greg-wells-tonecentric.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/greg-wells-tonecentric",
+    "trendingScore": 188,
+    "mentions7d": 18
+  },
+  "pluginB": {
+    "id": "jx7a1r9v4g7y356s4qknh92nss80h9fm",
+    "name": "OneKnob Driver",
+    "slug": "oneknob-driver",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Saturate your tracks, from light overdrive to full-on distortion",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "saturator",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/oneknob-driver.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/oneknob-driver",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "saturator",
+    "priceWinner": "b",
+    "trendingWinner": "a",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289503
+}

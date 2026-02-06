@@ -1,0 +1,67 @@
+{
+  "slug": "q-clone-vs-v-eq3",
+  "title": "V-EQ3 vs Q-Clone",
+  "metaDescription": "Compare V-EQ3 by Waves with Q-Clone by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx7apb917rpa437ebvtmy5nmch80g33y",
+    "name": "V-EQ3",
+    "slug": "v-eq3",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Vintage EQ with rich analog tone, modeled from 1066 and 1073 consoles",
+    "price": "$30",
+    "priceRaw": 2999,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/v-eq3-v2.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/v-eq3",
+    "trendingScore": 65,
+    "mentions7d": 6
+  },
+  "pluginB": {
+    "id": "jx70txf7q8e88f5qg4kqe7q9v180hwcv",
+    "name": "Q-Clone",
+    "slug": "q-clone",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Convert any hardware EQ curve into a plugin preset",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/q-clone.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/q-clone",
+    "trendingScore": 182,
+    "mentions7d": 17
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "a",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289503
+}

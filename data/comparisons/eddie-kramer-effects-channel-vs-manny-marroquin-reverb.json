@@ -1,0 +1,73 @@
+{
+  "slug": "eddie-kramer-effects-channel-vs-manny-marroquin-reverb",
+  "title": "Manny Marroquin Reverb vs Eddie Kramer Effects Channel",
+  "metaDescription": "Compare Manny Marroquin Reverb by Waves with Eddie Kramer Effects Channel by Waves. See pricing, features, formats, and which reverb plugin is right for you.",
+  "pluginA": {
+    "id": "jx7c51jerf82csbpmtej7db2an80gebg",
+    "name": "Manny Marroquin Reverb",
+    "slug": "manny-marroquin-reverb",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Re-creates Manny’s complete reverb signal chain",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/manny-marroquin-reverb.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/manny-marroquin-reverb",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7erse9khnhwmjby55chdw90580gq96",
+    "name": "Eddie Kramer Effects Channel",
+    "slug": "eddie-kramer-effects-channel",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "The Eddie Kramer Effects Channel by Waves is a plugin that emulates the vintage tape delay and plate reverb effects developed by legendary producer and engineer Eddie Kramer.",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "reverb",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [
+      "eq",
+      "reverb",
+      "delay",
+      "analog-modeling",
+      "mixing"
+    ],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/eddie-kramer-effects-channel.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/eddie-kramer-effects-channel",
+    "trendingScore": 134,
+    "mentions7d": 15
+  },
+  "comparison": {
+    "category": "reverb",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289512
+}

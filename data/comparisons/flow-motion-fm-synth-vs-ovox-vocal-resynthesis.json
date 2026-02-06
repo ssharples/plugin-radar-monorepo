@@ -1,0 +1,67 @@
+{
+  "slug": "flow-motion-fm-synth-vs-ovox-vocal-resynthesis",
+  "title": "OVox Vocal ReSynthesis vs Flow Motion FM Synth",
+  "metaDescription": "Compare OVox Vocal ReSynthesis by Waves with Flow Motion FM Synth by Waves. See pricing, features, formats, and which synth plugin is right for you.",
+  "pluginA": {
+    "id": "jx7dwb11bvzhbqw1k24w0m5r2x80geja",
+    "name": "OVox Vocal ReSynthesis",
+    "slug": "ovox-vocal-resynthesis",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Transform your vocals with the next-generation voice-controlled synth",
+    "price": "$40",
+    "priceRaw": 3999,
+    "isFree": false,
+    "category": "synth",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/ovox-vocal-resynthesis.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/ovox-vocal-resynthesis",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx70eke68dsjzqxmw3sjfm5wnn80g0nb",
+    "name": "Flow Motion FM Synth",
+    "slug": "flow-motion-fm-synth",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "FM synth engine with virtual analog processing",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "synth",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/flow-motion-fm-synth.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/flow-motion-fm-synth",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "synth",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289521
+}

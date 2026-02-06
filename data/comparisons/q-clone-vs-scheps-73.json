@@ -1,0 +1,67 @@
+{
+  "slug": "q-clone-vs-scheps-73",
+  "title": "Scheps 73 vs Q-Clone",
+  "metaDescription": "Compare Scheps 73 by Waves with Q-Clone by Waves. See pricing, features, formats, and which eq plugin is right for you.",
+  "pluginA": {
+    "id": "jx7a58cxmxe16636xfh81y3vj180g0dn",
+    "name": "Scheps 73",
+    "slug": "scheps-73",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Classic 1073 EQ emulation, created with Andrew Scheps",
+    "price": "$40",
+    "priceRaw": 3999,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/scheps-73.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/scheps-73",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx70txf7q8e88f5qg4kqe7q9v180hwcv",
+    "name": "Q-Clone",
+    "slug": "q-clone",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Convert any hardware EQ curve into a plugin preset",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "eq",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/q-clone.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/q-clone",
+    "trendingScore": 182,
+    "mentions7d": 17
+  },
+  "comparison": {
+    "category": "eq",
+    "priceWinner": "b",
+    "trendingWinner": "b",
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289519
+}

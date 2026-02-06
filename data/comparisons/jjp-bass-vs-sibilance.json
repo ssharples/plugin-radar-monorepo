@@ -1,0 +1,67 @@
+{
+  "slug": "jjp-bass-vs-sibilance",
+  "title": "Sibilance vs JJP Bass",
+  "metaDescription": "Compare Sibilance by Waves with JJP Bass by Waves. See pricing, features, formats, and which synth plugin is right for you.",
+  "pluginA": {
+    "id": "jx7eqsqxtd0wkze1atbgmy5aq980gye0",
+    "name": "Sibilance",
+    "slug": "sibilance",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "De-essing with Organic ReSynthesis technology",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "synth",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/sibilance.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/sibilance",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "pluginB": {
+    "id": "jx7bx1ak8nt78qdv0b803f7r2s80hdaz",
+    "name": "JJP Bass",
+    "slug": "jjp-bass",
+    "manufacturer": "Waves",
+    "manufacturerSlug": "waves",
+    "description": "Parallel multi-effects for electric and synth bass",
+    "price": "$35",
+    "priceRaw": 3499,
+    "isFree": false,
+    "category": "synth",
+    "formats": [
+      "VST3",
+      "AU",
+      "AAX"
+    ],
+    "platforms": [
+      "windows",
+      "mac"
+    ],
+    "tags": [],
+    "imageUrl": "https://media.wavescdn.com/images/products/plugins/600/jjp-bass.png?auto=format&ixlib=react-9.10.0&h=150",
+    "productUrl": "https://www.waves.com/plugins/jjp-bass",
+    "trendingScore": 0,
+    "mentions7d": 0
+  },
+  "comparison": {
+    "category": "synth",
+    "priceWinner": "b",
+    "trendingWinner": null,
+    "formatsA": "VST3, AU, AAX",
+    "formatsB": "VST3, AU, AAX",
+    "platformsA": "windows, mac",
+    "platformsB": "windows, mac"
+  },
+  "generatedAt": 1770258289519
+}
