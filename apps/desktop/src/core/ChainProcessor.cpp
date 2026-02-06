@@ -15,8 +15,17 @@ public:
     {
         setUsingNativeTitleBar(true);
         setContentOwned(editor, true);
-        setResizable(false, false);
-        addToDesktop(getDesktopWindowStyleFlags());
+        setResizable(editor->isResizable(), false);
+
+        // Use standard window flags WITHOUT windowIsTemporary — this prevents
+        // the always-on-top floating panel behavior that makes child plugin
+        // windows stay above the DAW and the main plugin editor.
+        int styleFlags = juce::ComponentPeer::windowHasTitleBar
+                       | juce::ComponentPeer::windowHasCloseButton
+                       | juce::ComponentPeer::windowHasDropShadow
+                       | juce::ComponentPeer::windowAppearsOnTaskbar;
+        addToDesktop(styleFlags);
+
         centreWithSize(getWidth(), getHeight());
         setVisible(true);
         toFront(true);
