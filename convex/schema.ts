@@ -1090,6 +1090,50 @@ export default defineSchema({
     .index("by_key", ["key"]),
 
   // ============================================
+  // FRIENDS & PRIVATE CHAIN SHARING
+  // ============================================
+
+  userProfiles: defineTable({
+    userId: v.id("users"),
+    username: v.string(),                    // stored lowercase
+    email: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()),
+    instagramHandle: v.optional(v.string()), // stored lowercase, without @
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_username", ["username"])
+    .index("by_email", ["email"])
+    .index("by_phone", ["phoneNumber"])
+    .index("by_instagram", ["instagramHandle"]),
+
+  friends: defineTable({
+    userId: v.id("users"),
+    friendId: v.id("users"),
+    status: v.string(),                      // "pending" | "accepted" | "blocked"
+    createdAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_friend", ["friendId"])
+    .index("by_user_and_friend", ["userId", "friendId"])
+    .index("by_status", ["status"]),
+
+  privateChains: defineTable({
+    senderId: v.id("users"),
+    recipientId: v.id("users"),
+    chainId: v.id("pluginChains"),
+    chainName: v.string(),
+    chainData: v.string(),                   // JSON snapshot of chain
+    status: v.string(),                      // "pending" | "accepted" | "rejected" | "imported"
+    sentAt: v.number(),
+    respondedAt: v.optional(v.number()),
+  })
+    .index("by_recipient", ["recipientId", "status"])
+    .index("by_sender", ["senderId"])
+    .index("by_recipient_and_sender", ["recipientId", "senderId"]),
+
+  // ============================================
   // PARAMETER TRANSLATION ENGINE
   // ============================================
 

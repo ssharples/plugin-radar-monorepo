@@ -1068,3 +1068,43 @@ export async function uploadDiscoveredParameterMap(
     return { success: false, error: String(err) };
   }
 }
+
+// ============================================
+// FRIENDS & CHAIN SHARING
+// ============================================
+
+/**
+ * Get the count of pending received chains (for notification badge)
+ */
+export async function getPendingChainCount(): Promise<number> {
+  const token = getStoredSession();
+  if (!token) return 0;
+
+  try {
+    const received = await convex.query(api.privateChains.getReceivedChains, {
+      sessionToken: token,
+    });
+    return received.length;
+  } catch (err) {
+    console.error("Failed to get pending chain count:", err);
+    return 0;
+  }
+}
+
+/**
+ * Get the count of pending friend requests (for notification badge)
+ */
+export async function getPendingFriendRequestCount(): Promise<number> {
+  const token = getStoredSession();
+  if (!token) return 0;
+
+  try {
+    const requests = await convex.query(api.friends.getPendingRequests, {
+      sessionToken: token,
+    });
+    return requests.length;
+  } catch (err) {
+    console.error("Failed to get pending request count:", err);
+    return 0;
+  }
+}

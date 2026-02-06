@@ -40,6 +40,8 @@ target_sources(PluginChainManager
         src/core/ChainNode.cpp
         src/core/PresetManager.cpp
         src/core/ParameterDiscovery.cpp
+        src/core/UserProfile.cpp
+        src/core/ChainSharingManager.cpp
         src/bridge/WebViewBridge.cpp
         src/bridge/ResourceProvider.cpp
         src/ui/PluginEditorHost.cpp
