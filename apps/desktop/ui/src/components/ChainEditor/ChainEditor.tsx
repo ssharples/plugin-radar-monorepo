@@ -1,23 +1,41 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   DndContext,
-  closestCenter,
-  KeyboardSensor,
+  DragOverlay,
   PointerSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
+  type DragStartEvent,
   type DragEndEvent,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
 import { Link2, Layers, GitBranch, Undo2, Redo2, Power, AppWindow } from 'lucide-react';
 import { useChainStore } from '../../stores/chainStore';
 import { juceBridge } from '../../api/juce-bridge';
+import type { ChainNodeUI } from '../../api/types';
 import { ChainNodeList } from './ChainNodeList';
+import { DragPreview } from './DragPreview';
 import { HeaderMenu } from '../HeaderMenu';
+
+// Root parent ID (the implicit root group)
+const ROOT_PARENT_ID = 0;
+
+/**
+ * Custom collision detection: prefer pointerWithin for drop zones (small targets),
+ * fall back to rectIntersection for group targets.
+ */
+const customCollisionDetection: CollisionDetection = (args) => {
+  // First try pointer-within (more precise for thin drop zones)
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) {
+    return pointerCollisions;
+  }
+  // Fall back to rect intersection for broader group targets
+  return rectIntersection(args);
+};
 
 export function ChainEditor() {
   const {
@@ -26,6 +44,7 @@ export function ChainEditor() {
     fetchChainState,
     moveNode,
     createGroup,
+    dissolveGroup,
     selectNode,
     undo,
     redo,
@@ -35,10 +54,29 @@ export function ChainEditor() {
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [activeDragNode, setActiveDragNode] = useState<ChainNodeUI | null>(null);
+  const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const [shiftHeld, setShiftHeld] = useState(false);
 
   // Chain-level toggle state
   const [bypassState, setBypassState] = useState<{ allBypassed: boolean; anyBypassed: boolean }>({ allBypassed: false, anyBypassed: false });
   const [windowState, setWindowState] = useState<{ openCount: number; totalCount: number }>({ openCount: 0, totalCount: 0 });
+
+  // Track shift key state
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setShiftHeld(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setShiftHeld(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   useEffect(() => {
     fetchChainState();
@@ -70,7 +108,7 @@ export function ChainEditor() {
     } catch { /* ignore */ }
   }, []);
 
-  // Keyboard shortcuts for undo/redo
+  // Keyboard shortcuts for undo/redo and group creation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
@@ -85,12 +123,21 @@ export function ChainEditor() {
       ) {
         e.preventDefault();
         if (canRedo()) redo();
+      } else if (e.key === 'g' || e.key === 'G') {
+        // Ctrl+G = serial group, Ctrl+Shift+G = parallel group
+        if (selectedIds.size >= 2) {
+          e.preventDefault();
+          const mode = e.shiftKey ? 'parallel' : 'serial';
+          const ids = Array.from(selectedIds);
+          createGroup(ids, mode);
+          setSelectedIds(new Set());
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, canUndo, canRedo]);
+  }, [undo, redo, canUndo, canRedo, selectedIds, createGroup]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -98,21 +145,88 @@ export function ChainEditor() {
         distance: 5,
       },
     }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor)
   );
 
-  // Tree-based DnD: reorder top-level nodes within root group (id=0)
-  const handleDragEnd = (event: DragEndEvent) => {
+  // DnD handlers
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    const data = active.data.current;
+    if (data?.node) {
+      setActiveDragNode(data.node as ChainNodeUI);
+      setActiveDragId(data.nodeId as number);
+    }
+  }, []);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const overIndex = nodes.findIndex((n) => n.id === over.id);
-      if (overIndex !== -1) {
-        moveNode(active.id as number, 0, overIndex);
+    setActiveDragNode(null);
+    setActiveDragId(null);
+
+    if (!over) return;
+
+    const dragData = active.data.current;
+    const draggedNodeId = dragData?.nodeId as number;
+    if (draggedNodeId == null) return;
+
+    const overId = String(over.id);
+
+    // Parse the droppable ID
+    if (overId.startsWith('drop:')) {
+      // Format: drop:{parentId}:{insertIndex}
+      const parts = overId.split(':');
+      const targetParentId = parseInt(parts[1], 10);
+      const targetIndex = parseInt(parts[2], 10);
+
+      if (isNaN(targetParentId) || isNaN(targetIndex)) return;
+
+      // Check if shift is held for group creation
+      if (shiftHeld) {
+        // Find the adjacent node for group creation
+        const adjacentNodeId = findAdjacentNodeId(nodes, targetParentId, targetIndex);
+        if (adjacentNodeId != null && adjacentNodeId !== draggedNodeId) {
+          // Create a parallel group with dragged + adjacent
+          await createGroup([draggedNodeId, adjacentNodeId], 'parallel');
+          return;
+        }
+      }
+
+      // Regular move: adjust index if needed
+      // The backend handles index adjustment for same-parent moves
+      await moveNode(draggedNodeId, targetParentId, targetIndex);
+
+      // Auto-dissolve: check if old parent now has 0 or 1 children
+      // The backend handles this via chainChanged event, but we can also
+      // check locally for responsiveness
+      const oldParent = findParentOf(nodes, draggedNodeId);
+      if (oldParent && oldParent.type === 'group') {
+        const remainingChildren = oldParent.children.filter(c => c.id !== draggedNodeId);
+        if (remainingChildren.length <= 1 && oldParent.id !== ROOT_PARENT_ID) {
+          // Auto-dissolve groups that end up with 0 or 1 children
+          await dissolveGroup(oldParent.id);
+        }
+      }
+    } else if (overId.startsWith('group:')) {
+      // Dropped onto a group container → append to end
+      const targetGroupId = parseInt(overId.split(':')[1], 10);
+      if (isNaN(targetGroupId)) return;
+
+      // Find the group to determine insert index
+      const targetGroup = findNodeById(nodes, targetGroupId);
+      const insertIndex = targetGroup?.type === 'group' ? targetGroup.children.length : 0;
+
+      await moveNode(draggedNodeId, targetGroupId, insertIndex);
+
+      // Auto-dissolve old parent if needed
+      const oldParent = findParentOf(nodes, draggedNodeId);
+      if (oldParent && oldParent.type === 'group') {
+        const remainingChildren = oldParent.children.filter(c => c.id !== draggedNodeId);
+        if (remainingChildren.length <= 1 && oldParent.id !== ROOT_PARENT_ID) {
+          await dissolveGroup(oldParent.id);
+        }
       }
     }
-  };
+  }, [nodes, moveNode, createGroup, dissolveGroup, shiftHeld]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (selectedIds.size >= 2) {
@@ -153,9 +267,7 @@ export function ChainEditor() {
 
   const hasNodes = nodes.length > 0;
   const totalPlugins = countPluginsInTree(nodes);
-
-  // Collect top-level node IDs for sortable context
-  const sortableIds = nodes.map((n) => n.id);
+  const isDragActive = activeDragNode !== null;
 
   return (
     <div className="flex flex-col h-full bg-plugin-surface rounded-lg overflow-hidden">
@@ -272,36 +384,46 @@ export function ChainEditor() {
         ) : (
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={customCollisionDetection}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext
-              items={sortableIds}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {/* Input indicator */}
-                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  Audio Input
-                </div>
-
-                {/* Tree-based rendering */}
-                <ChainNodeList
-                  nodes={nodes}
-                  depth={0}
-                  isParallelParent={false}
-                  onNodeSelect={handleNodeSelect}
-                  selectedIds={selectedIds}
-                />
-
-                {/* Output indicator */}
-                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  Audio Output
-                </div>
+            <div className="space-y-2">
+              {/* Input indicator */}
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                Audio Input
               </div>
-            </SortableContext>
+
+              {/* Tree-based rendering with drop zones */}
+              <ChainNodeList
+                nodes={nodes}
+                depth={0}
+                parentId={ROOT_PARENT_ID}
+                isParallelParent={false}
+                onNodeSelect={handleNodeSelect}
+                selectedIds={selectedIds}
+                isDragActive={isDragActive}
+                draggedNodeId={activeDragId}
+                shiftHeld={shiftHeld}
+              />
+
+              {/* Output indicator */}
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                Audio Output
+              </div>
+            </div>
+
+            {/* Drag overlay - follows cursor */}
+            <DragOverlay dropAnimation={{
+              duration: 200,
+              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+            }}>
+              {activeDragNode ? (
+                <DragPreview node={activeDragNode} />
+              ) : null}
+            </DragOverlay>
           </DndContext>
         )}
       </div>
@@ -319,6 +441,7 @@ export function ChainEditor() {
           >
             <Layers className="w-4 h-4 text-blue-400" />
             Create Serial Group
+            <span className="ml-auto text-xxs text-plugin-muted">⌘G</span>
           </button>
           <button
             onClick={() => handleCreateGroup('parallel')}
@@ -326,6 +449,7 @@ export function ChainEditor() {
           >
             <GitBranch className="w-4 h-4 text-orange-400" />
             Create Parallel Group
+            <span className="ml-auto text-xxs text-plugin-muted">⌘⇧G</span>
           </button>
         </div>
       )}
@@ -341,12 +465,15 @@ export function ChainEditor() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
-function countPluginsInTree(nodes: import('../../api/types').ChainNodeUI[]): number {
+// ============================================
+// Tree utility functions
+// ============================================
+
+function countPluginsInTree(nodes: ChainNodeUI[]): number {
   let count = 0;
   for (const node of nodes) {
     if (node.type === 'plugin') count++;
@@ -355,7 +482,63 @@ function countPluginsInTree(nodes: import('../../api/types').ChainNodeUI[]): num
   return count;
 }
 
-function renderSignalFlow(nodes: import('../../api/types').ChainNodeUI[]): React.ReactNode[] {
+/**
+ * Find a node by ID anywhere in the tree.
+ */
+function findNodeById(nodes: ChainNodeUI[], id: number): ChainNodeUI | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    if (node.type === 'group') {
+      const found = findNodeById(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find the parent group of a given node ID.
+ * Returns null for root-level nodes (parent is implicit root).
+ */
+function findParentOf(nodes: ChainNodeUI[], targetId: number, parent?: ChainNodeUI): ChainNodeUI | null {
+  for (const node of nodes) {
+    if (node.id === targetId) return parent ?? null;
+    if (node.type === 'group') {
+      const found = findParentOf(node.children, targetId, node);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find the adjacent node ID at a given insert position within a parent.
+ * Used for shift+drop group creation — returns the node that would be
+ * "next to" the drop position.
+ */
+function findAdjacentNodeId(
+  allNodes: ChainNodeUI[],
+  parentId: number,
+  insertIndex: number,
+): number | null {
+  const parentChildren = parentId === 0
+    ? allNodes
+    : (() => {
+        const parent = findNodeById(allNodes, parentId);
+        return parent?.type === 'group' ? parent.children : [];
+      })();
+
+  // Prefer the node just before the insert index, fall back to the one after
+  if (insertIndex > 0 && parentChildren[insertIndex - 1]) {
+    return parentChildren[insertIndex - 1].id;
+  }
+  if (parentChildren[insertIndex]) {
+    return parentChildren[insertIndex].id;
+  }
+  return null;
+}
+
+function renderSignalFlow(nodes: ChainNodeUI[]): React.ReactNode[] {
   const elements: React.ReactNode[] = [];
 
   nodes.forEach((node, i) => {

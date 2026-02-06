@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Power, X, ArrowLeftRight, Dice5 } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/core';
+import { GripVertical, Power, X, ArrowLeftRight } from 'lucide-react';
 import type { PluginNodeUI, ChainSlot as ChainSlotType } from '../../api/types';
 import { PluginSwapMenu } from './PluginSwapMenu';
 
@@ -20,6 +19,8 @@ interface ChainSlotProps {
   onToggleEditor: () => void;
   /** Called when a plugin swap completes successfully */
   onSwapComplete?: (newPluginName: string, confidence: number) => void;
+  /** Whether any drag is currently active (for dimming non-dragged items) */
+  isDragActive?: boolean;
 }
 
 export function ChainSlot({
@@ -33,6 +34,7 @@ export function ChainSlot({
   onToggleBypass,
   onToggleEditor,
   onSwapComplete,
+  isDragActive: _isDragActive = false,
 }: ChainSlotProps) {
   // Unified data access
   const id = node?.id ?? slot?.index ?? 0;
@@ -49,16 +51,15 @@ export function ChainSlot({
     attributes,
     listeners,
     setNodeRef,
-    transform,
-    transition,
     isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+  } = useDraggable({
+    id: `drag:${id}`,
+    data: {
+      type: 'plugin',
+      nodeId: id,
+      node: node,
+    },
+  });
 
   const handleSwapComplete = useCallback((newPluginName: string, confidence: number) => {
     setSwapToast(`Swapped ${name} → ${newPluginName} (${confidence}% match)`);
@@ -70,10 +71,11 @@ export function ChainSlot({
     <div className="relative">
       <div
         ref={setNodeRef}
-        style={style}
         onClick={(e) => { e.stopPropagation(); onToggleEditor(); }}
-        className={`flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${
-          isMultiSelected
+        className={`
+          flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer
+          ${isDragging ? 'opacity-30 scale-[0.98]' : ''}
+          ${isMultiSelected
             ? 'bg-plugin-accent/10 border-plugin-accent ring-1 ring-plugin-accent/50'
             : isSelected
               ? 'bg-plugin-accent/8 border-plugin-accent/70 ring-1 ring-plugin-accent/30 shadow-glow-accent'
@@ -82,7 +84,8 @@ export function ChainSlot({
                 : isEditorOpen
                   ? 'bg-plugin-bg border-plugin-accent shadow-glow-accent'
                   : 'bg-plugin-bg border-plugin-border hover:border-plugin-accent/50'
-        } ${isDragging ? 'shadow-lg shadow-plugin-accent/20' : ''}`}
+          }
+        `}
       >
         {/* Drag handle */}
         <button
@@ -104,7 +107,7 @@ export function ChainSlot({
             {name}
           </p>
           <p className="text-xs text-plugin-muted truncate">
-            {manufacturer} {format && `\u2022 ${format}`}
+            {manufacturer} {format && `• ${format}`}
           </p>
         </div>
 
