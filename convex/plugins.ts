@@ -709,6 +709,23 @@ export const update = mutation({
     mentionCount30d: v.optional(v.number()),
     mentionScore: v.optional(v.number()),
     lastMentionScan: v.optional(v.number()),
+    // Effect taxonomy
+    effectType: v.optional(v.string()),
+    circuitEmulation: v.optional(v.string()),
+    tonalCharacter: v.optional(v.array(v.string())),
+    // Enrichment fields
+    worksWellOn: v.optional(v.array(v.string())),
+    useCases: v.optional(v.array(v.string())),
+    genreSuitability: v.optional(v.array(v.string())),
+    sonicCharacter: v.optional(v.array(v.string())),
+    comparableTo: v.optional(v.array(v.string())),
+    skillLevel: v.optional(v.string()),
+    learningCurve: v.optional(v.string()),
+    cpuUsage: v.optional(v.string()),
+    licenseType: v.optional(v.string()),
+    keyFeatures: v.optional(v.array(v.string())),
+    recommendedDaws: v.optional(v.array(v.string())),
+    isIndustryStandard: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;

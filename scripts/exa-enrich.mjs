@@ -505,26 +505,34 @@ async function main() {
   const findMentionsData = args.includes('--mentions');
   const dryRun = args.includes('--dry-run');
   const manufacturerFilter = args.find(a => a.startsWith('--manufacturer='))?.split('=')[1];
+  const categoryFilter = args.find(a => a.startsWith('--category='))?.split('=')[1];
   
   console.log('=== Exa Plugin Enrichment ===');
   console.log(`Mode: ${useResearch ? 'Research API' : 'Search API'}`);
   console.log(`Limit: ${limit}`);
   console.log(`Dry run: ${dryRun}`);
   if (manufacturerFilter) console.log(`Manufacturer: ${manufacturerFilter}`);
+  if (categoryFilter) console.log(`Category filter: ${categoryFilter}`);
   
   // Get plugins that need enrichment
   const pluginResult = await client.query('plugins:list', { limit: 1000 });
   let plugins = pluginResult.items || pluginResult;
   
-  // Filter to those needing enrichment
-  plugins = plugins.filter(p => 
-    !p.description || 
-    p.description.length < 50 || 
-    !p.tags || 
-    p.tags.length === 0 ||
-    !p.formats ||
-    p.formats.length === 0
-  );
+  // Apply category filter FIRST (e.g., --category=utility)
+  if (categoryFilter) {
+    plugins = plugins.filter(p => p.category === categoryFilter);
+    console.log(`Filtered to ${plugins.length} plugins with category "${categoryFilter}"`);
+  } else {
+    // Default: filter to those needing enrichment
+    plugins = plugins.filter(p => 
+      !p.description || 
+      p.description.length < 50 || 
+      !p.tags || 
+      p.tags.length === 0 ||
+      !p.formats ||
+      p.formats.length === 0
+    );
+  }
   
   // Apply manufacturer filter
   if (manufacturerFilter) {
