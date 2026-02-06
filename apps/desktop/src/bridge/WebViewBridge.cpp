@@ -356,6 +356,29 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             else
                 completion(juce::var());
         })
+        // ============================================
+        // Chain-level toggle controls
+        // ============================================
+        .withNativeFunction("toggleAllBypass", [this](const juce::Array<juce::var>& args,
+                                                       juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            completion(toggleAllBypass());
+        })
+        .withNativeFunction("getAllBypassState", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            completion(getAllBypassState());
+        })
+        .withNativeFunction("toggleAllPluginWindows", [this](const juce::Array<juce::var>& args,
+                                                              juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            completion(toggleAllPluginWindows());
+        })
+        .withNativeFunction("getPluginWindowState", [this](const juce::Array<juce::var>& args,
+                                                            juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            completion(getPluginWindowState());
+        })
         .withResourceProvider([this](const juce::String& url) {
             return resourceHandler(url);
         }, juce::URL("https://ui.local").getOrigin());
@@ -1160,6 +1183,61 @@ juce::var WebViewBridge::setNodeBypassed(const juce::var& args)
     chainProcessor.setNodeBypassed(nodeId, bypassed);
     result->setProperty("success", true);
     result->setProperty("chainState", getChainState());
+
+    return juce::var(result);
+}
+
+//==============================================================================
+// Chain-level Toggle Controls
+//==============================================================================
+
+juce::var WebViewBridge::toggleAllBypass()
+{
+    auto* result = new juce::DynamicObject();
+
+    chainProcessor.toggleAllBypass();
+    auto state = chainProcessor.getBypassState();
+
+    result->setProperty("success", true);
+    result->setProperty("allBypassed", state.allBypassed);
+    result->setProperty("anyBypassed", state.anyBypassed);
+    result->setProperty("chainState", getChainState());
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::getAllBypassState()
+{
+    auto* result = new juce::DynamicObject();
+
+    auto state = chainProcessor.getBypassState();
+    result->setProperty("allBypassed", state.allBypassed);
+    result->setProperty("anyBypassed", state.anyBypassed);
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::toggleAllPluginWindows()
+{
+    auto* result = new juce::DynamicObject();
+
+    chainProcessor.toggleAllPluginWindows();
+    auto state = chainProcessor.getWindowState();
+
+    result->setProperty("success", true);
+    result->setProperty("openCount", state.openCount);
+    result->setProperty("totalCount", state.totalCount);
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::getPluginWindowState()
+{
+    auto* result = new juce::DynamicObject();
+
+    auto state = chainProcessor.getWindowState();
+    result->setProperty("openCount", state.openCount);
+    result->setProperty("totalCount", state.totalCount);
 
     return juce::var(result);
 }

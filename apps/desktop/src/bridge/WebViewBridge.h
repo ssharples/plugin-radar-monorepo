@@ -76,6 +76,12 @@ private:
     juce::var addPluginToGroup(const juce::var& args);
     juce::var setNodeBypassed(const juce::var& args);
 
+    // Chain-level toggle controls
+    juce::var toggleAllBypass();
+    juce::var getAllBypassState();
+    juce::var toggleAllPluginWindows();
+    juce::var getPluginWindowState();
+
     // Blacklist management
     juce::var getBlacklist();
     juce::var addToBlacklist(const juce::String& pluginPath);

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getSessionUser } from "./lib/auth";
+import { checkRateLimit } from "./lib/rateLimit";
 
 // ============================================
 // COMMENTS
@@ -18,6 +19,9 @@ export const addComment = mutation({
   },
   handler: async (ctx, args) => {
     const { userId, user } = await getSessionUser(ctx, args.sessionToken);
+
+    // Rate limit: 10 comments per minute per user
+    await checkRateLimit(ctx, `comment:${userId}`, 10, 60 * 1000);
 
     const chain = await ctx.db.get(args.chainId);
     if (!chain) throw new Error("Chain not found");

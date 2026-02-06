@@ -8,6 +8,8 @@ import { Footer } from './components/Footer';
 import { CloudSync } from './components/CloudSync';
 import { usePresetStore } from './stores/presetStore';
 import { useSyncStore } from './stores/syncStore';
+import { useOfflineStore, startRetryLoop } from './stores/offlineStore';
+import { executeQueuedWrite } from './api/convex-client';
 import { juceBridge } from './api/juce-bridge';
 
 interface ErrorBoundaryState {
@@ -49,15 +51,22 @@ function App() {
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [analyzerView, setAnalyzerView] = useState<AnalyzerView>('waveform');
   const { currentPreset, fetchPresets } = usePresetStore();
-  const { initialize } = useSyncStore();
+  const { initialize: initSync } = useSyncStore();
+  const { initialize: initOffline } = useOfflineStore();
 
   useEffect(() => {
     fetchPresets();
   }, [fetchPresets]);
 
   useEffect(() => {
-    initialize().catch(console.error);
-  }, [initialize]);
+    initSync().catch(console.error);
+  }, [initSync]);
+
+  // Initialize offline store and start retry loop
+  useEffect(() => {
+    initOffline();
+    startRetryLoop(executeQueuedWrite);
+  }, [initOffline]);
 
   // Start waveform/meter stream at app level so meters always receive data
   useEffect(() => {

@@ -13,8 +13,9 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Link2, Layers, GitBranch } from 'lucide-react';
+import { Link2, Layers, GitBranch, Undo2, Redo2, Power, AppWindow } from 'lucide-react';
 import { useChainStore } from '../../stores/chainStore';
+import { juceBridge } from '../../api/juce-bridge';
 import { ChainNodeList } from './ChainNodeList';
 
 export function ChainEditor() {
@@ -25,14 +26,70 @@ export function ChainEditor() {
     moveNode,
     createGroup,
     selectNode,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useChainStore();
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
+  // Chain-level toggle state
+  const [bypassState, setBypassState] = useState<{ allBypassed: boolean; anyBypassed: boolean }>({ allBypassed: false, anyBypassed: false });
+  const [windowState, setWindowState] = useState<{ openCount: number; totalCount: number }>({ openCount: 0, totalCount: 0 });
+
   useEffect(() => {
     fetchChainState();
+    // Fetch initial toggle states
+    juceBridge.getAllBypassState().then(setBypassState).catch(() => {});
+    juceBridge.getPluginWindowState().then(setWindowState).catch(() => {});
   }, [fetchChainState]);
+
+  // Refresh toggle states when chain changes
+  useEffect(() => {
+    const unsub = juceBridge.onChainChanged(() => {
+      juceBridge.getAllBypassState().then(setBypassState).catch(() => {});
+      juceBridge.getPluginWindowState().then(setWindowState).catch(() => {});
+    });
+    return unsub;
+  }, []);
+
+  const handleToggleAllBypass = useCallback(async () => {
+    try {
+      const result = await juceBridge.toggleAllBypass();
+      setBypassState({ allBypassed: result.allBypassed, anyBypassed: result.anyBypassed });
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleToggleAllWindows = useCallback(async () => {
+    try {
+      const result = await juceBridge.toggleAllPluginWindows();
+      setWindowState({ openCount: result.openCount, totalCount: result.totalCount });
+    } catch { /* ignore */ }
+  }, []);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo()) undo();
+      } else if (
+        (e.key === 'z' && e.shiftKey) ||
+        (e.key === 'y' && !e.shiftKey)
+      ) {
+        e.preventDefault();
+        if (canRedo()) redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, canUndo, canRedo]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -107,15 +164,103 @@ export function ChainEditor() {
           <Link2 className="w-4 h-4 text-plugin-accent" />
           <h2 className="text-sm font-semibold text-plugin-text">Plugin Chain</h2>
         </div>
-        <span className="text-xs text-plugin-muted">
-          {totalPlugins} plugin{totalPlugins !== 1 ? 's' : ''}
-        </span>
+        <div className="flex items-center gap-1">
+          {/* Undo/Redo buttons */}
+          <button
+            onClick={() => undo()}
+            disabled={!canUndo()}
+            className={`p-1 rounded transition-colors ${
+              canUndo()
+                ? 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50'
+                : 'text-plugin-dim cursor-not-allowed'
+            }`}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => redo()}
+            disabled={!canRedo()}
+            className={`p-1 rounded transition-colors ${
+              canRedo()
+                ? 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50'
+                : 'text-plugin-dim cursor-not-allowed'
+            }`}
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Quick Search button */}
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="p-1 rounded transition-colors text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50"
+            title="Quick Add Plugin (Ctrl+F)"
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Separator */}
+          {totalPlugins > 0 && (
+            <div className="w-px h-4 bg-plugin-border mx-1" />
+          )}
+
+          {/* Toggle All Bypass */}
+          {totalPlugins > 0 && (
+            <button
+              onClick={handleToggleAllBypass}
+              className={`p-1 rounded transition-colors ${
+                bypassState.allBypassed
+                  ? 'text-red-400 bg-red-500/15 hover:bg-red-500/25'
+                  : bypassState.anyBypassed
+                    ? 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/15'
+                    : 'text-green-400 hover:text-green-300 hover:bg-green-500/15'
+              }`}
+              title={
+                bypassState.allBypassed
+                  ? 'Enable all plugins'
+                  : 'Bypass all plugins'
+              }
+            >
+              <Power className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Toggle All Plugin Windows */}
+          {totalPlugins > 0 && (
+            <button
+              onClick={handleToggleAllWindows}
+              className={`p-1 rounded transition-colors flex items-center gap-1 ${
+                windowState.openCount > 0
+                  ? 'text-plugin-accent hover:text-plugin-accent/80 hover:bg-plugin-accent/15'
+                  : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50'
+              }`}
+              title={
+                windowState.openCount > 0
+                  ? `Close all plugin windows (${windowState.openCount}/${windowState.totalCount} open)`
+                  : 'Open all plugin windows'
+              }
+            >
+              <AppWindow className="w-3.5 h-3.5" />
+              {windowState.totalCount > 0 && (
+                <span className="text-[10px] leading-none">
+                  {windowState.openCount}/{windowState.totalCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          <span className="text-xs text-plugin-muted ml-2">
+            {totalPlugins} plugin{totalPlugins !== 1 ? 's' : ''}
+          </span>
+        </div>
       </div>
 
       {/* Chain */}
       <div
         className="flex-1 overflow-y-auto p-3"
         onContextMenu={handleContextMenu}
+        onClick={() => { selectNode(null); setSelectedIds(new Set()); }}
       >
         {loading && !hasNodes ? (
           <div className="flex items-center justify-center h-32 text-plugin-muted">
@@ -201,6 +346,12 @@ export function ChainEditor() {
           </div>
         </div>
       )}
+
+      {/* Quick Search overlay */}
+      <QuickSearch
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </div>
   );
 }

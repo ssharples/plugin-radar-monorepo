@@ -406,6 +406,53 @@ class JuceBridge {
   }
 
   // ============================================
+  // Chain-level Toggle Controls
+  // ============================================
+
+  /**
+   * Toggle all plugins bypass: if ANY are active, bypass all. If ALL are bypassed, enable all.
+   */
+  async toggleAllBypass(): Promise<{
+    success: boolean;
+    allBypassed: boolean;
+    anyBypassed: boolean;
+    chainState?: ChainStateV2;
+  }> {
+    return this.callNative('toggleAllBypass');
+  }
+
+  /**
+   * Get current bypass state for all plugins
+   */
+  async getAllBypassState(): Promise<{
+    allBypassed: boolean;
+    anyBypassed: boolean;
+  }> {
+    return this.callNative('getAllBypassState');
+  }
+
+  /**
+   * Toggle all plugin windows: if any are open, close all. If none open, open all.
+   */
+  async toggleAllPluginWindows(): Promise<{
+    success: boolean;
+    openCount: number;
+    totalCount: number;
+  }> {
+    return this.callNative('toggleAllPluginWindows');
+  }
+
+  /**
+   * Get current plugin window state
+   */
+  async getPluginWindowState(): Promise<{
+    openCount: number;
+    totalCount: number;
+  }> {
+    return this.callNative('getPluginWindowState');
+  }
+
+  // ============================================
   // Cloud Sharing - Export/Import with Presets
   // ============================================
 

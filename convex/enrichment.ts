@@ -1,10 +1,14 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Mutation to enrich a plugin with metadata
+// Mutation to enrich a plugin with metadata (unified — all enrichment fields)
 export const enrichPlugin = mutation({
   args: {
     id: v.id("plugins"),
+    // Effect taxonomy
+    effectType: v.optional(v.string()),
+    circuitEmulation: v.optional(v.string()),
+    tonalCharacter: v.optional(v.array(v.string())),
     // Usage Context
     worksWellOn: v.optional(v.array(v.string())),
     useCases: v.optional(v.array(v.string())),
@@ -42,20 +46,27 @@ export const enrichPlugin = mutation({
   },
 });
 
-// Batch enrich multiple plugins
+// Batch enrich multiple plugins (unified — all enrichment fields)
 export const batchEnrich = mutation({
   args: {
     plugins: v.array(
       v.object({
         id: v.id("plugins"),
+        // Effect taxonomy
+        effectType: v.optional(v.string()),
+        circuitEmulation: v.optional(v.string()),
+        tonalCharacter: v.optional(v.array(v.string())),
+        // Usage Context
         worksWellOn: v.optional(v.array(v.string())),
         useCases: v.optional(v.array(v.string())),
         genreSuitability: v.optional(v.array(v.string())),
         sonicCharacter: v.optional(v.array(v.string())),
         comparableTo: v.optional(v.array(v.string())),
+        // User Experience
         skillLevel: v.optional(v.string()),
         learningCurve: v.optional(v.string()),
         cpuUsage: v.optional(v.string()),
+        // Technical/Business
         licenseType: v.optional(v.string()),
         keyFeatures: v.optional(v.array(v.string())),
         recommendedDaws: v.optional(v.array(v.string())),
@@ -106,9 +117,10 @@ export const getUnenriched = query({
       .order("desc")
       .collect();
 
-    // Filter to plugins missing enrichment data
+    // Filter to plugins missing enrichment data (check both taxonomy + usage fields)
     const unenriched = plugins.filter(
       (p) =>
+        !p.effectType ||
         !p.worksWellOn ||
         p.worksWellOn.length === 0 ||
         !p.useCases ||
@@ -124,6 +136,9 @@ export const getUnenriched = query({
       category: p.category,
       manufacturer: p.manufacturer,
       // Include existing enrichment for context
+      effectType: p.effectType,
+      circuitEmulation: p.circuitEmulation,
+      tonalCharacter: p.tonalCharacter,
       worksWellOn: p.worksWellOn,
       useCases: p.useCases,
       sonicCharacter: p.sonicCharacter,
@@ -142,6 +157,11 @@ export const getEnrichmentStats = query({
 
     const stats = {
       total,
+      // Taxonomy fields
+      withEffectType: plugins.filter((p) => p.effectType).length,
+      withCircuitEmulation: plugins.filter((p) => p.circuitEmulation).length,
+      withTonalCharacter: plugins.filter((p) => p.tonalCharacter && p.tonalCharacter.length > 0).length,
+      // Usage fields
       withWorksWellOn: plugins.filter((p) => p.worksWellOn && p.worksWellOn.length > 0).length,
       withUseCases: plugins.filter((p) => p.useCases && p.useCases.length > 0).length,
       withSonicCharacter: plugins.filter((p) => p.sonicCharacter && p.sonicCharacter.length > 0).length,
@@ -151,6 +171,7 @@ export const getEnrichmentStats = query({
       withKeyFeatures: plugins.filter((p) => p.keyFeatures && p.keyFeatures.length > 0).length,
       fullyEnriched: plugins.filter(
         (p) =>
+          p.effectType &&
           p.worksWellOn &&
           p.worksWellOn.length > 0 &&
           p.useCases &&
@@ -163,6 +184,9 @@ export const getEnrichmentStats = query({
     return {
       ...stats,
       percentages: {
+        effectType: Math.round((stats.withEffectType / total) * 100),
+        circuitEmulation: Math.round((stats.withCircuitEmulation / total) * 100),
+        tonalCharacter: Math.round((stats.withTonalCharacter / total) * 100),
         worksWellOn: Math.round((stats.withWorksWellOn / total) * 100),
         useCases: Math.round((stats.withUseCases / total) * 100),
         sonicCharacter: Math.round((stats.withSonicCharacter / total) * 100),

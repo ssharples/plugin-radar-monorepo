@@ -3,6 +3,16 @@ import type { ChainSlot, ChainNodeUI, ChainStateV2 } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
 
+// ============================================
+// Undo/Redo snapshot type
+// ============================================
+interface ChainSnapshot {
+  nodes: ChainNodeUI[];
+  slots: ChainSlot[];
+}
+
+const MAX_HISTORY = 50;
+
 interface ChainStoreState {
   // Tree-based state (V2)
   nodes: ChainNodeUI[];
@@ -14,6 +24,12 @@ interface ChainStoreState {
   openEditors: Set<number>;  // keyed by node ID
   loading: boolean;
   error: string | null;
+
+  // Undo/Redo stacks
+  history: ChainSnapshot[];
+  future: ChainSnapshot[];
+  /** Whether the last state change was from undo/redo (skip pushing to history) */
+  _undoRedoInProgress: boolean;
 }
 
 interface ChainActions {
@@ -48,6 +64,14 @@ interface ChainActions {
 
   // Backward compat alias
   selectSlot: (slotIndex: number | null) => void;
+
+  // Undo/Redo
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  /** Push current state to history before a mutation */
+  _pushHistory: () => void;
 }
 
 function applyState(state: ChainStateV2) {
@@ -90,10 +114,98 @@ const initialState: ChainStoreState = {
   openEditors: new Set<number>(),
   loading: false,
   error: null,
+  history: [],
+  future: [],
+  _undoRedoInProgress: false,
 };
 
 export const useChainStore = create<ChainStoreState & ChainActions>((set, get) => ({
   ...initialState,
+
+  // =============================================
+  // Undo/Redo
+  // =============================================
+
+  _pushHistory: () => {
+    const { nodes, slots, history } = get();
+    // Deep clone the current state for the snapshot
+    const snapshot: ChainSnapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      slots: JSON.parse(JSON.stringify(slots)),
+    };
+    const newHistory = [...history, snapshot];
+    // Cap at MAX_HISTORY
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+    }
+    // Clear redo stack on new mutation
+    set({ history: newHistory, future: [] });
+  },
+
+  canUndo: () => get().history.length > 0,
+  canRedo: () => get().future.length > 0,
+
+  undo: async () => {
+    const { history, future, nodes, slots } = get();
+    if (history.length === 0) return;
+
+    // Save current state to future (redo stack)
+    const currentSnapshot: ChainSnapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      slots: JSON.parse(JSON.stringify(slots)),
+    };
+
+    const newHistory = [...history];
+    const previousState = newHistory.pop()!;
+
+    set({
+      _undoRedoInProgress: true,
+      history: newHistory,
+      future: [...future, currentSnapshot],
+      nodes: previousState.nodes,
+      slots: previousState.slots,
+    });
+
+    // Sync the restored state to the JUCE backend
+    try {
+      await juceBridge.importChain({ nodes: previousState.nodes, slots: previousState.slots });
+    } catch {
+      // importChain may fail if backend doesn't support state restore — UI state is still correct
+    }
+
+    set({ _undoRedoInProgress: false });
+  },
+
+  redo: async () => {
+    const { history, future, nodes, slots } = get();
+    if (future.length === 0) return;
+
+    // Save current state to history (undo stack)
+    const currentSnapshot: ChainSnapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      slots: JSON.parse(JSON.stringify(slots)),
+    };
+
+    const newFuture = [...future];
+    const nextState = newFuture.pop()!;
+
+    set({
+      _undoRedoInProgress: true,
+      history: [...history, currentSnapshot],
+      future: newFuture,
+      nodes: nextState.nodes,
+      slots: nextState.slots,
+    });
+
+    // Sync the restored state to the JUCE backend
+    try {
+      await juceBridge.importChain({ nodes: nextState.nodes, slots: nextState.slots });
+    } catch {
+      // importChain may fail if backend doesn't support state restore — UI state is still correct
+    }
+
+    set({ _undoRedoInProgress: false });
+  },
 
   fetchChainState: async () => {
     set({ loading: true, error: null });
@@ -110,6 +222,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // =============================================
 
   addPlugin: async (pluginId: string, insertIndex = -1) => {
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.addPlugin(pluginId, insertIndex);
@@ -145,6 +258,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   removePlugin: async (slotIndex: number) => {
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.removePlugin(slotIndex);
@@ -163,6 +277,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   movePlugin: async (fromIndex: number, toIndex: number) => {
+    get()._pushHistory();
     const { slots, nodes } = get();
     // Optimistic update for flat slots
     const newSlots = [...slots];
@@ -213,6 +328,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // =============================================
 
   removeNode: async (nodeId: number) => {
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.removeNode(nodeId);
@@ -233,6 +349,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   moveNode: async (nodeId: number, newParentId: number, newIndex: number) => {
+    get()._pushHistory();
     try {
       const result = await juceBridge.moveNode(nodeId, newParentId, newIndex);
       if (result.success && result.chainState) {
@@ -253,6 +370,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     const { nodes } = get();
     const node = findNodeById(nodes, nodeId);
     if (!node || node.type !== 'plugin') return;
+    get()._pushHistory();
 
     try {
       const result = await juceBridge.setNodeBypassed(nodeId, !node.bypassed);
@@ -270,6 +388,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // =============================================
 
   createGroup: async (childIds: number[], mode: 'serial' | 'parallel', name?: string) => {
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.createGroup(childIds, mode, name || 'Group');
@@ -288,6 +407,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   dissolveGroup: async (groupId: number) => {
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.dissolveGroup(groupId);
@@ -306,6 +426,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   setGroupMode: async (groupId: number, mode: 'serial' | 'parallel') => {
+    get()._pushHistory();
     try {
       const result = await juceBridge.setGroupMode(groupId, mode);
       if (result.success && result.chainState) {
@@ -318,6 +439,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   setGroupDryWet: async (groupId: number, mix: number) => {
+    get()._pushHistory();
     try {
       const result = await juceBridge.setGroupDryWet(groupId, mix);
       if (result.success && result.chainState) {
@@ -330,6 +452,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   setBranchGain: async (nodeId: number, gainDb: number) => {
+    get()._pushHistory();
     try {
       const result = await juceBridge.setBranchGain(nodeId, gainDb);
       if (result.success && result.chainState) {
@@ -342,6 +465,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   setBranchSolo: async (nodeId: number, solo: boolean) => {
+    get()._pushHistory();
     try {
       const result = await juceBridge.setBranchSolo(nodeId, solo);
       if (result.success && result.chainState) {
@@ -354,6 +478,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   setBranchMute: async (nodeId: number, mute: boolean) => {
+    get()._pushHistory();
     try {
       const result = await juceBridge.setBranchMute(nodeId, mute);
       if (result.success && result.chainState) {

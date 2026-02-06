@@ -159,9 +159,14 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
     }
   },
 
-  fetchDetailedCompatibility: async (_chainId: string) => {
-    // Not yet deployed on backend — will be added with social features
-    set({ detailedCompatibility: null });
+  fetchDetailedCompatibility: async (chainId: string) => {
+    try {
+      const result = await convexClient.fetchDetailedCompatibility(chainId);
+      set({ detailedCompatibility: result });
+    } catch (err) {
+      console.error("Failed to fetch detailed compatibility:", err);
+      set({ detailedCompatibility: null });
+    }
   },
 
   downloadChain: async (chainId: string) => {

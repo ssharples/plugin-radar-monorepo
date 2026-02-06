@@ -116,7 +116,7 @@ async function searchEnrich(pluginName, manufacturerName) {
 
 // Use Exa Answer API for enrichment
 async function researchEnrich(pluginName, manufacturerName, productUrl) {
-  const query = `What is ${pluginName} by ${manufacturerName}? Is it an audio EFFECT plugin or an instrument/synth? Give a brief description, what type of effect is it (EQ, compressor, reverb, delay, saturation, modulation, etc.), what specific subtype (e.g. parametric EQ, FET compressor, convolution reverb), does it emulate any specific hardware circuit, what is its tonal character (warm, transparent, aggressive, etc.), list the plugin formats (VST3, AU, AAX), and platforms (Windows, Mac).`;
+  const query = `What is ${pluginName} by ${manufacturerName}? Is it an audio EFFECT plugin or an instrument/synth? Give a brief description. What type of effect is it (EQ, compressor, reverb, delay, saturation, modulation, etc.)? What specific subtype (e.g. parametric EQ, FET compressor, convolution reverb)? Does it emulate any specific hardware circuit? What is its tonal character (warm, transparent, aggressive, etc.)? What sources does it work well on (vocals, drums, bass, etc.)? What genres is it suited for? What comparable plugins exist? Is it beginner-friendly or for professionals? Is the learning curve easy, moderate, or steep? Is CPU usage low, moderate, or high? What are its key features (3-8)? What's the license type (perpetual, subscription, etc.)? What DAWs does it work best with? Is it considered an industry standard? List the plugin formats (VST3, AU, AAX) and platforms (Windows, Mac).`;
   
   try {
     const result = await exa.answer(query, {
@@ -216,6 +216,55 @@ async function researchEnrich(pluginName, manufacturerName, productUrl) {
       if (/creative/i.test(answer)) tags.push('creative');
       if (tags.length > 0) extracted.tags = tags;
       
+      // Extract worksWellOn
+      const sourceKeywords = ['vocals', 'drums', 'bass', 'guitars', 'synths', 'piano', 'strings', 'master bus', 'mix bus', 'acoustic'];
+      const worksWellOn = sourceKeywords.filter(kw => new RegExp(`\\b${kw.replace(' ', '.?')}\\b`, 'i').test(answer));
+      if (worksWellOn.length > 0) extracted.worksWellOn = worksWellOn;
+      
+      // Extract genreSuitability
+      const genreKeywords = ['hip-hop', 'rock', 'pop', 'EDM', 'jazz', 'classical', 'R&B', 'metal', 'country', 'ambient', 'electronic', 'folk', 'soul'];
+      const genres = genreKeywords.filter(g => new RegExp(`\\b${g}\\b`, 'i').test(answer));
+      if (genres.length > 0) extracted.genreSuitability = genres;
+      
+      // Extract sonicCharacter (broader than tonalCharacter)
+      const sonicKeywords = ['warm', 'punchy', 'transparent', 'lush', 'crisp', 'vintage', 'modern', 'silky', 'gritty', 'fat', 'thick', 'open', 'natural'];
+      const sonicCharacter = sonicKeywords.filter(kw => new RegExp(`\\b${kw}\\b`, 'i').test(answer));
+      if (sonicCharacter.length > 0) extracted.sonicCharacter = sonicCharacter;
+      
+      // Extract skillLevel
+      if (/beginner|easy.to.use|user.friendly|intuitive|simple/i.test(answer)) extracted.skillLevel = 'beginner';
+      else if (/professional|pro.level|studio.professional|expert/i.test(answer)) extracted.skillLevel = 'professional';
+      else if (/advanced|power.user/i.test(answer)) extracted.skillLevel = 'advanced';
+      else if (/intermediate|moderate/i.test(answer)) extracted.skillLevel = 'intermediate';
+      
+      // Extract learningCurve
+      if (/easy.to.learn|straightforward|quick.to.pick.up|simple.interface/i.test(answer)) extracted.learningCurve = 'easy';
+      else if (/steep.learning|complex|takes.time/i.test(answer)) extracted.learningCurve = 'steep';
+      else if (/moderate|reasonable/i.test(answer) && /learn/i.test(answer)) extracted.learningCurve = 'moderate';
+      
+      // Extract cpuUsage
+      if (/low.cpu|light.on.cpu|cpu.efficient|lightweight/i.test(answer)) extracted.cpuUsage = 'low';
+      else if (/high.cpu|cpu.intensive|heavy|cpu.hungry|resource.intensive/i.test(answer)) extracted.cpuUsage = 'high';
+      else if (/very.high.cpu|extremely.cpu/i.test(answer)) extracted.cpuUsage = 'very-high';
+      else if (/moderate.cpu|reasonable.cpu/i.test(answer)) extracted.cpuUsage = 'moderate';
+      
+      // Extract licenseType
+      if (/subscription/i.test(answer)) extracted.licenseType = 'subscription';
+      else if (/rent.to.own/i.test(answer)) extracted.licenseType = 'rent-to-own';
+      else if (/open.source|free.and.open/i.test(answer)) extracted.licenseType = 'open-source';
+      else if (/freemium/i.test(answer)) extracted.licenseType = 'freemium';
+      else if (/perpetual|one.time.purchase|buy.once/i.test(answer)) extracted.licenseType = 'perpetual';
+      
+      // Extract recommendedDaws
+      const dawKeywords = ['Pro Tools', 'Logic Pro', 'Ableton Live', 'FL Studio', 'Cubase', 'Studio One', 'Reaper', 'Bitwig', 'Reason', 'GarageBand', 'Luna'];
+      const recommendedDaws = dawKeywords.filter(d => new RegExp(d.replace(/\s+/g, '.?'), 'i').test(answer));
+      if (recommendedDaws.length > 0) extracted.recommendedDaws = recommendedDaws;
+      
+      // Extract isIndustryStandard
+      if (/industry.standard|go.to.plugin|ubiquitous|standard.in|staple|must.have/i.test(answer)) {
+        extracted.isIndustryStandard = true;
+      }
+      
       return extracted;
     }
     
@@ -273,9 +322,12 @@ async function enrichPlugin(plugin, manufacturer, options = {}) {
   const needsTags = !plugin.tags || plugin.tags.length === 0;
   const needsFormats = !plugin.formats || plugin.formats.length === 0;
   const needsSystemReqs = !plugin.systemRequirements;
+  const needsUsageContext = !plugin.worksWellOn || plugin.worksWellOn.length === 0;
+  const needsSkillLevel = !plugin.skillLevel;
+  const needsEffectType = !plugin.effectType;
   
-  if (!needsDescription && !needsTags && !needsFormats && !needsSystemReqs) {
-    console.log('  Already enriched, skipping...');
+  if (!needsDescription && !needsTags && !needsFormats && !needsSystemReqs && !needsUsageContext && !needsSkillLevel && !needsEffectType) {
+    console.log('  Already fully enriched, skipping...');
     return null;
   }
   
@@ -315,6 +367,34 @@ async function enrichPlugin(plugin, manufacturer, options = {}) {
       }
       if (research.tonalCharacter?.length > 0) {
         updates.tonalCharacter = research.tonalCharacter;
+      }
+      // Unified enrichment fields
+      if (research.worksWellOn?.length > 0 && (!plugin.worksWellOn || plugin.worksWellOn.length === 0)) {
+        updates.worksWellOn = research.worksWellOn;
+      }
+      if (research.genreSuitability?.length > 0 && (!plugin.genreSuitability || plugin.genreSuitability.length === 0)) {
+        updates.genreSuitability = research.genreSuitability;
+      }
+      if (research.sonicCharacter?.length > 0 && (!plugin.sonicCharacter || plugin.sonicCharacter.length === 0)) {
+        updates.sonicCharacter = research.sonicCharacter;
+      }
+      if (research.skillLevel && !plugin.skillLevel) {
+        updates.skillLevel = research.skillLevel;
+      }
+      if (research.learningCurve && !plugin.learningCurve) {
+        updates.learningCurve = research.learningCurve;
+      }
+      if (research.cpuUsage && !plugin.cpuUsage) {
+        updates.cpuUsage = research.cpuUsage;
+      }
+      if (research.licenseType && !plugin.licenseType) {
+        updates.licenseType = research.licenseType;
+      }
+      if (research.recommendedDaws?.length > 0 && (!plugin.recommendedDaws || plugin.recommendedDaws.length === 0)) {
+        updates.recommendedDaws = research.recommendedDaws;
+      }
+      if (research.isIndustryStandard !== undefined && plugin.isIndustryStandard === undefined) {
+        updates.isIndustryStandard = research.isIndustryStandard;
       }
       if (needsSystemReqs && research.systemRequirements) {
         updates.systemRequirements = research.systemRequirements;
@@ -391,7 +471,12 @@ async function updatePlugin(pluginId, updates) {
       'bannerStorageId', 'screenshotStorageIds', 'productUrl', 'manualUrl',
       'isActive', 'isDiscontinued', 'mentionCount7d', 'mentionCount30d',
       'mentionScore', 'lastMentionScan',
-      'effectType', 'circuitEmulation', 'tonalCharacter'
+      // Effect taxonomy
+      'effectType', 'circuitEmulation', 'tonalCharacter',
+      // Enrichment fields (unified)
+      'worksWellOn', 'useCases', 'genreSuitability', 'sonicCharacter',
+      'comparableTo', 'skillLevel', 'learningCurve', 'cpuUsage',
+      'licenseType', 'keyFeatures', 'recommendedDaws', 'isIndustryStandard'
     ];
     
     const filteredUpdates = {};

@@ -592,6 +592,103 @@ void ChainProcessor::hideAllPluginWindows()
     pluginWindows.clear();
 }
 
+//==============================================================================
+// Chain-level toggle controls
+//==============================================================================
+
+void ChainProcessor::toggleAllBypass()
+{
+    auto state = getBypassState();
+
+    // If ANY are active (not bypassed), bypass all. If ALL are bypassed, enable all.
+    bool shouldBypass = !state.allBypassed;
+    setAllBypass(shouldBypass);
+}
+
+void ChainProcessor::setAllBypass(bool bypassed)
+{
+    std::vector<PluginLeaf*> plugins;
+    ChainNodeHelpers::collectPluginsMut(rootNode, plugins);
+
+    for (auto* leaf : plugins)
+    {
+        leaf->bypassed = bypassed;
+        if (auto gNode = getNodeForId(leaf->graphNodeId))
+            gNode->setBypassed(bypassed);
+    }
+
+    cachedSlotsDirty = true;
+    notifyChainChanged();
+}
+
+ChainProcessor::BypassState ChainProcessor::getBypassState() const
+{
+    std::vector<const PluginLeaf*> plugins;
+    ChainNodeHelpers::collectPlugins(rootNode, plugins);
+
+    BypassState state;
+    if (plugins.empty())
+        return state;
+
+    bool allBypassed = true;
+    bool anyBypassed = false;
+
+    for (const auto* leaf : plugins)
+    {
+        if (leaf->bypassed)
+            anyBypassed = true;
+        else
+            allBypassed = false;
+    }
+
+    state.allBypassed = allBypassed;
+    state.anyBypassed = anyBypassed;
+    return state;
+}
+
+void ChainProcessor::toggleAllPluginWindows()
+{
+    auto state = getWindowState();
+
+    // If any are open, close all. If none open, open all.
+    if (state.openCount > 0)
+        setAllPluginWindows(false);
+    else
+        setAllPluginWindows(true);
+}
+
+void ChainProcessor::setAllPluginWindows(bool open)
+{
+    if (!open)
+    {
+        pluginWindows.clear();
+        return;
+    }
+
+    // Open all plugin windows by recursively walking the tree
+    std::function<void(ChainNode&)> openWindows = [&](ChainNode& node) {
+        if (node.isPlugin())
+        {
+            showPluginWindow(node.id);
+        }
+        else if (node.isGroup())
+        {
+            for (auto& child : node.getGroup().children)
+                openWindows(*child);
+        }
+    };
+
+    openWindows(rootNode);
+}
+
+ChainProcessor::WindowState ChainProcessor::getWindowState() const
+{
+    WindowState state;
+    state.totalCount = ChainNodeHelpers::countPlugins(rootNode);
+    state.openCount = pluginWindows.size();
+    return state;
+}
+
 int ChainProcessor::getNumSlots() const
 {
     return ChainNodeHelpers::countPlugins(rootNode);

@@ -97,9 +97,26 @@ const pluginMcpServer = createSdkMcpServer({
         features: z.array(z.string()).optional().describe('Key features'),
         pros: z.array(z.string()).optional().describe('Advantages/strengths'),
         cons: z.array(z.string()).optional().describe('Disadvantages/weaknesses'),
-        useCases: z.array(z.string()).optional().describe('Ideal use cases'),
+        useCases: z.array(z.string()).optional().describe('Ideal use cases (e.g. "vocal processing", "drum bus glue", "mastering")'),
         productUrl: z.string().optional().describe('Manufacturer product page URL'),
         imageUrl: z.string().optional().describe('Plugin image URL'),
+        
+        // Enrichment fields — usage context
+        worksWellOn: z.array(z.string()).optional().describe('What sources it works well on: vocals, drums, bass, guitars, synths, piano, master bus, mix bus, etc.'),
+        genreSuitability: z.array(z.string()).optional().describe('Genres it suits: hip-hop, rock, pop, EDM, jazz, classical, R&B, metal, country, ambient, etc.'),
+        sonicCharacter: z.array(z.string()).optional().describe('Sonic character descriptors: warm, punchy, transparent, lush, crisp, vintage, modern, silky, gritty, etc.'),
+        comparableTo: z.array(z.string()).optional().describe('Comparable plugins by name (e.g. "FabFilter Pro-Q 3", "Waves CLA-76")'),
+        
+        // Enrichment fields — user info
+        skillLevel: z.enum(['beginner', 'intermediate', 'advanced', 'professional']).optional().describe('Target skill level'),
+        learningCurve: z.enum(['easy', 'moderate', 'steep']).optional().describe('How difficult to learn'),
+        cpuUsage: z.enum(['low', 'moderate', 'high', 'very-high']).optional().describe('CPU resource usage'),
+        
+        // Enrichment fields — meta
+        licenseType: z.string().optional().describe('License type: perpetual, subscription, rent-to-own, freemium, open-source'),
+        keyFeatures: z.array(z.string()).optional().describe('Key standout features (3-8 items)'),
+        recommendedDaws: z.array(z.string()).optional().describe('DAWs it integrates best with: Pro Tools, Logic Pro, Ableton Live, FL Studio, Cubase, Studio One, Reaper, etc.'),
+        isIndustryStandard: z.boolean().optional().describe('Whether this is widely considered an industry standard plugin'),
       },
       async (data) => {
         // Reject instruments/synths
@@ -302,7 +319,7 @@ const RESEARCH_PROMPT = `You are a DSP plugin research agent for PluginRadar, a 
 
 ⚠️ CRITICAL: PluginRadar ONLY tracks audio EFFECTS (EQ, compressor, limiter, reverb, delay, saturation, modulation, stereo imaging, gate/expander, de-esser, filter, channel strip, metering, noise reduction, multiband, utility). Do NOT save instruments, synths, samplers, or bundles.
 
-Your job is to research audio effect plugins (VST, AU, AAX) and save comprehensive information to our Convex database.
+Your job is to research audio effect plugins (VST, AU, AAX) and save **comprehensive** information to our Convex database — filling in ALL enrichment fields.
 
 **Available Tools:**
 - WebSearch: Search for plugin information, reviews, tutorials
@@ -314,21 +331,45 @@ Your job is to research audio effect plugins (VST, AU, AAX) and save comprehensi
 
 **Workflow:**
 1. Use search_plugins to check if the plugin already exists
-2. Use WebSearch to find official manufacturer info and professional reviews
+2. Use WebSearch to find official manufacturer info, professional reviews, and forum discussions
 3. Use WebFetch to read detailed content from key sources
-4. Classify the effect:
+4. Research and classify ALL of the following:
+
+   **Effect Taxonomy:**
    - **category**: eq, compressor, limiter, reverb, delay, saturation, modulation, stereo-imaging, gate-expander, de-esser, filter, channel-strip, metering, noise-reduction, multiband, utility
    - **effectType**: Granular subtype (e.g., "parametric" for EQ, "FET" for compressor, "convolution" for reverb, "tube" for saturation)
    - **circuitEmulation**: If it emulates hardware (e.g., "Neve 1073", "LA-2A", "SSL G-Bus")
    - **tonalCharacter**: Array of descriptors (e.g., ["warm", "smooth"], ["transparent", "clean"])
-5. Extract: name, manufacturer, category, effectType, circuitEmulation, tonalCharacter, description, features, formats, price, pros/cons, use cases
-6. Save using save_plugin_enrichment with all the data
+
+   **Usage Context:**
+   - **worksWellOn**: What sources does it excel on? (vocals, drums, bass, guitars, synths, master bus, etc.)
+   - **useCases**: Ideal use cases (e.g., "vocal processing", "drum bus glue", "mastering")
+   - **genreSuitability**: Which genres does it suit? (hip-hop, rock, pop, EDM, jazz, etc.)
+   - **sonicCharacter**: Sonic descriptors (warm, punchy, transparent, lush, crisp, vintage, modern, etc.)
+
+   **Comparison:**
+   - **comparableTo**: Similar/competing plugins by name
+
+   **User Experience:**
+   - **skillLevel**: beginner, intermediate, advanced, or professional
+   - **learningCurve**: easy, moderate, or steep
+   - **cpuUsage**: low, moderate, high, or very-high
+
+   **Meta:**
+   - **licenseType**: perpetual, subscription, rent-to-own, freemium, open-source
+   - **keyFeatures**: 3-8 standout features
+   - **recommendedDaws**: DAWs it integrates best with
+   - **isIndustryStandard**: true if widely regarded as an industry standard
+
+5. Extract: name, manufacturer, description, features, formats, price, pros/cons
+6. Save using save_plugin_enrichment with ALL the data — fill in every field you can
 
 **Important:**
 - REJECT any instruments, synths, or samplers — do not save them
 - Always provide a proper slug (lowercase, hyphens, e.g., "fabfilter-pro-q-4")
 - Convert price to cents (e.g., $179 → 17900)
-- Be thorough but factual - only include verified information
+- Be thorough but factual — only include verified information
+- Fill in ALL enrichment fields — the more complete the data, the better
 - The database handles deduplication, so saving updates existing records`;
 
 const COMPARISON_PROMPT = `You are a plugin comparison specialist for PluginRadar.

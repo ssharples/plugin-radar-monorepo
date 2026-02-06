@@ -43,6 +43,19 @@ export const upsertPluginEnrichment = mutation({
     // Links
     productUrl: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    
+    // Enrichment fields (unified — covers both agent + web UI paths)
+    worksWellOn: v.optional(v.array(v.string())),
+    genreSuitability: v.optional(v.array(v.string())),
+    sonicCharacter: v.optional(v.array(v.string())),
+    comparableTo: v.optional(v.array(v.string())),
+    skillLevel: v.optional(v.string()),
+    learningCurve: v.optional(v.string()),
+    cpuUsage: v.optional(v.string()),
+    licenseType: v.optional(v.string()),
+    keyFeatures: v.optional(v.array(v.string())),
+    recommendedDaws: v.optional(v.array(v.string())),
+    isIndustryStandard: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -121,6 +134,20 @@ export const upsertPluginEnrichment = mutation({
       isActive: true,
       isDiscontinued: false,
       
+      // Enrichment fields
+      worksWellOn: args.worksWellOn,
+      useCases: args.useCases,
+      genreSuitability: args.genreSuitability,
+      sonicCharacter: args.sonicCharacter,
+      comparableTo: args.comparableTo,
+      skillLevel: args.skillLevel,
+      learningCurve: args.learningCurve,
+      cpuUsage: args.cpuUsage,
+      licenseType: args.licenseType,
+      keyFeatures: args.keyFeatures,
+      recommendedDaws: args.recommendedDaws,
+      isIndustryStandard: args.isIndustryStandard,
+      
       updatedAt: now,
     };
     
@@ -128,6 +155,7 @@ export const upsertPluginEnrichment = mutation({
     
     if (existingPlugin) {
       // Update existing - merge data, don't overwrite good data with undefined
+      const ex = existingPlugin as any;
       await ctx.db.patch(existingPlugin._id, {
         ...pluginData,
         // Preserve existing values if new ones are empty
@@ -139,9 +167,22 @@ export const upsertPluginEnrichment = mutation({
         imageUrl: args.imageUrl || existingPlugin.imageUrl,
         productUrl: args.productUrl || existingPlugin.productUrl,
         // Preserve existing effect taxonomy if new values are empty
-        effectType: args.effectType || (existingPlugin as any).effectType,
-        circuitEmulation: args.circuitEmulation || (existingPlugin as any).circuitEmulation,
-        tonalCharacter: args.tonalCharacter?.length ? args.tonalCharacter : (existingPlugin as any).tonalCharacter,
+        effectType: args.effectType || ex.effectType,
+        circuitEmulation: args.circuitEmulation || ex.circuitEmulation,
+        tonalCharacter: args.tonalCharacter?.length ? args.tonalCharacter : ex.tonalCharacter,
+        // Preserve existing enrichment fields if new values are empty
+        worksWellOn: args.worksWellOn?.length ? args.worksWellOn : ex.worksWellOn,
+        useCases: args.useCases?.length ? args.useCases : ex.useCases,
+        genreSuitability: args.genreSuitability?.length ? args.genreSuitability : ex.genreSuitability,
+        sonicCharacter: args.sonicCharacter?.length ? args.sonicCharacter : ex.sonicCharacter,
+        comparableTo: args.comparableTo?.length ? args.comparableTo : ex.comparableTo,
+        skillLevel: args.skillLevel || ex.skillLevel,
+        learningCurve: args.learningCurve || ex.learningCurve,
+        cpuUsage: args.cpuUsage || ex.cpuUsage,
+        licenseType: args.licenseType || ex.licenseType,
+        keyFeatures: args.keyFeatures?.length ? args.keyFeatures : ex.keyFeatures,
+        recommendedDaws: args.recommendedDaws?.length ? args.recommendedDaws : ex.recommendedDaws,
+        isIndustryStandard: args.isIndustryStandard ?? ex.isIndustryStandard,
       });
       pluginId = existingPlugin._id;
     } else {

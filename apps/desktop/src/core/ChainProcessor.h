@@ -71,6 +71,32 @@ public:
     void hidePluginWindow(ChainNodeId nodeId);
     void hideAllPluginWindows();
 
+    // =============================================
+    // Chain-level toggle controls
+    // =============================================
+
+    // Toggle all plugins bypassed: if ANY are active, bypass all. If ALL are bypassed, enable all.
+    void toggleAllBypass();
+    // Explicit set all bypass state
+    void setAllBypass(bool bypassed);
+
+    struct BypassState {
+        bool allBypassed = false;
+        bool anyBypassed = false;
+    };
+    BypassState getBypassState() const;
+
+    // Toggle all plugin windows: if any are open, close all. If none open, open all.
+    void toggleAllPluginWindows();
+    // Explicit set all plugin windows open/closed
+    void setAllPluginWindows(bool open);
+
+    struct WindowState {
+        int openCount = 0;
+        int totalCount = 0;
+    };
+    WindowState getWindowState() const;
+
     // Note: showPluginWindow/hidePluginWindow accept both node IDs and slot indices
     // since ChainNodeId == int. The flat-index-based callers resolve to the same overload.
 

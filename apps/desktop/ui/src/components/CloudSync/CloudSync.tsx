@@ -23,6 +23,7 @@ export function CloudSync() {
   
   const [showAuth, setShowAuth] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -66,6 +67,33 @@ export function CloudSync() {
 
   if (!isLoggedIn) {
     if (showAuth) {
+      // "Forgot password" view — directs user to web app
+      if (showForgotPassword) {
+        return (
+          <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
+            <h3 className="text-white font-medium mb-2">Reset Password</h3>
+            <p className="text-gray-400 text-sm mb-3">
+              To reset your password, visit the PluginRadar website:
+            </p>
+            <a
+              href="https://pluginradar.com/forgot-password"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full bg-purple-600 hover:bg-purple-700 text-white rounded px-3 py-2 text-sm font-medium text-center mb-2"
+            >
+              Open Reset Page ↗
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(false)}
+              className="text-purple-400 hover:text-purple-300 text-sm w-full text-center"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
           <form onSubmit={handleAuth} className="space-y-3">
@@ -104,6 +132,18 @@ export function CloudSync() {
               required
               className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white text-sm"
             />
+            
+            {!isRegister && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-gray-400 hover:text-purple-400 text-xs transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
             
             <div className="flex gap-2">
               <button

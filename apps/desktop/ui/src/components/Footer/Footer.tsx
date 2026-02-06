@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Folder, Link2, Cloud, Download } from 'lucide-react';
+import { Folder, Link2, Cloud, Download, CloudOff, RefreshCw, AlertTriangle, Check } from 'lucide-react';
 import { Knob } from '../Knob';
 import { MeterDisplay } from '../MeterDisplay';
 import { LufsDisplay } from '../LufsDisplay';
@@ -7,6 +7,7 @@ import { SaveChainModal, LoadChainModal } from '../CloudSync';
 import { juceBridge } from '../../api/juce-bridge';
 import { useSyncStore } from '../../stores/syncStore';
 import { useChainStore } from '../../stores/chainStore';
+import { useOfflineStore } from '../../stores/offlineStore';
 import type { MeterData, GainSettings } from '../../api/types';
 
 interface FooterProps {
@@ -25,6 +26,7 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
 
   const { isLoggedIn } = useSyncStore();
   const { slots } = useChainStore();
+  const { syncStatus, pendingWrites, online } = useOfflineStore();
 
   // Load initial gain settings and match lock state
   useEffect(() => {
@@ -182,6 +184,38 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
           lufs={meterData?.outputLufs ?? -100}
           compact
         />
+      </div>
+
+      {/* Sync Status Indicator */}
+      <div className="flex items-center gap-1 px-2" title={
+        syncStatus === 'synced' ? 'All changes synced' :
+        syncStatus === 'pending' ? `${pendingWrites} change${pendingWrites !== 1 ? 's' : ''} pending sync` :
+        syncStatus === 'offline' ? 'Offline — changes will sync when reconnected' :
+        syncStatus === 'conflict' ? 'Sync conflict detected' :
+        'Sync error'
+      }>
+        {syncStatus === 'synced' && online && (
+          <Check className="w-3 h-3 text-green-400" />
+        )}
+        {syncStatus === 'pending' && (
+          <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" style={{ animationDuration: '2s' }} />
+        )}
+        {syncStatus === 'offline' && (
+          <CloudOff className="w-3 h-3 text-plugin-muted" />
+        )}
+        {syncStatus === 'conflict' && (
+          <AlertTriangle className="w-3 h-3 text-red-400" />
+        )}
+        {syncStatus === 'error' && (
+          <AlertTriangle className="w-3 h-3 text-red-400" />
+        )}
+        {syncStatus !== 'synced' && (
+          <span className="text-xxs text-plugin-muted">
+            {syncStatus === 'pending' ? `${pendingWrites}` :
+             syncStatus === 'offline' ? 'Offline' :
+             syncStatus === 'conflict' ? 'Conflict' : ''}
+          </span>
+        )}
       </div>
 
       {/* Spacer */}

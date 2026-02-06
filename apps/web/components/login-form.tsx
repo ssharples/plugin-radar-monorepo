@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "./auth-provider";
 
 export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
@@ -75,6 +76,17 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         {error && (
           <div className="text-red-400 text-sm bg-red-900/20 rounded-lg p-2">
             {error}
+          </div>
+        )}
+
+        {mode === "login" && (
+          <div className="text-right">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-stone-400 hover:text-amber-500 transition-colors"
+            >
+              Forgot password?
+            </Link>
           </div>
         )}
 

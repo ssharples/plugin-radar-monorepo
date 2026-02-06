@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { checkRateLimit } from "./lib/rateLimit";
 
 // ============================================
 // PLUGIN SYNC FROM PLUGIN-DIRECTORY APP
@@ -26,6 +27,9 @@ export const syncScannedPlugins = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Rate limit: 5 syncs per minute per user
+    await checkRateLimit(ctx, `sync:${args.userId}`, 5, 60 * 1000);
+
     const now = Date.now();
     const results = {
       synced: 0,
@@ -533,6 +537,177 @@ export const checkChainCompatibility = query({
       totalCount: chain.pluginCount,
       percentage: Math.round((ownedCount / chain.pluginCount) * 100),
       slots: slotStatus,
+    };
+  },
+});
+
+/**
+ * Get detailed compatibility info for a chain.
+ * For each slot, reports owned/missing status and suggests alternatives
+ * the user owns in the same category.
+ */
+export const getDetailedCompatibility = query({
+  args: {
+    chainId: v.id("pluginChains"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const chain = await ctx.db.get(args.chainId);
+    if (!chain) throw new Error("Chain not found");
+
+    // Get user's scanned plugins (with match data)
+    const scannedPlugins = await ctx.db
+      .query("scannedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .collect();
+
+    // Build a set of matched plugin IDs the user owns
+    const ownedPluginIds = new Set(
+      scannedPlugins
+        .filter((sp) => sp.matchedPlugin)
+        .map((sp) => sp.matchedPlugin!.toString())
+    );
+
+    // Also check ownedPlugins table
+    const ownedPlugins = await ctx.db
+      .query("ownedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .collect();
+    for (const op of ownedPlugins) {
+      ownedPluginIds.add(op.plugin.toString());
+    }
+
+    // Process each slot
+    const slots: Array<{
+      position: number;
+      pluginName: string;
+      manufacturer: string;
+      status: "owned" | "missing";
+      alternatives: Array<{
+        id: string;
+        name: string;
+        manufacturer: string;
+        slug?: string;
+      }>;
+    }> = [];
+
+    let ownedCount = 0;
+    let missingCount = 0;
+    const missingList: Array<{
+      pluginName: string;
+      manufacturer: string;
+      suggestion: string | null;
+    }> = [];
+
+    for (const slot of chain.slots) {
+      const isOwned =
+        slot.matchedPlugin &&
+        ownedPluginIds.has(slot.matchedPlugin.toString());
+
+      if (isOwned) {
+        ownedCount++;
+        slots.push({
+          position: slot.position,
+          pluginName: slot.pluginName,
+          manufacturer: slot.manufacturer,
+          status: "owned",
+          alternatives: [],
+        });
+      } else {
+        missingCount++;
+
+        // Find alternatives: same category plugins the user owns
+        const alternatives: Array<{
+          id: string;
+          name: string;
+          manufacturer: string;
+          slug?: string;
+        }> = [];
+
+        // Get the category of the missing plugin (if matched)
+        let pluginCategory: string | null = null;
+        if (slot.matchedPlugin) {
+          const matchedPlugin = await ctx.db.get(slot.matchedPlugin);
+          if (matchedPlugin) {
+            pluginCategory = matchedPlugin.category;
+          }
+        }
+
+        // If we know the category, find user-owned plugins in the same category
+        if (pluginCategory) {
+          const sameCategoryPlugins = await ctx.db
+            .query("plugins")
+            .withIndex("by_category", (q) => q.eq("category", pluginCategory!))
+            .take(50);
+
+          for (const candidate of sameCategoryPlugins) {
+            if (ownedPluginIds.has(candidate._id.toString())) {
+              const mfg = await ctx.db.get(candidate.manufacturer);
+              alternatives.push({
+                id: candidate._id,
+                name: candidate.name,
+                manufacturer: mfg?.name ?? "Unknown",
+                slug: candidate.slug,
+              });
+              if (alternatives.length >= 3) break; // Cap at 3 suggestions
+            }
+          }
+        }
+
+        // If no category match, try fuzzy name matching against user's scanned plugins
+        if (alternatives.length === 0) {
+          const normSlotName = slot.pluginName.toLowerCase().replace(/[^a-z0-9]/g, "");
+          for (const sp of scannedPlugins) {
+            const normSpName = sp.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+            // Check if names share significant overlap
+            if (
+              normSpName.includes(normSlotName.slice(0, 4)) ||
+              normSlotName.includes(normSpName.slice(0, 4))
+            ) {
+              // Exclude exact same plugin name
+              if (sp.name.toLowerCase() !== slot.pluginName.toLowerCase()) {
+                alternatives.push({
+                  id: sp._id,
+                  name: sp.name,
+                  manufacturer: sp.manufacturer,
+                });
+                if (alternatives.length >= 3) break;
+              }
+            }
+          }
+        }
+
+        const suggestion =
+          alternatives.length > 0
+            ? `${alternatives[0].name} (${alternatives[0].manufacturer})`
+            : null;
+
+        missingList.push({
+          pluginName: slot.pluginName,
+          manufacturer: slot.manufacturer,
+          suggestion,
+        });
+
+        slots.push({
+          position: slot.position,
+          pluginName: slot.pluginName,
+          manufacturer: slot.manufacturer,
+          status: "missing",
+          alternatives,
+        });
+      }
+    }
+
+    const totalCount = chain.slots.length;
+    const percentage =
+      totalCount > 0 ? Math.round((ownedCount / totalCount) * 100) : 100;
+
+    return {
+      slots,
+      ownedCount,
+      missingCount,
+      percentage,
+      missing: missingList,
     };
   },
 });

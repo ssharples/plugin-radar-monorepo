@@ -10,6 +10,7 @@ interface ChainSlotProps {
   slot?: ChainSlotType;
   isEditorOpen: boolean;
   isMultiSelected?: boolean;
+  isSelected?: boolean;
   onRemove: () => void;
   onToggleBypass: () => void;
   onToggleEditor: () => void;
@@ -20,6 +21,7 @@ export function ChainSlot({
   slot,
   isEditorOpen,
   isMultiSelected = false,
+  isSelected = false,
   onRemove,
   onToggleBypass,
   onToggleEditor,
@@ -54,11 +56,13 @@ export function ChainSlot({
       className={`flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${
         isMultiSelected
           ? 'bg-plugin-accent/10 border-plugin-accent ring-1 ring-plugin-accent/50'
-          : bypassed
-            ? 'bg-plugin-bg/50 border-plugin-border/50'
-            : isEditorOpen
-              ? 'bg-plugin-bg border-plugin-accent shadow-glow-accent'
-              : 'bg-plugin-bg border-plugin-border hover:border-plugin-accent/50'
+          : isSelected
+            ? 'bg-plugin-accent/8 border-plugin-accent/70 ring-1 ring-plugin-accent/30 shadow-glow-accent'
+            : bypassed
+              ? 'bg-plugin-bg/50 border-plugin-border/50'
+              : isEditorOpen
+                ? 'bg-plugin-bg border-plugin-accent shadow-glow-accent'
+                : 'bg-plugin-bg border-plugin-border hover:border-plugin-accent/50'
       } ${isDragging ? 'shadow-lg shadow-plugin-accent/20' : ''}`}
     >
       {/* Drag handle */}

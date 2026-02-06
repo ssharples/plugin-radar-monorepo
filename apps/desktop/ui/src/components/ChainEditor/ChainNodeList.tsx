@@ -15,6 +15,7 @@ interface ChainNodeListProps {
 export function ChainNodeList({ nodes, depth, isParallelParent = false, onNodeSelect, selectedIds }: ChainNodeListProps) {
   const {
     openEditors,
+    selectedNodeId,
     removeNode,
     toggleNodeBypass,
     togglePluginEditor,
@@ -55,6 +56,7 @@ export function ChainNodeList({ nodes, depth, isParallelParent = false, onNodeSe
                 node={node}
                 isEditorOpen={openEditors.has(node.id)}
                 isMultiSelected={isMultiSelected}
+                isSelected={selectedNodeId === node.id && !isMultiSelected}
                 onRemove={() => removeNode(node.id)}
                 onToggleBypass={() => toggleNodeBypass(node.id)}
                 onToggleEditor={() => togglePluginEditor(node.id)}

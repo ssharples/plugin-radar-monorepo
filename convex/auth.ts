@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { checkRateLimit } from "./lib/rateLimit";
 
 // =============================================================================
 // AUTH WITH PBKDF2 HASHING + OPAQUE SESSION TOKENS
@@ -107,6 +108,9 @@ export const register = mutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Rate limit: 3 registrations per hour (generic key — no IP in Convex)
+    await checkRateLimit(ctx, `register:global`, 3, 60 * 60 * 1000);
+
     const now = Date.now();
 
     // Check if user exists
@@ -163,6 +167,9 @@ export const login = mutation({
     password: v.string(),
   },
   handler: async (ctx, args) => {
+    // Rate limit: 5 attempts per 15 minutes per email
+    await checkRateLimit(ctx, `login:${args.email}`, 5, 15 * 60 * 1000);
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_email", (q) => q.eq("email", args.email))
@@ -261,6 +268,134 @@ export const logout = mutation({
     if (session) {
       await ctx.db.delete(session._id);
     }
+  },
+});
+
+// =============================================================================
+// PASSWORD RESET
+// =============================================================================
+
+const RESET_TOKEN_DURATION_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Request a password reset — generates token, stores it.
+ * In production this would send an email; for now we log the token.
+ */
+export const requestPasswordReset = mutation({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const email = args.email.toLowerCase().trim();
+
+    // Always return success to avoid email enumeration
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .first();
+
+    if (!user) {
+      // Don't reveal that email doesn't exist
+      console.log(`[password-reset] No user found for email: ${email}`);
+      return { success: true };
+    }
+
+    // Invalidate any existing unused tokens for this user
+    const existingTokens = await ctx.db
+      .query("passwordResetTokens")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    for (const t of existingTokens) {
+      if (!t.usedAt) {
+        await ctx.db.patch(t._id, { usedAt: now }); // mark as consumed
+      }
+    }
+
+    // Generate a new reset token
+    const token = generateToken();
+
+    await ctx.db.insert("passwordResetTokens", {
+      userId: user._id,
+      token,
+      email,
+      createdAt: now,
+      expiresAt: now + RESET_TOKEN_DURATION_MS,
+    });
+
+    // TODO: Send email with reset link. For now, log the token.
+    console.log(`[password-reset] Token generated for ${email}: ${token}`);
+    console.log(
+      `[password-reset] Reset link: https://pluginradar.com/reset-password?token=${token}`
+    );
+
+    return { success: true };
+  },
+});
+
+/**
+ * Reset password using a valid token.
+ * Validates the token, updates the password hash, and invalidates the token.
+ */
+export const resetPassword = mutation({
+  args: {
+    token: v.string(),
+    newPassword: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    if (args.newPassword.length < 6) {
+      throw new Error("Password must be at least 6 characters");
+    }
+
+    // Look up the token
+    const resetToken = await ctx.db
+      .query("passwordResetTokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+
+    if (!resetToken) {
+      throw new Error("Invalid or expired reset link");
+    }
+
+    // Check if already used
+    if (resetToken.usedAt) {
+      throw new Error("This reset link has already been used");
+    }
+
+    // Check expiry
+    if (resetToken.expiresAt < now) {
+      throw new Error("This reset link has expired. Please request a new one.");
+    }
+
+    // Get the user
+    const user = await ctx.db.get(resetToken.userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Hash the new password with PBKDF2
+    const passwordHash = await hashPassword(args.newPassword);
+
+    // Update the user's password
+    await ctx.db.patch(user._id, { passwordHash });
+
+    // Mark the token as used
+    await ctx.db.patch(resetToken._id, { usedAt: now });
+
+    // Invalidate all existing sessions for this user (force re-login)
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    for (const session of sessions) {
+      await ctx.db.delete(session._id);
+    }
+
+    console.log(`[password-reset] Password reset successful for ${user.email}`);
+
+    return { success: true };
   },
 });
 

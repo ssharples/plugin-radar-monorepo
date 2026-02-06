@@ -391,6 +391,19 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_admin", ["isAdmin"]),
 
+  // Password reset tokens
+  passwordResetTokens: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    email: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()), // null if unused, timestamp if consumed
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"])
+    .index("by_email", ["email"]),
+
   // Session-based auth (from plugin-radar-ui)
   sessions: defineTable({
     token: v.string(),
@@ -1061,4 +1074,15 @@ export default defineSchema({
   })
     .index("by_original", ["originalChainId"])
     .index("by_forked", ["forkedChainId"]),
+
+  // ============================================
+  // RATE LIMITING
+  // ============================================
+
+  rateLimits: defineTable({
+    key: v.string(),
+    count: v.number(),
+    windowStart: v.number(),
+  })
+    .index("by_key", ["key"]),
 });

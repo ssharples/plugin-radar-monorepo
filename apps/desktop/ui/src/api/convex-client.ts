@@ -1,11 +1,112 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
+import { useOfflineStore, isOnline } from "../stores/offlineStore";
 
 // PluginRadar Convex backend (shared monorepo convex/)
 const CONVEX_URL = "https://next-frog-231.convex.cloud";
 
 // HTTP client — now uses typed API from the shared monorepo convex/
 export const convex = new ConvexHttpClient(CONVEX_URL);
+
+// ============================================
+// Offline-aware helpers
+// ============================================
+
+/** Check if we're currently online */
+export { isOnline };
+
+/**
+ * Execute a cloud read with offline cache fallback.
+ * On success, caches the result. On failure (offline), returns cached data.
+ */
+async function withOfflineFallback<T>(
+  cacheKey: string,
+  remoteFn: () => Promise<T>
+): Promise<T | null> {
+  const offlineStore = useOfflineStore.getState();
+
+  if (isOnline()) {
+    try {
+      const result = await remoteFn();
+      // Cache successful reads
+      if (result !== null && result !== undefined) {
+        offlineStore.cacheChain(cacheKey, result);
+      }
+      return result;
+    } catch (err) {
+      console.warn(`[ConvexClient] Cloud call failed, falling back to cache for "${cacheKey}":`, err);
+      const cached = offlineStore.getCachedChain(cacheKey);
+      if (cached) return cached.data as T;
+      throw err; // No cache either — propagate the error
+    }
+  } else {
+    // Offline — use cache
+    const cached = offlineStore.getCachedChain(cacheKey);
+    if (cached) return cached.data as T;
+    return null;
+  }
+}
+
+/**
+ * Execute a cloud write. If offline or if it fails, queue it for retry.
+ */
+async function withWriteQueue<T>(
+  actionName: string,
+  args: any[],
+  remoteFn: () => Promise<T>
+): Promise<T> {
+  const offlineStore = useOfflineStore.getState();
+
+  if (!isOnline()) {
+    offlineStore.enqueueWrite(actionName, args);
+    throw new Error('Offline — write queued for retry');
+  }
+
+  try {
+    return await remoteFn();
+  } catch (err) {
+    // Queue for retry on network errors
+    const errMsg = String(err);
+    if (
+      errMsg.includes('Failed to fetch') ||
+      errMsg.includes('NetworkError') ||
+      errMsg.includes('ERR_INTERNET_DISCONNECTED') ||
+      errMsg.includes('ECONNREFUSED')
+    ) {
+      offlineStore.enqueueWrite(actionName, args);
+      offlineStore.setOnline(false);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Execute a queued write action by name.
+ * Used by the retry loop to replay failed writes.
+ */
+export async function executeQueuedWrite(action: string, args: any[]): Promise<any> {
+  switch (action) {
+    case 'saveChain':
+      return saveChain(args[0], args[1], args[2]);
+    case 'syncPlugins':
+      return syncPlugins(args[0]);
+    case 'toggleLike':
+      return toggleLike(args[0]);
+    case 'rateChain':
+      return rateChain(args[0], args[1]);
+    case 'addComment':
+      return addComment(args[0], args[1], args[2]);
+    case 'deleteComment':
+      return deleteComment(args[0]);
+    case 'followUser':
+      return followUser(args[0]);
+    case 'unfollowUser':
+      return unfollowUser(args[0]);
+    default:
+      console.warn(`[ConvexClient] Unknown queued action: ${action}`);
+      return null;
+  }
+}
 
 // Types matching the deployed web app's Convex schema
 export interface ScannedPlugin {
@@ -235,7 +336,8 @@ export async function getScannedPlugins(): Promise<any[]> {
 // ============================================
 
 /**
- * Save a plugin chain to PluginRadar
+ * Save a plugin chain to PluginRadar.
+ * Also caches locally. Queues for retry if offline.
  */
 export async function saveChain(
   name: string,
@@ -255,31 +357,51 @@ export async function saveChain(
   const userId = getUserId();
   if (!userId) return { error: "Not logged in" };
 
+  // Always cache locally
+  const offlineStore = useOfflineStore.getState();
+  const localData = { name, slots, options, savedAt: new Date().toISOString() };
+  offlineStore.cacheChain(`local:${name}`, localData);
+
   try {
-    const result = await convex.mutation(api.pluginDirectory.saveChain, {
-      userId: userId,
-      name,
-      slots,
-      category: options.category ?? "mixing",
-      tags: options.tags ?? [],
-      description: options.description,
-      isPublic: options.isPublic ?? false,
-    });
+    const result = await withWriteQueue(
+      'saveChain',
+      [name, slots, options],
+      () => convex.mutation(api.pluginDirectory.saveChain, {
+        userId: userId,
+        name,
+        slots,
+        category: options.category ?? "mixing",
+        tags: options.tags ?? [],
+        description: options.description,
+        isPublic: options.isPublic ?? false,
+      })
+    );
+    // Cache the cloud result with the proper slug
+    if (result.slug) {
+      offlineStore.cacheChain(`chain:${result.slug}`, { name, slots, ...result });
+    }
     return {
       chainId: result.chainId as string,
       slug: result.slug,
       shareCode: result.shareCode,
     };
   } catch (err) {
-    return { error: String(err) };
+    const errMsg = String(err);
+    if (errMsg.includes('queued for retry')) {
+      return { error: 'Saved locally — will sync when back online' };
+    }
+    return { error: errMsg };
   }
 }
 
 /**
- * Load a chain by slug or share code
+ * Load a chain by slug or share code.
+ * Uses offline cache fallback if the cloud is unreachable.
  */
 export async function loadChain(slugOrCode: string): Promise<any | null> {
-  try {
+  const cacheKey = `chain:${slugOrCode.toLowerCase()}`;
+
+  return withOfflineFallback(cacheKey, async () => {
     // Try as slug first
     let chain = await convex.query(api.pluginDirectory.getChain, {
       slug: slugOrCode,
@@ -291,10 +413,7 @@ export async function loadChain(slugOrCode: string): Promise<any | null> {
       shareCode: slugOrCode.toUpperCase(),
     });
     return chain;
-  } catch (err) {
-    console.error("Failed to load chain:", err);
-    return null;
-  }
+  });
 }
 
 /**
@@ -323,7 +442,45 @@ export async function checkChainCompatibility(
 }
 
 /**
- * Browse public chains
+ * Get detailed compatibility for a chain — per-slot owned/missing
+ * with alternative plugin suggestions for missing slots.
+ */
+export async function fetchDetailedCompatibility(
+  chainId: string
+): Promise<{
+  percentage: number;
+  ownedCount: number;
+  missingCount: number;
+  missing: Array<{
+    pluginName: string;
+    manufacturer: string;
+    suggestion: string | null;
+  }>;
+  slots: Array<{
+    position: number;
+    pluginName: string;
+    manufacturer: string;
+    status: "owned" | "missing";
+    alternatives: Array<{ id: string; name: string; manufacturer: string; slug?: string }>;
+  }>;
+} | null> {
+  const userId = getUserId();
+  if (!userId) return null;
+
+  try {
+    return await convex.query(api.pluginDirectory.getDetailedCompatibility, {
+      chainId: chainId,
+      userId: userId,
+    });
+  } catch (err) {
+    console.error("Failed to fetch detailed compatibility:", err);
+    return null;
+  }
+}
+
+/**
+ * Browse public chains.
+ * Falls back to cached browse results when offline.
  */
 export async function browseChains(
   options: {
@@ -332,12 +489,12 @@ export async function browseChains(
     limit?: number;
   } = {}
 ): Promise<any[]> {
-  try {
-    return await convex.query(api.pluginDirectory.browseChains, options);
-  } catch (err) {
-    console.error("Failed to browse chains:", err);
-    return [];
-  }
+  const cacheKey = `browse:${options.category ?? 'all'}:${options.sortBy ?? 'popular'}`;
+
+  const result = await withOfflineFallback(cacheKey, () =>
+    convex.query(api.pluginDirectory.browseChains, options)
+  );
+  return result ?? [];
 }
 
 /**
