@@ -1085,4 +1085,63 @@ export default defineSchema({
     windowStart: v.number(),
   })
     .index("by_key", ["key"]),
+
+  // ============================================
+  // PARAMETER TRANSLATION ENGINE
+  // ============================================
+
+  // Parameter mapping definitions for cross-plugin preset translation
+  pluginParameterMaps: defineTable({
+    plugin: v.id("plugins"),
+    pluginName: v.string(),        // For readability
+    category: v.string(),           // "eq", "compressor", etc.
+
+    // Semantic parameter definitions
+    parameters: v.array(v.object({
+      juceParamId: v.string(),       // JUCE parameter ID/name
+      juceParamIndex: v.optional(v.number()), // Parameter index
+      semantic: v.string(),          // Semantic meaning: "eq_band_1_freq", "comp_threshold", etc.
+      physicalUnit: v.string(),      // "hz", "db", "ms", "ratio", "percent", "boolean"
+      mappingCurve: v.string(),      // "linear", "logarithmic", "exponential", "stepped"
+      minValue: v.number(),          // Physical min (e.g., 20 for Hz)
+      maxValue: v.number(),          // Physical max (e.g., 20000 for Hz)
+      defaultValue: v.optional(v.number()), // Physical default
+      steps: v.optional(v.array(v.object({  // For stepped params (filter type, etc.)
+        normalizedValue: v.number(),  // 0.0-1.0 JUCE value
+        physicalValue: v.string(),    // "bell", "shelf_high", "hpf", etc.
+      }))),
+    })),
+
+    // EQ-specific metadata
+    eqBandCount: v.optional(v.number()),
+    eqBandParameterPattern: v.optional(v.string()), // e.g., "Band{N}_Freq", "Band{N}_Gain"
+
+    // Compressor-specific metadata
+    compHasAutoMakeup: v.optional(v.boolean()),
+    compHasParallelMix: v.optional(v.boolean()),
+    compHasLookahead: v.optional(v.boolean()),
+
+    // Metadata
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    confidence: v.number(),         // 0-100, how reliable is this mapping
+    source: v.string(),             // "manual", "ai-analyzed", "juce-scanned"
+  })
+    .index("by_plugin", ["plugin"])
+    .index("by_category", ["category"]),
+
+  // Standard semantic parameter definitions
+  parameterSemantics: defineTable({
+    category: v.string(),            // "eq", "compressor", "reverb", etc.
+    semanticId: v.string(),          // "eq_band_freq", "comp_threshold"
+    displayName: v.string(),         // "Frequency", "Threshold"
+    physicalUnit: v.string(),        // "hz", "db", "ms"
+    typicalMin: v.number(),
+    typicalMax: v.number(),
+    typicalDefault: v.number(),
+    typicalCurve: v.string(),        // "logarithmic" for freq, "linear" for gain
+    priority: v.number(),            // 1=critical (freq, gain), 2=important (Q), 3=nice-to-have
+  })
+    .index("by_category", ["category"])
+    .index("by_semantic", ["semanticId"]),
 });

@@ -358,6 +358,67 @@ class JuceBridge {
   }
 
   // ============================================
+  // Parameter Translation / Plugin Swap
+  // ============================================
+
+  /**
+   * Read all parameters from a loaded plugin instance by node ID.
+   * Returns parameter names, indices, and current normalized values.
+   */
+  async readPluginParameters(nodeId: number): Promise<{
+    success: boolean;
+    parameters?: Array<{
+      name: string;
+      index: number;
+      normalizedValue: number;
+      label: string;
+      text: string;
+      numSteps: number;
+    }>;
+    paramCount?: number;
+    error?: string;
+  }> {
+    return this.callNative('readPluginParameters', nodeId);
+  }
+
+  /**
+   * Apply translated parameters to a plugin instance.
+   * @param nodeId - The chain node ID of the plugin
+   * @param params - Array of {paramIndex, value} to apply
+   */
+  async applyPluginParameters(nodeId: number, params: Array<{ paramIndex: number; value: number }>): Promise<{
+    success: boolean;
+    appliedCount?: number;
+    error?: string;
+  }> {
+    return this.callNative('applyPluginParameters', JSON.stringify({ nodeId, params }));
+  }
+
+  /**
+   * Swap a plugin in the chain with a new one and apply translated parameters.
+   * Removes the old plugin, inserts the new one at the same position, then applies params.
+   * @param nodeId - The chain node ID of the plugin to replace
+   * @param newPluginUid - The JUCE unique identifier string of the new plugin
+   * @param translatedParams - Parameters to apply after swap
+   */
+  async swapPluginInChain(
+    nodeId: number,
+    newPluginUid: string,
+    translatedParams: Array<{ paramIndex: number; value: number }>
+  ): Promise<{
+    success: boolean;
+    appliedParams?: number;
+    chainState?: ChainStateV2;
+    error?: string;
+  }> {
+    return this.callNative('swapPluginInChain', JSON.stringify({
+      nodeId,
+      newPluginUid,
+      translatedParams,
+    }));
+  }
+
+  // ============================================
   // Group Operations (V2 Tree API)
   // ============================================
 

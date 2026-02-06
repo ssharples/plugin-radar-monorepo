@@ -379,6 +379,215 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             juce::ignoreUnused(args);
             completion(getPluginWindowState());
         })
+        // ============================================
+        // Parameter Translation / Plugin Swap
+        // ============================================
+        .withNativeFunction("readPluginParameters", [this](const juce::Array<juce::var>& args,
+                                                            juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+            {
+                int nodeId = static_cast<int>(args[0]);
+                auto* processor = chainProcessor.getNodeProcessor(nodeId);
+                if (processor)
+                {
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", true);
+                    
+                    juce::Array<juce::var> paramArray;
+                    auto& params = processor->getParameters();
+                    for (int i = 0; i < params.size(); ++i)
+                    {
+                        auto* param = params[i];
+                        auto* paramObj = new juce::DynamicObject();
+                        paramObj->setProperty("name", param->getName(256));
+                        paramObj->setProperty("index", i);
+                        paramObj->setProperty("normalizedValue", param->getValue());
+                        paramObj->setProperty("label", param->getLabel());
+                        paramObj->setProperty("text", param->getCurrentValueAsText());
+                        paramObj->setProperty("numSteps", param->getNumSteps());
+                        paramArray.add(juce::var(paramObj));
+                    }
+                    result->setProperty("parameters", paramArray);
+                    result->setProperty("paramCount", params.size());
+                    completion(juce::var(result));
+                }
+                else
+                {
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", false);
+                    result->setProperty("error", "No processor found for node " + juce::String(nodeId));
+                    completion(juce::var(result));
+                }
+            }
+            else
+            {
+                auto* result = new juce::DynamicObject();
+                result->setProperty("success", false);
+                result->setProperty("error", "Missing nodeId argument");
+                completion(juce::var(result));
+            }
+        })
+        .withNativeFunction("applyPluginParameters", [this](const juce::Array<juce::var>& args,
+                                                             juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            // args[0] = JSON string: { nodeId: number, params: [{paramIndex: number, value: number}] }
+            if (args.size() >= 1)
+            {
+                auto json = juce::JSON::parse(args[0].toString());
+                int nodeId = static_cast<int>(json.getProperty("nodeId", -1));
+                auto paramsList = json.getProperty("params", juce::var());
+                
+                auto* processor = chainProcessor.getNodeProcessor(nodeId);
+                if (processor && paramsList.isArray())
+                {
+                    auto& procParams = processor->getParameters();
+                    int applied = 0;
+                    
+                    for (int i = 0; i < paramsList.size(); ++i)
+                    {
+                        auto paramEntry = paramsList[i];
+                        int paramIndex = static_cast<int>(paramEntry.getProperty("paramIndex", -1));
+                        float value = static_cast<float>(paramEntry.getProperty("value", 0.0f));
+                        
+                        if (paramIndex >= 0 && paramIndex < procParams.size())
+                        {
+                            procParams[paramIndex]->setValue(value);
+                            applied++;
+                        }
+                    }
+                    
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", true);
+                    result->setProperty("appliedCount", applied);
+                    completion(juce::var(result));
+                }
+                else
+                {
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", false);
+                    result->setProperty("error", "Invalid nodeId or params");
+                    completion(juce::var(result));
+                }
+            }
+            else
+            {
+                auto* result = new juce::DynamicObject();
+                result->setProperty("success", false);
+                result->setProperty("error", "Missing arguments");
+                completion(juce::var(result));
+            }
+        })
+        .withNativeFunction("swapPluginInChain", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            // args[0] = JSON string: { nodeId: number, newPluginUid: string, translatedParams: [{paramIndex, value}] }
+            if (args.size() >= 1)
+            {
+                auto json = juce::JSON::parse(args[0].toString());
+                int nodeId = static_cast<int>(json.getProperty("nodeId", -1));
+                auto newPluginUid = json.getProperty("newPluginUid", "").toString();
+                auto translatedParams = json.getProperty("translatedParams", juce::var());
+                
+                // Find the position of this node in the chain
+                auto flatPlugins = chainProcessor.getFlatPluginList();
+                int flatIndex = -1;
+                for (int i = 0; i < static_cast<int>(flatPlugins.size()); ++i)
+                {
+                    if (flatPlugins[i] && flatPlugins[i]->id == nodeId)
+                    {
+                        flatIndex = i;
+                        break;
+                    }
+                }
+                
+                if (flatIndex < 0)
+                {
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", false);
+                    result->setProperty("error", "Node not found in chain");
+                    completion(juce::var(result));
+                    return;
+                }
+                
+                // Find the new plugin description
+                auto pluginList = pluginManager.getKnownPluginList().getTypes();
+                const juce::PluginDescription* newDesc = nullptr;
+                for (auto& desc : pluginList)
+                {
+                    if (desc.createIdentifierString() == newPluginUid ||
+                        juce::String(desc.uniqueId) == newPluginUid)
+                    {
+                        newDesc = &desc;
+                        break;
+                    }
+                }
+                
+                if (!newDesc)
+                {
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", false);
+                    result->setProperty("error", "New plugin not found: " + newPluginUid);
+                    completion(juce::var(result));
+                    return;
+                }
+                
+                // Remove old, add new at same position
+                bool removed = chainProcessor.removePlugin(flatIndex);
+                if (!removed)
+                {
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", false);
+                    result->setProperty("error", "Failed to remove old plugin");
+                    completion(juce::var(result));
+                    return;
+                }
+                
+                bool added = chainProcessor.addPlugin(*newDesc, flatIndex);
+                if (!added)
+                {
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", false);
+                    result->setProperty("error", "Failed to add new plugin");
+                    completion(juce::var(result));
+                    return;
+                }
+                
+                // Apply translated parameters to the new plugin
+                int appliedCount = 0;
+                if (translatedParams.isArray())
+                {
+                    // Get the new processor (should be at the same flat index)
+                    auto* newProcessor = chainProcessor.getSlotProcessor(flatIndex);
+                    if (newProcessor)
+                    {
+                        auto& procParams = newProcessor->getParameters();
+                        for (int i = 0; i < translatedParams.size(); ++i)
+                        {
+                            auto paramEntry = translatedParams[i];
+                            int paramIndex = static_cast<int>(paramEntry.getProperty("paramIndex", -1));
+                            float value = static_cast<float>(paramEntry.getProperty("value", 0.0f));
+                            
+                            if (paramIndex >= 0 && paramIndex < procParams.size())
+                            {
+                                procParams[paramIndex]->setValue(value);
+                                appliedCount++;
+                            }
+                        }
+                    }
+                }
+                
+                auto* result = new juce::DynamicObject();
+                result->setProperty("success", true);
+                result->setProperty("appliedParams", appliedCount);
+                result->setProperty("chainState", getChainState());
+                completion(juce::var(result));
+            }
+            else
+            {
+                auto* result = new juce::DynamicObject();
+                result->setProperty("success", false);
+                result->setProperty("error", "Missing arguments");
+                completion(juce::var(result));
+            }
+        })
         .withResourceProvider([this](const juce::String& url) {
             return resourceHandler(url);
         }, juce::URL("https://ui.local").getOrigin());

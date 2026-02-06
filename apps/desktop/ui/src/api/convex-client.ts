@@ -864,3 +864,102 @@ export async function getUserStats(
     return null;
   }
 }
+
+// ============================================
+// PARAMETER TRANSLATION
+// ============================================
+
+/**
+ * Find compatible plugins for swapping (same category, user-owned, with parameter maps)
+ */
+export async function findCompatibleSwaps(
+  pluginId: string
+): Promise<Array<{
+  pluginId: string;
+  pluginName: string;
+  category: string;
+  confidence: number;
+  parameterCount: number;
+  eqBandCount?: number;
+}>> {
+  const userId = getUserId();
+  if (!userId) return [];
+
+  try {
+    return await convex.query(api.parameterTranslation.findCompatibleSwaps, {
+      pluginId: pluginId as any,
+      userId: userId as any,
+    });
+  } catch (err) {
+    console.error("Failed to find compatible swaps:", err);
+    return [];
+  }
+}
+
+/**
+ * Get a random compatible swap for the "randomize" button
+ */
+export async function getRandomSwap(
+  pluginId: string
+): Promise<{
+  pluginId: string;
+  pluginName: string;
+  category: string;
+  confidence: number;
+  parameterCount: number;
+} | null> {
+  const userId = getUserId();
+  if (!userId) return null;
+
+  try {
+    return await convex.query(api.parameterTranslation.getRandomSwap, {
+      pluginId: pluginId as any,
+      userId: userId as any,
+      randomSeed: Math.floor(Math.random() * 1000000),
+    });
+  } catch (err) {
+    console.error("Failed to get random swap:", err);
+    return null;
+  }
+}
+
+/**
+ * Translate parameters from source plugin to target plugin
+ */
+export async function translateParameters(
+  sourcePluginId: string,
+  targetPluginId: string,
+  sourceParams: Array<{ paramId: string; paramIndex?: number; normalizedValue: number }>
+): Promise<{
+  targetParams: Array<{ paramId: string; paramIndex?: number; value: number }>;
+  confidence: number;
+  unmappedParams: string[];
+  sourcePluginName?: string;
+  targetPluginName?: string;
+  error?: string;
+} | null> {
+  try {
+    return await convex.query(api.parameterTranslation.translateParameters, {
+      sourcePluginId: sourcePluginId as any,
+      targetPluginId: targetPluginId as any,
+      sourceParams,
+    });
+  } catch (err) {
+    console.error("Failed to translate parameters:", err);
+    return null;
+  }
+}
+
+/**
+ * Get parameter map for a plugin
+ */
+export async function getParameterMap(pluginId: string): Promise<any | null> {
+  try {
+    return await convex.query(api.parameterTranslation.getParameterMap, {
+      pluginId: pluginId as any,
+    });
+  } catch (err) {
+    console.error("Failed to get parameter map:", err);
+    return null;
+  }
+}
