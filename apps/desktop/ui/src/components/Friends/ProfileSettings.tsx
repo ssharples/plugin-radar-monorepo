@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, Save, CheckCircle, AlertCircle } from 'lucide-react';
 import * as convexClient from '../../api/convex-client';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 export function ProfileSettings() {
   const [username, setUsername] = useState('');

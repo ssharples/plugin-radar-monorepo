@@ -6,6 +6,7 @@
 #include "../audio/GainProcessor.h"
 #include "../audio/AudioMeter.h"
 #include "../audio/FFTProcessor.h"
+#include "../audio/NodeMeterProcessor.h"
 #include <cmath>
 
 WebViewBridge::WebViewBridge(PluginManager& pm,
@@ -505,15 +506,22 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 auto newPluginUid = json.getProperty("newPluginUid", "").toString();
                 auto translatedParams = json.getProperty("translatedParams", juce::var());
                 
-                // Find the position of this node in the chain
+                // Find the position of this node in the flat plugin list
                 auto flatPlugins = chainProcessor.getFlatPluginList();
                 int flatIndex = -1;
-                for (int i = 0; i < static_cast<int>(flatPlugins.size()); ++i)
                 {
-                    if (flatPlugins[i] && flatPlugins[i]->id == nodeId)
+                    const auto* targetNode = ChainNodeHelpers::findById(chainProcessor.getRootNode(), nodeId);
+                    if (targetNode && targetNode->isPlugin())
                     {
-                        flatIndex = i;
-                        break;
+                        const auto* targetLeaf = &targetNode->getPlugin();
+                        for (int i = 0; i < static_cast<int>(flatPlugins.size()); ++i)
+                        {
+                            if (flatPlugins[i] == targetLeaf)
+                            {
+                                flatIndex = i;
+                                break;
+                            }
+                        }
                     }
                 }
                 
@@ -527,7 +535,7 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 }
                 
                 // Find the new plugin description
-                auto pluginList = pluginManager.getKnownPluginList().getTypes();
+                auto pluginList = pluginManager.getKnownPlugins().getTypes();
                 const juce::PluginDescription* newDesc = nullptr;
                 for (auto& desc : pluginList)
                 {
@@ -764,6 +772,25 @@ void WebViewBridge::timerCallback()
         fftObj->setProperty("sampleRate", fftProcessor->getSampleRate());
 
         emitEvent("fftData", juce::var(fftObj));
+    }
+
+    // Emit per-node meter data for inline plugin meters
+    {
+        auto nodeMeterReadings = chainProcessor.getNodeMeterReadings();
+        if (!nodeMeterReadings.empty())
+        {
+            auto* nodeMetersObj = new juce::DynamicObject();
+            for (const auto& nm : nodeMeterReadings)
+            {
+                auto* entry = new juce::DynamicObject();
+                entry->setProperty("peakL", nm.peakL);
+                entry->setProperty("peakR", nm.peakR);
+                entry->setProperty("peakHoldL", nm.peakHoldL);
+                entry->setProperty("peakHoldR", nm.peakHoldR);
+                nodeMetersObj->setProperty(juce::String(nm.nodeId), juce::var(entry));
+            }
+            emitEvent("nodeMeterData", juce::var(nodeMetersObj));
+        }
     }
 
     // Continuous match lock logic

@@ -1,6 +1,10 @@
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { useOfflineStore, isOnline } from "../stores/offlineStore";
+
+// Helper to cast string IDs to typed Convex Ids.
+// The desktop app stores IDs as plain strings but the typed API expects Id<"table">.
+const asId = (s: string) => s as any;
 
 // PluginRadar Convex backend (shared monorepo convex/)
 const CONVEX_URL = "https://next-frog-231.convex.cloud";
@@ -301,7 +305,7 @@ export async function syncPlugins(
 
   try {
     const result = await convex.mutation(api.pluginDirectory.syncScannedPlugins, {
-      userId: userId,
+      userId: asId(userId),
       plugins,
     });
     return {
@@ -432,7 +436,7 @@ export async function getScannedPlugins(): Promise<any[]> {
 
   try {
     return await convex.query(api.pluginDirectory.getUserScannedPlugins, {
-      userId: userId,
+      userId: asId(userId),
     });
   } catch (err) {
     console.error("Failed to get scanned plugins:", err);
@@ -477,7 +481,7 @@ export async function saveChain(
       'saveChain',
       [name, slots, options],
       () => convex.mutation(api.pluginDirectory.saveChain, {
-        userId: userId,
+        userId: asId(userId),
         name,
         slots,
         category: options.category ?? "mixing",
@@ -543,8 +547,8 @@ export async function checkChainCompatibility(
 
   try {
     return await convex.query(api.pluginDirectory.checkChainCompatibility, {
-      chainId: chainId,
-      userId: userId,
+      chainId: asId(chainId),
+      userId: asId(userId),
     });
   } catch (err) {
     console.error("Failed to check compatibility:", err);
@@ -580,8 +584,8 @@ export async function fetchDetailedCompatibility(
 
   try {
     return await convex.query(api.pluginDirectory.getDetailedCompatibility, {
-      chainId: chainId,
-      userId: userId,
+      chainId: asId(chainId),
+      userId: asId(userId),
     });
   } catch (err) {
     console.error("Failed to fetch detailed compatibility:", err);
@@ -617,8 +621,8 @@ export async function downloadChain(chainId: string): Promise<boolean> {
 
   try {
     await convex.mutation(api.pluginDirectory.downloadChain, {
-      chainId: chainId,
-      userId: userId,
+      chainId: asId(chainId),
+      userId: asId(userId),
     });
     return true;
   } catch (err) {
@@ -638,8 +642,8 @@ export async function toggleLike(
 
   try {
     return await convex.mutation(api.pluginDirectory.toggleChainLike, {
-      chainId: chainId,
-      userId: userId,
+      chainId: asId(chainId),
+      userId: asId(userId),
     });
   } catch (err) {
     console.error("Failed to toggle like:", err);
@@ -657,7 +661,7 @@ export async function toggleLike(
 export async function getComments(chainId: string): Promise<any[]> {
   try {
     return await convex.query(api.social.getComments, {
-      chainId: chainId,
+      chainId: asId(chainId),
     });
   } catch (err) {
     console.error("Failed to get comments:", err);
@@ -679,9 +683,9 @@ export async function addComment(
   try {
     const result = await convex.mutation(api.social.addComment, {
       sessionToken: token,
-      chainId: chainId,
+      chainId: asId(chainId),
       content,
-      parentCommentId: parentCommentId ? (parentCommentId) : undefined,
+      parentCommentId: parentCommentId ? asId(parentCommentId) : undefined,
     });
     return result as string;
   } catch (err) {
@@ -700,7 +704,7 @@ export async function deleteComment(commentId: string): Promise<boolean> {
   try {
     await convex.mutation(api.social.deleteComment, {
       sessionToken: token,
-      commentId: commentId,
+      commentId: asId(commentId),
     });
     return true;
   } catch (err) {
@@ -719,7 +723,7 @@ export async function getChainRating(
 
   try {
     return await convex.query(api.social.getChainRating, {
-      chainId: chainId,
+      chainId: asId(chainId),
       sessionToken: token ?? undefined,
     });
   } catch (err) {
@@ -741,7 +745,7 @@ export async function rateChain(
   try {
     await convex.mutation(api.social.rateChain, {
       sessionToken: token,
-      chainId: chainId,
+      chainId: asId(chainId),
       rating,
     });
     return true;
@@ -761,7 +765,7 @@ export async function followUser(userId: string): Promise<boolean> {
   try {
     await convex.mutation(api.social.followUser, {
       sessionToken: token,
-      userId: userId,
+      userId: asId(userId),
     });
     return true;
   } catch (err) {
@@ -780,7 +784,7 @@ export async function unfollowUser(userId: string): Promise<boolean> {
   try {
     await convex.mutation(api.social.unfollowUser, {
       sessionToken: token,
-      userId: userId,
+      userId: asId(userId),
     });
     return true;
   } catch (err) {
@@ -799,7 +803,7 @@ export async function isFollowing(userId: string): Promise<boolean> {
   try {
     return await convex.query(api.social.isFollowing, {
       sessionToken: token,
-      userId: userId,
+      userId: asId(userId),
     });
   } catch (err) {
     console.error("Failed to check follow status:", err);
@@ -820,7 +824,7 @@ export async function forkChain(
   try {
     const result = await convex.mutation(api.social.forkChain, {
       sessionToken: token,
-      chainId: chainId,
+      chainId: asId(chainId),
       newName,
     });
     return {
@@ -842,7 +846,7 @@ export async function getChainsByUser(userId: string): Promise<any[]> {
 
   try {
     return await convex.query(api.pluginDirectory.getChainsByUser, {
-      userId: userId,
+      userId: asId(userId),
       sessionToken: token ?? undefined,
     });
   } catch (err) {
@@ -859,7 +863,7 @@ export async function getUserStats(
 ): Promise<{ chainCount: number; totalLikes: number; totalDownloads: number; followerCount: number } | null> {
   try {
     return await convex.query(api.pluginDirectory.getUserStats, {
-      userId: userId,
+      userId: asId(userId),
     });
   } catch (err) {
     console.error("Failed to get user stats:", err);

@@ -105,6 +105,13 @@ public:
     const PluginSlot* getSlot(int index) const;
     PluginSlot* getSlot(int index);
 
+    // Per-node meter data collection (called by WebViewBridge timer)
+    struct NodeMeterData {
+        ChainNodeId nodeId;
+        float peakL, peakR, peakHoldL, peakHoldR;
+    };
+    std::vector<NodeMeterData> getNodeMeterReadings() const;
+
     // Latency reporting
     int getTotalLatencySamples() const;
 
@@ -150,7 +157,7 @@ private:
     WireResult wireSerialGroup(ChainNode& node, NodeID audioIn, NodeID midiIn);
     WireResult wireParallelGroup(ChainNode& node, NodeID audioIn, NodeID midiIn);
 
-    void removeUtilityNodes();
+    void removeUtilityNodes(UpdateKind update = UpdateKind::sync);
     void notifyChainChanged();
 
     // Latency helpers

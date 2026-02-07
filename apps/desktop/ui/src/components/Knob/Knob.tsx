@@ -21,6 +21,7 @@ export function Knob({
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ y: 0, value: 0 });
+  const shiftHeldRef = useRef(false);
   const knobRef = useRef<SVGSVGElement>(null);
 
   // Convert dB value to rotation angle (0-270 degrees)
@@ -36,6 +37,7 @@ export function Knob({
     e.preventDefault();
     setIsDragging(true);
     dragStartRef.current = { y: e.clientY, value };
+    shiftHeldRef.current = e.shiftKey;
   }, [value]);
 
   const handleDoubleClick = useCallback(() => {
@@ -45,7 +47,8 @@ export function Knob({
   // Scroll-to-change
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const sensitivity = (max - min) / 400;
+    const fine = e.shiftKey;
+    const sensitivity = fine ? (max - min) / 2000 : (max - min) / 400;
     const delta = -e.deltaY * sensitivity;
     const newValue = Math.max(min, Math.min(max, value + delta));
     onChange(Math.round(newValue * 10) / 10);
@@ -62,8 +65,10 @@ export function Knob({
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      shiftHeldRef.current = e.shiftKey;
       const deltaY = dragStartRef.current.y - e.clientY;
-      const sensitivity = (max - min) / 200;
+      // Fine control when Shift is held (5x more precise)
+      const sensitivity = e.shiftKey ? (max - min) / 1000 : (max - min) / 200;
       const newValue = dragStartRef.current.value + deltaY * sensitivity;
       const clampedValue = Math.max(min, Math.min(max, newValue));
       onChange(Math.round(clampedValue * 10) / 10);
@@ -122,7 +127,7 @@ export function Knob({
   const isAtZero = Math.abs(value) < 0.05;
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5 relative">
       <svg
         ref={knobRef}
         width={size}
@@ -157,22 +162,22 @@ export function Knob({
           strokeWidth={1.5}
         />
 
-        {/* Track arc (background) */}
+        {/* Track arc (background) — thicker */}
         <path
           d={createArc(-135, 135, radius * 0.85)}
           fill="none"
           stroke="#222"
-          strokeWidth={2.5}
+          strokeWidth={3}
           strokeLinecap="round"
         />
 
-        {/* Value arc (filled portion) */}
+        {/* Value arc (filled portion) — thicker */}
         {value > min && (
           <path
             d={createArc(-135, angle, radius * 0.85)}
             fill="none"
-            stroke={isDragging ? '#ff8c33' : '#f97316'}
-            strokeWidth={2.5}
+            stroke={isDragging ? '#818cf8' : '#6366f1'}
+            strokeWidth={3}
             strokeLinecap="round"
           />
         )}
@@ -183,7 +188,7 @@ export function Knob({
           y1={tickY1}
           x2={tickX2}
           y2={tickY2}
-          stroke={isAtZero ? '#f97316' : '#444'}
+          stroke={isAtZero ? '#6366f1' : '#444'}
           strokeWidth={1}
           strokeLinecap="round"
         />
@@ -202,10 +207,24 @@ export function Knob({
           y1={center}
           x2={indicatorX}
           y2={indicatorY}
-          stroke="#f97316"
+          stroke="#6366f1"
           strokeWidth={2}
           strokeLinecap="round"
         />
+
+        {/* Value inside knob circle when dragging */}
+        {isDragging && (
+          <text
+            x={center}
+            y={center + radius * 0.45}
+            textAnchor="middle"
+            fontSize={size * 0.18}
+            fontFamily="monospace"
+            fill="#818cf8"
+          >
+            {formatValue(value)}
+          </text>
+        )}
       </svg>
 
       {/* Value display */}
@@ -215,9 +234,9 @@ export function Knob({
         {formatValue(value)}
       </div>
 
-      {/* Label */}
+      {/* Label — bumped from 8px to 9px minimum */}
       {label && (
-        <div className="text-[8px] text-plugin-muted uppercase tracking-widest font-medium">
+        <div className="text-[9px] text-plugin-muted uppercase tracking-widest font-medium">
           {label}
         </div>
       )}

@@ -49,6 +49,7 @@ target_sources(PluginChainManager
         src/audio/WaveformCapture.cpp
         src/audio/GainProcessor.cpp
         src/audio/AudioMeter.cpp
+        src/audio/NodeMeterProcessor.cpp
         src/audio/FFTProcessor.cpp
         src/audio/DryWetMixProcessor.cpp
         src/audio/BranchGainProcessor.cpp

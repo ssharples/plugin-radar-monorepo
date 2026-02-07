@@ -93,6 +93,14 @@ export function HeaderMenu() {
     <div ref={headerRef} className="relative">
       {/* Header bar */}
       <div className="flex items-center gap-0.5 px-2 py-1 bg-plugin-surface border-b border-plugin-border">
+        {/* Logo mark */}
+        <div className="flex items-center gap-1.5 mr-1">
+          <div className="w-5 h-5 rounded bg-gradient-to-br from-plugin-accent to-plugin-accent-dim flex items-center justify-center">
+            <span className="text-[9px] font-black text-white leading-none">P</span>
+          </div>
+        </div>
+        <div className="w-px h-5 bg-plugin-border mr-1" />
+
         {/* Save */}
         <button
           onClick={() => toggle('save')}

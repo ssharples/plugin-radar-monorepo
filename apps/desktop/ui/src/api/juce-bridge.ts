@@ -6,6 +6,7 @@ import type {
   ApiResponse,
   WaveformData,
   MeterData,
+  NodeMeterReadings,
   GainSettings,
   FFTData,
 } from './types';
@@ -97,6 +98,7 @@ class JuceBridge {
       'fftData',
       'gainChanged',
       'matchLockWarning',
+      'nodeMeterData',
     ];
 
     events.forEach((eventName) => {
@@ -345,6 +347,11 @@ class JuceBridge {
   // Meter data
   onMeterData(handler: EventHandler<MeterData>): () => void {
     return this.on('meterData', handler);
+  }
+
+  // Per-node meter data (inline plugin meters)
+  onNodeMeterData(handler: EventHandler<Record<string, NodeMeterReadings>>): () => void {
+    return this.on('nodeMeterData', handler);
   }
 
   // Gain change events (from match lock auto-adjustment)

@@ -18,6 +18,7 @@ struct PluginLeaf
 {
     juce::PluginDescription description;
     juce::AudioProcessorGraph::NodeID graphNodeId;
+    juce::AudioProcessorGraph::NodeID meterNodeId;  // Meter node inserted after this plugin
     bool bypassed = false;
 };
 
@@ -34,7 +35,6 @@ struct GroupData
     juce::AudioProcessorGraph::NodeID dryWetMixNodeId;
     juce::AudioProcessorGraph::NodeID sumGainNodeId;
     std::vector<juce::AudioProcessorGraph::NodeID> branchGainNodeIds;
-    std::vector<juce::AudioProcessorGraph::NodeID> delayCompNodeIds;
 };
 
 struct ChainNode

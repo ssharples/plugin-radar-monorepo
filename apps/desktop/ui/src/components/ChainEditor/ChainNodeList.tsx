@@ -15,6 +15,7 @@ interface ChainNodeListProps {
   isDragActive?: boolean;
   draggedNodeId?: number | null;
   shiftHeld?: boolean;
+  groupSelectMode?: boolean;
 }
 
 export function ChainNodeList({
@@ -27,6 +28,7 @@ export function ChainNodeList({
   isDragActive = false,
   draggedNodeId = null,
   shiftHeld = false,
+  groupSelectMode = false,
 }: ChainNodeListProps) {
   const {
     openEditors,
@@ -52,12 +54,19 @@ export function ChainNodeList({
 
       {visibleNodes.map((node, visualIndex) => {
         // Calculate the real insert index for the drop zone after this node.
-        // We need the original index in the parent's children array.
         const realIndex = nodes.indexOf(node);
         const insertIndexAfter = realIndex + 1;
+        const isLastNode = visualIndex === visibleNodes.length - 1;
 
         return (
           <div key={node.id}>
+            {/* Signal flow connector line (before each node except first) */}
+            {visualIndex > 0 && !isParallelParent && (
+              <div className="flex justify-center py-0">
+                <div className="w-px h-1.5 bg-plugin-border-bright" />
+              </div>
+            )}
+
             {node.type === 'group' ? (
               <div>
                 {isParallelParent && (
@@ -72,6 +81,7 @@ export function ChainNodeList({
                   isDragActive={isDragActive}
                   draggedNodeId={draggedNodeId}
                   shiftHeld={shiftHeld}
+                  groupSelectMode={groupSelectMode}
                 />
               </div>
             ) : (
@@ -80,7 +90,6 @@ export function ChainNodeList({
                   flex items-center gap-1.5 transition-opacity duration-200
                   ${node.id === draggedNodeId ? 'opacity-30' : 'opacity-100'}
                 `}
-                onClick={onNodeSelect ? (e) => onNodeSelect(e, node.id) : undefined}
               >
                 {isParallelParent && (
                   <ParallelBranchControls node={node} />
@@ -95,8 +104,17 @@ export function ChainNodeList({
                     onToggleBypass={() => toggleNodeBypass(node.id)}
                     onToggleEditor={() => togglePluginEditor(node.id)}
                     isDragActive={isDragActive}
+                    groupSelectMode={groupSelectMode}
+                    onSelect={onNodeSelect ? (e) => onNodeSelect(e, node.id) : undefined}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Signal flow connector line (after last node, before output) */}
+            {isLastNode && !isParallelParent && depth === 0 && (
+              <div className="flex justify-center py-0">
+                <div className="w-px h-1.5 bg-plugin-border-bright" />
               </div>
             )}
 

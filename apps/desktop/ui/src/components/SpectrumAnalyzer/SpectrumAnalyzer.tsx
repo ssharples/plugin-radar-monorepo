@@ -443,7 +443,7 @@ export function SpectrumAnalyzer({ height = 100 }: SpectrumAnalyzerProps) {
     for (let i = 1; i < points.length; i++) {
       ctx.lineTo(points[i].x, points[i].y);
     }
-    ctx.strokeStyle = '#ff6b00';
+    ctx.strokeStyle = '#6366f1';
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }, []);

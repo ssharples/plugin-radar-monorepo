@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Download, X, RefreshCw, Inbox, Check } from 'lucide-react';
 import * as convexClient from '../../api/convex-client';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { juceBridge } from '../../api/juce-bridge';
 
 interface ReceivedChain {

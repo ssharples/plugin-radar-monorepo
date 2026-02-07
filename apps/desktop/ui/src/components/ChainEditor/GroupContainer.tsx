@@ -1,9 +1,9 @@
-import { ChevronDown, ChevronRight, Layers, GitBranch, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, GitBranch, X, GripVertical } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useChainStore } from '../../stores/chainStore';
 import type { GroupNodeUI, ChainNodeUI } from '../../api/types';
 import { ChainNodeList } from './ChainNodeList';
-import { GripVertical } from 'lucide-react';
+import { Slider } from '../Slider/Slider';
 
 interface GroupContainerProps {
   node: GroupNodeUI;
@@ -14,6 +14,7 @@ interface GroupContainerProps {
   isDragActive?: boolean;
   draggedNodeId?: number | null;
   shiftHeld?: boolean;
+  groupSelectMode?: boolean;
 }
 
 export function GroupContainer({
@@ -25,6 +26,7 @@ export function GroupContainer({
   isDragActive = false,
   draggedNodeId = null,
   shiftHeld = false,
+  groupSelectMode = false,
 }: GroupContainerProps) {
   const {
     setGroupMode,
@@ -92,21 +94,21 @@ export function GroupContainer({
       `}
       style={{ marginLeft: depth > 0 ? 8 : 0 }}
     >
-      {/* Group Header */}
-      <div className="flex items-center gap-2 px-3 py-2">
-        {/* Drag handle */}
-        <button
-          {...dragAttributes}
-          {...dragListeners}
-          onClick={(e) => e.stopPropagation()}
-          className="flex-shrink-0 p-0.5 rounded hover:bg-plugin-border/50 cursor-grab active:cursor-grabbing text-plugin-muted"
-        >
+      {/* Group Header — entire row is draggable (5px movement activates) */}
+      <div
+        {...dragAttributes}
+        {...dragListeners}
+        className="flex items-center gap-2 px-3 py-2 cursor-grab active:cursor-grabbing"
+      >
+        {/* Drag handle indicator */}
+        <div className="flex-shrink-0 p-0.5 text-plugin-muted">
           <GripVertical className="w-3.5 h-3.5" />
-        </button>
+        </div>
 
         {/* Collapse toggle */}
         <button
-          onClick={() => toggleGroupCollapsed(node.id)}
+          onClick={(e) => { e.stopPropagation(); toggleGroupCollapsed(node.id); }}
+          onPointerDown={(e) => e.stopPropagation()}
           className="flex-shrink-0 p-0.5 rounded hover:bg-plugin-border/50 text-plugin-muted"
         >
           {node.collapsed ? (
@@ -129,7 +131,7 @@ export function GroupContainer({
         </span>
 
         {/* Mode toggle */}
-        <div className="flex items-center bg-plugin-bg rounded overflow-hidden border border-plugin-border" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center bg-plugin-bg rounded overflow-hidden border border-plugin-border" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
           <button
             onClick={() => setGroupMode(node.id, 'serial')}
             className={`px-2 py-0.5 text-xxs font-medium transition-colors ${
@@ -154,16 +156,16 @@ export function GroupContainer({
 
         {/* Dry/Wet for serial groups (non-root) */}
         {isSerial && (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
             <span className="text-xxs text-plugin-muted">D/W</span>
-            <input
-              type="range"
+            <Slider
+              value={node.dryWet}
               min={0}
               max={1}
               step={0.01}
-              value={node.dryWet}
-              onChange={(e) => setGroupDryWet(node.id, parseFloat(e.target.value))}
-              className="w-12 h-1 accent-blue-400 cursor-pointer"
+              color="blue"
+              width="w-14"
+              onChange={(v) => setGroupDryWet(node.id, v)}
               title={`Dry/Wet: ${Math.round(node.dryWet * 100)}%`}
             />
             <span className="text-xxs text-plugin-muted w-7 text-right tabular-nums">
@@ -173,7 +175,7 @@ export function GroupContainer({
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
           {/* Dissolve group */}
           <button
             onClick={() => dissolveGroup(node.id)}
@@ -213,6 +215,7 @@ export function GroupContainer({
               isDragActive={isDragActive}
               draggedNodeId={draggedNodeId}
               shiftHeld={shiftHeld}
+              groupSelectMode={groupSelectMode}
             />
           )}
         </div>
@@ -258,9 +261,14 @@ function EmptyGroupDropZone({
   const bgColor = isParallel ? 'bg-orange-500/10' : 'bg-blue-500/10';
   const textColor = isParallel ? 'text-orange-400' : 'text-blue-400';
 
+  const handleClick = () => {
+    window.dispatchEvent(new Event('openPluginBrowser'));
+  };
+
   return (
     <div
       ref={setNodeRef}
+      onClick={handleClick}
       className={`
         mx-1 rounded-lg border-2 border-dashed transition-all duration-200
         ${isOver && isDragActive

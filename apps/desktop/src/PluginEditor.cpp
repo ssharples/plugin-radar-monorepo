@@ -10,8 +10,8 @@ PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& 
 
     // Set the size - this triggers resized() which sets WebView to full bounds
     setResizable(true, true);
-    setResizeLimits(500, 500, 3840, 2160);
-    setSize(675, 700);
+    setResizeLimits(600, 400, 3840, 2160);
+    setSize(900, 750);
 }
 
 PluginChainManagerEditor::~PluginChainManagerEditor()
@@ -42,7 +42,7 @@ void PluginChainManagerEditor::initializeWebView()
 
     // Create WebBrowserComponent with native function bindings
     webBrowser = std::make_unique<juce::WebBrowserComponent>(webViewBridge->getOptions());
-    webBrowser->setWantsKeyboardFocus(false);  // Don't capture keyboard from DAW
+    webBrowser->setWantsKeyboardFocus(true);  // Allow WebView to receive keyboard events when focused
     webViewBridge->setBrowserComponent(webBrowser.get());
     addAndMakeVisible(*webBrowser);
 
@@ -65,14 +65,10 @@ void PluginChainManagerEditor::resized()
     {
         auto bounds = getLocalBounds();
 
-        // Leave a small margin at the edges so the JUCE resize handles
-        // remain reachable (WebBrowserComponent can intercept mouse events
-        // at window borders, especially in Ableton Live and other DAWs).
-        // Bottom-right corner needs more space for the corner resizer.
-        constexpr int edgeMargin = 2;
-        constexpr int cornerSize = 12;
-
-        webBrowser->setBounds(bounds.reduced(edgeMargin));
+        // Give the WebBrowser the full bounds. The React UI handles its own
+        // layout within 100vw/100vh. A small edge margin is no longer needed
+        // since the JUCE corner resizer is brought to front below.
+        webBrowser->setBounds(bounds);
 
         // Ensure the corner resizer (if present) stays on top of the WebView
         for (int i = getNumChildComponents() - 1; i >= 0; --i)

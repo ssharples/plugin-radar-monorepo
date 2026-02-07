@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, Check, X, RefreshCw } from 'lucide-react';
 import * as convexClient from '../../api/convex-client';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 interface PendingRequest {
   requestId: string;

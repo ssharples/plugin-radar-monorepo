@@ -128,7 +128,7 @@ export function MeterDisplay({
           {scaleMarks.map((db) => (
             <div
               key={db}
-              className="absolute right-1 transform -translate-y-1/2 text-[7px] text-plugin-dim"
+              className="absolute right-1 transform -translate-y-1/2 text-[9px] text-plugin-dim"
               style={{ bottom: `${dbToPercent(db)}%` }}
             >
               {db}

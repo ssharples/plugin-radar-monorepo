@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Send, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import * as convexClient from '../../api/convex-client';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 interface ShareChainModalProps {
   chainId: string;

@@ -75,9 +75,10 @@ export function DropZone({
     <div
       ref={setNodeRef}
       className={`
-        relative transition-all duration-200 ease-out
-        ${isOver ? 'py-1' : 'py-0.5'}
+        relative transition-all duration-200
+        ${isOver ? 'py-1.5' : 'py-0.5'}
       `}
+      style={{ transitionTimingFunction: isOver ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'ease-out' }}
     >
       {/* Main drop indicator line */}
       <div

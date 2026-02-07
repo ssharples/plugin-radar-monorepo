@@ -134,7 +134,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
             {tonalChars.map((char) => (
               <span
                 key={char}
-                className="px-1 py-px text-[8px] leading-tight rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize"
+                className="px-1 py-px text-[9px] leading-tight rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize"
               >
                 {char}
               </span>
@@ -149,10 +149,6 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
           </p>
         )}
 
-        {/* Not in catalog label for unmatched plugins */}
-        {!enriched && (
-          <span className="text-[8px] text-plugin-dim/50 italic">Not in catalog</span>
-        )}
       </div>
 
       {/* Add button / Enter hint */}

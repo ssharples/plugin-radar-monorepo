@@ -76,6 +76,14 @@ export interface MeterData {
   outputLufs: number;
 }
 
+// Per-node meter readings (from NodeMeterProcessor)
+export interface NodeMeterReadings {
+  peakL: number;
+  peakR: number;
+  peakHoldL: number;
+  peakHoldR: number;
+}
+
 // Gain settings
 export interface GainSettings {
   inputGainDB: number;

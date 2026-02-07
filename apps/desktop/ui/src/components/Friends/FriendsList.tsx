@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, UserMinus, RefreshCw } from 'lucide-react';
 import * as convexClient from '../../api/convex-client';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 interface Friend {
   friendshipId: string;

@@ -1,12 +1,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Search, RefreshCw, Filter, X } from 'lucide-react';
+import { Search, RefreshCw, Filter, X, PanelLeftOpen } from 'lucide-react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useChainStore } from '../../stores/chainStore';
 import { PluginItem } from './PluginItem';
 import { PluginFilters } from './PluginFilters';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
-export function PluginBrowser() {
+interface PluginBrowserProps {
+  collapsed?: boolean;
+  onToggle?: () => void;
+}
+
+export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProps) {
   const {
     filteredPlugins,
     searchQuery,
@@ -25,7 +30,7 @@ export function PluginBrowser() {
     clearAllFilters,
   } = usePluginStore();
 
-  const { addPlugin, selectNode, selectedNodeId, slots } = useChainStore();
+  const { addPlugin, addPluginToGroup, selectNode, selectedNodeId, slots, nodes } = useChainStore();
 
   useEffect(() => {
     fetchPlugins();
@@ -63,26 +68,38 @@ export function PluginBrowser() {
   }, [toast]);
 
   const handleInsertPlugin = useCallback(async (pluginId: string, pluginName: string) => {
-    let insertIndex = -1;
-    if (selectedNodeId !== null) {
-      const idx = slots.findIndex(
+    let success = false;
+
+    // Find the tree position of the selected node (parent group + index)
+    const treePos = selectedNodeId !== null ? findTreePosition(nodes, selectedNodeId) : null;
+
+    if (treePos && treePos.parentId !== 0) {
+      // Selected node is inside a group — add to that group after the selected node
+      success = await addPluginToGroup(pluginId, treePos.parentId, treePos.index + 1);
+    } else if (treePos) {
+      // Selected node is at root — use flat insert after it
+      const flatIdx = slots.findIndex(
         (s) => s.index === selectedNodeId || s.uid === selectedNodeId
       );
-      if (idx !== -1) insertIndex = idx + 1;
+      success = await addPlugin(pluginId, flatIdx !== -1 ? flatIdx + 1 : -1);
+    } else {
+      // Nothing selected — append to end
+      success = await addPlugin(pluginId);
     }
 
-    const success = await addPlugin(pluginId, insertIndex);
     if (success) {
       const { slots: newSlots, nodes: newNodes } = useChainStore.getState();
-      const actualIdx = insertIndex === -1 ? newSlots.length - 1 : insertIndex;
-      const newSlot = newSlots[actualIdx];
-      if (newSlot) {
-        const nodeId = findNodeIdByUid(newNodes, newSlot.uid);
-        selectNode(nodeId ?? newSlot.index);
+      // Find and select the newly added plugin
+      const lastNode = findLastPluginByName(newNodes, pluginName);
+      if (lastNode) {
+        selectNode(lastNode);
+      } else if (newSlots.length > 0) {
+        const lastSlot = newSlots[newSlots.length - 1];
+        selectNode(lastSlot.index);
       }
       setToast(`Added "${pluginName}"`);
     }
-  }, [addPlugin, selectedNodeId, slots, selectNode]);
+  }, [addPlugin, addPluginToGroup, selectedNodeId, slots, nodes, selectNode]);
 
   const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     const count = filteredPlugins.length;
@@ -125,18 +142,66 @@ export function PluginBrowser() {
     }
   }, [filteredPlugins, highlightedIndex, searchQuery, setSearchQuery, handleInsertPlugin]);
 
-  const handleAddPlugin = async (pluginId: string) => {
-    await addPlugin(pluginId);
-  };
+  const handleAddPlugin = useCallback(async (pluginId: string, pluginName: string) => {
+    let success = false;
+
+    // If a node inside a group is selected, add to that group
+    const treePos = selectedNodeId !== null ? findTreePosition(nodes, selectedNodeId) : null;
+    if (treePos && treePos.parentId !== 0) {
+      success = await addPluginToGroup(pluginId, treePos.parentId, treePos.index + 1);
+    } else {
+      success = await addPlugin(pluginId);
+    }
+
+    if (success) {
+      const { nodes: newNodes } = useChainStore.getState();
+      const lastNode = findLastPluginByName(newNodes, pluginName);
+      if (lastNode) selectNode(lastNode);
+      setToast(`Added "${pluginName}"`);
+    }
+  }, [addPlugin, addPluginToGroup, selectedNodeId, nodes, selectNode]);
 
   const formats = ['VST3', 'AudioUnit'];
   const activeFilters = hasActiveFilters();
+
+  // Collapsed state — thin sidebar with vertical label
+  if (collapsed) {
+    return (
+      <div className="flex flex-col h-full bg-plugin-surface items-center py-2">
+        <button
+          onClick={onToggle}
+          className="p-1 rounded hover:bg-plugin-border text-plugin-muted hover:text-plugin-text transition-colors"
+          title="Expand plugin browser (⌘B)"
+        >
+          <PanelLeftOpen className="w-4 h-4" />
+        </button>
+        <div className="flex-1 flex items-center justify-center">
+          <span
+            className="text-[10px] font-semibold text-plugin-muted uppercase tracking-[0.15em] select-none"
+            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+          >
+            Plugins
+          </span>
+        </div>
+        <div className="text-[9px] font-mono text-plugin-dim">
+          {filteredPlugins.length}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-plugin-surface overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-plugin-border">
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={onToggle}
+            className="p-0.5 rounded hover:bg-plugin-border text-plugin-muted hover:text-plugin-text transition-colors"
+            title="Collapse (⌘B)"
+          >
+            <PanelLeftOpen className="w-3.5 h-3.5 rotate-180" />
+          </button>
           <h2 className="text-xs font-semibold text-plugin-text uppercase tracking-wider">Plugins</h2>
           {enrichmentLoading && (
             <span className="text-[9px] text-plugin-accent animate-pulse">syncing catalog...</span>
@@ -277,7 +342,7 @@ export function PluginBrowser() {
                 key={plugin.id}
                 plugin={plugin}
                 isHighlighted={isSearchFocused && index === highlightedIndex}
-                onAdd={() => handleAddPlugin(plugin.id)}
+                onAdd={() => handleAddPlugin(plugin.id, plugin.name)}
                 onInsert={() => handleInsertPlugin(plugin.id, plugin.name)}
                 onMouseEnter={() => { if (isSearchFocused) setHighlightedIndex(index); }}
               />
@@ -308,14 +373,31 @@ export function PluginBrowser() {
   );
 }
 
-/** Walk node tree to find a node by plugin UID */
-function findNodeIdByUid(nodes: import('../../api/types').ChainNodeUI[], uid: number): number | null {
-  for (const node of nodes) {
-    if (node.type === 'plugin' && node.uid === uid) return node.id;
-    if (node.type === 'group') {
-      const found = findNodeIdByUid(node.children, uid);
-      if (found !== null) return found;
+type NodeUI = import('../../api/types').ChainNodeUI;
+
+/** Find the parent ID and index of a node within the tree */
+function findTreePosition(nodes: NodeUI[], targetId: number, parentId = 0): { parentId: number; index: number } | null {
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].id === targetId) {
+      return { parentId, index: i };
+    }
+    if (nodes[i].type === 'group') {
+      const found = findTreePosition(nodes[i].children, targetId, nodes[i].id);
+      if (found) return found;
     }
   }
   return null;
+}
+
+/** Find the node ID of the last plugin with a given name (for selecting newly added plugins) */
+function findLastPluginByName(nodes: NodeUI[], name: string): number | null {
+  let lastId: number | null = null;
+  for (const node of nodes) {
+    if (node.type === 'plugin' && node.name === name) lastId = node.id;
+    if (node.type === 'group') {
+      const found = findLastPluginByName(node.children, name);
+      if (found !== null) lastId = found;
+    }
+  }
+  return lastId;
 }

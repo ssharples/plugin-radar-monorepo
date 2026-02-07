@@ -1,8 +1,13 @@
 #include "ChainProcessor.h"
 #include "../audio/DryWetMixProcessor.h"
 #include "../audio/BranchGainProcessor.h"
-#include "../audio/LatencyCompensationProcessor.h"
+#include "../audio/NodeMeterProcessor.h"
 #include <cmath>
+
+#if JUCE_MAC
+ #include <objc/objc.h>
+ #include <objc/message.h>
+#endif
 
 //==============================================================================
 // Plugin Window for showing native plugin UIs
@@ -17,14 +22,34 @@ public:
         setContentOwned(editor, true);
         setResizable(editor->isResizable(), false);
 
-        // Use standard window flags WITHOUT windowIsTemporary — this prevents
-        // the always-on-top floating panel behavior that makes child plugin
-        // windows stay above the DAW and the main plugin editor.
+        // Standard window flags — appears on taskbar as a real window.
         int styleFlags = juce::ComponentPeer::windowHasTitleBar
                        | juce::ComponentPeer::windowHasCloseButton
                        | juce::ComponentPeer::windowHasDropShadow
                        | juce::ComponentPeer::windowAppearsOnTaskbar;
         addToDesktop(styleFlags);
+
+        // On macOS, the DAW's plugin host window (containing our WebBrowserComponent
+        // with its native WKWebView) often sits at a floating window level. Child
+        // plugin windows created with addToDesktop are at the normal level by default,
+        // so they appear behind the main editor. Raise them to floating level so they
+        // can be dragged over the main window.
+#if JUCE_MAC
+        if (auto* peer = getPeer())
+        {
+            // getNativeHandle() returns NSView* on macOS, not NSWindow*
+            auto nsView = (id) peer->getNativeHandle();
+            if (nsView)
+            {
+                auto nsWindow = ((id (*)(id, SEL))objc_msgSend)(nsView, sel_registerName("window"));
+                if (nsWindow)
+                {
+                    // NSFloatingWindowLevel = 3 (CGWindowLevelForKey(kCGFloatingWindowLevelKey))
+                    ((void (*)(id, SEL, long))objc_msgSend)(nsWindow, sel_registerName("setLevel:"), 3);
+                }
+            }
+        }
+#endif
 
         centreWithSize(getWidth(), getHeight());
         setVisible(true);
@@ -33,10 +58,16 @@ public:
 
     void closeButtonPressed() override { setVisible(false); }
 
-    void activeWindowStatusChanged() override {}
+    void activeWindowStatusChanged() override
+    {
+        // When this window becomes active, ensure it's in front
+        if (isActiveWindow())
+            toFront(true);
+    }
 
     void mouseDown(const juce::MouseEvent& e) override
     {
+        toFront(true);
         DocumentWindow::mouseDown(e);
     }
 
@@ -55,7 +86,7 @@ ChainProcessor::ChainProcessor(PluginManager& pm)
     // Initialize root as an empty Serial group with id=0
     rootNode.id = 0;
     rootNode.name = "Root";
-    rootNode.data = GroupData{ GroupMode::Serial, 1.0f, {}, {}, {}, {}, {} };
+    rootNode.data = GroupData{ GroupMode::Serial, 1.0f, {}, {}, {}, {} };
 }
 
 ChainProcessor::~ChainProcessor()
@@ -449,10 +480,9 @@ void ChainProcessor::setNodeBypassed(ChainNodeId nodeId, bool bypassed)
 
     node->getPlugin().bypassed = bypassed;
 
-    if (auto gNode = getNodeForId(node->getPlugin().graphNodeId))
-        gNode->setBypassed(bypassed);
-
-    cachedSlotsDirty = true;
+    // Rebuild the graph to fully disconnect/reconnect the plugin.
+    // Bypassed plugins are skipped in wireNode(), so they use zero CPU.
+    rebuildGraph();
     notifyChainChanged();
 }
 
@@ -620,13 +650,10 @@ void ChainProcessor::setAllBypass(bool bypassed)
     ChainNodeHelpers::collectPluginsMut(rootNode, plugins);
 
     for (auto* leaf : plugins)
-    {
         leaf->bypassed = bypassed;
-        if (auto gNode = getNodeForId(leaf->graphNodeId))
-            gNode->setBypassed(bypassed);
-    }
 
-    cachedSlotsDirty = true;
+    // Single rebuild disconnects/reconnects all plugins at once
+    rebuildGraph();
     notifyChainChanged();
 }
 
@@ -751,10 +778,10 @@ juce::AudioProcessor* ChainProcessor::getNodeProcessor(ChainNodeId nodeId)
 // Graph wiring
 //==============================================================================
 
-void ChainProcessor::removeUtilityNodes()
+void ChainProcessor::removeUtilityNodes(UpdateKind update)
 {
     for (auto nodeId : utilityNodes)
-        AudioProcessorGraph::removeNode(nodeId);
+        AudioProcessorGraph::removeNode(nodeId, update);
     utilityNodes.clear();
 }
 
@@ -762,48 +789,56 @@ void ChainProcessor::rebuildGraph()
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
+    // Use UpdateKind::none for all intermediate operations to avoid rebuilding
+    // the internal render sequence after every single change. We call rebuild()
+    // once at the end for an atomic, glitch-free update.
+    constexpr auto deferred = UpdateKind::none;
+
     // Remove all connections
     for (auto& connection : getConnections())
-        removeConnection(connection);
+        removeConnection(connection, deferred);
 
     // Remove utility nodes from previous wiring
-    removeUtilityNodes();
+    removeUtilityNodes(deferred);
 
     // Remove I/O nodes if they exist
     if (audioInputNode.uid != 0)
-        AudioProcessorGraph::removeNode(audioInputNode);
+        AudioProcessorGraph::removeNode(audioInputNode, deferred);
     if (audioOutputNode.uid != 0)
-        AudioProcessorGraph::removeNode(audioOutputNode);
+        AudioProcessorGraph::removeNode(audioOutputNode, deferred);
     if (midiInputNode.uid != 0)
-        AudioProcessorGraph::removeNode(midiInputNode);
+        AudioProcessorGraph::removeNode(midiInputNode, deferred);
     if (midiOutputNode.uid != 0)
-        AudioProcessorGraph::removeNode(midiOutputNode);
+        AudioProcessorGraph::removeNode(midiOutputNode, deferred);
 
     // Create I/O nodes
     if (auto audioIn = addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
-            juce::AudioProcessorGraph::AudioGraphIOProcessor::audioInputNode)))
+            juce::AudioProcessorGraph::AudioGraphIOProcessor::audioInputNode), {}, deferred))
         audioInputNode = audioIn->nodeID;
 
     if (auto audioOut = addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
-            juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode)))
+            juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode), {}, deferred))
         audioOutputNode = audioOut->nodeID;
 
     if (auto midiIn = addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
-            juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode)))
+            juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode), {}, deferred))
         midiInputNode = midiIn->nodeID;
 
     if (auto midiOut = addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
-            juce::AudioProcessorGraph::AudioGraphIOProcessor::midiOutputNode)))
+            juce::AudioProcessorGraph::AudioGraphIOProcessor::midiOutputNode), {}, deferred))
         midiOutputNode = midiOut->nodeID;
 
-    // Wire the root group
+    // Wire the root group (all wire* methods now use deferred updates)
     auto result = wireNode(rootNode, audioInputNode, midiInputNode);
 
     // Connect last output to audio/midi output
-    addConnection({{result.audioOut, 0}, {audioOutputNode, 0}});
-    addConnection({{result.audioOut, 1}, {audioOutputNode, 1}});
+    addConnection({{result.audioOut, 0}, {audioOutputNode, 0}}, deferred);
+    addConnection({{result.audioOut, 1}, {audioOutputNode, 1}}, deferred);
     addConnection({{result.midiOut, juce::AudioProcessorGraph::midiChannelIndex},
-                   {midiOutputNode, juce::AudioProcessorGraph::midiChannelIndex}});
+                   {midiOutputNode, juce::AudioProcessorGraph::midiChannelIndex}}, deferred);
+
+    // Single atomic rebuild of the render sequence
+    rebuild();
 }
 
 WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn, NodeID midiIn)
@@ -811,15 +846,36 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn, NodeID midi
     if (node.isPlugin())
     {
         auto& leaf = node.getPlugin();
+
+        // Bypassed plugins are completely disconnected from the graph — zero CPU.
+        // Audio passes straight through as if the plugin doesn't exist.
+        if (leaf.bypassed)
+            return { audioIn, midiIn };
+
         auto nodeId = leaf.graphNodeId;
 
-        // Audio connections (stereo)
-        addConnection({{audioIn, 0}, {nodeId, 0}});
-        addConnection({{audioIn, 1}, {nodeId, 1}});
+        // Audio connections (stereo) — deferred, rebuilt once in rebuildGraph()
+        addConnection({{audioIn, 0}, {nodeId, 0}}, UpdateKind::none);
+        addConnection({{audioIn, 1}, {nodeId, 1}}, UpdateKind::none);
 
         // MIDI connection
         addConnection({{midiIn, juce::AudioProcessorGraph::midiChannelIndex},
-                       {nodeId, juce::AudioProcessorGraph::midiChannelIndex}});
+                       {nodeId, juce::AudioProcessorGraph::midiChannelIndex}}, UpdateKind::none);
+
+        // Insert meter node after plugin for per-plugin output metering
+        auto meterProc = std::make_unique<NodeMeterProcessor>();
+        meterProc->setAssociatedNodeId(node.id);
+        auto meterNode = addNode(std::move(meterProc));
+        if (meterNode != nullptr)
+        {
+            leaf.meterNodeId = meterNode->nodeID;
+            utilityNodes.insert(meterNode->nodeID);
+            addConnection({{nodeId, 0}, {meterNode->nodeID, 0}}, UpdateKind::none);
+            addConnection({{nodeId, 1}, {meterNode->nodeID, 1}}, UpdateKind::none);
+            addConnection({{nodeId, juce::AudioProcessorGraph::midiChannelIndex},
+                           {meterNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex}}, UpdateKind::none);
+            return { meterNode->nodeID, meterNode->nodeID };
+        }
 
         return { nodeId, nodeId };
     }
@@ -867,7 +923,7 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn, Node
     auto mixProc = std::make_unique<DryWetMixProcessor>();
     mixProc->setMix(group.dryWetMix);
 
-    auto mixNode = addNode(std::move(mixProc));
+    auto mixNode = addNode(std::move(mixProc), {}, UpdateKind::none);
     if (!mixNode)
         return { audioIn, midiIn };
 
@@ -875,8 +931,8 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn, Node
     utilityNodes.insert(mixNode->nodeID);
 
     // Dry path: connect input directly to mix node channels 0-1
-    addConnection({{audioIn, 0}, {mixNode->nodeID, 0}});
-    addConnection({{audioIn, 1}, {mixNode->nodeID, 1}});
+    addConnection({{audioIn, 0}, {mixNode->nodeID, 0}}, UpdateKind::none);
+    addConnection({{audioIn, 1}, {mixNode->nodeID, 1}}, UpdateKind::none);
 
     // Wet path: wire children in series, then connect to mix node channels 2-3
     NodeID prevAudio = audioIn;
@@ -889,8 +945,8 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn, Node
         prevMidi = result.midiOut;
     }
 
-    addConnection({{prevAudio, 0}, {mixNode->nodeID, 2}});
-    addConnection({{prevAudio, 1}, {mixNode->nodeID, 3}});
+    addConnection({{prevAudio, 0}, {mixNode->nodeID, 2}}, UpdateKind::none);
+    addConnection({{prevAudio, 1}, {mixNode->nodeID, 3}}, UpdateKind::none);
 
     // MIDI passes through the wet chain
     return { mixNode->nodeID, prevMidi };
@@ -932,15 +988,14 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn, No
     if (activeBranches == 0)
     {
         // All branches muted/silenced - passthrough silence
-        // Create a gain node with -inf dB
         auto silenceProc = std::make_unique<BranchGainProcessor>();
         silenceProc->setGainDb(-60.0f);
-        auto silenceNode = addNode(std::move(silenceProc));
+        auto silenceNode = addNode(std::move(silenceProc), {}, UpdateKind::none);
         if (silenceNode)
         {
             utilityNodes.insert(silenceNode->nodeID);
-            addConnection({{audioIn, 0}, {silenceNode->nodeID, 0}});
-            addConnection({{audioIn, 1}, {silenceNode->nodeID, 1}});
+            addConnection({{audioIn, 0}, {silenceNode->nodeID, 0}}, UpdateKind::none);
+            addConnection({{audioIn, 1}, {silenceNode->nodeID, 1}}, UpdateKind::none);
             return { silenceNode->nodeID, midiIn };
         }
         return { audioIn, midiIn };
@@ -951,28 +1006,22 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn, No
     auto sumGainProc = std::make_unique<BranchGainProcessor>();
     sumGainProc->setGainDb(compensationDb);
 
-    auto sumGainNode = addNode(std::move(sumGainProc));
+    auto sumGainNode = addNode(std::move(sumGainProc), {}, UpdateKind::none);
     if (!sumGainNode)
         return { audioIn, midiIn };
 
     group.sumGainNodeId = sumGainNode->nodeID;
     utilityNodes.insert(sumGainNode->nodeID);
 
-    // Clear and rebuild branch node ID vectors
+    // Clear branch node ID vectors
     group.branchGainNodeIds.clear();
-    group.delayCompNodeIds.clear();
 
     NodeID lastMidi = midiIn;
 
-    // Phase 1: Wire all branches and record their output nodes + latencies
-    struct BranchInfo {
-        NodeID audioOut;
-        NodeID midiOut;
-        int latency = 0;
-        size_t index = 0;
-    };
-    std::vector<BranchInfo> branchInfos;
-
+    // Wire all branches: input → branchGain → child → sumGain
+    // JUCE's AudioProcessorGraph automatically handles delay compensation
+    // for parallel paths via its internal DelayChannelOp mechanism, so we
+    // do NOT need to manually insert LatencyCompensationProcessor nodes.
     for (size_t i = 0; i < children.size(); ++i)
     {
         auto& child = children[i];
@@ -986,7 +1035,6 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn, No
         if (!isActive)
         {
             group.branchGainNodeIds.push_back({});
-            group.delayCompNodeIds.push_back({});
             continue;
         }
 
@@ -994,65 +1042,29 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn, No
         auto branchGainProc = std::make_unique<BranchGainProcessor>();
         branchGainProc->setGainDb(child->branchGainDb);
 
-        auto branchGainNode = addNode(std::move(branchGainProc));
+        auto branchGainNode = addNode(std::move(branchGainProc), {}, UpdateKind::none);
         if (!branchGainNode)
         {
             group.branchGainNodeIds.push_back({});
-            group.delayCompNodeIds.push_back({});
             continue;
         }
 
         group.branchGainNodeIds.push_back(branchGainNode->nodeID);
-        group.delayCompNodeIds.push_back({}); // placeholder, filled in phase 2
         utilityNodes.insert(branchGainNode->nodeID);
 
         // Fan-out: connect input to branch gain
-        addConnection({{audioIn, 0}, {branchGainNode->nodeID, 0}});
-        addConnection({{audioIn, 1}, {branchGainNode->nodeID, 1}});
+        addConnection({{audioIn, 0}, {branchGainNode->nodeID, 0}}, UpdateKind::none);
+        addConnection({{audioIn, 1}, {branchGainNode->nodeID, 1}}, UpdateKind::none);
 
         // Wire child after branch gain
         auto result = wireNode(*child, branchGainNode->nodeID, midiIn);
 
-        // Compute this branch's latency
-        int branchLatency = computeNodeLatency(*child);
-
-        branchInfos.push_back({ result.audioOut, result.midiOut, branchLatency, i });
-        lastMidi = result.midiOut;
-    }
-
-    // Phase 2: Find max latency and insert delay compensation on shorter branches
-    int maxLatency = 0;
-    for (const auto& info : branchInfos)
-        maxLatency = std::max(maxLatency, info.latency);
-
-    for (auto& info : branchInfos)
-    {
-        int delayNeeded = maxLatency - info.latency;
-        NodeID connectFrom = info.audioOut;
-
-        if (delayNeeded > 0)
-        {
-            // Insert a delay compensation processor
-            auto delayProc = std::make_unique<LatencyCompensationProcessor>(delayNeeded);
-            auto delayNode = addNode(std::move(delayProc));
-
-            if (delayNode)
-            {
-                utilityNodes.insert(delayNode->nodeID);
-                group.delayCompNodeIds[info.index] = delayNode->nodeID;
-
-                // Wire branch output → delay → (then to sum)
-                addConnection({{info.audioOut, 0}, {delayNode->nodeID, 0}});
-                addConnection({{info.audioOut, 1}, {delayNode->nodeID, 1}});
-
-                connectFrom = delayNode->nodeID;
-            }
-        }
-
-        // Fan-in: connect (possibly delayed) branch output to sum gain node
+        // Fan-in: connect branch output to sum gain node
         // (AudioProcessorGraph auto-sums multiple connections to the same input)
-        addConnection({{connectFrom, 0}, {sumGainNode->nodeID, 0}});
-        addConnection({{connectFrom, 1}, {sumGainNode->nodeID, 1}});
+        addConnection({{result.audioOut, 0}, {sumGainNode->nodeID, 0}}, UpdateKind::none);
+        addConnection({{result.audioOut, 1}, {sumGainNode->nodeID, 1}}, UpdateKind::none);
+
+        lastMidi = result.midiOut;
     }
 
     return { sumGainNode->nodeID, lastMidi };
@@ -1071,6 +1083,8 @@ int ChainProcessor::computeNodeLatency(const ChainNode& node) const
 {
     if (node.isPlugin())
     {
+        // Bypassed plugins are fully disconnected from the graph,
+        // so they contribute zero latency to the signal path.
         if (node.getPlugin().bypassed)
             return 0;
 
@@ -1109,6 +1123,43 @@ int ChainProcessor::computeNodeLatency(const ChainNode& node) const
     }
 
     return 0;
+}
+
+//==============================================================================
+// Per-node meter readings
+//==============================================================================
+
+std::vector<ChainProcessor::NodeMeterData> ChainProcessor::getNodeMeterReadings() const
+{
+    std::vector<NodeMeterData> results;
+
+    std::function<void(const ChainNode&)> collect = [&](const ChainNode& node)
+    {
+        if (node.isPlugin())
+        {
+            const auto& leaf = node.getPlugin();
+            if (!leaf.bypassed && leaf.meterNodeId != juce::AudioProcessorGraph::NodeID())
+            {
+                if (auto* graphNode = getNodeForId(leaf.meterNodeId))
+                {
+                    if (auto* meterProc = dynamic_cast<NodeMeterProcessor*>(graphNode->getProcessor()))
+                    {
+                        auto readings = meterProc->getReadings();
+                        results.push_back({ node.id, readings.peakL, readings.peakR,
+                                            readings.peakHoldL, readings.peakHoldR });
+                    }
+                }
+            }
+        }
+        else if (node.isGroup())
+        {
+            for (const auto& child : node.getGroup().children)
+                collect(*child);
+        }
+    };
+
+    collect(rootNode);
+    return results;
 }
 
 //==============================================================================
@@ -1195,11 +1246,7 @@ std::unique_ptr<ChainNode> ChainProcessor::xmlToNode(const juce::XmlElement& xml
                 }
 
                 if (auto graphNode = addNode(std::move(instance)))
-                {
                     leaf.graphNodeId = graphNode->nodeID;
-                    if (leaf.bypassed)
-                        graphNode->setBypassed(true);
-                }
             }
         }
 
@@ -1383,11 +1430,7 @@ std::unique_ptr<ChainNode> ChainProcessor::jsonToNode(const juce::var& json)
             }
 
             if (auto graphNode = addNode(std::move(instance)))
-            {
                 leaf.graphNodeId = graphNode->nodeID;
-                if (leaf.bypassed)
-                    graphNode->setBypassed(true);
-            }
         }
 
         node->data = std::move(leaf);

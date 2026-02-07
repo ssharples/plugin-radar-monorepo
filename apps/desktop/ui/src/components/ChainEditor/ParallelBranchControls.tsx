@@ -1,5 +1,6 @@
 import { useChainStore } from '../../stores/chainStore';
 import type { ChainNodeUI } from '../../api/types';
+import { Slider } from '../Slider/Slider';
 
 interface ParallelBranchControlsProps {
   node: ChainNodeUI;
@@ -42,14 +43,14 @@ export function ParallelBranchControls({ node }: ParallelBranchControlsProps) {
 
       {/* Gain slider */}
       <div className="flex items-center gap-1">
-        <input
-          type="range"
+        <Slider
+          value={gainDb}
           min={-60}
           max={12}
           step={0.5}
-          value={gainDb}
-          onChange={(e) => setBranchGain(node.id, parseFloat(e.target.value))}
-          className="w-14 h-1 accent-plugin-accent cursor-pointer"
+          color="accent"
+          width="w-16"
+          onChange={(v) => setBranchGain(node.id, v)}
           title={`${gainDb.toFixed(1)} dB`}
         />
         <span className="text-xxs text-plugin-muted w-10 text-right tabular-nums">

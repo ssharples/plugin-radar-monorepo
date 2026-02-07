@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChainSlot, ChainNodeUI, ChainStateV2 } from '../api/types';
+import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
 import { usePluginStore } from './pluginStore';
@@ -14,6 +14,12 @@ interface ChainSnapshot {
 }
 
 const MAX_HISTORY = 50;
+
+/** A/B/C snapshot — full chain export including preset data */
+interface ABSnapshot {
+  data: unknown;
+  savedAt: number;
+}
 
 interface ChainStoreState {
   // Tree-based state (V2)
@@ -37,6 +43,13 @@ interface ChainStoreState {
   future: ChainSnapshot[];
   /** Whether the last state change was from undo/redo (skip pushing to history) */
   _undoRedoInProgress: boolean;
+
+  // A/B/C Snapshots
+  snapshots: (ABSnapshot | null)[];
+  activeSnapshot: number | null;
+
+  // Per-node meter data (keyed by ChainNodeId as string)
+  nodeMeterData: Record<string, NodeMeterReadings>;
 }
 
 interface ChainActions {
@@ -44,6 +57,7 @@ interface ChainActions {
 
   // Flat API (backward compat - delegates to tree when possible)
   addPlugin: (pluginId: string, insertIndex?: number) => Promise<boolean>;
+  addPluginToGroup: (pluginId: string, parentId: number, insertIndex?: number) => Promise<boolean>;
   removePlugin: (slotIndex: number) => Promise<boolean>;
   movePlugin: (fromIndex: number, toIndex: number) => Promise<boolean>;
   toggleBypass: (slotIndex: number) => Promise<void>;
@@ -83,6 +97,10 @@ interface ChainActions {
   canRedo: () => boolean;
   /** Push current state to history before a mutation */
   _pushHistory: () => void;
+
+  // A/B/C Snapshots
+  saveSnapshot: (index: number) => Promise<void>;
+  recallSnapshot: (index: number) => Promise<void>;
 }
 
 function applyState(state: ChainStateV2) {
@@ -177,6 +195,9 @@ const initialState: ChainStoreState = {
   history: [],
   future: [],
   _undoRedoInProgress: false,
+  snapshots: [null, null, null],
+  activeSnapshot: null,
+  nodeMeterData: {},
 };
 
 export const useChainStore = create<ChainStoreState & ChainActions>((set, get) => ({
@@ -267,6 +288,34 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ _undoRedoInProgress: false });
   },
 
+  // =============================================
+  // A/B/C Snapshots
+  // =============================================
+
+  saveSnapshot: async (index: number) => {
+    try {
+      const data = await juceBridge.exportChain();
+      const snapshots = [...get().snapshots];
+      snapshots[index] = { data, savedAt: Date.now() };
+      set({ snapshots, activeSnapshot: index });
+    } catch (err) {
+      console.warn('Failed to save snapshot:', err);
+    }
+  },
+
+  recallSnapshot: async (index: number) => {
+    const snapshot = get().snapshots[index];
+    if (!snapshot) return;
+
+    get()._pushHistory();
+    try {
+      await juceBridge.importChain(snapshot.data);
+      set({ activeSnapshot: index });
+    } catch (err) {
+      console.warn('Failed to recall snapshot:', err);
+    }
+  },
+
   fetchChainState: async () => {
     set({ loading: true, error: null });
     try {
@@ -336,6 +385,25 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
         return true;
       } else {
         set({ error: result.error || 'Failed to add plugin', loading: false });
+        return false;
+      }
+    } catch (err) {
+      set({ error: String(err), loading: false });
+      return false;
+    }
+  },
+
+  addPluginToGroup: async (pluginId: string, parentId: number, insertIndex = -1) => {
+    get()._pushHistory();
+    set({ loading: true, error: null });
+    try {
+      const result = await juceBridge.addPluginToGroup(pluginId, parentId, insertIndex);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
+        return true;
+      } else {
+        set({ error: result.error || 'Failed to add plugin to group', loading: false });
         return false;
       }
     } catch (err) {
@@ -645,4 +713,9 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 // Set up event listener - handles both V1 and V2 chain state
 juceBridge.onChainChanged((state: ChainStateV2) => {
   useChainStore.setState(applyState(state));
+});
+
+// Per-node meter data for inline plugin meters
+juceBridge.onNodeMeterData((data: Record<string, NodeMeterReadings>) => {
+  useChainStore.setState({ nodeMeterData: data });
 });

@@ -68,7 +68,7 @@ void ChainSharingManager::checkForReceivedChains()
 
         for (int i = 0; i < arr->size(); ++i)
         {
-            auto& item = (*arr)[i];
+            auto item = (*arr)[i];
             ReceivedChainShare share;
             share.shareId = item["_id"].toString();
             share.chainName = item["chainName"].toString();
@@ -173,7 +173,7 @@ juce::var ChainSharingManager::httpPost(const juce::String& path, const juce::va
     auto jsonBody = juce::JSON::toString(args);
     url = url.withPOSTData(jsonBody);
 
-    auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inPostBody)
+    auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inPostData)
         .withExtraHeaders("Content-Type: application/json")
         .withConnectionTimeoutMs(10000)
         .withResponseHeaders(nullptr);

@@ -7,33 +7,29 @@ interface DragPreviewProps {
 
 /**
  * Drag overlay preview rendered at cursor position during drag.
- * Shows a compact, elevated version of the plugin/group being dragged.
+ * Compact, elevated card at 70% scale with soft shadow.
  */
 export function DragPreview({ node }: DragPreviewProps) {
   if (node.type === 'plugin') {
     return (
       <div
         className="
-          flex items-center gap-2 p-2 rounded-lg border
-          bg-plugin-bg border-plugin-accent
-          shadow-lg shadow-plugin-accent/20
-          opacity-90 backdrop-blur-sm
-          w-[280px] pointer-events-none
+          flex items-center gap-2 p-1.5 rounded-lg border
+          bg-plugin-bg/95 border-plugin-accent/60
+          shadow-[0_4px_24px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.05)]
+          backdrop-blur-sm
+          w-[220px] pointer-events-none
         "
-        style={{ transform: 'rotate(1.5deg)' }}
       >
-        {/* Drag handle icon */}
-        <div className="flex-shrink-0 p-1 rounded text-plugin-accent">
-          <GripVertical className="w-4 h-4" />
+        <div className="flex-shrink-0 p-0.5 rounded text-plugin-accent">
+          <GripVertical className="w-3.5 h-3.5" />
         </div>
-
-        {/* Plugin info */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm truncate text-plugin-text font-medium">
+          <p className="text-[13px] truncate text-plugin-text font-medium">
             {node.name}
           </p>
-          <p className="text-xs text-plugin-muted truncate">
-            {node.manufacturer} {node.format && `• ${node.format}`}
+          <p className="text-[11px] text-plugin-muted truncate">
+            {node.manufacturer} {node.format && `· ${node.format}`}
           </p>
         </div>
       </div>
@@ -42,28 +38,27 @@ export function DragPreview({ node }: DragPreviewProps) {
 
   if (node.type === 'group') {
     const isParallel = node.mode === 'parallel';
-    const accentColor = isParallel ? 'border-orange-500' : 'border-blue-500';
-    const bgColor = isParallel ? 'bg-orange-500/5' : 'bg-blue-500/5';
+    const accentColor = isParallel ? 'border-plugin-parallel/60' : 'border-plugin-serial/60';
+    const bgColor = isParallel ? 'bg-plugin-parallel/5' : 'bg-plugin-serial/5';
     const childCount = countPlugins(node.children);
 
     return (
       <div
         className={`
           rounded-lg border ${accentColor} ${bgColor}
-          shadow-lg shadow-plugin-accent/20
-          opacity-90 backdrop-blur-sm
-          w-[280px] pointer-events-none
+          shadow-[0_4px_24px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.05)]
+          backdrop-blur-sm
+          w-[220px] pointer-events-none
         `}
-        style={{ transform: 'rotate(1.5deg)' }}
       >
-        <div className="flex items-center gap-2 px-3 py-2">
-          <div className="flex-shrink-0 p-1 rounded text-plugin-accent">
-            <GripVertical className="w-4 h-4" />
+        <div className="flex items-center gap-2 px-2.5 py-1.5">
+          <div className="flex-shrink-0 p-0.5 rounded text-plugin-muted">
+            <GripVertical className="w-3.5 h-3.5" />
           </div>
-          <span className={`text-xs font-medium ${isParallel ? 'text-orange-400' : 'text-blue-400'}`}>
+          <span className={`text-[11px] font-medium ${isParallel ? 'text-plugin-parallel' : 'text-plugin-serial'}`}>
             {isParallel ? '||' : '>'} {node.name}
           </span>
-          <span className="text-xs text-plugin-muted ml-auto">
+          <span className="text-[11px] text-plugin-muted ml-auto">
             {childCount} plugin{childCount !== 1 ? 's' : ''}
           </span>
         </div>
