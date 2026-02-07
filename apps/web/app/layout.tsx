@@ -18,8 +18,8 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "PluginRadar - Track Audio Plugin Deals",
-  description: "Never miss a sale on your favorite VST plugins. Track prices, get alerts, and discover new audio software.",
+  title: "PluginRadar — Build & Share Plugin Chains Across Any DAW",
+  description: "Build effect chains with any VST/AU/AAX plugin. Share with friends cross-DAW. Discover vocal chains, mix bus setups, and mastering presets from the community.",
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${dmSans.variable} ${outfit.variable}`}>
-      <body className="font-sans antialiased bg-[#1a1714] min-h-screen flex flex-col text-stone-300">
+      <body className="font-sans antialiased bg-[#0a0a12] min-h-screen flex flex-col text-stone-300">
         <ConvexClientProvider>
           <Navigation />
           <main className="flex-1">{children}</main>

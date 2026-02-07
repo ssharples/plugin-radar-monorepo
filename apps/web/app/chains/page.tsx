@@ -44,7 +44,7 @@ export default function ChainsPage() {
   return (
     <div className="relative">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/[0.02] via-transparent to-transparent pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-6 py-10 relative">
         <BreadcrumbSchema
@@ -81,7 +81,7 @@ export default function ChainsPage() {
                 onClick={() => setCategory(cat.value)}
                 className={`px-3 py-1.5 rounded-xl text-sm transition ${
                   category === cat.value
-                    ? "bg-amber-500 text-stone-900 font-semibold shadow-lg shadow-amber-500/20"
+                    ? "bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/20"
                     : "bg-white/[0.04] text-stone-300 hover:bg-white/[0.08] border border-white/[0.06]"
                 }`}
               >
@@ -96,7 +96,7 @@ export default function ChainsPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-1.5 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 text-sm focus:outline-none focus:border-amber-500/50 transition"
+              className="px-3 py-1.5 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 text-sm focus:outline-none focus:border-indigo-500/50 transition"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -155,7 +155,7 @@ function ChainCard({ chain }: { chain: any }) {
   return (
     <Link
       href={`/chains/${chain.slug}`}
-      className="block glass-card rounded-xl p-5 hover:border-amber-500/30 transition group"
+      className="block glass-card rounded-xl p-5 hover:border-indigo-500/25 transition group"
     >
       {/* Category + plugin count */}
       <div className="flex items-center justify-between mb-3">
@@ -168,7 +168,7 @@ function ChainCard({ chain }: { chain: any }) {
       </div>
 
       {/* Name */}
-      <h3 className="font-semibold text-stone-100 group-hover:text-amber-400 transition truncate mb-1">
+      <h3 className="font-semibold text-stone-100 group-hover:text-indigo-400 transition truncate mb-1">
         {chain.name}
       </h3>
 
@@ -183,7 +183,7 @@ function ChainCard({ chain }: { chain: any }) {
           {chain.tags.slice(0, 4).map((tag: string) => (
             <span
               key={tag}
-              className="text-xs px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400/80"
+              className="text-xs px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400/80"
             >
               {tag}
             </span>

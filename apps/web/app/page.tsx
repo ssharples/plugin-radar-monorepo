@@ -4,82 +4,371 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import { PluginCard } from "@/components/plugin-card";
-import { ArrowRight, Lightning, Clock, Gift, Fire, TrendUp } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  Lightning,
+  Clock,
+  Gift,
+  Fire,
+  TrendUp,
+  Link as LinkIcon,
+  ShareNetwork,
+  MagnifyingGlass,
+  WaveSquare,
+  SlidersHorizontal,
+  ArrowsLeftRight,
+  Gauge,
+  ArrowCounterClockwise,
+  Check,
+  X as XIcon,
+  Warning,
+  DownloadSimple,
+  Users,
+  Waveform,
+  GitFork,
+} from "@phosphor-icons/react";
 
 export default function Home() {
   const stats = useQuery(api.stats.overview);
-  const plugins = useQuery(api.plugins.list, { limit: 12 });
+  const plugins = useQuery(api.plugins.list, { limit: 8 });
   const manufacturers = useQuery(api.manufacturers.list, { limit: 10 });
   const activeSales = useQuery(api.sales.listActive, { limit: 6 });
   const trendingPlugins = useQuery(api.mentions.getTrendingPlugins, { limit: 6 });
-  const newPlugins = useQuery(api.plugins.newThisWeek, { limit: 6 });
-  const freePlugins = useQuery(api.plugins.freePlugins, { limit: 6 });
+  const chains = useQuery(api.pluginDirectory.browseChains, {
+    sortBy: "popular",
+    limit: 6,
+  });
 
   return (
     <div className="relative">
       {/* ===== HERO SECTION ===== */}
       <section className="relative overflow-hidden">
-        {/* Background warm gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.03] via-transparent to-transparent" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-amber-500/[0.04] rounded-full blur-[120px]" />
+        {/* Background gradient — cool indigo */}
+        <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/[0.04] via-transparent to-transparent" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-indigo-500/[0.05] rounded-full blur-[140px]" />
 
-        <div className="container mx-auto px-4 lg:px-6 pt-16 pb-12 relative">
+        <div className="container mx-auto px-4 lg:px-6 pt-20 pb-16 relative">
           <div className="max-w-3xl">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-6">
+              <LinkIcon weight="bold" className="w-3.5 h-3.5" />
+              The first cross-DAW plugin chain platform
+            </div>
+
             <h1
-              className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-5"
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-5"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              <span className="text-stone-100">Never miss a </span>
-              <span className="text-amber-400">deal</span>
-              <span className="text-stone-100"> on audio plugins</span>
+              <span className="text-stone-100">Build plugin chains.</span>
+              <br />
+              <span className="text-indigo-400">Share them with the world.</span>
             </h1>
             <p className="text-lg text-stone-400 max-w-xl leading-relaxed mb-8">
-              Track prices across 900+ plugins from 34 manufacturers. Get alerts when prices drop, discover free tools, and build your perfect collection.
+              Build effect chains with any VST/AU/AAX plugin. Share with friends
+              across any DAW. Discover vocal chains, mix bus setups, and mastering
+              presets from the community.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/sales"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 text-sm"
+                href="#download"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/35 text-sm"
               >
-                <Lightning weight="fill" className="w-4 h-4" />
-                Browse Deals
+                <DownloadSimple weight="bold" className="w-4 h-4" />
+                Download Free
               </Link>
               <Link
-                href="/plugins"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/[0.05] hover:bg-white/[0.08] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.06] text-sm"
+                href="/chains"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.05] hover:bg-white/[0.08] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.08] text-sm"
               >
-                Explore Plugins
+                Browse Chains
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
 
           {/* Stats row */}
-          {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-14">
-              <StatCard value={stats.totalPlugins} label="Plugins Tracked" icon={<div className="w-2 h-2 rounded-full bg-amber-500" />} />
-              <StatCard value={stats.totalManufacturers} label="Manufacturers" icon={<div className="w-2 h-2 rounded-full bg-blue-400" />} />
-              <StatCard value={stats.activeSales} label="Active Sales" icon={<div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />} />
-              <StatCard value={stats.freePlugins} label="Free Plugins" icon={<div className="w-2 h-2 rounded-full bg-green-400" />} />
-            </div>
-          )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-16">
+            <StatCard
+              value={stats?.totalPlugins ? `${stats.totalPlugins.toLocaleString()}+` : "..."}
+              label="Plugins Supported"
+              icon={<div className="w-2 h-2 rounded-full bg-indigo-400" />}
+            />
+            <StatCard
+              value="Any DAW"
+              label="Cross-Platform"
+              icon={<div className="w-2 h-2 rounded-full bg-emerald-400" />}
+            />
+            <StatCard
+              value="Free"
+              label="Open Community"
+              icon={<div className="w-2 h-2 rounded-full bg-violet-400" />}
+            />
+            <StatCard
+              value="Unlimited"
+              label="Chains & Presets"
+              icon={<div className="w-2 h-2 rounded-full bg-cyan-400" />}
+            />
+          </div>
         </div>
       </section>
 
       <div className="section-line" />
 
-      {/* ===== HOT DEALS ===== */}
+      {/* ===== HOW IT WORKS ===== */}
+      <section className="container mx-auto px-4 lg:px-6 py-20">
+        <div className="text-center mb-14">
+          <p className="text-xs text-indigo-400 uppercase tracking-[0.2em] font-semibold mb-3">How It Works</p>
+          <h2
+            className="text-3xl font-bold text-stone-100"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Three steps to better mixing
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <StepCard
+            number="01"
+            icon={<SlidersHorizontal weight="duotone" className="w-7 h-7 text-indigo-400" />}
+            title="Build Your Chain"
+            description="Drag any plugins from your collection into a visual chain editor. Set up serial or parallel routing. See per-plugin metering in real-time."
+          />
+          <StepCard
+            number="02"
+            icon={<ShareNetwork weight="duotone" className="w-7 h-7 text-indigo-400" />}
+            title="Share With Anyone"
+            description="Save your chain to the cloud and share with a link. Friends load it in their DAW — with automatic plugin compatibility matching."
+          />
+          <StepCard
+            number="03"
+            icon={<MagnifyingGlass weight="duotone" className="w-7 h-7 text-indigo-400" />}
+            title="Discover & Learn"
+            description="Browse chains shared by the community. Find vocal chains, drum bus setups, mastering presets. Fork them, tweak them, make them yours."
+          />
+        </div>
+      </section>
+
+      <div className="section-line" />
+
+      {/* ===== COMPARISON TABLE ===== */}
+      <section className="container mx-auto px-4 lg:px-6 py-20">
+        <div className="text-center mb-12">
+          <p className="text-xs text-indigo-400 uppercase tracking-[0.2em] font-semibold mb-3">Why PluginRadar</p>
+          <h2
+            className="text-3xl font-bold text-stone-100 mb-3"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            The only chain platform that works with every plugin
+          </h2>
+          <p className="text-stone-500 max-w-lg mx-auto">
+            No ecosystem lock-in. No subscription. Just your plugins, working together.
+          </p>
+        </div>
+        <div className="max-w-3xl mx-auto overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06]">
+                <th className="text-left py-4 px-4 text-stone-500 font-medium">Feature</th>
+                <th className="py-4 px-4 text-center">
+                  <span className="text-indigo-400 font-semibold">PluginRadar</span>
+                </th>
+                <th className="py-4 px-4 text-center text-stone-500 font-medium">Waves StudioVerse</th>
+                <th className="py-4 px-4 text-center text-stone-500 font-medium">Your DAW</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              <CompareRow
+                feature="Works with ANY plugin"
+                us={true}
+                waves={false}
+                daw={true}
+                wavesNote="Waves only"
+              />
+              <CompareRow
+                feature="Cross-DAW chains"
+                us={true}
+                waves={true}
+                daw={false}
+              />
+              <CompareRow
+                feature="Community sharing"
+                us={true}
+                waves={true}
+                daw={false}
+              />
+              <CompareRow
+                feature="Per-plugin metering"
+                us={true}
+                waves={false}
+                daw={false}
+              />
+              <CompareRow
+                feature="Parallel / serial routing"
+                us={true}
+                waves="partial"
+                daw="partial"
+              />
+              <CompareRow
+                feature="Plugin compatibility check"
+                us={true}
+                waves={false}
+                daw={false}
+              />
+              <CompareRow
+                feature="Free to use"
+                us={true}
+                waves={false}
+                daw={true}
+                wavesNote="Subscription"
+              />
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div className="section-line" />
+
+      {/* ===== BUILT FOR ENGINEERS ===== */}
+      <section className="container mx-auto px-4 lg:px-6 py-20">
+        <div className="text-center mb-14">
+          <p className="text-xs text-indigo-400 uppercase tracking-[0.2em] font-semibold mb-3">Pro Features</p>
+          <h2
+            className="text-3xl font-bold text-stone-100 mb-3"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Built for engineers who care about signal flow
+          </h2>
+          <p className="text-stone-500 max-w-lg mx-auto">
+            Advanced routing. Real-time metering. Zero hassle.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+          <FeatureCard
+            icon={<Gauge weight="duotone" className="w-6 h-6" />}
+            title="Per-Plugin Metering"
+            description="See output levels after every plugin in the chain. Spot gain staging issues at a glance — no DAW offers this."
+          />
+          <FeatureCard
+            icon={<GitFork weight="duotone" className="w-6 h-6" />}
+            title="Parallel Processing"
+            description="Split, process, merge — visually. Drag-and-drop parallel compression without the aux send headache."
+          />
+          <FeatureCard
+            icon={<ArrowsLeftRight weight="duotone" className="w-6 h-6" />}
+            title="A/B/C Snapshots"
+            description="Save three chain configurations. Switch between them instantly for rapid comparison."
+          />
+          <FeatureCard
+            icon={<Waveform weight="duotone" className="w-6 h-6" />}
+            title="LUFS Targeting"
+            description="Built-in loudness monitoring with target matching. Hit your loudness specs every time."
+          />
+          <FeatureCard
+            icon={<ArrowCounterClockwise weight="duotone" className="w-6 h-6" />}
+            title="Undo / Redo"
+            description="Experiment fearlessly with full history. Every chain edit is reversible."
+          />
+          <FeatureCard
+            icon={<Users weight="duotone" className="w-6 h-6" />}
+            title="Friends & Sharing"
+            description="Add friends, share chains privately, fork each other's setups. Collaborate without leaving the plugin."
+          />
+        </div>
+      </section>
+
+      <div className="section-line" />
+
+      {/* ===== COMMUNITY CHAINS ===== */}
+      {chains && chains.length > 0 && (
+        <>
+          <section className="container mx-auto px-4 lg:px-6 py-16">
+            <SectionHeader
+              title="Popular Chains"
+              subtitle="Shared by the community"
+              href="/chains"
+              linkText="Browse all chains"
+              icon={<LinkIcon weight="bold" className="w-5 h-5 text-indigo-400" />}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {chains.map((chain: any) => (
+                <ChainCard key={chain._id} chain={chain} />
+              ))}
+            </div>
+          </section>
+          <div className="section-line" />
+        </>
+      )}
+
+      {/* ===== DOWNLOAD CTA ===== */}
+      <section id="download" className="container mx-auto px-4 lg:px-6 py-20">
+        <div className="relative rounded-2xl overflow-hidden border border-indigo-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.08] via-transparent to-violet-500/[0.05]" />
+          <div className="relative px-8 py-14 text-center">
+            <h2
+              className="text-3xl font-bold text-stone-100 mb-3"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Ready to build your first chain?
+            </h2>
+            <p className="text-stone-400 max-w-md mx-auto mb-8">
+              Download the free desktop plugin. Works with any DAW on macOS and Windows.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <a
+                href="#"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25 text-sm"
+              >
+                <DownloadSimple weight="bold" className="w-4 h-4" />
+                Download for macOS
+              </a>
+              <a
+                href="#"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.06] hover:bg-white/[0.1] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.08] text-sm"
+              >
+                <DownloadSimple weight="bold" className="w-4 h-4" />
+                Download for Windows
+              </a>
+            </div>
+            <p className="text-stone-600 text-xs mt-4">
+              VST3 / AU / AAX — Free forever, no account required
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="section-line" />
+
+      {/* ===== TRENDING PLUGINS (Demoted) ===== */}
+      {trendingPlugins === undefined ? (
+        <SectionSkeleton title="Trending Plugins" />
+      ) : trendingPlugins.length > 0 ? (
+        <section className="container mx-auto px-4 lg:px-6 py-14">
+          <SectionHeader
+            title="Trending Plugins"
+            subtitle="Popular in the community this week"
+            href="/plugins"
+            linkText="Browse all"
+            icon={<TrendUp weight="bold" className="w-5 h-5 text-indigo-400" />}
+          />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {trendingPlugins.map((plugin: any) => (
+              <PluginCard key={plugin._id} plugin={plugin} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ===== HOT DEALS (Demoted) ===== */}
       {activeSales && activeSales.length > 0 && (
         <section className="container mx-auto px-4 lg:px-6 py-14">
           <SectionHeader
-            title="Hot Deals"
-            subtitle="Limited-time savings on premium plugins"
+            title="Plugin Deals"
+            subtitle="Save on plugins for your chains"
             href="/sales"
             linkText="All sales"
-            icon={<Fire weight="fill" className="w-5 h-5 text-red-400" />}
+            icon={<Fire weight="fill" className="w-5 h-5 text-amber-400" />}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {activeSales.map((sale, i) => (
+            {activeSales.map((sale: any, i: number) => (
               <SaleCard key={sale._id} sale={sale} index={i} />
             ))}
           </div>
@@ -88,79 +377,17 @@ export default function Home() {
 
       <div className="section-line" />
 
-      {/* ===== TRENDING ===== */}
-      {trendingPlugins === undefined ? (
-        <SectionSkeleton title="Trending" />
-      ) : trendingPlugins.length > 0 ? (
-        <section className="container mx-auto px-4 lg:px-6 py-14">
-          <SectionHeader
-            title="Trending"
-            subtitle="Most talked about this week"
-            href="/plugins"
-            linkText="Browse all"
-            icon={<TrendUp weight="bold" className="w-5 h-5 text-amber-400" />}
-          />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {trendingPlugins.map((plugin) => (
-              <PluginCard key={plugin._id} plugin={plugin} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* ===== NEW THIS WEEK ===== */}
-      {newPlugins === undefined ? (
-        <SectionSkeleton title="New This Week" />
-      ) : newPlugins.length > 0 ? (
-        <section className="container mx-auto px-4 lg:px-6 py-14">
-          <SectionHeader
-            title="New This Week"
-            subtitle="Recently added to the catalog"
-            href="/plugins"
-            linkText="View all new"
-            icon={<Clock weight="bold" className="w-5 h-5 text-purple-400" />}
-          />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {newPlugins.map((plugin) => (
-              <PluginCard key={plugin._id} plugin={plugin} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* ===== FREE PLUGINS ===== */}
-      {freePlugins === undefined ? (
-        <SectionSkeleton title="Free Plugins" />
-      ) : freePlugins.length > 0 ? (
-        <section className="container mx-auto px-4 lg:px-6 py-14">
-          <SectionHeader
-            title="Free Plugins"
-            subtitle="Professional tools, zero cost"
-            href="/free"
-            linkText="See all free"
-            icon={<Gift weight="bold" className="w-5 h-5 text-green-400" />}
-          />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {freePlugins.slice(0, 6).map((plugin) => (
-              <PluginCard key={plugin._id} plugin={plugin} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <div className="section-line" />
-
-      {/* ===== LATEST PLUGINS ===== */}
+      {/* ===== PLUGIN CATALOG (Demoted) ===== */}
       <section className="container mx-auto px-4 lg:px-6 py-14">
         <SectionHeader
-          title="Latest Plugins"
-          subtitle="Browse the full catalog"
+          title="Plugin Directory"
+          subtitle="Discover plugins for your chains"
           href="/plugins"
           linkText="Browse all"
         />
         {plugins ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {plugins.items.map((plugin) => (
+            {plugins.items.map((plugin: any) => (
               <PluginCard key={plugin._id} plugin={plugin} />
             ))}
           </div>
@@ -183,13 +410,13 @@ export default function Home() {
         />
         {manufacturers ? (
           <div className="flex flex-wrap gap-2">
-            {manufacturers.map((m) => (
+            {manufacturers.map((m: any) => (
               <Link
                 key={m._id}
                 href={`/manufacturers/${m.slug}`}
-                className="group inline-flex items-center gap-2 px-4 py-2 glass-card rounded-xl hover:border-amber-500/20 transition-all duration-200"
+                className="group inline-flex items-center gap-2 px-4 py-2 glass-card rounded-xl hover:border-indigo-500/20 transition-all duration-200"
               >
-                <span className="text-stone-300 text-sm group-hover:text-amber-400 transition-colors">
+                <span className="text-stone-300 text-sm group-hover:text-indigo-400 transition-colors">
                   {m.name}
                 </span>
                 <span className="text-stone-600 text-xs tabular-nums">
@@ -208,17 +435,156 @@ export default function Home() {
 
 /* ===== SUB-COMPONENTS ===== */
 
-function StatCard({ value, label, icon }: { value: number; label: string; icon: React.ReactNode }) {
+function StatCard({
+  value,
+  label,
+  icon,
+}: {
+  value: string;
+  label: string;
+  icon: React.ReactNode;
+}) {
   return (
     <div className="glass-card rounded-xl px-5 py-4 animate-fade-in-up">
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <span className="text-2xl font-bold text-stone-100 tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
-          {value.toLocaleString()}
+        <span
+          className="text-2xl font-bold text-stone-100 tabular-nums"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {value}
         </span>
       </div>
       <span className="text-xs text-stone-500 uppercase tracking-wider">{label}</span>
     </div>
+  );
+}
+
+function StepCard({
+  number,
+  icon,
+  title,
+  description,
+}: {
+  number: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="glass-card rounded-xl p-6 text-center group hover:border-indigo-500/20 transition-all">
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/10 mb-5 group-hover:bg-indigo-500/15 transition-colors">
+        {icon}
+      </div>
+      <div className="text-[10px] text-indigo-400/60 font-mono uppercase tracking-widest mb-2">
+        Step {number}
+      </div>
+      <h3
+        className="text-lg font-semibold text-stone-100 mb-2"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        {title}
+      </h3>
+      <p className="text-stone-500 text-sm leading-relaxed">{description}</p>
+    </div>
+  );
+}
+
+function CompareRow({
+  feature,
+  us,
+  waves,
+  daw,
+  wavesNote,
+}: {
+  feature: string;
+  us: boolean | "partial";
+  waves: boolean | "partial";
+  daw: boolean | "partial";
+  wavesNote?: string;
+}) {
+  const renderCell = (val: boolean | "partial", note?: string) => {
+    if (val === true)
+      return <Check weight="bold" className="w-5 h-5 text-emerald-400 mx-auto" />;
+    if (val === "partial")
+      return <Warning weight="fill" className="w-4 h-4 text-amber-400/70 mx-auto" />;
+    return (
+      <div className="flex flex-col items-center gap-0.5">
+        <XIcon weight="bold" className="w-4 h-4 text-stone-600 mx-auto" />
+        {note && <span className="text-[10px] text-stone-600">{note}</span>}
+      </div>
+    );
+  };
+
+  return (
+    <tr className="hover:bg-white/[0.02] transition-colors">
+      <td className="py-3.5 px-4 text-stone-300">{feature}</td>
+      <td className="py-3.5 px-4 text-center bg-indigo-500/[0.03]">
+        {renderCell(us)}
+      </td>
+      <td className="py-3.5 px-4 text-center">{renderCell(waves, wavesNote)}</td>
+      <td className="py-3.5 px-4 text-center">{renderCell(daw)}</td>
+    </tr>
+  );
+}
+
+function FeatureCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="glass-card rounded-xl p-5 group hover:border-indigo-500/15 transition-all">
+      <div className="text-indigo-400 mb-3 group-hover:text-indigo-300 transition-colors">
+        {icon}
+      </div>
+      <h3 className="font-semibold text-stone-100 mb-1.5 text-sm">{title}</h3>
+      <p className="text-stone-500 text-sm leading-relaxed">{description}</p>
+    </div>
+  );
+}
+
+function ChainCard({ chain }: { chain: any }) {
+  return (
+    <Link
+      href={`/chains/${chain.slug}`}
+      className="block glass-card rounded-xl p-5 hover:border-indigo-500/25 transition group"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="px-2 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded text-xs text-indigo-400 capitalize">
+          {chain.category}
+        </span>
+        <span className="text-xs text-stone-500">
+          {chain.pluginCount} plugin{chain.pluginCount !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <h3 className="font-semibold text-stone-100 group-hover:text-indigo-400 transition truncate mb-1">
+        {chain.name}
+      </h3>
+      {chain.author && (
+        <p className="text-stone-500 text-sm mb-3">by {chain.author.name}</p>
+      )}
+      {chain.tags && chain.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {chain.tags.slice(0, 3).map((tag: string) => (
+            <span
+              key={tag}
+              className="text-xs px-2 py-0.5 bg-white/[0.04] border border-white/[0.06] rounded-full text-stone-500"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-4 text-xs text-stone-600">
+        <span className="flex items-center gap-1">❤️ {chain.likes}</span>
+        <span className="flex items-center gap-1">⬇️ {chain.downloads}</span>
+      </div>
+    </Link>
   );
 }
 
@@ -240,7 +606,10 @@ function SectionHeader({
       <div className="flex items-center gap-3">
         {icon}
         <div>
-          <h2 className="text-xl font-semibold text-stone-100" style={{ fontFamily: "var(--font-display)" }}>
+          <h2
+            className="text-xl font-semibold text-stone-100"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
             {title}
           </h2>
           {subtitle && (
@@ -250,7 +619,7 @@ function SectionHeader({
       </div>
       <Link
         href={href}
-        className="text-sm text-stone-500 hover:text-amber-400 transition-colors flex items-center gap-1 shrink-0"
+        className="text-sm text-stone-500 hover:text-indigo-400 transition-colors flex items-center gap-1 shrink-0"
       >
         {linkText}
         <ArrowRight className="w-3.5 h-3.5" />
@@ -261,8 +630,12 @@ function SectionHeader({
 
 function SaleCard({ sale, index }: { sale: any; index: number }) {
   const timeLeft = sale.endsAt ? sale.endsAt - Date.now() : null;
-  const daysLeft = timeLeft ? Math.floor(timeLeft / (1000 * 60 * 60 * 24)) : null;
-  const hoursLeft = timeLeft ? Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)) : null;
+  const daysLeft = timeLeft
+    ? Math.floor(timeLeft / (1000 * 60 * 60 * 24))
+    : null;
+  const hoursLeft = timeLeft
+    ? Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    : null;
   const isUrgent = daysLeft !== null && daysLeft <= 2;
 
   return (
@@ -274,21 +647,31 @@ function SaleCard({ sale, index }: { sale: any; index: number }) {
           -{sale.discountPercent}%
         </span>
         {timeLeft && timeLeft > 0 && (
-          <span className={`text-xs px-2 py-1 rounded-md ${
-            isUrgent
-              ? "bg-red-500/10 text-red-400"
-              : "bg-white/[0.04] text-stone-500"
-          }`}>
-            {daysLeft && daysLeft > 0 ? `${daysLeft}d ` : ""}{hoursLeft}h left
+          <span
+            className={`text-xs px-2 py-1 rounded-md ${
+              isUrgent
+                ? "bg-red-500/10 text-red-400"
+                : "bg-white/[0.04] text-stone-500"
+            }`}
+          >
+            {daysLeft && daysLeft > 0 ? `${daysLeft}d ` : ""}
+            {hoursLeft}h left
           </span>
         )}
       </div>
-      <h3 className="font-medium text-stone-200 mb-2 truncate">{sale.saleName || "Sale"}</h3>
+      <h3 className="font-medium text-stone-200 mb-2 truncate">
+        {sale.saleName || "Sale"}
+      </h3>
       <div className="flex items-baseline gap-2.5">
-        <span className="text-xl font-bold text-amber-400" style={{ fontFamily: "var(--font-display)" }}>
+        <span
+          className="text-xl font-bold text-amber-400"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
           ${(sale.salePrice / 100).toFixed(0)}
         </span>
-        <span className="text-stone-500 line-through text-sm">${(sale.originalPrice / 100).toFixed(0)}</span>
+        <span className="text-stone-500 line-through text-sm">
+          ${(sale.originalPrice / 100).toFixed(0)}
+        </span>
         <span className="text-xs text-green-400/70 ml-auto">
           Save ${((sale.originalPrice - sale.salePrice) / 100).toFixed(0)}
         </span>
@@ -306,7 +689,10 @@ function SectionSkeleton({ title }: { title: string }) {
   return (
     <section className="container mx-auto px-4 lg:px-6 py-14">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-stone-100" style={{ fontFamily: "var(--font-display)" }}>
+        <h2
+          className="text-xl font-semibold text-stone-100"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
           {title}
         </h2>
       </div>
