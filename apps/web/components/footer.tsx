@@ -3,7 +3,6 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
-import { Link as LinkIcon } from "@phosphor-icons/react";
 
 export function Footer() {
   const stats = useQuery(api.stats.overview);
@@ -65,13 +64,13 @@ export function Footer() {
         {stats && (
           <div className="flex flex-wrap items-center gap-6 py-4 mb-8 border-y border-white/[0.04] text-xs text-stone-600">
             <span>
-              <span className="text-indigo-400/70 font-medium tabular-nums">
+              <span className="text-amber-400/70 font-medium tabular-nums">
                 {stats.totalPlugins?.toLocaleString() || "..."}
               </span>{" "}
               plugins supported
             </span>
             <span>
-              <span className="text-indigo-400/70 font-medium tabular-nums">
+              <span className="text-amber-400/70 font-medium tabular-nums">
                 {stats.totalManufacturers || "..."}
               </span>{" "}
               manufacturers
@@ -94,10 +93,11 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 rounded bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-              <LinkIcon weight="bold" className="w-2.5 h-2.5 text-white" />
-            </div>
-            <span className="text-stone-500 text-sm">PluginRadar</span>
+            <img
+              src="/propane-logo.png"
+              alt="Propane"
+              className="h-6 w-auto object-contain opacity-50"
+            />
           </div>
           <p className="text-stone-600 text-xs">
             Your plugins. Your chains. Shared everywhere.
@@ -119,7 +119,7 @@ function FooterLink({
     <li>
       <Link
         href={href}
-        className="text-sm text-stone-500 hover:text-indigo-400/80 transition-colors duration-200"
+        className="text-sm text-stone-500 hover:text-amber-400/80 transition-colors duration-200"
       >
         {children}
       </Link>

@@ -9,9 +9,10 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 interface PluginBrowserProps {
   collapsed?: boolean;
   onToggle?: () => void;
+  onClose?: () => void;
 }
 
-export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProps) {
+export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBrowserProps) {
   const {
     filteredPlugins,
     searchQuery,
@@ -164,8 +165,8 @@ export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProp
   const formats = ['VST3', 'AudioUnit'];
   const activeFilters = hasActiveFilters();
 
-  // Collapsed state — thin sidebar with vertical label
-  if (collapsed) {
+  // Collapsed state — thin sidebar with vertical label (only for sidebar mode, not overlay)
+  if (collapsed && !onClose) {
     return (
       <div className="flex flex-col h-full bg-plugin-surface items-center py-2">
         <button
@@ -177,7 +178,7 @@ export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProp
         </button>
         <div className="flex-1 flex items-center justify-center">
           <span
-            className="text-[10px] font-semibold text-plugin-muted uppercase tracking-[0.15em] select-none"
+            className="text-[10px] font-mono font-semibold text-plugin-muted uppercase tracking-[0.15em] select-none"
             style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
           >
             Plugins
@@ -196,13 +197,13 @@ export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProp
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-plugin-border">
         <div className="flex items-center gap-1.5">
           <button
-            onClick={onToggle}
+            onClick={onClose || onToggle}
             className="p-0.5 rounded hover:bg-plugin-border text-plugin-muted hover:text-plugin-text transition-colors"
-            title="Collapse (⌘B)"
+            title="Close (⌘B)"
           >
-            <PanelLeftOpen className="w-3.5 h-3.5 rotate-180" />
+            {onClose ? <X className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5 rotate-180" />}
           </button>
-          <h2 className="text-xs font-semibold text-plugin-text uppercase tracking-wider">Plugins</h2>
+          <h2 className="text-xs font-mono font-semibold text-plugin-text uppercase tracking-wider">Plugins</h2>
           {enrichmentLoading && (
             <span className="text-[9px] text-plugin-accent animate-pulse">syncing catalog...</span>
           )}
@@ -233,7 +234,7 @@ export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProp
             onKeyDown={handleSearchKeyDown}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
-            className={`w-full pl-7 pr-3 py-1 bg-plugin-bg rounded text-xs text-plugin-text placeholder:text-plugin-dim border transition-colors focus:outline-none ${
+            className={`w-full pl-7 pr-3 py-1 bg-plugin-bg rounded-propane font-mono text-xs text-plugin-text placeholder:text-plugin-dim border transition-colors focus:outline-none ${
               isSearchFocused
                 ? 'border-plugin-accent/60 shadow-glow-accent'
                 : 'border-plugin-border focus:border-plugin-accent/50'
@@ -247,7 +248,7 @@ export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProp
             <div className="flex gap-0.5">
               <button
                 onClick={() => setFormatFilter(null)}
-                className={`px-2 py-0.5 text-xxs rounded transition-all ${
+                className={`px-2 py-0.5 text-xxs font-mono uppercase rounded transition-all ${
                   formatFilter === null
                     ? 'bg-plugin-accent text-black font-semibold'
                     : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text border border-plugin-border'
@@ -259,7 +260,7 @@ export function PluginBrowser({ collapsed = false, onToggle }: PluginBrowserProp
                 <button
                   key={format}
                   onClick={() => setFormatFilter(format)}
-                  className={`px-2 py-0.5 text-xxs rounded transition-all ${
+                  className={`px-2 py-0.5 text-xxs font-mono uppercase rounded transition-all ${
                     formatFilter === format
                       ? 'bg-plugin-accent text-black font-semibold'
                       : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text border border-plugin-border'

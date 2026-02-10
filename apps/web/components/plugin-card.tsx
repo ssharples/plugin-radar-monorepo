@@ -46,7 +46,7 @@ export function PluginCard({ plugin, showSaleBadge = true }: { plugin: Plugin; s
     <Link href={`/plugins/${plugin.slug}`} className="group block">
       <div className="relative rounded-xl overflow-hidden transition-all duration-300 group-hover:glow-amber-sm">
         {/* Image container */}
-        <div className="aspect-[4/3] relative overflow-hidden bg-[#1e1b18]">
+        <div className="aspect-[4/3] relative overflow-hidden bg-[#0a0a0a]">
           {plugin.imageUrl ? (
             <img
               src={plugin.imageUrl}
@@ -65,7 +65,7 @@ export function PluginCard({ plugin, showSaleBadge = true }: { plugin: Plugin; s
           )}
 
           {/* Warm overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1a1714] via-transparent to-transparent opacity-60" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-transparent to-transparent opacity-60" />
           <div className="absolute inset-0 bg-amber-500/0 group-hover:bg-amber-500/[0.03] transition-colors duration-300" />
 
           {/* Badges — top right */}

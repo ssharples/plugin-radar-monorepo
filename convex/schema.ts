@@ -949,6 +949,10 @@ export default defineSchema({
     // Genre/use case
     genre: v.optional(v.string()),   // "hip-hop", "rock", "edm", "acoustic", "orchestral"
     useCase: v.optional(v.string()), // "lead-vocal", "drum-bus", "master", "bass-guitar"
+    useCaseGroup: v.optional(v.string()), // Derived from useCase: "vocals", "drums", "bass", etc.
+
+    // Pre-computed matched plugin IDs for fast compatibility filtering during browse
+    pluginIds: v.optional(v.array(v.string())),
     
     // The actual chain
     slots: v.array(v.object({
@@ -970,6 +974,15 @@ export default defineSchema({
       // Settings
       bypassed: v.boolean(),
       notes: v.optional(v.string()),         // User notes for this slot
+
+      // Captured plugin parameters (key params only, semantically filtered)
+      parameters: v.optional(v.array(v.object({
+        name: v.string(),
+        value: v.string(),
+        normalizedValue: v.number(),
+        semantic: v.optional(v.string()),
+        unit: v.optional(v.string()),
+      }))),
     })),
     
     // Total plugins required
@@ -1001,9 +1014,12 @@ export default defineSchema({
     .index("by_downloads", ["downloads"])
     .index("by_likes", ["likes"])
     .index("by_share_code", ["shareCode"])
+    .index("by_use_case", ["useCase", "isPublic"])
+    .index("by_use_case_group", ["useCaseGroup", "isPublic"])
+    .index("by_public_downloads", ["isPublic", "downloads"])
     .searchIndex("search_name", {
       searchField: "name",
-      filterFields: ["category", "isPublic"]
+      filterFields: ["category", "isPublic", "useCaseGroup", "useCase"]
     }),
 
   // Likes/saves on chains
@@ -1077,6 +1093,18 @@ export default defineSchema({
   })
     .index("by_original", ["originalChainId"])
     .index("by_forked", ["forkedChainId"]),
+
+  // Chain collections — cross-platform bookmarks (web + desktop)
+  chainCollections: defineTable({
+    user: v.id("users"),
+    chain: v.id("pluginChains"),
+    addedAt: v.number(),
+    source: v.string(),              // "web" | "desktop"
+    notes: v.optional(v.string()),
+  })
+    .index("by_user", ["user"])
+    .index("by_chain", ["chain"])
+    .index("by_user_chain", ["user", "chain"]),
 
   // ============================================
   // RATE LIMITING

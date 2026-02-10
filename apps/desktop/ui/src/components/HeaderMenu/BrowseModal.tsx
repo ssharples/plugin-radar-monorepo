@@ -190,14 +190,14 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
       onClick={onClose}
     >
       <div
-        className="bg-plugin-surface rounded-xl w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col border border-plugin-border shadow-2xl animate-slide-up"
+        className="bg-plugin-surface rounded-propane-lg w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col border border-plugin-border shadow-2xl animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-plugin-border flex-shrink-0">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-plugin-accent" />
-            <span className="text-sm font-bold text-plugin-text">Community Chains</span>
+            <span className="text-sm font-mono uppercase font-bold text-plugin-text">Community Chains</span>
           </div>
           <button
             onClick={onClose}
@@ -217,7 +217,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder="Search chains..."
-              className="w-full bg-black/40 border border-plugin-border rounded-lg pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="w-full bg-black/40 border border-plugin-border rounded-propane font-mono pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
 
@@ -225,7 +225,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="bg-black/40 border border-plugin-border rounded-lg px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
+            className="bg-black/40 border border-plugin-border rounded-propane font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
@@ -236,7 +236,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-black/40 border border-plugin-border rounded-lg px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
+            className="bg-black/40 border border-plugin-border rounded-propane font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
           >
             {SORT_OPTIONS.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -270,7 +270,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             {previewChain.tags?.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
                 {previewChain.tags.map((tag: string) => (
-                  <span key={tag} className="px-1.5 py-0.5 bg-purple-500/15 text-purple-300 rounded text-[10px]">
+                  <span key={tag} className="px-1.5 py-0.5 bg-plugin-accent/15 text-plugin-accent rounded text-[10px]">
                     {tag}
                   </span>
                 ))}
@@ -319,7 +319,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
 
             {/* Plugin slots */}
             <div className="mb-4">
-              <h4 className="text-[10px] text-plugin-dim uppercase tracking-wider mb-2">
+              <h4 className="text-[10px] font-mono text-plugin-dim uppercase tracking-wider mb-2">
                 Plugins ({previewChain.slots?.length ?? 0})
               </h4>
               <div className="space-y-1">
@@ -364,7 +364,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => handleLoadChain(previewChain)}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 text-xs font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded-lg px-4 py-2 text-xs font-mono uppercase font-bold transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
                 Load Chain
@@ -375,7 +375,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                     setForkName(`${previewChain.name} (fork)`);
                     setShowForkInput(true);
                   }}
-                  className="flex items-center gap-1.5 border border-plugin-border hover:border-purple-500/40 text-plugin-muted hover:text-plugin-text rounded-lg px-4 py-2 text-xs transition-colors"
+                  className="flex items-center gap-1.5 border border-plugin-border hover:border-plugin-accent/40 text-plugin-muted hover:text-plugin-text rounded-lg px-4 py-2 text-xs font-mono uppercase transition-colors"
                 >
                   <GitFork className="w-3.5 h-3.5" />
                   Fork
@@ -391,13 +391,13 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                   value={forkName}
                   onChange={(e) => setForkName(e.target.value)}
                   placeholder="Fork name..."
-                  className="flex-1 bg-black/40 border border-plugin-border rounded px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+                  className="flex-1 bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
                   autoFocus
                 />
                 <button
                   onClick={() => handleFork(previewChain)}
                   disabled={forking || !forkName.trim()}
-                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium disabled:opacity-40"
+                  className="px-3 py-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded text-xs font-mono uppercase font-bold disabled:opacity-40"
                 >
                   {forking ? '...' : 'Fork'}
                 </button>
@@ -535,20 +535,20 @@ function ChainCard({
       <div className="flex items-center gap-1.5 ml-6">
         <button
           onClick={onLoad}
-          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-medium transition-colors"
+          className="px-2.5 py-1 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded text-[10px] font-mono uppercase font-bold transition-colors"
         >
           Load
         </button>
         <button
           onClick={onPreview}
-          className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] transition-colors"
+          className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] font-mono uppercase transition-colors"
         >
           Preview
         </button>
         {isLoggedIn && (
           <button
             onClick={onFork}
-            className="px-2.5 py-1 border border-plugin-border hover:border-purple-500/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] transition-colors"
+            className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] font-mono uppercase transition-colors"
           >
             Fork
           </button>

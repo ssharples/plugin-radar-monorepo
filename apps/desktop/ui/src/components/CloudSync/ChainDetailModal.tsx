@@ -157,7 +157,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
       onClick={onClose}
     >
       <div
-        className="bg-plugin-surface rounded-lg p-6 max-w-lg w-full mx-4 border border-plugin-border max-h-[85vh] overflow-y-auto animate-slide-up"
+        className="bg-plugin-surface rounded-propane-lg p-6 max-w-lg w-full mx-4 border border-plugin-accent max-h-[85vh] overflow-y-auto animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Back button */}
@@ -172,7 +172,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
         <div className="flex items-start justify-between mb-2">
           <h2 className="text-xl font-bold text-white">{currentChain.name}</h2>
           {currentChain.forkedFrom && (
-            <span className="text-xxs bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">
+            <span className="text-xxs bg-plugin-accent/20 text-plugin-accent px-1.5 py-0.5 rounded">
               fork
             </span>
           )}
@@ -189,8 +189,8 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                 onClick={handleFollow}
                 className={`text-xxs px-2 py-0.5 rounded border transition-colors ${
                   following
-                    ? 'border-purple-500/50 text-purple-300 bg-purple-500/10'
-                    : 'border-plugin-border text-plugin-muted hover:text-white hover:border-purple-500/50'
+                    ? 'border-plugin-accent/50 text-plugin-accent bg-plugin-accent/10'
+                    : 'border-plugin-border text-plugin-muted hover:text-white hover:border-plugin-accent/50'
                 }`}
               >
                 {following ? 'Following' : 'Follow'}
@@ -210,7 +210,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
             {currentChain.tags.map((tag: string) => (
               <span
                 key={tag}
-                className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xxs"
+                className="px-2 py-0.5 bg-plugin-accent/20 text-plugin-accent rounded text-xxs"
               >
                 {tag}
               </span>
@@ -278,7 +278,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                     <span className="text-yellow-400">{m.pluginName}</span>
                     <span className="text-plugin-muted"> by {m.manufacturer}</span>
                     {m.suggestion && (
-                      <span className="text-purple-300"> — try {m.suggestion}</span>
+                      <span className="text-plugin-accent"> — try {m.suggestion}</span>
                     )}
                   </div>
                 ))}
@@ -342,14 +342,14 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                 setForkName(`${currentChain.name} (fork)`);
                 setShowForkDialog(true);
               }}
-              className="px-3 py-1.5 border border-plugin-border rounded text-sm text-gray-400 hover:text-white hover:border-purple-500/50 transition-colors"
+              className="px-3 py-1.5 border border-plugin-border rounded text-sm text-gray-400 hover:text-white hover:border-plugin-accent/50 transition-colors"
             >
               Fork
             </button>
           )}
           <button
             onClick={handleLoadChain}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded px-4 py-1.5 text-sm font-medium"
+            className="flex-1 bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-1.5 text-sm font-medium"
           >
             {compatibility?.canFullyLoad ? 'Load Chain' : 'Load Available Plugins'}
           </button>
@@ -371,7 +371,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
               <button
                 onClick={handleFork}
                 disabled={forking || !forkName.trim()}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded font-medium"
+                className="px-3 py-1.5 text-xs bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded font-medium"
               >
                 {forking ? '...' : 'Fork'}
               </button>

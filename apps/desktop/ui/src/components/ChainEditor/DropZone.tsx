@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useState, useEffect, useRef } from 'react';
-import { GitBranch } from 'lucide-react';
+import { GitBranch, ChevronDown } from 'lucide-react';
 
 interface DropZoneProps {
   /** Unique droppable ID encoding: `{parentId}:{insertIndex}` */
@@ -15,6 +15,8 @@ interface DropZoneProps {
   nodeBelowId?: number;
   /** Whether shift key is held (for group creation hint) */
   shiftHeld?: boolean;
+  /** Whether this drop zone is disabled (self-drop prevention) */
+  disabled?: boolean;
 }
 
 /**
@@ -29,9 +31,11 @@ export function DropZone({
   nodeAboveId,
   nodeBelowId,
   shiftHeld = false,
+  disabled = false,
 }: DropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: droppableId,
+    disabled,
   });
 
   const [showGroupHint, setShowGroupHint] = useState(false);
@@ -64,10 +68,10 @@ export function DropZone({
     return <div ref={setNodeRef} className="h-0.5" />;
   }
 
-  const lineColor = isParallelContext ? 'bg-orange-500' : 'bg-blue-500';
-  const glowColor = isParallelContext ? 'shadow-orange-500/30' : 'shadow-blue-500/30';
-  const borderColor = isParallelContext ? 'border-orange-500/50' : 'border-blue-500/50';
-  const bgColor = isParallelContext ? 'bg-orange-500/10' : 'bg-blue-500/10';
+  const lineColor = isParallelContext ? 'bg-plugin-parallel' : 'bg-plugin-serial';
+  const glowColor = isParallelContext ? 'shadow-[0_0_8px_rgba(90,120,66,0.3)]' : 'shadow-[0_0_8px_rgba(201,148,74,0.3)]';
+  const borderColor = isParallelContext ? 'border-plugin-parallel/50' : 'border-plugin-serial/50';
+  const bgColor = isParallelContext ? 'bg-plugin-parallel/10' : 'bg-plugin-serial/10';
 
   const isShowingGroupHint = showGroupHint && shiftHeld && nodeAboveId != null && nodeBelowId != null;
 
@@ -76,7 +80,7 @@ export function DropZone({
       ref={setNodeRef}
       className={`
         relative transition-all duration-200
-        ${isOver ? 'py-1.5' : 'py-0.5'}
+        ${isOver ? 'py-2' : 'py-1'}
       `}
       style={{ transitionTimingFunction: isOver ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'ease-out' }}
     >
@@ -86,10 +90,17 @@ export function DropZone({
           mx-3 rounded-full transition-all duration-200 ease-out
           ${isOver
             ? `h-1 ${lineColor} shadow-md ${glowColor}`
-            : `h-0.5 ${lineColor}/40`
+            : `h-0.5 ${lineColor}/40 animate-pulse-soft`
           }
         `}
       />
+
+      {/* Arrow indicator when hovered */}
+      {isOver && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-0 animate-fade-in">
+          <ChevronDown className={`w-3 h-3 ${isParallelContext ? 'text-plugin-parallel' : 'text-plugin-serial'}`} />
+        </div>
+      )}
 
       {/* Group creation hint (appears after 500ms hover + shift) */}
       {isShowingGroupHint && (
@@ -103,7 +114,7 @@ export function DropZone({
             backdrop-blur-sm
           `}
         >
-          <GitBranch className={`w-3 h-3 ${isParallelContext ? 'text-orange-400' : 'text-blue-400'}`} />
+          <GitBranch className={`w-3 h-3 ${isParallelContext ? 'text-plugin-parallel' : 'text-plugin-serial'}`} />
           <span className="text-plugin-text">
             Drop to create parallel group
           </span>
@@ -149,9 +160,9 @@ export function GroupDropZone({
     id: droppableId,
   });
 
-  const borderColor = isParallelContext ? 'border-orange-500' : 'border-blue-500';
-  const bgColor = isParallelContext ? 'bg-orange-500/10' : 'bg-blue-500/10';
-  const textColor = isParallelContext ? 'text-orange-400' : 'text-blue-400';
+  const borderColor = isParallelContext ? 'border-plugin-parallel' : 'border-plugin-serial';
+  const bgColor = isParallelContext ? 'bg-plugin-parallel/10' : 'bg-plugin-serial/10';
+  const textColor = isParallelContext ? 'text-plugin-parallel' : 'text-plugin-serial';
 
   // Empty group placeholder
   if (isEmpty) {

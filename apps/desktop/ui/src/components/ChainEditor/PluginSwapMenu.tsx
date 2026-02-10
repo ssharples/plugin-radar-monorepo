@@ -63,8 +63,8 @@ function MapSourceIndicator({
       );
     case 'ai-analyzed':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-blue-400">
-          <span className="w-2 h-2 rounded-full bg-blue-500" />
+        <div className="flex items-center gap-1.5 text-[10px] text-plugin-accent">
+          <span className="w-2 h-2 rounded-full bg-plugin-accent" />
           AI-analyzed{confidence ? ` (${confidence}%)` : ''}
         </div>
       );

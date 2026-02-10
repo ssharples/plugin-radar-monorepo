@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Save, FolderOpen, Globe, Settings, Check, X } from 'lucide-react';
+import { Save, FolderOpen, Globe, Settings, Check, X, Share2 } from 'lucide-react';
 import { SaveDropdown } from './SaveDropdown';
 import { LoadDropdown } from './LoadDropdown';
-import { BrowseModal } from './BrowseModal';
+import { AvatarDropdown } from './AvatarDropdown';
+import { QuickSharePanel } from './QuickSharePanel';
+import { ChainBrowser } from '../ChainBrowser';
 import { useChainStore } from '../../stores/chainStore';
+import { usePresetStore } from '../../stores/presetStore';
 
-type ActiveDropdown = 'save' | 'load' | 'browse' | 'settings' | null;
+type ActiveDropdown = 'save' | 'load' | 'browse' | 'share' | 'settings' | 'avatar' | null;
 
 export function HeaderMenu() {
   const [active, setActive] = useState<ActiveDropdown>(null);
@@ -15,6 +18,7 @@ export function HeaderMenu() {
   const headerRef = useRef<HTMLDivElement>(null);
 
   const { chainName, setChainName, targetInputLufs } = useChainStore();
+  const { loadPreset } = usePresetStore();
 
   const toggle = useCallback((dropdown: ActiveDropdown) => {
     setActive((prev) => (prev === dropdown ? null : dropdown));
@@ -23,6 +27,23 @@ export function HeaderMenu() {
   const close = useCallback(() => {
     setActive(null);
   }, []);
+
+  // Handle sharePreset event from LoadDropdown
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.name && detail?.path) {
+        loadPreset(detail.path).then((success) => {
+          if (success) {
+            setChainName(detail.name);
+            setActive('share');
+          }
+        });
+      }
+    };
+    window.addEventListener('sharePreset', handler);
+    return () => window.removeEventListener('sharePreset', handler);
+  }, [loadPreset, setChainName]);
 
   // Close on Escape
   useEffect(() => {
@@ -84,7 +105,7 @@ export function HeaderMenu() {
   };
 
   const btnBase =
-    'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-all relative';
+    'flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase font-medium rounded transition-all relative';
   const btnInactive =
     'text-plugin-muted hover:text-plugin-text hover:bg-white/5';
   const btnActive = 'text-plugin-text bg-white/8 shadow-sm';
@@ -93,12 +114,8 @@ export function HeaderMenu() {
     <div ref={headerRef} className="relative">
       {/* Header bar */}
       <div className="flex items-center gap-0.5 px-2 py-1 bg-plugin-surface border-b border-plugin-border">
-        {/* Logo mark */}
-        <div className="flex items-center gap-1.5 mr-1">
-          <div className="w-5 h-5 rounded bg-gradient-to-br from-plugin-accent to-plugin-accent-dim flex items-center justify-center">
-            <span className="text-[9px] font-black text-white leading-none">P</span>
-          </div>
-        </div>
+        {/* Avatar / Profile */}
+        <AvatarDropdown isOpen={active === 'avatar'} onToggle={() => toggle('avatar')} onClose={close} />
         <div className="w-px h-5 bg-plugin-border mr-1" />
 
         {/* Save */}
@@ -131,6 +148,16 @@ export function HeaderMenu() {
           <span>Browse</span>
         </button>
 
+        {/* Share */}
+        <button
+          onClick={() => toggle('share')}
+          className={`${btnBase} ${active === 'share' ? btnActive : btnInactive}`}
+          title="Share chain"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          <span>Share</span>
+        </button>
+
         {/* Divider */}
         <div className="w-px h-5 bg-plugin-border mx-1" />
 
@@ -147,7 +174,7 @@ export function HeaderMenu() {
                 if (e.key === 'Escape') cancelEditName();
               }}
               onBlur={commitName}
-              className="flex-1 min-w-0 px-2 py-0.5 bg-black/40 border border-plugin-accent/50 rounded text-xs text-plugin-text font-medium focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="flex-1 min-w-0 px-2 py-0.5 bg-black/40 border border-plugin-accent/50 rounded font-mono text-xs text-plugin-text font-medium focus:outline-none focus:ring-1 focus:ring-plugin-accent"
               maxLength={64}
             />
             <button
@@ -205,8 +232,14 @@ export function HeaderMenu() {
         </div>
       )}
 
+      {active === 'share' && (
+        <div className="absolute left-0 top-full z-50 mt-0.5">
+          <QuickSharePanel onClose={close} />
+        </div>
+      )}
+
       {active === 'browse' && (
-        <BrowseModal onClose={close} />
+        <ChainBrowser onClose={close} />
       )}
 
       {active === 'settings' && (
@@ -243,13 +276,13 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl p-4 animate-slide-up">
-      <h3 className="text-xs font-semibold text-plugin-text mb-3 uppercase tracking-wider">
+      <h3 className="text-xs font-mono font-semibold text-plugin-text mb-3 uppercase tracking-wider">
         Chain Settings
       </h3>
 
       {/* Target LUFS */}
       <div className="mb-3">
-        <label className="block text-[11px] text-plugin-muted mb-1.5">
+        <label className="block text-[11px] font-mono text-plugin-muted mb-1.5">
           🎚️ Target Input LUFS
         </label>
         <div className="flex items-center gap-2">
@@ -261,12 +294,13 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
             max={0}
             step={1}
             className="w-16 bg-black/40 border border-plugin-border rounded px-2 py-1 text-xs text-plugin-text font-mono text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+
           />
           <span className="text-[10px] text-plugin-dim">dB</span>
           <select
             value={lufsValue}
             onChange={(e) => setLufsValue(Number(e.target.value))}
-            className="flex-1 bg-black/40 border border-plugin-border rounded px-2 py-1 text-[11px] text-plugin-muted focus:outline-none"
+            className="flex-1 bg-black/40 border border-plugin-border rounded px-2 py-1 text-[11px] font-mono text-plugin-muted focus:outline-none"
           >
             {LUFS_PRESETS.map((p) => (
               <option key={p.value} value={p.value}>

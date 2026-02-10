@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -6,6 +6,7 @@ import {
   useSensor,
   useSensors,
   useDroppable,
+  defaultDropAnimationSideEffects,
   type DragStartEvent,
   type DragEndEvent,
   pointerWithin,
@@ -20,26 +21,53 @@ import { ChainNodeList } from './ChainNodeList';
 import { DragPreview } from './DragPreview';
 import { ChainTemplates } from './ChainTemplates';
 import { HeaderMenu } from '../HeaderMenu';
-import { getLastSlotHoverSide } from './ChainSlot';
+import { getLastSlotHoverSide, resetLastSlotHoverSide } from './ChainSlot';
 
 // Root parent ID (the implicit root group)
 const ROOT_PARENT_ID = 0;
 
 /**
- * Custom collision detection: prefer slot targets (drop-on-plugin for grouping)
- * over thin drop zones (reorder between plugins).
- * Slot targets have IDs like "slot:123", drop zones have "drop:0:1".
+ * Custom collision detection: zone-based approach using pointer Y position.
+ * - Top/bottom 25% of a slot → prefer drop: targets (reordering between plugins)
+ * - Middle 50% of a slot → prefer slot: targets (grouping with this plugin)
+ * This prevents the old problem where slots always won over drop zones.
  */
 const customCollisionDetection: CollisionDetection = (args) => {
   const pointerCollisions = pointerWithin(args);
-  if (pointerCollisions.length > 0) {
-    // Prefer slot targets (larger plugin slots) over thin drop zones
-    const slotCollisions = pointerCollisions.filter(c => String(c.id).startsWith('slot:'));
-    if (slotCollisions.length > 0) return slotCollisions;
-    return pointerCollisions;
+  if (pointerCollisions.length === 0) {
+    // Fall back to rect intersection for broader group targets
+    return rectIntersection(args);
   }
-  // Fall back to rect intersection for broader group targets
-  return rectIntersection(args);
+
+  const slotCollisions = pointerCollisions.filter(c => String(c.id).startsWith('slot:'));
+  const dropCollisions = pointerCollisions.filter(c => String(c.id).startsWith('drop:'));
+  const groupCollisions = pointerCollisions.filter(c => String(c.id).startsWith('group:'));
+
+  // If we're over a slot, use zone-based detection
+  if (slotCollisions.length > 0 && dropCollisions.length > 0) {
+    const slotId = slotCollisions[0].id;
+    const slotRect = args.droppableRects.get(slotId);
+    const pointerY = args.pointerCoordinates?.y;
+
+    if (slotRect && pointerY != null) {
+      const relY = (pointerY - slotRect.top) / slotRect.height;
+      // Top 25% or bottom 25% → prefer reorder (drop zones)
+      if (relY < 0.25 || relY > 0.75) {
+        return dropCollisions;
+      }
+      // Middle 50% → prefer grouping (slot targets)
+      return slotCollisions;
+    }
+  }
+
+  // If only slots, return them
+  if (slotCollisions.length > 0) return slotCollisions;
+  // If only drops, return them
+  if (dropCollisions.length > 0) return dropCollisions;
+  // Group targets
+  if (groupCollisions.length > 0) return groupCollisions;
+
+  return pointerCollisions;
 };
 
 export function ChainEditor() {
@@ -49,7 +77,7 @@ export function ChainEditor() {
     fetchChainState,
     moveNode,
     createGroup,
-    dissolveGroup,
+    dissolveGroupSilent,
     selectNode,
     undo,
     redo,
@@ -67,6 +95,7 @@ export function ChainEditor() {
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
   const [groupSelectMode, setGroupSelectMode] = useState(false);
+  const [disabledDropIds, setDisabledDropIds] = useState<Set<number>>(new Set());
 
   // Chain-level toggle state
   const [bypassState, setBypassState] = useState<{ allBypassed: boolean; anyBypassed: boolean }>({ allBypassed: false, anyBypassed: false });
@@ -171,21 +200,44 @@ export function ChainEditor() {
     const { active } = event;
     const data = active.data.current;
     if (data?.node) {
-      setActiveDragNode(data.node as ChainNodeUI);
-      setActiveDragId(data.nodeId as number);
+      const dragNode = data.node as ChainNodeUI;
+      const dragNodeId = data.nodeId as number;
+      setActiveDragNode(dragNode);
+      setActiveDragId(dragNodeId);
+
+      // Bug 9: Reset stale hover side from previous drag
+      resetLastSlotHoverSide();
+
+      // Bug 4: Compute disabled drop IDs — the dragged node's entire subtree
+      // to prevent dropping a group into itself or its descendants
+      const disabled = new Set<number>();
+      collectSubtreeIds(dragNode, disabled);
+      setDisabledDropIds(disabled);
     }
+  }, []);
+
+  // Bug 6: Cancel handler — resets all drag state when Escape is pressed
+  const handleDragCancel = useCallback(() => {
+    setActiveDragNode(null);
+    setActiveDragId(null);
+    setDisabledDropIds(new Set());
   }, []);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragNode(null);
     setActiveDragId(null);
+    setDisabledDropIds(new Set());
 
     if (!over) return;
 
-    const dragData = active.data.current;
-    const draggedNodeId = dragData?.nodeId as number;
-    if (draggedNodeId == null) return;
+    // Parse node ID from active.id ("drag:{nodeId}") instead of active.data.current.
+    // The dragged node unmounts during drag (filtered from ChainNodeList), which causes
+    // active.data.current to become {} (dnd-kit issue #794). active.id is always reliable.
+    const activeIdStr = String(active.id);
+    if (!activeIdStr.startsWith('drag:')) return;
+    const draggedNodeId = parseInt(activeIdStr.split(':')[1], 10);
+    if (isNaN(draggedNodeId)) return;
 
     const overId = String(over.id);
 
@@ -194,41 +246,58 @@ export function ChainEditor() {
       // Format: drop:{parentId}:{insertIndex}
       const parts = overId.split(':');
       const targetParentId = parseInt(parts[1], 10);
-      const targetIndex = parseInt(parts[2], 10);
+      let targetIndex = parseInt(parts[2], 10);
 
       if (isNaN(targetParentId) || isNaN(targetIndex)) return;
 
+      // Bug 4: Prevent dropping into own subtree
+      if (isAncestorOf(nodes, draggedNodeId, targetParentId)) return;
+
       // Check if shift is held for group creation
       if (shiftHeld) {
-        // Find the adjacent node for group creation
         const adjacentNodeId = findAdjacentNodeId(nodes, targetParentId, targetIndex);
         if (adjacentNodeId != null && adjacentNodeId !== draggedNodeId) {
-          // Create a parallel group with dragged + adjacent
           await createGroup([draggedNodeId, adjacentNodeId], 'parallel');
           return;
         }
       }
 
-      // Regular move: adjust index if needed
-      // The backend handles index adjustment for same-parent moves
+      // Bug 1: Same-parent index adjustment
+      // The C++ backend extracts the node first, then inserts at the given index.
+      // So if we're moving within the same parent and the source is before the target,
+      // we need to subtract 1 because extraction shifts everything down.
+      const sourceParent = findParentOf(nodes, draggedNodeId);
+      const sourceParentId = sourceParent?.id ?? ROOT_PARENT_ID;
+      const sourceIndex = findIndexInParent(nodes, draggedNodeId, sourceParentId);
+
+      if (sourceParentId === targetParentId && sourceIndex !== -1) {
+        // Bug 8: No-op detection — dropping in the same position
+        if (sourceIndex === targetIndex || sourceIndex === targetIndex - 1) return;
+
+        // Bug 1: Adjust for extraction
+        if (sourceIndex < targetIndex) {
+          targetIndex -= 1;
+        }
+      }
+
       await moveNode(draggedNodeId, targetParentId, targetIndex);
 
-      // Auto-dissolve: check if old parent now has 0 or 1 children
-      // The backend handles this via chainChanged event, but we can also
-      // check locally for responsiveness
-      const oldParent = findParentOf(nodes, draggedNodeId);
-      if (oldParent && oldParent.type === 'group') {
-        const remainingChildren = oldParent.children.filter(c => c.id !== draggedNodeId);
-        if (remainingChildren.length <= 1 && oldParent.id !== ROOT_PARENT_ID) {
-          // Auto-dissolve groups that end up with 0 or 1 children
-          await dissolveGroup(oldParent.id);
+      // Bug 2: Read fresh state for auto-dissolve (not stale closure `nodes`)
+      // Bug 3: Use dissolveGroupSilent to avoid double undo push
+      const freshNodes = useChainStore.getState().nodes;
+      if (sourceParent && sourceParent.type === 'group' && sourceParent.id !== ROOT_PARENT_ID) {
+        const freshParent = findNodeById(freshNodes, sourceParent.id);
+        if (freshParent && freshParent.type === 'group' && freshParent.children.length <= 1) {
+          await dissolveGroupSilent(sourceParent.id);
         }
       }
     } else if (overId.startsWith('slot:')) {
       // Dropped onto another plugin → create a group
-      // Left half = serial, right half = parallel
       const targetNodeId = parseInt(overId.split(':')[1], 10);
       if (isNaN(targetNodeId) || targetNodeId === draggedNodeId) return;
+
+      // Bug 4: Prevent dropping group onto its own descendant
+      if (isAncestorOf(nodes, draggedNodeId, targetNodeId)) return;
 
       const mode = getLastSlotHoverSide() === 'left' ? 'serial' : 'parallel';
       await createGroup([targetNodeId, draggedNodeId], mode);
@@ -237,22 +306,40 @@ export function ChainEditor() {
       const targetGroupId = parseInt(overId.split(':')[1], 10);
       if (isNaN(targetGroupId)) return;
 
+      // Bug 7: Prevent dropping a group onto itself
+      if (targetGroupId === draggedNodeId) return;
+      // Bug 4: Prevent dropping into own subtree
+      if (isAncestorOf(nodes, draggedNodeId, targetGroupId)) return;
+
       // Find the group to determine insert index
       const targetGroup = findNodeById(nodes, targetGroupId);
-      const insertIndex = targetGroup?.type === 'group' ? targetGroup.children.length : 0;
+      let insertIndex = targetGroup?.type === 'group' ? targetGroup.children.length : 0;
+
+      // Bug 1: Same-parent index adjustment for group targets too
+      const sourceParent = findParentOf(nodes, draggedNodeId);
+      const sourceParentId = sourceParent?.id ?? ROOT_PARENT_ID;
+
+      if (sourceParentId === targetGroupId) {
+        const sourceIndex = findIndexInParent(nodes, draggedNodeId, targetGroupId);
+        // Bug 8: No-op if already at the end
+        if (sourceIndex === insertIndex - 1) return;
+        if (sourceIndex !== -1 && sourceIndex < insertIndex) {
+          insertIndex -= 1;
+        }
+      }
 
       await moveNode(draggedNodeId, targetGroupId, insertIndex);
 
-      // Auto-dissolve old parent if needed
-      const oldParent = findParentOf(nodes, draggedNodeId);
-      if (oldParent && oldParent.type === 'group') {
-        const remainingChildren = oldParent.children.filter(c => c.id !== draggedNodeId);
-        if (remainingChildren.length <= 1 && oldParent.id !== ROOT_PARENT_ID) {
-          await dissolveGroup(oldParent.id);
+      // Bug 2 & 3: Fresh state auto-dissolve with silent history
+      const freshNodes = useChainStore.getState().nodes;
+      if (sourceParent && sourceParent.type === 'group' && sourceParent.id !== ROOT_PARENT_ID) {
+        const freshParent = findNodeById(freshNodes, sourceParent.id);
+        if (freshParent && freshParent.type === 'group' && freshParent.children.length <= 1) {
+          await dissolveGroupSilent(sourceParent.id);
         }
       }
     }
-  }, [nodes, moveNode, createGroup, dissolveGroup, shiftHeld]);
+  }, [nodes, moveNode, createGroup, dissolveGroupSilent, shiftHeld]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (selectedIds.size >= 2) {
@@ -295,17 +382,17 @@ export function ChainEditor() {
   const totalPlugins = countPluginsInTree(nodes);
   const isDragActive = activeDragNode !== null;
 
+  // Compute 1-based DFS slot numbers for all plugins
+  const slotNumbers = useMemo(() => computeSlotNumbers(nodes), [nodes]);
+
   return (
-    <div className="relative flex flex-col h-full bg-plugin-surface rounded-lg overflow-hidden">
-      {/* Unified Header Menu */}
+    <div className="relative flex flex-col h-full overflow-hidden">
+
+      {/* Unified Header Menu — save/load/browse/chain name */}
       <HeaderMenu />
 
       {/* Chain Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-plugin-border">
-        <div className="flex items-center gap-2">
-          <Link2 className="w-3.5 h-3.5 text-plugin-accent" />
-          <span className="text-xs font-medium text-plugin-muted">Chain</span>
-        </div>
+      <div className="flex items-center justify-between px-2 py-1 border-b border-plugin-border/30">
         <div className="flex items-center gap-1">
           {/* Undo/Redo buttons with history depth badges */}
           <div className="relative">
@@ -396,8 +483,7 @@ export function ChainEditor() {
               }`}
               title="Group select mode — click plugins to select, then create group"
             >
-              <MousePointer2 className="w-4 h-4" />
-              <span className="text-[11px] font-medium">Group</span>
+              <MousePointer2 className="w-3.5 h-3.5" />
             </button>
           )}
 
@@ -446,15 +532,15 @@ export function ChainEditor() {
             </button>
           )}
 
-          <span className="text-xs text-plugin-muted ml-2">
-            {totalPlugins} plugin{totalPlugins !== 1 ? 's' : ''}
+          <span className="text-[10px] font-mono uppercase text-plugin-dim ml-1">
+            {totalPlugins}
           </span>
         </div>
       </div>
 
       {/* Chain */}
       <div
-        className="flex-1 overflow-y-auto p-3"
+        className="flex-1 overflow-y-auto p-2 chain-scrollbar"
         onContextMenu={handleContextMenu}
         onClick={() => { selectNode(null); setSelectedIds(new Set()); }}
       >
@@ -470,11 +556,12 @@ export function ChainEditor() {
             collisionDetection={customCollisionDetection}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
           >
             <div className="space-y-2">
               {/* Input indicator */}
               <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <div className="w-2 h-2 rounded-full bg-plugin-success" />
                 Audio Input
               </div>
 
@@ -490,6 +577,8 @@ export function ChainEditor() {
                 draggedNodeId={activeDragId}
                 shiftHeld={shiftHeld}
                 groupSelectMode={groupSelectMode}
+                disabledDropIds={disabledDropIds}
+                slotNumbers={slotNumbers}
               />
 
               {/* Empty slot at bottom — always visible drop target */}
@@ -501,7 +590,7 @@ export function ChainEditor() {
 
               {/* Output indicator */}
               <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <div className="w-2 h-2 rounded-full bg-plugin-accent" />
                 Audio Output
               </div>
             </div>
@@ -509,7 +598,16 @@ export function ChainEditor() {
             {/* Drag overlay - follows cursor */}
             <DragOverlay dropAnimation={{
               duration: 200,
-              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+              easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+              keyframes({ transform: { initial } }) {
+                return [
+                  { transform: `translate3d(${initial.x}px, ${initial.y}px, 0) scale(1)`, opacity: '1' },
+                  { transform: `translate3d(${initial.x}px, ${initial.y}px, 0) scale(0.92)`, opacity: '0' },
+                ];
+              },
+              sideEffects: defaultDropAnimationSideEffects({
+                styles: { active: { opacity: '0.5' } },
+              }),
             }}>
               {activeDragNode ? (
                 <DragPreview node={activeDragNode} />
@@ -564,7 +662,7 @@ export function ChainEditor() {
             onClick={() => handleCreateGroup('serial')}
             className="w-full px-3 py-1.5 text-left text-sm text-plugin-text hover:bg-plugin-border/50 flex items-center gap-2"
           >
-            <Layers className="w-4 h-4 text-blue-400" />
+            <Layers className="w-4 h-4 text-plugin-serial" />
             Create Serial Group
             <span className="ml-auto text-xxs text-plugin-muted">⌘G</span>
           </button>
@@ -572,7 +670,7 @@ export function ChainEditor() {
             onClick={() => handleCreateGroup('parallel')}
             className="w-full px-3 py-1.5 text-left text-sm text-plugin-text hover:bg-plugin-border/50 flex items-center gap-2"
           >
-            <GitBranch className="w-4 h-4 text-orange-400" />
+            <GitBranch className="w-4 h-4 text-plugin-parallel" />
             Create Parallel Group
             <span className="ml-auto text-xxs text-plugin-muted">⌘⇧G</span>
           </button>
@@ -586,6 +684,79 @@ export function ChainEditor() {
 // ============================================
 // Tree utility functions
 // ============================================
+
+/**
+ * Find the index of a node within its parent's children array.
+ * Returns -1 if not found.
+ */
+function findIndexInParent(allNodes: ChainNodeUI[], nodeId: number, parentId: number): number {
+  const parentChildren = parentId === 0
+    ? allNodes
+    : (() => {
+        const parent = findNodeById(allNodes, parentId);
+        return parent?.type === 'group' ? parent.children : [];
+      })();
+
+  return parentChildren.findIndex(n => n.id === nodeId);
+}
+
+/**
+ * Check if potentialAncestorId is an ancestor of (or equal to) targetId in the tree.
+ * Used to prevent dropping a group into itself or its descendants.
+ */
+function isAncestorOf(nodes: ChainNodeUI[], potentialAncestorId: number, targetId: number): boolean {
+  if (potentialAncestorId === targetId) return true;
+  const ancestor = findNodeById(nodes, potentialAncestorId);
+  if (!ancestor || ancestor.type !== 'group') return false;
+  // Search the ancestor's subtree for targetId
+  for (const child of ancestor.children) {
+    if (containsNodeId(child, targetId)) return true;
+  }
+  return false;
+}
+
+/** Check if a node or any of its descendants has the given ID */
+function containsNodeId(node: ChainNodeUI, targetId: number): boolean {
+  if (node.id === targetId) return true;
+  if (node.type === 'group') {
+    for (const child of node.children) {
+      if (containsNodeId(child, targetId)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Collect all node IDs in a subtree (including the root node itself).
+ * Used to build the set of disabled drop target IDs.
+ */
+function collectSubtreeIds(node: ChainNodeUI, ids: Set<number>): void {
+  ids.add(node.id);
+  if (node.type === 'group') {
+    for (const child of node.children) {
+      collectSubtreeIds(child, ids);
+    }
+  }
+}
+
+/**
+ * Compute a map of nodeId → 1-based DFS slot number for all plugin nodes.
+ */
+function computeSlotNumbers(nodes: ChainNodeUI[]): Map<number, number> {
+  const map = new Map<number, number>();
+  let counter = 1;
+  function dfs(nodes: ChainNodeUI[]) {
+    for (const node of nodes) {
+      if (node.type === 'plugin') {
+        map.set(node.id, counter++);
+      } else if (node.type === 'group') {
+        dfs(node.children);
+      }
+    }
+  }
+  dfs(nodes);
+  return map;
+}
 
 function countPluginsInTree(nodes: ChainNodeUI[]): number {
   let count = 0;
@@ -669,17 +840,24 @@ function EmptySlot({
     id: `drop:${parentId}:${insertIndex}`,
   });
 
+  const handleClick = useCallback(() => {
+    if (!isDragActive) {
+      window.dispatchEvent(new Event('openPluginBrowser'));
+    }
+  }, [isDragActive]);
+
   return (
     <div
       ref={setNodeRef}
+      onClick={handleClick}
       className={`
         mx-0 rounded-lg border-2 border-dashed transition-all duration-200
-        flex items-center justify-center gap-2 cursor-default
+        flex items-center justify-center gap-2
         ${isOver && isDragActive
-          ? 'border-plugin-accent bg-plugin-accent/10 py-4'
+          ? 'border-plugin-accent bg-plugin-accent/10 py-4 cursor-default'
           : isDragActive
-            ? 'border-plugin-border/70 bg-plugin-bg/30 py-3'
-            : 'border-plugin-border/40 py-2.5'
+            ? 'border-plugin-border/70 bg-plugin-bg/30 py-3 cursor-default'
+            : 'border-plugin-border/40 py-2.5 cursor-pointer hover:border-plugin-accent/40 hover:bg-plugin-accent/5'
         }
       `}
     >
@@ -695,7 +873,7 @@ function EmptySlot({
           ? 'Drop here'
           : isDragActive
             ? 'Move to end'
-            : 'Drag plugin here'
+            : 'Add plugin'
         }
       </span>
     </div>

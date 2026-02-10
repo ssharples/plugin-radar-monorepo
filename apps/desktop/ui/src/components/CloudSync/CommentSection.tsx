@@ -65,14 +65,14 @@ function CommentItem({
     <div className={depth > 0 ? 'ml-4 border-l border-plugin-border pl-3' : ''}>
       <div className="py-2">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-medium text-plugin-text">
+          <span className="text-xs font-mono font-medium text-plugin-text">
             {comment.authorName}
           </span>
           <span className="text-xxs text-plugin-muted">
             {formatRelativeTime(comment.createdAt)}
           </span>
         </div>
-        <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">
+        <p className="text-sm font-mono text-gray-300 whitespace-pre-wrap break-words">
           {comment.content}
         </p>
         <div className="flex items-center gap-3 mt-1">
@@ -108,7 +108,7 @@ function CommentItem({
             <button
               onClick={handleReply}
               disabled={submitting || !replyText.trim()}
-              className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded"
+              className="px-2 py-1 text-xs font-mono bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded"
             >
               {submitting ? '...' : 'Reply'}
             </button>
@@ -166,7 +166,7 @@ export function CommentSection({
 
   return (
     <div>
-      <h4 className="text-sm font-medium text-plugin-text mb-3">
+      <h4 className="text-sm font-mono font-medium text-plugin-text mb-3">
         Comments {comments.length > 0 && `(${comments.length})`}
       </h4>
 
@@ -183,7 +183,7 @@ export function CommentSection({
           <button
             onClick={handleSubmit}
             disabled={submitting || !newComment.trim()}
-            className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded font-medium"
+            className="px-3 py-1.5 text-xs font-mono bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded font-medium"
           >
             {submitting ? '...' : 'Post'}
           </button>

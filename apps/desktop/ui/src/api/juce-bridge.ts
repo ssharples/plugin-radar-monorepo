@@ -516,6 +516,10 @@ class JuceBridge {
     return this.callNative<ApiResponse>('setNodeBypassed', JSON.stringify({ nodeId, bypassed }));
   }
 
+  async duplicateNode(nodeId: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('duplicateNode', JSON.stringify({ nodeId }));
+  }
+
   // ============================================
   // Chain-level Toggle Controls
   // ============================================

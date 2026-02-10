@@ -2,8 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted fonts for JUCE WebView (no network access) */
+@font-face {
+  font-family: 'Cutive Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/CutiveMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Nosifer';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/Nosifer-Regular.woff2') format('woff2');
+}
+
 :root {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Cutive Mono', monospace;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -17,7 +34,7 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #0a0a0f;
+  background-color: #000000;
   overflow: hidden;
 }
 
@@ -27,23 +44,57 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Custom scrollbar */
+/* Default scrollbar — Propane amber */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #131318;
+  background: #121212;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #22222a;
+  background: rgba(137, 87, 42, 0.24);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6366f1;
+  background: #89572a;
+}
+
+/* Custom PNG-backed scrollbar for chain area */
+.chain-scrollbar::-webkit-scrollbar {
+  width: 16px;
+}
+
+.chain-scrollbar::-webkit-scrollbar-track {
+  background: url('./assets/scrollbar-bg.png') repeat-y;
+  background-size: 16px auto;
+}
+
+.chain-scrollbar::-webkit-scrollbar-thumb {
+  background: url('./assets/scrollbar-thumb.png') repeat-y;
+  background-size: 16px auto;
+  border-radius: 0;
+}
+
+.chain-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: url('./assets/scrollbar-thumb.png') repeat-y;
+  background-size: 16px auto;
+  filter: brightness(1.3);
+}
+
+/* CRT text glow effect */
+.crt-text {
+  text-shadow: 0 0 0.95px rgba(255, 255, 255, 0.6);
+}
+
+/* Propane label utility */
+.propane-label {
+  font-family: 'Cutive Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* Plugin slot transitions */
@@ -66,4 +117,25 @@ html, body, #root {
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 200ms, transform 200ms;
+}
+
+/* Drop zone stripe patterns for group creation */
+.drop-zone-stripes-serial {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(201, 148, 74, 0.12) 3px,
+    rgba(201, 148, 74, 0.12) 6px
+  );
+}
+
+.drop-zone-stripes-parallel {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(90, 120, 66, 0.12) 3px,
+    rgba(90, 120, 66, 0.12) 6px
+  );
 }

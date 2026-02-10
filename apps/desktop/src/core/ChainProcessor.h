@@ -108,9 +108,13 @@ public:
     // Per-node meter data collection (called by WebViewBridge timer)
     struct NodeMeterData {
         ChainNodeId nodeId;
-        float peakL, peakR, peakHoldL, peakHoldR;
+        float peakL, peakR, peakHoldL, peakHoldR;                     // output
+        float inputPeakL, inputPeakR, inputPeakHoldL, inputPeakHoldR; // input
     };
     std::vector<NodeMeterData> getNodeMeterReadings() const;
+
+    // Duplicate a plugin node (inserts copy right after the original)
+    bool duplicateNode(ChainNodeId nodeId);
 
     // Latency reporting
     int getTotalLatencySamples() const;

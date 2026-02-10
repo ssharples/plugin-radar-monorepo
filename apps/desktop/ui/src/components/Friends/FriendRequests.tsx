@@ -91,10 +91,10 @@ export function FriendRequests() {
     <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Bell size={18} className="text-purple-400" />
-          <h3 className="text-white font-medium">Friend Requests</h3>
+          <Bell size={18} className="text-plugin-accent" />
+          <h3 className="text-white font-mono font-medium">Friend Requests</h3>
           {requests.length > 0 && (
-            <span className="bg-purple-600 text-white text-xs rounded-full px-2 py-0.5">
+            <span className="bg-plugin-accent text-white text-xs rounded-full px-2 py-0.5">
               {requests.length}
             </span>
           )}

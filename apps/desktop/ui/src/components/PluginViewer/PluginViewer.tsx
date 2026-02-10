@@ -511,7 +511,7 @@ export function PluginViewer() {
 
               {/* Output indicator */}
               <div className="flex items-center justify-center gap-1.5 pt-0.5">
-                <div className="w-2 h-2 rounded-full bg-plugin-accent shadow-[0_0_6px_rgba(255,107,0,0.4)]" />
+                <div className="w-2 h-2 rounded-full bg-plugin-accent shadow-[0_0_6px_rgba(137,87,42,0.4)]" />
                 <span className="text-xxs text-plugin-dim uppercase tracking-widest font-medium">Out</span>
               </div>
             </SortableContext>

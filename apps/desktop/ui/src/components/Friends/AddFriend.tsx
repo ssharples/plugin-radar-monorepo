@@ -84,8 +84,8 @@ export function AddFriend() {
   return (
     <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center gap-2 mb-4">
-        <UserPlus size={18} className="text-purple-400" />
-        <h3 className="text-white font-medium">Add Friend</h3>
+        <UserPlus size={18} className="text-plugin-accent" />
+        <h3 className="text-white font-mono font-medium">Add Friend</h3>
       </div>
 
       <div className="flex gap-2 mb-3">
@@ -100,7 +100,7 @@ export function AddFriend() {
         <button
           onClick={handleSearch}
           disabled={searching || query.trim().length < 2}
-          className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 text-white rounded px-3 py-2"
+          className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-accent/50 text-white rounded px-3 py-2"
         >
           <Search size={16} />
         </button>
@@ -142,8 +142,8 @@ export function AddFriend() {
                 disabled={sending === user.userId}
                 className={`flex items-center gap-1 text-sm rounded px-3 py-1 ${
                   sending === user.userId
-                    ? 'bg-purple-600/50 text-purple-200 cursor-wait'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                    ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
+                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
                 }`}
               >
                 <UserPlus size={14} />

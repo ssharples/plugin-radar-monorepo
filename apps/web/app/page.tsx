@@ -43,14 +43,14 @@ export default function Home() {
     <div className="relative">
       {/* ===== HERO SECTION ===== */}
       <section className="relative overflow-hidden">
-        {/* Background gradient — cool indigo */}
-        <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/[0.04] via-transparent to-transparent" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-indigo-500/[0.05] rounded-full blur-[140px]" />
+        {/* Background gradient — warm amber */}
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.04] via-transparent to-transparent" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-amber-500/[0.05] rounded-full blur-[140px]" />
 
         <div className="container mx-auto px-4 lg:px-6 pt-20 pb-16 relative">
           <div className="max-w-3xl">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium mb-6">
               <LinkIcon weight="bold" className="w-3.5 h-3.5" />
               The first cross-DAW plugin chain platform
             </div>
@@ -61,7 +61,7 @@ export default function Home() {
             >
               <span className="text-stone-100">Build plugin chains.</span>
               <br />
-              <span className="text-indigo-400">Share them with the world.</span>
+              <span className="text-amber-400">Share them with the world.</span>
             </h1>
             <p className="text-lg text-stone-400 max-w-xl leading-relaxed mb-8">
               Build effect chains with any VST/AU/AAX plugin. Share with friends
@@ -71,7 +71,7 @@ export default function Home() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="#download"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/35 text-sm"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/35 text-sm"
               >
                 <DownloadSimple weight="bold" className="w-4 h-4" />
                 Download Free
@@ -91,7 +91,7 @@ export default function Home() {
             <StatCard
               value={stats?.totalPlugins ? `${stats.totalPlugins.toLocaleString()}+` : "..."}
               label="Plugins Supported"
-              icon={<div className="w-2 h-2 rounded-full bg-indigo-400" />}
+              icon={<div className="w-2 h-2 rounded-full bg-amber-400" />}
             />
             <StatCard
               value="Any DAW"
@@ -117,7 +117,7 @@ export default function Home() {
       {/* ===== HOW IT WORKS ===== */}
       <section className="container mx-auto px-4 lg:px-6 py-20">
         <div className="text-center mb-14">
-          <p className="text-xs text-indigo-400 uppercase tracking-[0.2em] font-semibold mb-3">How It Works</p>
+          <p className="text-xs text-amber-400 uppercase tracking-[0.2em] font-semibold mb-3">How It Works</p>
           <h2
             className="text-3xl font-bold text-stone-100"
             style={{ fontFamily: "var(--font-display)" }}
@@ -128,19 +128,19 @@ export default function Home() {
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <StepCard
             number="01"
-            icon={<SlidersHorizontal weight="duotone" className="w-7 h-7 text-indigo-400" />}
+            icon={<SlidersHorizontal weight="duotone" className="w-7 h-7 text-amber-400" />}
             title="Build Your Chain"
             description="Drag any plugins from your collection into a visual chain editor. Set up serial or parallel routing. See per-plugin metering in real-time."
           />
           <StepCard
             number="02"
-            icon={<ShareNetwork weight="duotone" className="w-7 h-7 text-indigo-400" />}
+            icon={<ShareNetwork weight="duotone" className="w-7 h-7 text-amber-400" />}
             title="Share With Anyone"
             description="Save your chain to the cloud and share with a link. Friends load it in their DAW — with automatic plugin compatibility matching."
           />
           <StepCard
             number="03"
-            icon={<MagnifyingGlass weight="duotone" className="w-7 h-7 text-indigo-400" />}
+            icon={<MagnifyingGlass weight="duotone" className="w-7 h-7 text-amber-400" />}
             title="Discover & Learn"
             description="Browse chains shared by the community. Find vocal chains, drum bus setups, mastering presets. Fork them, tweak them, make them yours."
           />
@@ -152,7 +152,7 @@ export default function Home() {
       {/* ===== COMPARISON TABLE ===== */}
       <section className="container mx-auto px-4 lg:px-6 py-20">
         <div className="text-center mb-12">
-          <p className="text-xs text-indigo-400 uppercase tracking-[0.2em] font-semibold mb-3">Why PluginRadar</p>
+          <p className="text-xs text-amber-400 uppercase tracking-[0.2em] font-semibold mb-3">Why PluginRadar</p>
           <h2
             className="text-3xl font-bold text-stone-100 mb-3"
             style={{ fontFamily: "var(--font-display)" }}
@@ -169,7 +169,7 @@ export default function Home() {
               <tr className="border-b border-white/[0.06]">
                 <th className="text-left py-4 px-4 text-stone-500 font-medium">Feature</th>
                 <th className="py-4 px-4 text-center">
-                  <span className="text-indigo-400 font-semibold">PluginRadar</span>
+                  <span className="text-amber-400 font-semibold">PluginRadar</span>
                 </th>
                 <th className="py-4 px-4 text-center text-stone-500 font-medium">Waves StudioVerse</th>
                 <th className="py-4 px-4 text-center text-stone-500 font-medium">Your DAW</th>
@@ -230,7 +230,7 @@ export default function Home() {
       {/* ===== BUILT FOR ENGINEERS ===== */}
       <section className="container mx-auto px-4 lg:px-6 py-20">
         <div className="text-center mb-14">
-          <p className="text-xs text-indigo-400 uppercase tracking-[0.2em] font-semibold mb-3">Pro Features</p>
+          <p className="text-xs text-amber-400 uppercase tracking-[0.2em] font-semibold mb-3">Pro Features</p>
           <h2
             className="text-3xl font-bold text-stone-100 mb-3"
             style={{ fontFamily: "var(--font-display)" }}
@@ -286,7 +286,7 @@ export default function Home() {
               subtitle="Shared by the community"
               href="/chains"
               linkText="Browse all chains"
-              icon={<LinkIcon weight="bold" className="w-5 h-5 text-indigo-400" />}
+              icon={<LinkIcon weight="bold" className="w-5 h-5 text-amber-400" />}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {chains.map((chain: any) => (
@@ -300,8 +300,8 @@ export default function Home() {
 
       {/* ===== DOWNLOAD CTA ===== */}
       <section id="download" className="container mx-auto px-4 lg:px-6 py-20">
-        <div className="relative rounded-2xl overflow-hidden border border-indigo-500/20">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.08] via-transparent to-violet-500/[0.05]" />
+        <div className="relative rounded-2xl overflow-hidden border border-amber-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/[0.08] via-transparent to-orange-500/[0.05]" />
           <div className="relative px-8 py-14 text-center">
             <h2
               className="text-3xl font-bold text-stone-100 mb-3"
@@ -315,7 +315,7 @@ export default function Home() {
             <div className="flex flex-wrap justify-center gap-3">
               <a
                 href="#"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25 text-sm"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25 text-sm"
               >
                 <DownloadSimple weight="bold" className="w-4 h-4" />
                 Download for macOS
@@ -347,7 +347,7 @@ export default function Home() {
             subtitle="Popular in the community this week"
             href="/plugins"
             linkText="Browse all"
-            icon={<TrendUp weight="bold" className="w-5 h-5 text-indigo-400" />}
+            icon={<TrendUp weight="bold" className="w-5 h-5 text-amber-400" />}
           />
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {trendingPlugins.map((plugin: any) => (
@@ -414,9 +414,9 @@ export default function Home() {
               <Link
                 key={m._id}
                 href={`/manufacturers/${m.slug}`}
-                className="group inline-flex items-center gap-2 px-4 py-2 glass-card rounded-xl hover:border-indigo-500/20 transition-all duration-200"
+                className="group inline-flex items-center gap-2 px-4 py-2 glass-card rounded-xl hover:border-amber-500/20 transition-all duration-200"
               >
-                <span className="text-stone-300 text-sm group-hover:text-indigo-400 transition-colors">
+                <span className="text-stone-300 text-sm group-hover:text-amber-400 transition-colors">
                   {m.name}
                 </span>
                 <span className="text-stone-600 text-xs tabular-nums">
@@ -472,11 +472,11 @@ function StepCard({
   description: string;
 }) {
   return (
-    <div className="glass-card rounded-xl p-6 text-center group hover:border-indigo-500/20 transition-all">
-      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/10 mb-5 group-hover:bg-indigo-500/15 transition-colors">
+    <div className="glass-card rounded-xl p-6 text-center group hover:border-amber-500/20 transition-all">
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/10 mb-5 group-hover:bg-amber-500/15 transition-colors">
         {icon}
       </div>
-      <div className="text-[10px] text-indigo-400/60 font-mono uppercase tracking-widest mb-2">
+      <div className="text-[10px] text-amber-400/60 font-mono uppercase tracking-widest mb-2">
         Step {number}
       </div>
       <h3
@@ -519,7 +519,7 @@ function CompareRow({
   return (
     <tr className="hover:bg-white/[0.02] transition-colors">
       <td className="py-3.5 px-4 text-stone-300">{feature}</td>
-      <td className="py-3.5 px-4 text-center bg-indigo-500/[0.03]">
+      <td className="py-3.5 px-4 text-center bg-amber-500/[0.03]">
         {renderCell(us)}
       </td>
       <td className="py-3.5 px-4 text-center">{renderCell(waves, wavesNote)}</td>
@@ -538,8 +538,8 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="glass-card rounded-xl p-5 group hover:border-indigo-500/15 transition-all">
-      <div className="text-indigo-400 mb-3 group-hover:text-indigo-300 transition-colors">
+    <div className="glass-card rounded-xl p-5 group hover:border-amber-500/15 transition-all">
+      <div className="text-amber-400 mb-3 group-hover:text-amber-300 transition-colors">
         {icon}
       </div>
       <h3 className="font-semibold text-stone-100 mb-1.5 text-sm">{title}</h3>
@@ -552,17 +552,17 @@ function ChainCard({ chain }: { chain: any }) {
   return (
     <Link
       href={`/chains/${chain.slug}`}
-      className="block glass-card rounded-xl p-5 hover:border-indigo-500/25 transition group"
+      className="block glass-card rounded-xl p-5 hover:border-amber-500/25 transition group"
     >
       <div className="flex items-center justify-between mb-3">
-        <span className="px-2 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded text-xs text-indigo-400 capitalize">
+        <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-400 capitalize">
           {chain.category}
         </span>
         <span className="text-xs text-stone-500">
           {chain.pluginCount} plugin{chain.pluginCount !== 1 ? "s" : ""}
         </span>
       </div>
-      <h3 className="font-semibold text-stone-100 group-hover:text-indigo-400 transition truncate mb-1">
+      <h3 className="font-semibold text-stone-100 group-hover:text-amber-400 transition truncate mb-1">
         {chain.name}
       </h3>
       {chain.author && (
@@ -619,7 +619,7 @@ function SectionHeader({
       </div>
       <Link
         href={href}
-        className="text-sm text-stone-500 hover:text-indigo-400 transition-colors flex items-center gap-1 shrink-0"
+        className="text-sm text-stone-500 hover:text-amber-400 transition-colors flex items-center gap-1 shrink-0"
       >
         {linkText}
         <ArrowRight className="w-3.5 h-3.5" />

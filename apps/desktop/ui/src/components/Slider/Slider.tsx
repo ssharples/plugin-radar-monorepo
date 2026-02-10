@@ -15,8 +15,8 @@ interface SliderProps {
 
 const colorMap = {
   accent: { fill: 'bg-plugin-accent', thumb: 'border-plugin-accent', hover: 'bg-plugin-accent-bright' },
-  blue: { fill: 'bg-plugin-serial', thumb: 'border-plugin-serial', hover: 'bg-blue-400' },
-  orange: { fill: 'bg-plugin-parallel', thumb: 'border-plugin-parallel', hover: 'bg-orange-400' },
+  blue: { fill: 'bg-plugin-serial', thumb: 'border-plugin-serial', hover: 'bg-plugin-serial' },
+  orange: { fill: 'bg-plugin-parallel', thumb: 'border-plugin-parallel', hover: 'bg-plugin-parallel' },
 };
 
 export function Slider({

@@ -15,6 +15,8 @@ import {
   LinkSimple,
   CheckCircle,
   XCircle,
+  BookmarkSimple,
+  CaretDown,
 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { StarRating } from "@/components/social/StarRating";
@@ -65,9 +67,12 @@ export default function ChainDetailPage() {
   const followUserMutation = useMutation(api.social.followUser);
   const unfollowUserMutation = useMutation(api.social.unfollowUser);
   const forkChainMutation = useMutation(api.social.forkChain);
+  const addToCollectionMutation = useMutation(api.pluginDirectory.addToCollection);
 
   const [copiedShareCode, setCopiedShareCode] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [inCollection, setInCollection] = useState(false);
+  const [addingToCollection, setAddingToCollection] = useState(false);
 
   if (chain === undefined) {
     return <ChainSkeleton />;
@@ -146,6 +151,24 @@ export default function ChainDetailPage() {
   const handleFork = async (newName: string) => {
     if (!sessionToken) return;
     await forkChainMutation({ sessionToken, chainId: chain._id, newName });
+  };
+
+  const handleAddToCollection = async () => {
+    if (!sessionToken || addingToCollection) return;
+    setAddingToCollection(true);
+    try {
+      await addToCollectionMutation({
+        sessionToken,
+        chainId: chain._id,
+        source: "web",
+      });
+      setInCollection(true);
+    } catch (err: any) {
+      if (err?.message?.includes("already")) {
+        setInCollection(true);
+      }
+    }
+    setAddingToCollection(false);
   };
 
   // Map Convex comments to the Comment interface
@@ -341,6 +364,22 @@ export default function ChainDetailPage() {
               </div>
             )}
 
+            {/* Add to collection */}
+            {isAuthenticated && user && !isOwnChain && (
+              <button
+                onClick={handleAddToCollection}
+                disabled={addingToCollection || inCollection}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition text-sm border ${
+                  inCollection
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                    : "bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 border-white/[0.06]"
+                } disabled:cursor-default`}
+              >
+                <BookmarkSimple className="w-4 h-4" weight={inCollection ? "fill" : "regular"} />
+                {inCollection ? "In Collection" : addingToCollection ? "Adding..." : "Add to Collection"}
+              </button>
+            )}
+
             {/* Fork button */}
             {isAuthenticated && (
               <ForkButton
@@ -427,89 +466,119 @@ function SlotRow({
   compatibility?: { owned: boolean };
 }) {
   const hasMatch = !!slot.pluginData;
+  const hasParams = slot.parameters && slot.parameters.length > 0;
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div
-      className={`flex items-center gap-4 p-4 rounded-xl border transition ${
-        slot.bypassed
-          ? "bg-white/[0.02] border-white/[0.03] opacity-60"
-          : "glass-card"
-      }`}
-    >
-      {/* Position */}
-      <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-sm font-mono text-stone-400 shrink-0">
-        {slot.position + 1}
-      </div>
-
-      {/* Plugin image or placeholder */}
-      {hasMatch && slot.pluginData.imageUrl ? (
-        <div className="w-14 h-10 rounded overflow-hidden bg-white/[0.04] shrink-0">
-          <img
-            src={slot.pluginData.imageUrl}
-            alt={slot.pluginData.name}
-            className="w-full h-full object-contain"
-          />
+    <div>
+      <div
+        className={`flex items-center gap-4 p-4 rounded-xl border transition ${
+          slot.bypassed
+            ? "bg-white/[0.02] border-white/[0.03] opacity-60"
+            : "glass-card"
+        } ${hasParams ? "cursor-pointer" : ""}`}
+        onClick={() => hasParams && setExpanded(!expanded)}
+      >
+        {/* Position */}
+        <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-sm font-mono text-stone-400 shrink-0">
+          {slot.position + 1}
         </div>
-      ) : (
-        <div className="w-14 h-10 rounded bg-white/[0.04] flex items-center justify-center text-stone-600 shrink-0">
-          <LinkSimple className="w-5 h-5" />
-        </div>
-      )}
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          {hasMatch ? (
-            <Link
-              href={`/plugins/${slot.pluginData.slug}`}
-              className="font-medium text-stone-100 hover:text-amber-400 transition truncate"
-            >
-              {slot.pluginData.name}
-            </Link>
-          ) : (
-            <span className="font-medium text-stone-100 truncate">
-              {slot.pluginName}
-            </span>
-          )}
-          {slot.bypassed && (
-            <span className="text-xs px-1.5 py-0.5 bg-white/[0.04] border border-white/[0.06] rounded text-stone-500">
-              bypassed
-            </span>
-          )}
-        </div>
-        <p className="text-sm text-stone-500 truncate">
-          {hasMatch ? slot.pluginData.manufacturer : slot.manufacturer}
-          {slot.presetName && (
-            <span className="text-stone-600"> &middot; {slot.presetName}</span>
-          )}
-        </p>
-      </div>
+        {/* Plugin image or placeholder */}
+        {hasMatch && slot.pluginData.imageUrl ? (
+          <div className="w-14 h-10 rounded overflow-hidden bg-white/[0.04] shrink-0">
+            <img
+              src={slot.pluginData.imageUrl}
+              alt={slot.pluginData.name}
+              className="w-full h-full object-contain"
+            />
+          </div>
+        ) : (
+          <div className="w-14 h-10 rounded bg-white/[0.04] flex items-center justify-center text-stone-600 shrink-0">
+            <LinkSimple className="w-5 h-5" />
+          </div>
+        )}
 
-      {/* Price (if matched) */}
-      {hasMatch && (
-        <div className="text-right shrink-0">
-          <span
-            className={`text-sm font-medium ${
-              slot.pluginData.isFree ? "text-green-400" : "text-stone-100"
-            }`}
-          >
-            {slot.pluginData.isFree
-              ? "Free"
-              : slot.pluginData.currentPrice
-                ? `$${(slot.pluginData.currentPrice / 100).toFixed(0)}`
-                : ""}
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            {hasMatch ? (
+              <Link
+                href={`/plugins/${slot.pluginData.slug}`}
+                className="font-medium text-stone-100 hover:text-amber-400 transition truncate"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {slot.pluginData.name}
+              </Link>
+            ) : (
+              <span className="font-medium text-stone-100 truncate">
+                {slot.pluginName}
+              </span>
+            )}
+            {slot.bypassed && (
+              <span className="text-xs px-1.5 py-0.5 bg-white/[0.04] border border-white/[0.06] rounded text-stone-500">
+                bypassed
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-stone-500 truncate">
+            {hasMatch ? slot.pluginData.manufacturer : slot.manufacturer}
+            {slot.presetName && (
+              <span className="text-stone-600"> &middot; {slot.presetName}</span>
+            )}
+          </p>
+        </div>
+
+        {/* Param count indicator */}
+        {hasParams && (
+          <span className="text-xs text-stone-500 font-mono shrink-0">
+            {slot.parameters.length} params
+            <CaretDown
+              className={`inline w-3 h-3 ml-1 transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
           </span>
-        </div>
-      )}
+        )}
 
-      {/* Owned indicator */}
-      {compatibility !== undefined && (
-        <div className="shrink-0">
-          {compatibility.owned ? (
-            <CheckCircle className="w-5 h-5 text-amber-400" weight="fill" />
-          ) : (
-            <XCircle className="w-5 h-5 text-stone-600" />
-          )}
+        {/* Price (if matched) */}
+        {hasMatch && (
+          <div className="text-right shrink-0">
+            <span
+              className={`text-sm font-medium ${
+                slot.pluginData.isFree ? "text-green-400" : "text-stone-100"
+              }`}
+            >
+              {slot.pluginData.isFree
+                ? "Free"
+                : slot.pluginData.currentPrice
+                  ? `$${(slot.pluginData.currentPrice / 100).toFixed(0)}`
+                  : ""}
+            </span>
+          </div>
+        )}
+
+        {/* Owned indicator */}
+        {compatibility !== undefined && (
+          <div className="shrink-0">
+            {compatibility.owned ? (
+              <CheckCircle className="w-5 h-5 text-amber-400" weight="fill" />
+            ) : (
+              <XCircle className="w-5 h-5 text-stone-600" />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Expandable parameter grid */}
+      {expanded && hasParams && (
+        <div className="ml-8 mt-1 mb-2 p-3 bg-white/[0.02] border border-white/[0.04] rounded-lg">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+            {slot.parameters.map((p: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="text-stone-400 truncate">{p.name}</span>
+                <span className="text-stone-200 font-mono ml-2 shrink-0">{p.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

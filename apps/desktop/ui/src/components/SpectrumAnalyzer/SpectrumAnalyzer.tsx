@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { juceBridge } from '../../api/juce-bridge';
 import type { FFTData } from '../../api/types';
 
@@ -9,7 +9,8 @@ import type { FFTData } from '../../api/types';
 type VisualizationMode = 'bars' | 'line' | 'octave';
 
 interface SpectrumAnalyzerProps {
-  height?: number;
+  mode?: VisualizationMode;
+  octaveMode?: 'third' | 'full';
 }
 
 interface PeakEntry {
@@ -116,7 +117,7 @@ function formatFreq(freq: number): string {
 // Component
 // ============================================
 
-export function SpectrumAnalyzer({ height = 100 }: SpectrumAnalyzerProps) {
+export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: SpectrumAnalyzerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const magnitudesRef = useRef<number[]>([]);
@@ -124,9 +125,6 @@ export function SpectrumAnalyzer({ height = 100 }: SpectrumAnalyzerProps) {
   const fftSizeRef = useRef(2048);
   const smoothedRef = useRef<number[]>([]);
   const peaksRef = useRef<PeakEntry[]>([]);
-
-  const [mode, setMode] = useState<VisualizationMode>('bars');
-  const [octaveMode, setOctaveMode] = useState<'third' | 'full'>('third');
 
   // ============================================
   // Aggregate magnitudes into octave bands
@@ -443,7 +441,7 @@ export function SpectrumAnalyzer({ height = 100 }: SpectrumAnalyzerProps) {
     for (let i = 1; i < points.length; i++) {
       ctx.lineTo(points[i].x, points[i].y);
     }
-    ctx.strokeStyle = '#6366f1';
+    ctx.strokeStyle = '#89572a';
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }, []);
@@ -556,59 +554,9 @@ export function SpectrumAnalyzer({ height = 100 }: SpectrumAnalyzerProps) {
   // ============================================
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {/* Toggle buttons */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setMode('bars')}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xxs font-medium transition-all ${
-            mode === 'bars'
-              ? 'bg-plugin-accent/12 text-plugin-accent border border-plugin-accent/30'
-              : 'text-plugin-dim border border-plugin-border hover:border-plugin-muted'
-          }`}
-        >
-          Bars
-        </button>
-        <button
-          onClick={() => setMode('line')}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xxs font-medium transition-all ${
-            mode === 'line'
-              ? 'bg-plugin-accent/12 text-plugin-accent border border-plugin-accent/30'
-              : 'text-plugin-dim border border-plugin-border hover:border-plugin-muted'
-          }`}
-        >
-          Line
-        </button>
-        <button
-          onClick={() => setMode('octave')}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xxs font-medium transition-all ${
-            mode === 'octave'
-              ? 'bg-plugin-accent/12 text-plugin-accent border border-plugin-accent/30'
-              : 'text-plugin-dim border border-plugin-border hover:border-plugin-muted'
-          }`}
-        >
-          Octave
-        </button>
-
-        {mode === 'octave' && (
-          <>
-            <div className="w-px h-3 bg-plugin-border" />
-            <button
-              onClick={() => setOctaveMode(octaveMode === 'third' ? 'full' : 'third')}
-              className="px-2 py-0.5 rounded text-xxs font-mono text-plugin-dim border border-plugin-border hover:border-plugin-muted transition-all"
-            >
-              {octaveMode === 'third' ? '1/3 Oct' : '1/1 Oct'}
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="w-full rounded border border-plugin-border"
-        style={{ height: `${height}px`, background: '#050505' }}
-      />
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="w-full h-full"
+    />
   );
 }

@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { checkRateLimit } from "./lib/rateLimit";
+import { USE_CASE_TO_GROUP } from "./lib/chainUseCases";
+import { getSessionUser } from "./lib/auth";
 
 // ============================================
 // PLUGIN SYNC FROM PLUGIN-DIRECTORY APP
@@ -371,6 +373,13 @@ export const saveChain = mutation({
       presetSizeBytes: v.optional(v.number()),
       bypassed: v.boolean(),
       notes: v.optional(v.string()),
+      parameters: v.optional(v.array(v.object({
+        name: v.string(),
+        value: v.string(),
+        normalizedValue: v.number(),
+        semantic: v.optional(v.string()),
+        unit: v.optional(v.string()),
+      }))),
     })),
     isPublic: v.boolean(),
     targetInputLufs: v.optional(v.number()),
@@ -406,6 +415,16 @@ export const saveChain = mutation({
     // Generate share code
     const shareCode = generateShareCode();
 
+    // Pre-compute pluginIds for fast compatibility checks during browse
+    const pluginIds = enrichedSlots
+      .filter((s) => s.matchedPlugin)
+      .map((s) => s.matchedPlugin!.toString());
+
+    // Derive useCaseGroup from useCase
+    const useCaseGroup = args.useCase
+      ? USE_CASE_TO_GROUP[args.useCase] ?? undefined
+      : undefined;
+
     const chainId = await ctx.db.insert("pluginChains", {
       user: args.userId,
       name: args.name,
@@ -415,6 +434,8 @@ export const saveChain = mutation({
       tags: args.tags,
       genre: args.genre,
       useCase: args.useCase,
+      useCaseGroup,
+      pluginIds: pluginIds.length > 0 ? pluginIds : undefined,
       slots: enrichedSlots,
       pluginCount: enrichedSlots.length,
       views: 0,
@@ -512,22 +533,49 @@ export const checkChainCompatibility = query({
     const chain = await ctx.db.get(args.chainId);
     if (!chain) throw new Error("Chain not found");
 
-    // Get user's owned plugins
+    // Get user's owned plugins (catalog-matched)
     const owned = await ctx.db
       .query("ownedPlugins")
       .withIndex("by_user", (q) => q.eq("user", args.userId))
       .collect();
-    
+
     const ownedPluginIds = new Set(owned.map((o) => o.plugin.toString()));
 
+    // Get user's scanned plugins for name-based fallback matching
+    const scannedPlugins = await ctx.db
+      .query("scannedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", args.userId))
+      .collect();
+
+    // Build a set of normalized "name::manufacturer" keys from scanned plugins
+    const scannedKeys = new Set(
+      scannedPlugins.map((sp) =>
+        `${sp.name.toLowerCase()}::${sp.manufacturer.toLowerCase()}`
+      )
+    );
+
     // Check each slot
-    const slotStatus = chain.slots.map((slot) => ({
-      position: slot.position,
-      pluginName: slot.pluginName,
-      manufacturer: slot.manufacturer,
-      matchedPlugin: slot.matchedPlugin,
-      owned: slot.matchedPlugin ? ownedPluginIds.has(slot.matchedPlugin.toString()) : false,
-    }));
+    const slotStatus = chain.slots.map((slot) => {
+      // First: check by catalog match ID
+      let isOwned = slot.matchedPlugin
+        ? ownedPluginIds.has(slot.matchedPlugin.toString())
+        : false;
+
+      // Fallback: if no catalog match or not found in ownedPlugins,
+      // check if user has a scanned plugin with the same name+manufacturer
+      if (!isOwned) {
+        const slotKey = `${slot.pluginName.toLowerCase()}::${slot.manufacturer.toLowerCase()}`;
+        isOwned = scannedKeys.has(slotKey);
+      }
+
+      return {
+        position: slot.position,
+        pluginName: slot.pluginName,
+        manufacturer: slot.manufacturer,
+        matchedPlugin: slot.matchedPlugin,
+        owned: isOwned,
+      };
+    });
 
     const ownedCount = slotStatus.filter((s) => s.owned).length;
     const missingCount = chain.pluginCount - ownedCount;
@@ -579,6 +627,13 @@ export const getDetailedCompatibility = query({
       ownedPluginIds.add(op.plugin.toString());
     }
 
+    // Build a set of normalized "name::manufacturer" keys for fallback matching
+    const scannedKeys = new Set(
+      scannedPlugins.map((sp) =>
+        `${sp.name.toLowerCase()}::${sp.manufacturer.toLowerCase()}`
+      )
+    );
+
     // Process each slot
     const slots: Array<{
       position: number;
@@ -602,9 +657,15 @@ export const getDetailedCompatibility = query({
     }> = [];
 
     for (const slot of chain.slots) {
-      const isOwned =
+      let isOwned =
         slot.matchedPlugin &&
         ownedPluginIds.has(slot.matchedPlugin.toString());
+
+      // Fallback: name+manufacturer match against scanned plugins
+      if (!isOwned) {
+        const slotKey = `${slot.pluginName.toLowerCase()}::${slot.manufacturer.toLowerCase()}`;
+        isOwned = scannedKeys.has(slotKey);
+      }
 
       if (isOwned) {
         ownedCount++;
@@ -941,5 +1002,302 @@ export const getUserStats = query({
       totalDownloads,
       followerCount: followers.length,
     };
+  },
+});
+
+// ============================================
+// ENHANCED CHAIN BROWSING
+// ============================================
+
+/**
+ * Browse public chains with granular filtering, sorting, and compatibility.
+ * Replaces basic browseChains for the new ChainBrowser UI.
+ */
+export const browseChainsPaginated = query({
+  args: {
+    useCaseGroup: v.optional(v.string()),
+    useCase: v.optional(v.string()),
+    search: v.optional(v.string()),
+    sortBy: v.optional(v.string()),       // "popular" | "recent" | "downloads" | "rating"
+    compatibilityFilter: v.optional(v.string()), // "all" | "full" | "close"
+    sessionToken: v.optional(v.string()),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 20;
+    const offset = args.offset || 0;
+
+    // Determine user's owned plugin IDs for compatibility filtering
+    let ownedPluginIds: Set<string> | null = null;
+    if (args.compatibilityFilter && args.compatibilityFilter !== "all" && args.sessionToken) {
+      try {
+        const { userId } = await getSessionUser(ctx, args.sessionToken);
+        const owned = await ctx.db
+          .query("ownedPlugins")
+          .withIndex("by_user", (q) => q.eq("user", userId))
+          .collect();
+        ownedPluginIds = new Set(owned.map((o) => o.plugin.toString()));
+      } catch {
+        // Not authenticated — skip compatibility filtering
+      }
+    }
+
+    let chains;
+
+    // Use search index if search text is provided
+    if (args.search && args.search.trim()) {
+      let searchQuery = ctx.db
+        .query("pluginChains")
+        .withSearchIndex("search_name", (q: any) => {
+          let sq = q.search("name", args.search!);
+          sq = sq.eq("isPublic", true);
+          if (args.useCaseGroup) {
+            sq = sq.eq("useCaseGroup", args.useCaseGroup);
+          }
+          if (args.useCase) {
+            sq = sq.eq("useCase", args.useCase);
+          }
+          return sq;
+        });
+      chains = await searchQuery.take(200);
+    } else if (args.useCase) {
+      // Filter by specific use case
+      chains = await ctx.db
+        .query("pluginChains")
+        .withIndex("by_use_case", (q) =>
+          q.eq("useCase", args.useCase!).eq("isPublic", true)
+        )
+        .take(200);
+    } else if (args.useCaseGroup) {
+      // Filter by use case group
+      chains = await ctx.db
+        .query("pluginChains")
+        .withIndex("by_use_case_group", (q) =>
+          q.eq("useCaseGroup", args.useCaseGroup!).eq("isPublic", true)
+        )
+        .take(200);
+    } else {
+      // All public chains
+      chains = await ctx.db
+        .query("pluginChains")
+        .withIndex("by_public", (q) => q.eq("isPublic", true))
+        .take(200);
+    }
+
+    // Apply compatibility filter if requested
+    if (ownedPluginIds && args.compatibilityFilter !== "all") {
+      chains = chains.filter((chain) => {
+        if (!chain.pluginIds || chain.pluginIds.length === 0) {
+          // No pre-computed IDs — skip filtering for this chain
+          return true;
+        }
+        const missing = chain.pluginIds.filter(
+          (id) => !ownedPluginIds!.has(id)
+        ).length;
+        if (args.compatibilityFilter === "full") {
+          return missing === 0;
+        }
+        // "close" = missing 0-2
+        return missing <= 2;
+      });
+    }
+
+    // Sort
+    if (args.sortBy === "rating") {
+      const chainsWithRating = await Promise.all(
+        chains.map(async (chain) => {
+          const ratings = await ctx.db
+            .query("chainRatings")
+            .withIndex("by_chain_user", (q) => q.eq("chainId", chain._id))
+            .collect();
+          const avg =
+            ratings.length > 0
+              ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+              : 0;
+          return { chain, avgRating: avg, ratingCount: ratings.length };
+        })
+      );
+      chainsWithRating.sort(
+        (a, b) => b.avgRating - a.avgRating || b.ratingCount - a.ratingCount
+      );
+      chains = chainsWithRating.map((c) => c.chain);
+    } else if (args.sortBy === "downloads") {
+      chains.sort((a, b) => b.downloads - a.downloads);
+    } else if (args.sortBy === "popular") {
+      chains.sort((a, b) => b.likes - a.likes);
+    } else {
+      // Default: recent
+      chains.sort((a, b) => b.createdAt - a.createdAt);
+    }
+
+    // Paginate
+    const total = chains.length;
+    const paged = chains.slice(offset, offset + limit);
+
+    // Enrich with author info
+    const enriched = await Promise.all(
+      paged.map(async (chain) => {
+        const author = await ctx.db.get(chain.user);
+        return {
+          ...chain,
+          author: author
+            ? { name: author.name, avatarUrl: author.avatarUrl }
+            : null,
+        };
+      })
+    );
+
+    return {
+      chains: enriched,
+      total,
+      hasMore: offset + limit < total,
+    };
+  },
+});
+
+// ============================================
+// CHAIN COLLECTIONS (cross-platform bookmarks)
+// ============================================
+
+/**
+ * Add a chain to the user's collection
+ */
+export const addToCollection = mutation({
+  args: {
+    sessionToken: v.string(),
+    chainId: v.id("pluginChains"),
+    source: v.string(), // "web" | "desktop"
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Check if already in collection
+    const existing = await ctx.db
+      .query("chainCollections")
+      .withIndex("by_user_chain", (q) =>
+        q.eq("user", userId).eq("chain", args.chainId)
+      )
+      .first();
+
+    if (existing) {
+      // Update notes if provided
+      if (args.notes !== undefined) {
+        await ctx.db.patch(existing._id, { notes: args.notes });
+      }
+      return { _id: existing._id, alreadyExists: true };
+    }
+
+    const id = await ctx.db.insert("chainCollections", {
+      user: userId,
+      chain: args.chainId,
+      addedAt: Date.now(),
+      source: args.source,
+      notes: args.notes,
+    });
+
+    return { _id: id, alreadyExists: false };
+  },
+});
+
+/**
+ * Remove a chain from the user's collection
+ */
+export const removeFromCollection = mutation({
+  args: {
+    sessionToken: v.string(),
+    chainId: v.id("pluginChains"),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    const existing = await ctx.db
+      .query("chainCollections")
+      .withIndex("by_user_chain", (q) =>
+        q.eq("user", userId).eq("chain", args.chainId)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Get the user's chain collection with enriched data
+ */
+export const getMyCollection = query({
+  args: {
+    sessionToken: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    let userId;
+    try {
+      ({ userId } = await getSessionUser(ctx, args.sessionToken));
+    } catch {
+      return [];
+    }
+
+    const limit = args.limit || 50;
+    const items = await ctx.db
+      .query("chainCollections")
+      .withIndex("by_user", (q) => q.eq("user", userId))
+      .take(limit);
+
+    // Sort by most recently added
+    items.sort((a, b) => b.addedAt - a.addedAt);
+
+    // Enrich with chain + author data
+    const enriched = await Promise.all(
+      items.map(async (item) => {
+        const chain = await ctx.db.get(item.chain);
+        if (!chain) return null;
+
+        const author = await ctx.db.get(chain.user);
+        return {
+          ...item,
+          chain: {
+            ...chain,
+            author: author
+              ? { name: author.name, avatarUrl: author.avatarUrl }
+              : null,
+          },
+        };
+      })
+    );
+
+    return enriched.filter((e) => e !== null);
+  },
+});
+
+/**
+ * Check if a chain is in the user's collection
+ */
+export const isInCollection = query({
+  args: {
+    sessionToken: v.string(),
+    chainId: v.id("pluginChains"),
+  },
+  handler: async (ctx, args) => {
+    let userId;
+    try {
+      ({ userId } = await getSessionUser(ctx, args.sessionToken));
+    } catch {
+      return false;
+    }
+
+    const existing = await ctx.db
+      .query("chainCollections")
+      .withIndex("by_user_chain", (q) =>
+        q.eq("user", userId).eq("chain", args.chainId)
+      )
+      .first();
+
+    return !!existing;
   },
 });

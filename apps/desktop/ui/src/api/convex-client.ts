@@ -458,6 +458,7 @@ export async function saveChain(
   options: {
     description?: string;
     category?: string;
+    useCase?: string;
     tags?: string[];
     isPublic?: boolean;
     targetInputLufs?: number;
@@ -489,6 +490,7 @@ export async function saveChain(
         description: options.description,
         isPublic: options.isPublic ?? false,
         targetInputLufs: options.targetInputLufs,
+        useCase: options.useCase,
       })
     );
     // Cache the cloud result with the proper slug
@@ -1070,6 +1072,119 @@ export async function uploadDiscoveredParameterMap(
   } catch (err) {
     console.error("[ConvexClient] Failed to upload discovered parameter map:", err);
     return { success: false, error: String(err) };
+  }
+}
+
+// ============================================
+// ENHANCED CHAIN BROWSING
+// ============================================
+
+/**
+ * Browse chains with granular filters (use-case taxonomy, compatibility, pagination)
+ */
+export async function browseChainsPaginated(
+  options: {
+    useCaseGroup?: string;
+    useCase?: string;
+    search?: string;
+    sortBy?: "popular" | "recent" | "downloads" | "rating";
+    compatibilityFilter?: "all" | "full" | "close";
+    limit?: number;
+    offset?: number;
+  } = {}
+): Promise<{ chains: any[]; total: number; hasMore: boolean }> {
+  const token = getStoredSession();
+  const cacheKey = `browse:${options.useCaseGroup ?? 'all'}:${options.useCase ?? 'all'}:${options.sortBy ?? 'popular'}:${options.offset ?? 0}`;
+
+  const result = await withOfflineFallback(cacheKey, () =>
+    convex.query(api.pluginDirectory.browseChainsPaginated, {
+      ...options,
+      sessionToken: token ?? undefined,
+    })
+  );
+  return result ?? { chains: [], total: 0, hasMore: false };
+}
+
+// ============================================
+// CHAIN COLLECTIONS
+// ============================================
+
+/**
+ * Add a chain to the user's collection
+ */
+export async function addToCollection(
+  chainId: string,
+  source: "web" | "desktop" = "desktop",
+  notes?: string
+): Promise<{ _id?: string; alreadyExists?: boolean; error?: string }> {
+  const token = getStoredSession();
+  if (!token) return { error: "Not logged in" };
+
+  try {
+    return await convex.mutation(api.pluginDirectory.addToCollection, {
+      sessionToken: token,
+      chainId: asId(chainId),
+      source,
+      notes,
+    });
+  } catch (err) {
+    console.error("Failed to add to collection:", err);
+    return { error: String(err) };
+  }
+}
+
+/**
+ * Remove a chain from the user's collection
+ */
+export async function removeFromCollection(chainId: string): Promise<boolean> {
+  const token = getStoredSession();
+  if (!token) return false;
+
+  try {
+    await convex.mutation(api.pluginDirectory.removeFromCollection, {
+      sessionToken: token,
+      chainId: asId(chainId),
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to remove from collection:", err);
+    return false;
+  }
+}
+
+/**
+ * Get the user's chain collection
+ */
+export async function getMyCollection(limit?: number): Promise<any[]> {
+  const token = getStoredSession();
+  if (!token) return [];
+
+  try {
+    return await convex.query(api.pluginDirectory.getMyCollection, {
+      sessionToken: token,
+      limit,
+    });
+  } catch (err) {
+    console.error("Failed to get collection:", err);
+    return [];
+  }
+}
+
+/**
+ * Check if a chain is in the user's collection
+ */
+export async function isInCollection(chainId: string): Promise<boolean> {
+  const token = getStoredSession();
+  if (!token) return false;
+
+  try {
+    return await convex.query(api.pluginDirectory.isInCollection, {
+      sessionToken: token,
+      chainId: asId(chainId),
+    });
+  } catch (err) {
+    console.error("Failed to check collection status:", err);
+    return false;
   }
 }
 

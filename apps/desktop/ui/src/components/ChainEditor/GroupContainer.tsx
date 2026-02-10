@@ -15,6 +15,10 @@ interface GroupContainerProps {
   draggedNodeId?: number | null;
   shiftHeld?: boolean;
   groupSelectMode?: boolean;
+  /** Set of node IDs whose drop targets should be disabled (self-drop prevention) */
+  disabledDropIds?: Set<number>;
+  /** Map of nodeId → 1-based DFS plugin slot number */
+  slotNumbers?: Map<number, number>;
 }
 
 export function GroupContainer({
@@ -27,6 +31,8 @@ export function GroupContainer({
   draggedNodeId = null,
   shiftHeld = false,
   groupSelectMode = false,
+  disabledDropIds,
+  slotNumbers,
 }: GroupContainerProps) {
   const {
     setGroupMode,
@@ -61,20 +67,21 @@ export function GroupContainer({
       type: 'group-target',
       groupId: node.id,
     },
+    disabled: disabledDropIds?.has(node.id),
   });
 
   const isSerial = node.mode === 'serial';
   const isParallel = node.mode === 'parallel';
-  const borderColor = isSerial ? 'border-blue-500/30' : 'border-orange-500/30';
-  const bgColor = isSerial ? 'bg-blue-500/5' : 'bg-orange-500/5';
+  const borderColor = isSerial ? 'border-plugin-serial/30' : 'border-plugin-parallel/30';
+  const bgColor = isSerial ? 'bg-plugin-serial/5' : 'bg-plugin-parallel/5';
   const childCount = countNodes(node.children);
 
   // Highlight states for drop target
   const dropHighlightBorder = isGroupDropOver && isDragActive
-    ? (isParallel ? 'border-orange-500/70' : 'border-blue-500/70')
+    ? (isParallel ? 'border-plugin-parallel/70' : 'border-plugin-serial/70')
     : borderColor;
   const dropHighlightBg = isGroupDropOver && isDragActive
-    ? (isParallel ? 'bg-orange-500/15' : 'bg-blue-500/15')
+    ? (isParallel ? 'bg-plugin-parallel/15' : 'bg-plugin-serial/15')
     : bgColor;
 
   // Combine refs for both draggable and droppable
@@ -87,7 +94,7 @@ export function GroupContainer({
     <div
       ref={setRef}
       className={`
-        rounded-lg border transition-all duration-200
+        rounded-propane-lg border transition-all duration-200
         ${dropHighlightBorder} ${dropHighlightBg}
         ${isDragging ? 'opacity-30 scale-[0.98]' : ''}
         overflow-hidden
@@ -120,13 +127,13 @@ export function GroupContainer({
 
         {/* Group icon */}
         {isSerial ? (
-          <Layers className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+          <Layers className="w-3.5 h-3.5 text-plugin-serial flex-shrink-0" />
         ) : (
-          <GitBranch className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+          <GitBranch className="w-3.5 h-3.5 text-plugin-parallel flex-shrink-0" />
         )}
 
         {/* Group name */}
-        <span className="text-xs font-medium text-plugin-text truncate flex-1">
+        <span className="text-xs font-medium font-mono uppercase text-plugin-text truncate flex-1">
           {node.name}
         </span>
 
@@ -136,7 +143,7 @@ export function GroupContainer({
             onClick={() => setGroupMode(node.id, 'serial')}
             className={`px-2 py-0.5 text-xxs font-medium transition-colors ${
               isSerial
-                ? 'bg-blue-500/20 text-blue-400'
+                ? 'bg-plugin-serial/20 text-plugin-serial'
                 : 'text-plugin-muted hover:text-plugin-text'
             }`}
           >
@@ -146,7 +153,7 @@ export function GroupContainer({
             onClick={() => setGroupMode(node.id, 'parallel')}
             className={`px-2 py-0.5 text-xxs font-medium transition-colors ${
               isParallel
-                ? 'bg-orange-500/20 text-orange-400'
+                ? 'bg-plugin-parallel/20 text-plugin-parallel'
                 : 'text-plugin-muted hover:text-plugin-text'
             }`}
           >
@@ -216,6 +223,8 @@ export function GroupContainer({
               draggedNodeId={draggedNodeId}
               shiftHeld={shiftHeld}
               groupSelectMode={groupSelectMode}
+              disabledDropIds={disabledDropIds}
+              slotNumbers={slotNumbers}
             />
           )}
         </div>
@@ -232,8 +241,12 @@ export function GroupContainer({
       {isGroupDropOver && isDragActive && !isDragging && (
         <div
           className={`
-            absolute inset-0 rounded-lg pointer-events-none z-10
-            ${isParallel ? 'ring-2 ring-orange-500/40' : 'ring-2 ring-blue-500/40'}
+            absolute inset-0 rounded-propane-lg pointer-events-none z-10
+            animate-fade-in transition-all duration-200
+            ${isParallel
+              ? 'ring-2 ring-plugin-parallel/40 animate-glow-pulse'
+              : 'ring-2 ring-plugin-serial/40 animate-glow-pulse'
+            }
           `}
         />
       )}
@@ -257,9 +270,9 @@ function EmptyGroupDropZone({
     id: `drop:${groupId}:0`,
   });
 
-  const borderColor = isParallel ? 'border-orange-500/40' : 'border-blue-500/40';
-  const bgColor = isParallel ? 'bg-orange-500/10' : 'bg-blue-500/10';
-  const textColor = isParallel ? 'text-orange-400' : 'text-blue-400';
+  const borderColor = isParallel ? 'border-plugin-parallel/40' : 'border-plugin-serial/40';
+  const bgColor = isParallel ? 'bg-plugin-parallel/10' : 'bg-plugin-serial/10';
+  const textColor = isParallel ? 'text-plugin-parallel' : 'text-plugin-serial';
 
   const handleClick = () => {
     window.dispatchEvent(new Event('openPluginBrowser'));

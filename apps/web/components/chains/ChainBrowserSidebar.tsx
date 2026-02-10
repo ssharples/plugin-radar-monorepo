@@ -1,0 +1,95 @@
+"use client";
+
+import { MagnifyingGlass, SortAscending } from "@phosphor-icons/react";
+import { UseCaseCategoryTree } from "./UseCaseCategoryTree";
+
+const SORT_OPTIONS = [
+  { value: "recent", label: "Most Recent" },
+  { value: "popular", label: "Most Popular" },
+  { value: "downloads", label: "Most Downloaded" },
+];
+
+export function ChainBrowserSidebar({
+  searchQuery,
+  onSearchChange,
+  category,
+  onCategoryChange,
+  sortBy,
+  onSortChange,
+  showCompatible,
+  onCompatibleChange,
+}: {
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  category: string;
+  onCategoryChange: (value: string) => void;
+  sortBy: string;
+  onSortChange: (value: string) => void;
+  showCompatible: boolean;
+  onCompatibleChange: (value: boolean) => void;
+}) {
+  return (
+    <aside className="w-full lg:w-[240px] shrink-0 space-y-6">
+      {/* Search */}
+      <div>
+        <div className="relative">
+          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search chains..."
+            className="w-full pl-9 pr-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/20 transition-all text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Category Tree */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">
+          Categories
+        </h3>
+        <UseCaseCategoryTree
+          selectedCategory={category}
+          onSelect={onCategoryChange}
+        />
+      </div>
+
+      {/* Compatibility filter */}
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={showCompatible}
+            onChange={(e) => onCompatibleChange(e.target.checked)}
+            className="w-4 h-4 rounded border-stone-700 bg-white/[0.04] text-amber-500 focus:ring-amber-500/20 focus:ring-offset-0"
+          />
+          <span className="text-sm text-stone-400 group-hover:text-stone-300 transition">
+            Compatible only
+          </span>
+        </label>
+      </div>
+
+      {/* Sort */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">
+          Sort By
+        </h3>
+        <div className="flex items-center gap-2">
+          <SortAscending className="w-4 h-4 text-stone-500" />
+          <select
+            value={sortBy}
+            onChange={(e) => onSortChange(e.target.value)}
+            className="flex-1 px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 text-sm focus:outline-none focus:border-amber-500/30 transition"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </aside>
+  );
+}

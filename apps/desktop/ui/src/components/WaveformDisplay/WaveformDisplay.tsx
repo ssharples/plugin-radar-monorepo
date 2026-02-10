@@ -3,17 +3,15 @@ import { juceBridge } from '../../api/juce-bridge';
 import type { WaveformData } from '../../api/types';
 
 interface WaveformDisplayProps {
-  height?: number;
+  showInput?: boolean;
+  showOutput?: boolean;
 }
 
-export function WaveformDisplay({ height = 100 }: WaveformDisplayProps) {
+export function WaveformDisplay({ showInput = true, showOutput = true }: WaveformDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const preDataRef = useRef<number[]>([]);
   const postDataRef = useRef<number[]>([]);
-
-  const [showInput, setShowInput] = useState(true);
-  const [showOutput, setShowOutput] = useState(true);
 
   // Zoom state
   const [zoomX, setZoomX] = useState(1);
@@ -70,7 +68,7 @@ export function WaveformDisplay({ height = 100 }: WaveformDisplayProps) {
 
     // Draw output waveform (accent orange)
     if (showOutput && postDataRef.current.length > 0) {
-      drawWaveform(ctx, postDataRef.current, width, canvasHeight, `rgba(255, 107, 0, ${baseOpacity})`);
+      drawWaveform(ctx, postDataRef.current, width, canvasHeight, `rgba(137, 87, 42, ${baseOpacity})`);
     }
 
     // Draw zoom indicator if zoomed
@@ -198,51 +196,11 @@ export function WaveformDisplay({ height = 100 }: WaveformDisplayProps) {
   }, [draw]);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {/* Toggle buttons */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setShowInput(!showInput)}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xxs font-medium transition-all ${
-            showInput
-              ? 'bg-white/8 text-plugin-text border border-white/20'
-              : 'text-plugin-dim border border-plugin-border hover:border-plugin-muted'
-          }`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${showInput ? 'bg-white' : 'bg-plugin-dim'}`} />
-          Input
-        </button>
-        <button
-          onClick={() => setShowOutput(!showOutput)}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xxs font-medium transition-all ${
-            showOutput
-              ? 'bg-plugin-accent/12 text-plugin-accent border border-plugin-accent/30'
-              : 'text-plugin-dim border border-plugin-border hover:border-plugin-muted'
-          }`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${showOutput ? 'bg-plugin-accent' : 'bg-plugin-dim'}`} />
-          Output
-        </button>
-
-        {/* Zoom reset */}
-        {(zoomX > 1 || zoomY > 1) && (
-          <button
-            onClick={handleDoubleClick}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xxs text-plugin-dim hover:text-plugin-text border border-plugin-border hover:border-plugin-muted transition-all ml-auto font-mono"
-          >
-            Reset
-          </button>
-        )}
-      </div>
-
-      {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="w-full rounded border border-plugin-border cursor-crosshair"
-        style={{ height: `${height}px`, background: '#050505' }}
-        onDoubleClick={handleDoubleClick}
-        title="Scroll: zoom | Pinch: amplitude | Shift+scroll: pan | Double-click: reset"
-      />
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="w-full h-full cursor-crosshair"
+      onDoubleClick={handleDoubleClick}
+      title="Scroll: zoom | Pinch: amplitude | Shift+scroll: pan | Double-click: reset"
+    />
   );
 }

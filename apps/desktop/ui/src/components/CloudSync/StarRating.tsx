@@ -69,7 +69,7 @@ export function StarRating({ rating, count, interactive = false, onRate, size = 
               className={`${
                 interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'
               } transition-transform ${
-                filled || half ? 'text-yellow-400' : 'text-plugin-dim'
+                filled || half ? 'text-[#89572a]' : 'text-[#323232]'
               } ${starSize}`}
             >
               <StarIcon filled={filled} half={half} className="w-full h-full" />
@@ -78,7 +78,7 @@ export function StarRating({ rating, count, interactive = false, onRate, size = 
         })}
       </div>
       {typeof count === 'number' && (
-        <span className="text-plugin-muted text-xs">
+        <span className="text-plugin-muted text-xs font-mono">
           {rating > 0 ? rating.toFixed(1) : '--'} ({count})
         </span>
       )}

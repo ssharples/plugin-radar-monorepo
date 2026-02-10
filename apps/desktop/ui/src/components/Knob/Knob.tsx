@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import knobSvg from '../../assets/volume-knob.svg';
 
 interface KnobProps {
   value: number;           // Value in dB
@@ -22,7 +23,7 @@ export function Knob({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ y: 0, value: 0 });
   const shiftHeldRef = useRef(false);
-  const knobRef = useRef<SVGSVGElement>(null);
+  const knobRef = useRef<HTMLDivElement>(null);
 
   // Convert dB value to rotation angle (0-270 degrees)
   const valueToAngle = (dB: number): number => {
@@ -30,7 +31,8 @@ export function Knob({
     return normalized * 270 - 135; // -135 to +135 degrees
   };
 
-  const angle = valueToAngle(value);
+  const safeValue = value ?? defaultValue;
+  const angle = valueToAngle(safeValue);
   const zeroAngle = valueToAngle(0);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -67,7 +69,6 @@ export function Knob({
     const handleMouseMove = (e: MouseEvent) => {
       shiftHeldRef.current = e.shiftKey;
       const deltaY = dragStartRef.current.y - e.clientY;
-      // Fine control when Shift is held (5x more precise)
       const sensitivity = e.shiftKey ? (max - min) / 1000 : (max - min) / 200;
       const newValue = dragStartRef.current.value + deltaY * sensitivity;
       const clampedValue = Math.max(min, Math.min(max, newValue));
@@ -89,6 +90,7 @@ export function Knob({
 
   // Format display value
   const formatValue = (dB: number): string => {
+    if (dB == null) return '0.0';
     if (dB <= min) return '-inf';
     if (dB >= 0) return `+${dB.toFixed(1)}`;
     return dB.toFixed(1);
@@ -96,12 +98,6 @@ export function Knob({
 
   const center = size / 2;
   const radius = size * 0.38;
-  const indicatorLength = radius * 0.65;
-
-  // Calculate indicator end point
-  const indicatorAngle = (angle - 90) * (Math.PI / 180);
-  const indicatorX = center + Math.cos(indicatorAngle) * indicatorLength;
-  const indicatorY = center + Math.sin(indicatorAngle) * indicatorLength;
 
   // Arc path for track
   const createArc = (startAngle: number, endAngle: number, r: number): string => {
@@ -124,119 +120,85 @@ export function Knob({
   const tickX2 = center + Math.cos(zeroTickAngle) * tickOuter;
   const tickY2 = center + Math.sin(zeroTickAngle) * tickOuter;
 
-  const isAtZero = Math.abs(value) < 0.05;
+  const isAtZero = Math.abs(safeValue) < 0.05;
+
+  // Knob image size — slightly smaller than the container to leave room for the arc track
+  const knobImgSize = size * 0.82;
 
   return (
     <div className="flex flex-col items-center gap-0.5 relative">
-      <svg
+      <div
         ref={knobRef}
-        width={size}
-        height={size}
-        className={`select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`relative select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{ width: size, height: size }}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
       >
-        {/* Outer shadow ring */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius + 1}
-          fill="none"
-          stroke="#0a0a0a"
-          strokeWidth={2}
-        />
-
-        {/* Background circle with subtle gradient */}
-        <defs>
-          <radialGradient id={`knob-bg-${label}`} cx="40%" cy="35%">
-            <stop offset="0%" stopColor="#2a2a2a" />
-            <stop offset="100%" stopColor="#151515" />
-          </radialGradient>
-        </defs>
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill={`url(#knob-bg-${label})`}
-          stroke="#333"
-          strokeWidth={1.5}
-        />
-
-        {/* Track arc (background) — thicker */}
-        <path
-          d={createArc(-135, 135, radius * 0.85)}
-          fill="none"
-          stroke="#222"
-          strokeWidth={3}
-          strokeLinecap="round"
-        />
-
-        {/* Value arc (filled portion) — thicker */}
-        {value > min && (
+        {/* Track arc + tick behind the knob */}
+        <svg
+          width={size}
+          height={size}
+          className="absolute inset-0 pointer-events-none"
+        >
+          {/* Track arc (background) */}
           <path
-            d={createArc(-135, angle, radius * 0.85)}
+            d={createArc(-135, 135, radius * 0.95)}
             fill="none"
-            stroke={isDragging ? '#818cf8' : '#6366f1'}
-            strokeWidth={3}
+            stroke="#222"
+            strokeWidth={2.5}
             strokeLinecap="round"
           />
-        )}
 
-        {/* 0 dB tick mark */}
-        <line
-          x1={tickX1}
-          y1={tickY1}
-          x2={tickX2}
-          y2={tickY2}
-          stroke={isAtZero ? '#6366f1' : '#444'}
-          strokeWidth={1}
-          strokeLinecap="round"
+          {/* Value arc (filled portion) */}
+          {safeValue > min && (
+            <path
+              d={createArc(-135, angle, radius * 0.95)}
+              fill="none"
+              stroke={isDragging ? '#a06830' : '#89572a'}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+            />
+          )}
+
+          {/* 0 dB tick mark */}
+          <line
+            x1={tickX1}
+            y1={tickY1}
+            x2={tickX2}
+            y2={tickY2}
+            stroke={isAtZero ? '#89572a' : '#444'}
+            strokeWidth={1}
+            strokeLinecap="round"
+          />
+        </svg>
+
+        {/* Rotatable knob image */}
+        <img
+          src={knobSvg}
+          alt=""
+          draggable={false}
+          className="absolute pointer-events-none"
+          style={{
+            width: knobImgSize,
+            height: knobImgSize,
+            top: (size - knobImgSize) / 2,
+            left: (size - knobImgSize) / 2,
+            transform: `rotate(${angle}deg)`,
+            transition: isDragging ? 'none' : 'transform 50ms ease-out',
+          }}
         />
-
-        {/* Center dot */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius * 0.12}
-          fill="#1a1a1a"
-        />
-
-        {/* Indicator line */}
-        <line
-          x1={center}
-          y1={center}
-          x2={indicatorX}
-          y2={indicatorY}
-          stroke="#6366f1"
-          strokeWidth={2}
-          strokeLinecap="round"
-        />
-
-        {/* Value inside knob circle when dragging */}
-        {isDragging && (
-          <text
-            x={center}
-            y={center + radius * 0.45}
-            textAnchor="middle"
-            fontSize={size * 0.18}
-            fontFamily="monospace"
-            fill="#818cf8"
-          >
-            {formatValue(value)}
-          </text>
-        )}
-      </svg>
+      </div>
 
       {/* Value display */}
       <div className={`text-[10px] font-mono tabular-nums transition-colors ${
         isDragging ? 'text-plugin-accent' : 'text-plugin-text'
       }`}>
-        {formatValue(value)}
+        {formatValue(safeValue)}
       </div>
 
-      {/* Label — bumped from 8px to 9px minimum */}
+      {/* Label */}
       {label && (
-        <div className="text-[9px] text-plugin-muted uppercase tracking-widest font-medium">
+        <div className="text-[9px] font-mono text-plugin-muted uppercase tracking-widest font-medium">
           {label}
         </div>
       )}

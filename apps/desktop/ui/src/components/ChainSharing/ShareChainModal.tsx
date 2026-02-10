@@ -86,10 +86,10 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-      <div className="bg-plugin-surface rounded-lg p-6 max-w-md w-full mx-4 border border-plugin-border animate-slide-up" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-4">
-          <Send size={18} className="text-purple-400" />
-          <h2 className="text-xl font-bold text-white">Share Chain</h2>
+          <Send size={18} className="text-plugin-accent" />
+          <h2 className="text-xl font-mono font-bold text-white">Share Chain</h2>
         </div>
 
         <div className="bg-black/20 rounded p-3 mb-4">
@@ -110,7 +110,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
             <div className="text-green-400 font-medium mb-4">{success}</div>
             <button
               onClick={onClose}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded px-4 py-2"
+              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-2"
             >
               Done
             </button>
@@ -133,11 +133,11 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
                     onClick={() => setSelectedFriend(friend.userId)}
                     className={`w-full flex items-center gap-3 p-3 rounded text-left transition-colors ${
                       selectedFriend === friend.userId
-                        ? 'bg-purple-600/20 border border-purple-500/50'
+                        ? 'bg-plugin-accent/20 border border-plugin-accent/50'
                         : 'bg-black/20 border border-transparent hover:border-plugin-border'
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-plugin-accent/30 flex items-center justify-center text-plugin-accent text-sm font-bold">
                       {friend.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="text-white text-sm">{friend.username}</div>
@@ -158,8 +158,8 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
                 disabled={sending || !selectedFriend}
                 className={`flex-1 flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium ${
                   sending || !selectedFriend
-                    ? 'bg-purple-600/50 text-purple-200 cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                    ? 'bg-plugin-accent/50 text-plugin-accent cursor-not-allowed'
+                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
                 }`}
               >
                 <Send size={14} />

@@ -18,7 +18,8 @@ struct PluginLeaf
 {
     juce::PluginDescription description;
     juce::AudioProcessorGraph::NodeID graphNodeId;
-    juce::AudioProcessorGraph::NodeID meterNodeId;  // Meter node inserted after this plugin
+    juce::AudioProcessorGraph::NodeID meterNodeId;       // Output meter (after plugin)
+    juce::AudioProcessorGraph::NodeID inputMeterNodeId;  // Input meter (before plugin)
     bool bypassed = false;
 };
 

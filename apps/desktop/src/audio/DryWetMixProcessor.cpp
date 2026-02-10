@@ -32,7 +32,8 @@ void DryWetMixProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
     if (numChannels < 4)
     {
-        // Fallback: if we don't have 4 channels, just pass through
+        // Fallback passthrough — don't silently produce silence
+        DBG("DryWetMixProcessor: expected 4 channels, got " + juce::String(numChannels));
         return;
     }
 

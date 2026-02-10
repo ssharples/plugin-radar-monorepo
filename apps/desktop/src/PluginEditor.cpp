@@ -10,8 +10,8 @@ PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& 
 
     // Set the size - this triggers resized() which sets WebView to full bounds
     setResizable(true, true);
-    setResizeLimits(600, 400, 3840, 2160);
-    setSize(900, 750);
+    setResizeLimits(500, 800, 3840, 2160);
+    setSize(500, 1000);
 }
 
 PluginChainManagerEditor::~PluginChainManagerEditor()

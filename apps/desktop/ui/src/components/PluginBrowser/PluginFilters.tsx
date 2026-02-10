@@ -158,7 +158,7 @@ export function PluginFilters() {
             <button
               key={opt.value}
               onClick={() => setTypeFilter(opt.value)}
-              className={`px-1.5 py-0.5 text-xxs transition-all ${
+              className={`px-1.5 py-0.5 text-xxs font-mono uppercase transition-all ${
                 typeFilter === opt.value
                   ? 'bg-plugin-accent text-black font-semibold'
                   : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text'
@@ -173,7 +173,7 @@ export function PluginFilters() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="bg-plugin-bg text-xxs text-plugin-muted rounded px-1.5 py-0.5 border border-plugin-border focus:outline-none focus:border-plugin-accent/50 cursor-pointer"
+          className="bg-plugin-bg text-xxs font-mono text-plugin-muted rounded px-1.5 py-0.5 border border-plugin-border focus:outline-none focus:border-plugin-accent/50 cursor-pointer"
         >
           {sortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -186,7 +186,7 @@ export function PluginFilters() {
         {enrichmentLoaded && (
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xxs rounded border transition-all ${
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xxs font-mono uppercase rounded border transition-all ${
               activeFilterCount > 0
                 ? 'bg-plugin-accent/15 text-plugin-accent border-plugin-accent/40'
                 : 'bg-plugin-bg text-plugin-muted border-plugin-border hover:text-plugin-text'
@@ -203,7 +203,7 @@ export function PluginFilters() {
         <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl p-2.5 space-y-2">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <span className="text-xxs font-semibold text-plugin-text uppercase tracking-wider">Filters</span>
+            <span className="text-xxs font-mono font-semibold text-plugin-text uppercase tracking-wider">Filters</span>
             {hasActiveFilters() && (
               <button
                 onClick={clearAllFilters}
@@ -217,11 +217,11 @@ export function PluginFilters() {
 
           {/* Category filter */}
           <div>
-            <label className="text-[9px] text-plugin-dim uppercase tracking-wider mb-1 block">Category</label>
+            <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Category</label>
             <div className="flex flex-wrap gap-0.5">
               <button
                 onClick={() => setCategoryFilter(null)}
-                className={`px-1.5 py-0.5 text-[9px] rounded transition-all ${
+                className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
                   categoryFilter === null
                     ? 'bg-plugin-accent text-black font-semibold'
                     : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
@@ -233,7 +233,7 @@ export function PluginFilters() {
                 <button
                   key={cat.value}
                   onClick={() => setCategoryFilter(categoryFilter === cat.value ? null : cat.value)}
-                  className={`px-1.5 py-0.5 text-[9px] rounded transition-all ${
+                  className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
                     categoryFilter === cat.value
                       ? 'bg-plugin-accent text-black font-semibold'
                       : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
@@ -248,11 +248,11 @@ export function PluginFilters() {
           {/* Effect type filter (contextual based on category) */}
           {availableEffectTypes.length > 0 && (
             <div>
-              <label className="text-[9px] text-plugin-dim uppercase tracking-wider mb-1 block">Effect Type</label>
+              <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Effect Type</label>
               <div className="flex flex-wrap gap-0.5">
                 <button
                   onClick={() => setEffectTypeFilter(null)}
-                  className={`px-1.5 py-0.5 text-[9px] rounded transition-all ${
+                  className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
                     effectTypeFilter === null
                       ? 'bg-plugin-accent text-black font-semibold'
                       : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
@@ -264,7 +264,7 @@ export function PluginFilters() {
                   <button
                     key={et.value}
                     onClick={() => setEffectTypeFilter(effectTypeFilter === et.value ? null : et.value)}
-                    className={`px-1.5 py-0.5 text-[9px] rounded transition-all ${
+                    className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
                       effectTypeFilter === et.value
                         ? 'bg-plugin-accent text-black font-semibold'
                         : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
@@ -279,13 +279,13 @@ export function PluginFilters() {
 
           {/* Tonal character filter */}
           <div>
-            <label className="text-[9px] text-plugin-dim uppercase tracking-wider mb-1 block">Tonal Character</label>
+            <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Tonal Character</label>
             <div className="flex flex-wrap gap-0.5">
               {TONAL_CHARACTERS.map((tc) => (
                 <button
                   key={tc.value}
                   onClick={() => toggleTonalCharacter(tc.value)}
-                  className={`px-1.5 py-0.5 text-[9px] rounded transition-all ${
+                  className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
                     tonalCharacterFilter.includes(tc.value)
                       ? 'bg-plugin-accent text-black font-semibold'
                       : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
@@ -299,7 +299,7 @@ export function PluginFilters() {
 
           {/* Price filter */}
           <div>
-            <label className="text-[9px] text-plugin-dim uppercase tracking-wider mb-1 block">Price</label>
+            <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Price</label>
             <div className="flex gap-0.5">
               {[
                 { value: 'all' as const, label: 'All' },
@@ -309,7 +309,7 @@ export function PluginFilters() {
                 <button
                   key={opt.value}
                   onClick={() => setPriceFilter(opt.value)}
-                  className={`px-2 py-0.5 text-[9px] rounded transition-all ${
+                  className={`px-2 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
                     priceFilter === opt.value
                       ? 'bg-plugin-accent text-black font-semibold'
                       : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'

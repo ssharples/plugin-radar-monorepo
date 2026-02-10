@@ -48,6 +48,9 @@ interface ChainStoreState {
   snapshots: (ABSnapshot | null)[];
   activeSnapshot: number | null;
 
+  // Last cloud chain ID (for share-without-re-saving)
+  lastCloudChainId: string | null;
+
   // Per-node meter data (keyed by ChainNodeId as string)
   nodeMeterData: Record<string, NodeMeterReadings>;
 }
@@ -66,10 +69,13 @@ interface ChainActions {
   removeNode: (nodeId: number) => Promise<boolean>;
   moveNode: (nodeId: number, newParentId: number, newIndex: number) => Promise<boolean>;
   toggleNodeBypass: (nodeId: number) => Promise<void>;
+  duplicateNode: (nodeId: number) => Promise<boolean>;
 
   // Group operations
   createGroup: (childIds: number[], mode: 'serial' | 'parallel', name?: string) => Promise<number | null>;
   dissolveGroup: (groupId: number) => Promise<boolean>;
+  /** Dissolve group without pushing to undo history (for auto-dissolve after moveNode) */
+  dissolveGroupSilent: (groupId: number) => Promise<boolean>;
   setGroupMode: (groupId: number, mode: 'serial' | 'parallel') => Promise<void>;
   setGroupDryWet: (groupId: number, mix: number) => Promise<void>;
   setBranchGain: (nodeId: number, gainDb: number) => Promise<void>;
@@ -90,6 +96,9 @@ interface ChainActions {
   setTargetInputLufs: (lufs: number | null) => void;
   setChainName: (name: string) => void;
 
+  // Cloud chain ID tracking
+  setLastCloudChainId: (id: string | null) => void;
+
   // Undo/Redo
   undo: () => Promise<void>;
   redo: () => Promise<void>;
@@ -107,6 +116,7 @@ function applyState(state: ChainStateV2) {
   return {
     nodes: state.nodes || [],
     slots: state.slots || [],
+    lastCloudChainId: null,
   };
 }
 
@@ -192,6 +202,7 @@ const initialState: ChainStoreState = {
   error: null,
   targetInputLufs: null,
   chainName: 'Untitled Chain',
+  lastCloudChainId: null,
   history: [],
   future: [],
   _undoRedoInProgress: false,
@@ -245,6 +256,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
       future: [...future, currentSnapshot],
       nodes: previousState.nodes,
       slots: previousState.slots,
+      lastCloudChainId: null,
     });
 
     // Sync the restored state to the JUCE backend
@@ -276,6 +288,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
       future: newFuture,
       nodes: nextState.nodes,
       slots: nextState.slots,
+      lastCloudChainId: null,
     });
 
     // Sync the restored state to the JUCE backend
@@ -310,7 +323,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     get()._pushHistory();
     try {
       await juceBridge.importChain(snapshot.data);
-      set({ activeSnapshot: index });
+      set({ activeSnapshot: index, lastCloudChainId: null });
     } catch (err) {
       console.warn('Failed to recall snapshot:', err);
     }
@@ -503,6 +516,25 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
+  duplicateNode: async (nodeId: number) => {
+    get()._pushHistory();
+    set({ loading: true, error: null });
+    try {
+      const result = await juceBridge.duplicateNode(nodeId);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
+        return true;
+      } else {
+        set({ error: result.error || 'Failed to duplicate node', loading: false });
+        return false;
+      }
+    } catch (err) {
+      set({ error: String(err), loading: false });
+      return false;
+    }
+  },
+
   moveNode: async (nodeId: number, newParentId: number, newIndex: number) => {
     get()._pushHistory();
     try {
@@ -563,6 +595,26 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   dissolveGroup: async (groupId: number) => {
     get()._pushHistory();
+    set({ loading: true, error: null });
+    try {
+      const result = await juceBridge.dissolveGroup(groupId);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
+        return true;
+      } else {
+        set({ error: result.error || 'Failed to dissolve group', loading: false });
+        return false;
+      }
+    } catch (err) {
+      set({ error: String(err), loading: false });
+      return false;
+    }
+  },
+
+  dissolveGroupSilent: async (groupId: number) => {
+    // Same as dissolveGroup but without _pushHistory — used for auto-dissolve after moveNode
+    // so that move + dissolve is a single undo unit
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.dissolveGroup(groupId);
@@ -708,6 +760,10 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   setChainName: (name: string) => {
     set({ chainName: name });
   },
+
+  setLastCloudChainId: (id: string | null) => {
+    set({ lastCloudChainId: id });
+  },
 }));
 
 // Set up event listener - handles both V1 and V2 chain state
@@ -716,6 +772,34 @@ juceBridge.onChainChanged((state: ChainStateV2) => {
 });
 
 // Per-node meter data for inline plugin meters
+// Granular update: only replace entries whose values actually changed,
+// so Zustand selectors for unchanged nodes return the same reference.
 juceBridge.onNodeMeterData((data: Record<string, NodeMeterReadings>) => {
-  useChainStore.setState({ nodeMeterData: data });
+  const prev = useChainStore.getState().nodeMeterData;
+  const next: Record<string, NodeMeterReadings> = { ...prev };
+  let changed = false;
+  for (const key in data) {
+    const p = prev[key];
+    const n = data[key];
+    if (
+      !p ||
+      p.peakL !== n.peakL ||
+      p.peakR !== n.peakR ||
+      p.inputPeakL !== n.inputPeakL ||
+      p.inputPeakR !== n.inputPeakR
+    ) {
+      next[key] = n;
+      changed = true;
+    }
+  }
+  // Remove nodes no longer present
+  for (const key in prev) {
+    if (!(key in data)) {
+      delete next[key];
+      changed = true;
+    }
+  }
+  if (changed) {
+    useChainStore.setState({ nodeMeterData: next });
+  }
 });

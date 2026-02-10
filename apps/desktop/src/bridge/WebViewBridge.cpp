@@ -358,6 +358,28 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             else
                 completion(juce::var());
         })
+        .withNativeFunction("duplicateNode", [this](const juce::Array<juce::var>& args,
+                                                     juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+            {
+                auto parsed = juce::JSON::parse(args[0].toString());
+                auto* obj = parsed.getDynamicObject();
+                if (obj && obj->hasProperty("nodeId"))
+                {
+                    int nodeId = static_cast<int>(obj->getProperty("nodeId"));
+                    bool success = chainProcessor.duplicateNode(nodeId);
+                    auto* result = new juce::DynamicObject();
+                    result->setProperty("success", success);
+                    if (success)
+                        result->setProperty("chainState", chainProcessor.getChainStateAsJson());
+                    completion(juce::var(result));
+                }
+                else
+                    completion(juce::var());
+            }
+            else
+                completion(juce::var());
+        })
         // ============================================
         // Chain-level toggle controls
         // ============================================
@@ -787,6 +809,10 @@ void WebViewBridge::timerCallback()
                 entry->setProperty("peakR", nm.peakR);
                 entry->setProperty("peakHoldL", nm.peakHoldL);
                 entry->setProperty("peakHoldR", nm.peakHoldR);
+                entry->setProperty("inputPeakL", nm.inputPeakL);
+                entry->setProperty("inputPeakR", nm.inputPeakR);
+                entry->setProperty("inputPeakHoldL", nm.inputPeakHoldL);
+                entry->setProperty("inputPeakHoldR", nm.inputPeakHoldR);
                 nodeMetersObj->setProperty(juce::String(nm.nodeId), juce::var(entry));
             }
             emitEvent("nodeMeterData", juce::var(nodeMetersObj));
@@ -1550,7 +1576,7 @@ juce::var WebViewBridge::startWaveformStream()
     if (waveformCapture)
     {
         waveformStreamActive = true;
-        startTimerHz(60);  // 60fps
+        startTimerHz(30);  // 30fps — sufficient for meter visualization
         result->setProperty("success", true);
     }
     else

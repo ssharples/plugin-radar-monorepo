@@ -81,7 +81,7 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
   }, [matchLocked]);
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1.5 bg-plugin-surface border-t border-plugin-border">
+    <div className="flex items-center gap-1 px-3 py-1.5 bg-plugin-surface border-t border-plugin-accent">
       {/* Input metering section */}
       <div className="flex items-center gap-2 px-2">
         <LufsDisplay
@@ -122,7 +122,7 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
             title={matchLocked ? "Auto-matching enabled (click to disable)" : "Enable auto-matching"}
           >
             <Link2 className="w-3 h-3" />
-            <span>{matchLocked ? 'LOCK' : 'Match'}</span>
+            <span className="font-mono uppercase">{matchLocked ? 'LOCK' : 'Match'}</span>
           </button>
           {matchLockWarning && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-amber-600/90 text-white text-xxs rounded shadow-lg whitespace-nowrap animate-fade-in">
@@ -134,8 +134,8 @@ export function Footer({ currentPresetName, onPresetClick }: FooterProps) {
         {/* Target LUFS indicator (when a target is set) */}
         {targetInputLufs !== null && (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/20 border border-plugin-border">
-            <span className="text-[9px] text-plugin-dim">Target:</span>
-            <span className="text-[10px] font-mono font-medium text-plugin-accent">
+            <span className="text-[9px] font-mono uppercase text-plugin-dim">Target:</span>
+            <span className="text-[10px] font-mono uppercase font-medium text-plugin-accent">
               {targetInputLufs} LUFS
             </span>
           </div>

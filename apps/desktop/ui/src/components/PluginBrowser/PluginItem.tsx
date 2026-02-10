@@ -101,7 +101,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-xs text-plugin-text truncate leading-tight font-medium">{plugin.name}</p>
+          <p className="text-xs font-mono text-plugin-text truncate leading-tight font-medium">{plugin.name}</p>
           {/* Category badge */}
           {enriched && categoryLabel && (
             <span className={`flex-shrink-0 px-1 py-px text-[9px] leading-tight rounded border font-medium ${categoryColor}`}>
@@ -122,7 +122,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
         </div>
 
         {/* Manufacturer + format / effect type */}
-        <p className="text-xxs text-plugin-dim truncate leading-tight">
+        <p className="text-xxs font-mono text-plugin-dim truncate leading-tight">
           {plugin.manufacturer}
           <span className="text-plugin-border-bright"> / </span>
           {effectSubtitle || plugin.format}

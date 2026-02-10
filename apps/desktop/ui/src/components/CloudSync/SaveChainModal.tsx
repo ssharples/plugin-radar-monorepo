@@ -64,14 +64,14 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-        <div className="bg-plugin-surface rounded-lg p-6 max-w-md w-full mx-4 border border-plugin-border animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
           <h2 className="text-xl font-bold text-white mb-4">Sign In Required</h2>
           <p className="text-gray-400 mb-4">
             Connect to PluginRadar to save and share your chains.
           </p>
           <button
             onClick={onClose}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded px-4 py-2"
+            className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-2"
           >
             Close
           </button>
@@ -83,7 +83,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
   if (savedResult) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-        <div className="bg-plugin-surface rounded-lg p-6 max-w-md w-full mx-4 border border-plugin-border animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
           <div className="text-center">
             <div className="text-4xl mb-4">🎉</div>
             <h2 className="text-xl font-bold text-white mb-2">Chain Saved!</h2>
@@ -93,20 +93,20 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
             
             <div className="bg-black/30 rounded-lg p-4 mb-4">
               <div className="text-sm text-gray-400 mb-1">Share Code</div>
-              <div className="text-2xl font-mono font-bold text-purple-400">
+              <div className="text-2xl font-mono font-bold text-plugin-accent">
                 {savedResult.shareCode}
               </div>
             </div>
             
             {isPublic && (
               <div className="text-sm text-gray-400 mb-4">
-                View at: <span className="text-purple-400">plugin-radar.com/chains/{savedResult.slug}</span>
+                View at: <span className="text-plugin-accent">plugin-radar.com/chains/{savedResult.slug}</span>
               </div>
             )}
             
             <button
               onClick={onClose}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded px-4 py-2"
+              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-2"
             >
               Done
             </button>
@@ -118,7 +118,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-      <div className="bg-plugin-surface rounded-lg p-6 max-w-md w-full mx-4 border border-plugin-border animate-slide-up" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold text-white mb-4">Save Chain to Cloud</h2>
         
         {error && (
@@ -211,8 +211,8 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
               disabled={saving || !name.trim()}
               className={`flex-1 rounded px-4 py-2 font-medium ${
                 saving
-                  ? 'bg-purple-600/50 text-purple-200 cursor-wait'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
+                  : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
               }`}
             >
               {saving ? 'Saving...' : 'Save Chain'}

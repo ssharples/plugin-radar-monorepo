@@ -79,14 +79,14 @@ export function CloudSync() {
               href="https://pluginradar.com/forgot-password"
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full bg-purple-600 hover:bg-purple-700 text-white rounded px-3 py-2 text-sm font-medium text-center mb-2"
+              className="block w-full bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-3 py-2 text-sm font-mono font-medium text-center mb-2"
             >
               Open Reset Page ↗
             </a>
             <button
               type="button"
               onClick={() => setShowForgotPassword(false)}
-              className="text-purple-400 hover:text-purple-300 text-sm w-full text-center"
+              className="text-plugin-accent hover:text-plugin-accent-bright text-sm font-mono w-full text-center"
             >
               Back to Sign In
             </button>
@@ -138,7 +138,7 @@ export function CloudSync() {
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
-                  className="text-gray-400 hover:text-purple-400 text-xs transition-colors"
+                  className="text-gray-400 hover:text-plugin-accent text-xs font-mono transition-colors"
                 >
                   Forgot password?
                 </button>
@@ -148,7 +148,7 @@ export function CloudSync() {
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded px-3 py-2 text-sm font-medium"
+                className="flex-1 bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-3 py-2 text-sm font-mono font-medium"
               >
                 {isRegister ? 'Create Account' : 'Sign In'}
               </button>
@@ -164,7 +164,7 @@ export function CloudSync() {
             <button
               type="button"
               onClick={() => setIsRegister(!isRegister)}
-              className="text-purple-400 hover:text-purple-300 text-sm w-full text-center"
+              className="text-plugin-accent hover:text-plugin-accent-bright text-sm font-mono w-full text-center"
             >
               {isRegister ? 'Already have an account? Sign in' : "Don't have an account? Register"}
             </button>
@@ -176,7 +176,7 @@ export function CloudSync() {
     return (
       <button
         onClick={() => setShowAuth(true)}
-        className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 rounded text-purple-300 text-xs transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1 bg-plugin-accent/15 hover:bg-plugin-accent/25 border border-plugin-accent/25 rounded text-plugin-accent text-xs font-mono transition-colors"
       >
         <Cloud className="w-3.5 h-3.5" />
         <span>Connect</span>
@@ -190,9 +190,9 @@ export function CloudSync() {
         onClick={handleSync}
         disabled={isSyncing || plugins.length === 0}
         className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-          isSyncing 
-            ? 'bg-purple-600/50 text-purple-200 cursor-wait'
-            : 'bg-purple-600 hover:bg-purple-700 text-white'
+          isSyncing
+            ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
+            : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
         }`}
       >
         <Cloud className={`w-4 h-4 ${isSyncing ? 'animate-pulse' : ''}`} />
@@ -209,7 +209,7 @@ export function CloudSync() {
           {newPlugins.length > 0 && (
             <>
               <span className="mx-1">&bull;</span>
-              <span className="text-purple-400">+{newPlugins.length} new to catalog</span>
+              <span className="text-plugin-accent">+{newPlugins.length} new to catalog</span>
             </>
           )}
           <span className="mx-1">&bull;</span>

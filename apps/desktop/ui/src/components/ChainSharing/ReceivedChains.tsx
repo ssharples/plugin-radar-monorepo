@@ -117,10 +117,10 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
     <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Inbox size={18} className="text-purple-400" />
-          <h3 className="text-white font-medium">Received Chains</h3>
+          <Inbox size={18} className="text-plugin-accent" />
+          <h3 className="text-white font-mono font-medium">Received Chains</h3>
           {chains.length > 0 && (
-            <span className="bg-purple-600 text-white text-xs rounded-full px-2 py-0.5 animate-pulse">
+            <span className="bg-plugin-accent text-white text-xs rounded-full px-2 py-0.5 animate-pulse">
               {chains.length}
             </span>
           )}
@@ -156,7 +156,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
                 <div>
                   <div className="text-white text-sm font-medium">{chain.chainName}</div>
                   <div className="text-gray-500 text-xs">
-                    From <span className="text-purple-400">{chain.senderUsername}</span> • {formatTime(chain.sentAt)}
+                    From <span className="text-plugin-accent">{chain.senderUsername}</span> • {formatTime(chain.sentAt)}
                   </div>
                 </div>
               </div>

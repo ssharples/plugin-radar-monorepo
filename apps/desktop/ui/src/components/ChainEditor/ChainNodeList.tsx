@@ -16,6 +16,10 @@ interface ChainNodeListProps {
   draggedNodeId?: number | null;
   shiftHeld?: boolean;
   groupSelectMode?: boolean;
+  /** Set of node IDs whose drop targets should be disabled (self-drop prevention) */
+  disabledDropIds?: Set<number>;
+  /** Map of nodeId → 1-based DFS plugin slot number */
+  slotNumbers?: Map<number, number>;
 }
 
 export function ChainNodeList({
@@ -29,6 +33,8 @@ export function ChainNodeList({
   draggedNodeId = null,
   shiftHeld = false,
   groupSelectMode = false,
+  disabledDropIds,
+  slotNumbers,
 }: ChainNodeListProps) {
   const {
     openEditors,
@@ -50,6 +56,7 @@ export function ChainNodeList({
         isDragActive={isDragActive}
         nodeBelowId={visibleNodes[0]?.id}
         shiftHeld={shiftHeld}
+        disabled={disabledDropIds?.has(parentId) ?? false}
       />
 
       {visibleNodes.map((node, visualIndex) => {
@@ -63,7 +70,7 @@ export function ChainNodeList({
             {/* Signal flow connector line (before each node except first) */}
             {visualIndex > 0 && !isParallelParent && (
               <div className="flex justify-center py-0">
-                <div className="w-px h-1.5 bg-plugin-border-bright" />
+                <div className={`w-px h-1.5 bg-plugin-border-bright transition-opacity duration-200 ${isDragActive ? 'opacity-50' : 'opacity-100'}`} />
               </div>
             )}
 
@@ -82,6 +89,8 @@ export function ChainNodeList({
                   draggedNodeId={draggedNodeId}
                   shiftHeld={shiftHeld}
                   groupSelectMode={groupSelectMode}
+                  disabledDropIds={disabledDropIds}
+                  slotNumbers={slotNumbers}
                 />
               </div>
             ) : (
@@ -97,6 +106,7 @@ export function ChainNodeList({
                 <div className="flex-1 min-w-0">
                   <ChainSlot
                     node={node}
+                    slotNumber={slotNumbers?.get(node.id)}
                     isEditorOpen={openEditors.has(node.id)}
                     isMultiSelected={selectedIds?.has(node.id) ?? false}
                     isSelected={selectedNodeId === node.id && !(selectedIds?.has(node.id) ?? false)}
@@ -106,6 +116,7 @@ export function ChainNodeList({
                     isDragActive={isDragActive}
                     groupSelectMode={groupSelectMode}
                     onSelect={onNodeSelect ? (e) => onNodeSelect(e, node.id) : undefined}
+                    disabledDropIds={disabledDropIds}
                   />
                 </div>
               </div>
@@ -114,7 +125,7 @@ export function ChainNodeList({
             {/* Signal flow connector line (after last node, before output) */}
             {isLastNode && !isParallelParent && depth === 0 && (
               <div className="flex justify-center py-0">
-                <div className="w-px h-1.5 bg-plugin-border-bright" />
+                <div className={`w-px h-1.5 bg-plugin-border-bright transition-opacity duration-200 ${isDragActive ? 'opacity-50' : 'opacity-100'}`} />
               </div>
             )}
 
@@ -126,6 +137,7 @@ export function ChainNodeList({
               nodeAboveId={node.id}
               nodeBelowId={visibleNodes[visualIndex + 1]?.id}
               shiftHeld={shiftHeld}
+              disabled={disabledDropIds?.has(parentId) ?? false}
             />
           </div>
         );

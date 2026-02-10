@@ -81,8 +81,8 @@ export function ProfileSettings() {
   return (
     <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center gap-2 mb-4">
-        <User size={18} className="text-purple-400" />
-        <h3 className="text-white font-medium">Profile Settings</h3>
+        <User size={18} className="text-plugin-accent" />
+        <h3 className="text-white font-mono font-medium">Profile Settings</h3>
       </div>
 
       {error && (
@@ -151,8 +151,8 @@ export function ProfileSettings() {
           disabled={saving || !username.trim()}
           className={`w-full flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium ${
             saving
-              ? 'bg-purple-600/50 text-purple-200 cursor-wait'
-              : 'bg-purple-600 hover:bg-purple-700 text-white'
+              ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
+              : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
           }`}
         >
           <Save size={14} />

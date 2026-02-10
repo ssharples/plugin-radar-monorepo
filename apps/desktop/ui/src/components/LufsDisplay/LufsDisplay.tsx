@@ -62,7 +62,7 @@ export function LufsDisplay({
           </span>
           {getDirectionArrow()}
         </div>
-        <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">LUFS</span>
+        <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-mono font-medium">LUFS</span>
         {target != null && (
           <span className="text-[9px] text-plugin-dim font-mono leading-none mt-px">
             ⊕{target}
@@ -75,7 +75,7 @@ export function LufsDisplay({
   return (
     <div className="flex flex-col items-center gap-0.5">
       {label && (
-        <span className="text-[9px] text-plugin-dim uppercase tracking-widest font-medium">
+        <span className="text-[9px] text-plugin-dim uppercase tracking-widest font-mono font-medium">
           {label}
         </span>
       )}
@@ -83,12 +83,12 @@ export function LufsDisplay({
         <span className={`font-mono text-sm font-medium tabular-nums ${getColor(lufs)}`}>
           {formatLufs(lufs)}
         </span>
-        <span className="text-[9px] text-plugin-dim">LUFS</span>
+        <span className="text-[9px] text-plugin-dim font-mono uppercase">LUFS</span>
         {getDirectionArrow()}
       </div>
       {target != null && (
         <div className="flex items-center gap-1">
-          <span className="text-[9px] text-plugin-dim font-mono">
+          <span className="text-[9px] text-plugin-dim font-mono uppercase">
             Target: {target}
           </span>
         </div>

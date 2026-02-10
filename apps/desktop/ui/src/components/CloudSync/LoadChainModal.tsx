@@ -83,9 +83,9 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-      <div className="bg-plugin-surface rounded-lg p-6 max-w-lg w-full mx-4 border border-plugin-border max-h-[80vh] overflow-y-auto animate-slide-up" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-lg w-full mx-4 border border-plugin-accent max-h-[80vh] overflow-y-auto animate-slide-up" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Load Chain</h2>
+          <h2 className="text-xl font-mono font-bold text-white">Load Chain</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">&#x2715;</button>
         </div>
 
@@ -104,7 +104,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
             <button
               onClick={handleLoadByCode}
               disabled={shareCode.length < 6}
-              className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded px-4 py-2"
+              className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded px-4 py-2 font-mono"
             >
               Load
             </button>

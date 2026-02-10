@@ -82,6 +82,10 @@ export interface NodeMeterReadings {
   peakR: number;
   peakHoldL: number;
   peakHoldR: number;
+  inputPeakL: number;
+  inputPeakR: number;
+  inputPeakHoldL: number;
+  inputPeakHoldR: number;
 }
 
 // Gain settings
@@ -136,6 +140,44 @@ export interface ApiResponse<T = void> {
   preset?: PresetInfo;
   message?: string;
   data?: T;
+}
+
+// =============================================
+// Chain browser types
+// =============================================
+
+export interface BrowseChainResult {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  category: string;
+  tags: string[];
+  useCase?: string;
+  useCaseGroup?: string;
+  pluginCount: number;
+  downloads: number;
+  likes: number;
+  isPublic: boolean;
+  pluginIds?: string[];
+  slots: any[];
+  author?: { name?: string; avatarUrl?: string };
+  targetInputLufs?: number;
+  createdAt: number;
+}
+
+export interface BrowseChainsPaginatedResult {
+  chains: BrowseChainResult[];
+  total: number;
+  hasMore: boolean;
+}
+
+export interface CollectionItem {
+  _id: string;
+  chain: BrowseChainResult & { author?: { name?: string; avatarUrl?: string } };
+  addedAt: number;
+  source: string;
+  notes?: string;
 }
 
 // Native function types for JUCE bridge

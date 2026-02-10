@@ -68,8 +68,8 @@ export function FriendsList() {
     <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Users size={18} className="text-purple-400" />
-          <h3 className="text-white font-medium">Friends</h3>
+          <Users size={18} className="text-plugin-accent" />
+          <h3 className="text-white font-mono font-medium">Friends</h3>
           <span className="text-gray-500 text-xs">({friends.length})</span>
         </div>
         <button

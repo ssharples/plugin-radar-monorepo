@@ -44,7 +44,7 @@ function MeterBar({
   return (
     <div
       className="relative rounded-sm overflow-hidden shadow-meter"
-      style={{ width, height, background: '#0a0a0a' }}
+      style={{ width, height, background: '#000000' }}
     >
       {/* Segment lines for pro look */}
       <div
