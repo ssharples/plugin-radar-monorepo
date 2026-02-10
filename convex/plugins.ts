@@ -1,5 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+  computeSimilarityScore,
+  generateReasonString,
+  similarityComparator,
+  type SimilarityPlugin,
+} from "./lib/similarity";
 
 // Helper to get storage URL for a plugin's image
 export const getImageUrl = query({
@@ -410,6 +416,62 @@ export const similar = query({
     return plugins
       .filter((p) => p._id !== args.pluginId)
       .slice(0, limit);
+  },
+});
+
+// Find similar plugins using feature-level similarity scoring
+export const findSimilarPlugins = query({
+  args: {
+    pluginId: v.id("plugins"),
+    limit: v.optional(v.number()),
+    excludeIds: v.optional(v.array(v.id("plugins"))),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 6;
+
+    const source = await ctx.db.get(args.pluginId);
+    if (!source) return [];
+
+    const excludeSet = new Set(
+      (args.excludeIds ?? []).map((id) => id.toString())
+    );
+    excludeSet.add(args.pluginId.toString());
+
+    // Get candidates from same category (up to 200)
+    const candidates = await ctx.db
+      .query("plugins")
+      .withIndex("by_category", (q) => q.eq("category", source.category))
+      .take(200);
+
+    const filtered = candidates.filter(
+      (p) => !excludeSet.has(p._id.toString())
+    );
+
+    // Score each candidate
+    const scored = filtered.map((candidate) => {
+      const { score, reasons } = computeSimilarityScore(
+        source as unknown as SimilarityPlugin,
+        candidate as unknown as SimilarityPlugin
+      );
+      return {
+        score,
+        reasons,
+        plugin: candidate as unknown as SimilarityPlugin,
+        doc: candidate,
+      };
+    });
+
+    // Sort using tiebreaker comparator
+    scored.sort((a, b) => similarityComparator(
+      { score: a.score, plugin: a.plugin },
+      { score: b.score, plugin: b.plugin }
+    ));
+
+    return scored.slice(0, limit).map((s) => ({
+      ...s.doc,
+      similarityScore: s.score,
+      similarityReasons: generateReasonString(s.reasons),
+    }));
   },
 });
 

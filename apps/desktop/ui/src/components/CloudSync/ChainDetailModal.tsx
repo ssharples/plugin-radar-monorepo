@@ -43,6 +43,11 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
   const [showForkDialog, setShowForkDialog] = useState(false);
   const [forkName, setForkName] = useState('');
   const [forking, setForking] = useState(false);
+  const [substitutions, setSubstitutions] = useState<Map<number, {
+    originalName: string;
+    altName: string;
+    altManufacturer: string;
+  }>>(new Map());
 
   const chainId = currentChain?._id;
 
@@ -121,26 +126,45 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
     }
   };
 
+  const handleSubstitute = (position: number, originalName: string, alt: { name: string; manufacturer: string }) => {
+    setSubstitutions((prev) => {
+      const next = new Map(prev);
+      next.set(position, { originalName, altName: alt.name, altManufacturer: alt.manufacturer });
+      return next;
+    });
+  };
+
+  const handleUndoSubstitute = (position: number) => {
+    setSubstitutions((prev) => {
+      const next = new Map(prev);
+      next.delete(position);
+      return next;
+    });
+  };
+
   const handleLoadChain = () => {
     downloadChain(currentChain._id);
 
     const chainData = {
       version: 1,
       numSlots: currentChain.slots.length,
-      slots: currentChain.slots.map((slot: any, idx: number) => ({
-        type: 'plugin',
-        id: idx + 1,
-        index: slot.position ?? idx,
-        name: slot.pluginName,
-        manufacturer: slot.manufacturer,
-        format: slot.format || 'VST3',
-        uid: slot.uid || 0,
-        fileOrIdentifier: slot.fileOrIdentifier || '',
-        version: slot.version || '',
-        bypassed: slot.bypassed ?? false,
-        presetData: slot.presetData || '',
-        presetSizeBytes: slot.presetSizeBytes || 0,
-      })),
+      slots: currentChain.slots.map((slot: any, idx: number) => {
+        const sub = substitutions.get(slot.position ?? idx);
+        return {
+          type: 'plugin',
+          id: idx + 1,
+          index: slot.position ?? idx,
+          name: sub ? sub.altName : slot.pluginName,
+          manufacturer: sub ? sub.altManufacturer : slot.manufacturer,
+          format: slot.format || 'VST3',
+          uid: sub ? 0 : (slot.uid || 0),
+          fileOrIdentifier: sub ? '' : (slot.fileOrIdentifier || ''),
+          version: slot.version || '',
+          bypassed: slot.bypassed ?? false,
+          presetData: sub ? '' : (slot.presetData || ''),
+          presetSizeBytes: sub ? 0 : (slot.presetSizeBytes || 0),
+        };
+      }),
     };
 
     onLoad(chainData);
@@ -270,18 +294,51 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                 style={{ width: `${compatibility.percentage}%` }}
               />
             </div>
-            {/* Missing plugin suggestions from detailed compatibility */}
+            {/* Missing plugin suggestions with actionable swap buttons */}
             {detailedCompatibility && detailedCompatibility.missing.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {detailedCompatibility.missing.map((m, i) => (
-                  <div key={i} className="text-xxs">
-                    <span className="text-yellow-400">{m.pluginName}</span>
-                    <span className="text-plugin-muted"> by {m.manufacturer}</span>
-                    {m.suggestion && (
-                      <span className="text-plugin-accent"> — try {m.suggestion}</span>
-                    )}
-                  </div>
-                ))}
+              <div className="mt-2 space-y-1.5">
+                {detailedCompatibility.missing.map((m, i) => {
+                  const slot = detailedCompatibility.slots?.find(
+                    (s) => s.pluginName.toLowerCase() === m.pluginName.toLowerCase() && s.status === 'missing'
+                  );
+                  const sub = substitutions.get(slot?.position ?? -1);
+                  return (
+                    <div key={i} className="text-xxs">
+                      <span className="text-yellow-400">{m.pluginName}</span>
+                      <span className="text-plugin-muted"> by {m.manufacturer}</span>
+                      {sub ? (
+                        <span className="ml-1.5 inline-flex items-center gap-1">
+                          <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded text-[10px]">
+                            Using {sub.altName}
+                          </span>
+                          <button
+                            onClick={() => handleUndoSubstitute(slot?.position ?? -1)}
+                            className="text-plugin-muted hover:text-white text-[10px] underline"
+                          >
+                            undo
+                          </button>
+                        </span>
+                      ) : (
+                        slot?.alternatives?.map((alt, j) => (
+                          <span key={j} className="inline-flex flex-col ml-1">
+                            <button
+                              onClick={() => handleSubstitute(slot.position, m.pluginName, alt)}
+                              className="px-1.5 py-0.5 bg-plugin-accent/20 text-plugin-accent
+                                         hover:bg-plugin-accent/30 rounded text-[10px] transition-colors"
+                            >
+                              Use {alt.name}
+                            </button>
+                            {alt.similarityReasons && (
+                              <span className="text-[9px] text-plugin-dim ml-0.5 mt-0.5 truncate max-w-[180px]">
+                                {alt.similarityReasons}
+                              </span>
+                            )}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -351,7 +408,11 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
             onClick={handleLoadChain}
             className="flex-1 bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-1.5 text-sm font-medium"
           >
-            {compatibility?.canFullyLoad ? 'Load Chain' : 'Load Available Plugins'}
+            {compatibility?.canFullyLoad
+              ? 'Load Chain'
+              : substitutions.size > 0
+                ? `Load with ${substitutions.size} swap${substitutions.size > 1 ? 's' : ''}`
+                : 'Load Available Plugins'}
           </button>
         </div>
 

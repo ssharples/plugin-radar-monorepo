@@ -4,6 +4,12 @@ import { Id } from "./_generated/dataModel";
 import { checkRateLimit } from "./lib/rateLimit";
 import { USE_CASE_TO_GROUP } from "./lib/chainUseCases";
 import { getSessionUser } from "./lib/auth";
+import {
+  computeSimilarityScore,
+  generateReasonString,
+  similarityComparator,
+  type SimilarityPlugin,
+} from "./lib/similarity";
 
 // ============================================
 // PLUGIN SYNC FROM PLUGIN-DIRECTORY APP
@@ -645,6 +651,8 @@ export const getDetailedCompatibility = query({
         name: string;
         manufacturer: string;
         slug?: string;
+        similarityScore?: number;
+        similarityReasons?: string;
       }>;
     }> = [];
 
@@ -679,55 +687,82 @@ export const getDetailedCompatibility = query({
       } else {
         missingCount++;
 
-        // Find alternatives: same category plugins the user owns
+        // Find alternatives: same category plugins the user owns, ranked by similarity
         const alternatives: Array<{
           id: string;
           name: string;
           manufacturer: string;
           slug?: string;
+          similarityScore?: number;
+          similarityReasons?: string;
         }> = [];
 
-        // Get the category of the missing plugin (if matched)
-        let pluginCategory: string | null = null;
+        // Get the full doc of the missing plugin (if matched)
+        let matchedPlugin: any = null;
         if (slot.matchedPlugin) {
-          const matchedPlugin = await ctx.db.get(slot.matchedPlugin);
-          if (matchedPlugin) {
-            pluginCategory = matchedPlugin.category;
-          }
+          matchedPlugin = await ctx.db.get(slot.matchedPlugin);
         }
 
-        // If we know the category, find user-owned plugins in the same category
-        if (pluginCategory) {
+        // If we know the category, find user-owned plugins and score them
+        if (matchedPlugin) {
           const sameCategoryPlugins = await ctx.db
             .query("plugins")
-            .withIndex("by_category", (q) => q.eq("category", pluginCategory!))
-            .take(50);
+            .withIndex("by_category", (q) => q.eq("category", matchedPlugin.category))
+            .take(100);
+
+          // Filter to owned and score
+          const scoredAlternatives: Array<{
+            score: number;
+            plugin: any;
+            reasons: string[];
+          }> = [];
 
           for (const candidate of sameCategoryPlugins) {
-            if (ownedPluginIds.has(candidate._id.toString())) {
-              const mfg = await ctx.db.get(candidate.manufacturer);
-              alternatives.push({
-                id: candidate._id,
-                name: candidate.name,
-                manufacturer: mfg?.name ?? "Unknown",
-                slug: candidate.slug,
-              });
-              if (alternatives.length >= 3) break; // Cap at 3 suggestions
-            }
+            if (!ownedPluginIds.has(candidate._id.toString())) continue;
+            if (candidate._id.toString() === slot.matchedPlugin?.toString()) continue;
+
+            const { score, reasons } = computeSimilarityScore(
+              matchedPlugin as unknown as SimilarityPlugin,
+              candidate as unknown as SimilarityPlugin
+            );
+            scoredAlternatives.push({
+              score,
+              plugin: candidate,
+              reasons,
+            });
+          }
+
+          // Sort by score descending (with tiebreaker)
+          scoredAlternatives.sort((a, b) =>
+            similarityComparator(
+              { score: a.score, plugin: a.plugin as SimilarityPlugin },
+              { score: b.score, plugin: b.plugin as SimilarityPlugin }
+            )
+          );
+
+          // Take top 3
+          for (const alt of scoredAlternatives.slice(0, 3)) {
+            const mfg = await ctx.db.get(alt.plugin.manufacturer as Id<"manufacturers">);
+            alternatives.push({
+              id: alt.plugin._id,
+              name: alt.plugin.name,
+              manufacturer: mfg?.name ?? "Unknown",
+              slug: alt.plugin.slug,
+              similarityScore: alt.score,
+              similarityReasons: generateReasonString(alt.reasons),
+            });
           }
         }
 
-        // If no category match, try fuzzy name matching against user's scanned plugins
+        // Fallback: fuzzy name matching against user's scanned plugins
         if (alternatives.length === 0) {
           const normSlotName = slot.pluginName.toLowerCase().replace(/[^a-z0-9]/g, "");
           for (const sp of scannedPlugins) {
             const normSpName = sp.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-            // Check if names share significant overlap
             if (
               normSpName.includes(normSlotName.slice(0, 4)) ||
               normSlotName.includes(normSpName.slice(0, 4))
             ) {
-              // Exclude exact same plugin name
               if (sp.name.toLowerCase() !== slot.pluginName.toLowerCase()) {
                 alternatives.push({
                   id: sp._id,

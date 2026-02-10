@@ -578,7 +578,14 @@ export async function fetchDetailedCompatibility(
     pluginName: string;
     manufacturer: string;
     status: "owned" | "missing";
-    alternatives: Array<{ id: string; name: string; manufacturer: string; slug?: string }>;
+    alternatives: Array<{
+      id: string;
+      name: string;
+      manufacturer: string;
+      slug?: string;
+      similarityScore?: number;
+      similarityReasons?: string;
+    }>;
   }>;
 } | null> {
   const userId = getUserId();
@@ -1013,6 +1020,15 @@ export async function uploadDiscoveredParameterMap(
       minValue: number;
       maxValue: number;
       defaultValue?: number;
+      // NormalisableRange data
+      rangeStart?: number;
+      rangeEnd?: number;
+      skewFactor?: number;
+      symmetricSkew?: boolean;
+      interval?: number;
+      hasNormalisableRange?: boolean;
+      curveSamples?: Array<{ normalized: number; physical: number }>;
+      qRepresentation?: string;
     }>;
   },
   pluginId: string
@@ -1058,6 +1074,17 @@ export async function uploadDiscoveredParameterMap(
         minValue: p.minValue,
         maxValue: p.maxValue,
         defaultValue: p.defaultValue,
+        // NormalisableRange data
+        ...(p.hasNormalisableRange ? {
+          rangeStart: p.rangeStart,
+          rangeEnd: p.rangeEnd,
+          skewFactor: p.skewFactor,
+          symmetricSkew: p.symmetricSkew,
+          interval: p.interval,
+          hasNormalisableRange: p.hasNormalisableRange,
+          curveSamples: p.curveSamples,
+          qRepresentation: p.qRepresentation,
+        } : {}),
       })),
       eqBandCount: discoveredMap.eqBandCount,
       eqBandParameterPattern: discoveredMap.eqBandParameterPattern,
