@@ -13,13 +13,14 @@ import {
   rectIntersection,
   type CollisionDetection,
 } from '@dnd-kit/core';
-import { Link2, Layers, GitBranch, Undo2, Redo2, Power, AppWindow, Plus, MousePointer2 } from 'lucide-react';
+import { Layers, GitBranch, Undo2, Redo2, Power, AppWindow, Plus, MousePointer2 } from 'lucide-react';
 import { useChainStore } from '../../stores/chainStore';
 import { juceBridge } from '../../api/juce-bridge';
 import type { ChainNodeUI } from '../../api/types';
 import { ChainNodeList } from './ChainNodeList';
 import { DragPreview } from './DragPreview';
 import { ChainTemplates } from './ChainTemplates';
+import { MirrorIndicator } from './MirrorIndicator';
 import { HeaderMenu } from '../HeaderMenu';
 import { getLastSlotHoverSide, resetLastSlotHoverSide } from './ChainSlot';
 
@@ -536,6 +537,9 @@ export function ChainEditor() {
             {totalPlugins}
           </span>
         </div>
+
+        {/* Mirror indicator — shown when linked to another track */}
+        <MirrorIndicator />
       </div>
 
       {/* Chain */}
@@ -620,7 +624,7 @@ export function ChainEditor() {
       {/* Floating action bar when 2+ nodes selected */}
       {selectedIds.size >= 2 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-40 animate-slide-up">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-plugin-surface/95 border border-plugin-border shadow-[0_4px_24px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-plugin-surface/95 border border-plugin-border shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
             <span className="text-[11px] text-plugin-muted mr-1">
               {selectedIds.size} selected
             </span>

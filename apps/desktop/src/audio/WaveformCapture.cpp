@@ -15,7 +15,7 @@ void WaveformCapture::setLatencyCompensation(int samples)
 
 void WaveformCapture::pushPreSamples(const juce::AudioBuffer<float>& buffer)
 {
-    // Compute peak of incoming buffer
+    // Compute peak of incoming buffer (across all channels)
     float peak = 0.0f;
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
@@ -24,75 +24,117 @@ void WaveformCapture::pushPreSamples(const juce::AudioBuffer<float>& buffer)
         peak = std::max(peak, std::max(std::abs(range.getStart()), std::abs(range.getEnd())));
     }
 
-    // Accumulate samples
+    // Just accumulate — don't advance the write index.
+    // pushPostSamples controls when peaks are committed.
     preAccumulator = std::max(preAccumulator, peak);
-    preSampleCount += buffer.getNumSamples();
-
-    // When we have enough samples for a peak
-    while (preSampleCount >= SAMPLES_PER_PEAK)
-    {
-        int currentDelay = delayInPeaks.load(std::memory_order_relaxed);
-
-        if (currentDelay > 0)
-        {
-            // Write to delay line
-            delayLine[delayWritePos] = preAccumulator;
-            delayWritePos = (delayWritePos + 1) % MAX_DELAY_PEAKS;
-
-            // Calculate how many peaks are in the delay line
-            size_t peaksInBuffer = (delayWritePos >= delayReadPos)
-                ? (delayWritePos - delayReadPos)
-                : (MAX_DELAY_PEAKS - delayReadPos + delayWritePos);
-
-            // Read from delay line when we have enough buffered
-            if (peaksInBuffer > static_cast<size_t>(currentDelay))
-            {
-                float delayedPeak = delayLine[delayReadPos];
-                delayReadPos = (delayReadPos + 1) % MAX_DELAY_PEAKS;
-
-                // Push to the actual peak buffer
-                size_t idx = preBuffer.writeIndex.load(std::memory_order_relaxed);
-                preBuffer.peaks[idx].store(delayedPeak, std::memory_order_relaxed);
-                preBuffer.writeIndex.store((idx + 1) % NUM_PEAKS, std::memory_order_release);
-            }
-        }
-        else
-        {
-            // No delay - push directly
-            size_t idx = preBuffer.writeIndex.load(std::memory_order_relaxed);
-            preBuffer.peaks[idx].store(preAccumulator, std::memory_order_relaxed);
-            preBuffer.writeIndex.store((idx + 1) % NUM_PEAKS, std::memory_order_release);
-        }
-
-        preAccumulator = 0.0f;
-        preSampleCount -= SAMPLES_PER_PEAK;
-    }
 }
 
 void WaveformCapture::pushPostSamples(const juce::AudioBuffer<float>& buffer)
 {
-    postBuffer.pushSamples(buffer);
+    // Compute peak of incoming buffer (across all channels)
+    float peak = 0.0f;
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
+        auto range = juce::FloatVectorOperations::findMinAndMax(
+            buffer.getReadPointer(ch), buffer.getNumSamples());
+        peak = std::max(peak, std::max(std::abs(range.getStart()), std::abs(range.getEnd())));
+    }
+
+    postAccumulator = std::max(postAccumulator, peak);
+    sampleCount += buffer.getNumSamples();
+
+    // When we have enough samples for a peak, commit BOTH pre and post together
+    while (sampleCount >= SAMPLES_PER_PEAK)
+    {
+        size_t idx = sharedWriteIndex.load(std::memory_order_relaxed);
+
+        // Commit post peak directly
+        postPeaks[idx].store(postAccumulator, std::memory_order_relaxed);
+
+        // Commit pre peak through delay line for latency compensation
+        int currentDelay = delayInPeaks.load(std::memory_order_relaxed);
+
+        if (currentDelay > 0)
+        {
+            // Write current pre peak into delay line
+            delayLine[delayWritePos] = preAccumulator;
+            delayWritePos = (delayWritePos + 1) % MAX_DELAY_PEAKS;
+            peaksInDelayLine++;
+
+            // Read from delay line when we have enough buffered
+            if (peaksInDelayLine > static_cast<size_t>(currentDelay))
+            {
+                float delayedPeak = delayLine[delayReadPos];
+                delayReadPos = (delayReadPos + 1) % MAX_DELAY_PEAKS;
+                peaksInDelayLine--;
+                prePeaks[idx].store(delayedPeak, std::memory_order_relaxed);
+            }
+            else
+            {
+                // Delay line still filling — write silence for pre
+                prePeaks[idx].store(0.0f, std::memory_order_relaxed);
+            }
+        }
+        else
+        {
+            // No delay — push pre peak directly
+            prePeaks[idx].store(preAccumulator, std::memory_order_relaxed);
+        }
+
+        // Advance shared write index (single atomic for both buffers)
+        sharedWriteIndex.store((idx + 1) % NUM_PEAKS, std::memory_order_release);
+
+        // Reset accumulators
+        preAccumulator = 0.0f;
+        postAccumulator = 0.0f;
+        sampleCount -= SAMPLES_PER_PEAK;
+    }
 }
 
 std::vector<float> WaveformCapture::getPrePeaks() const
 {
-    return preBuffer.getPeaks();
+    std::vector<float> result(NUM_PEAKS);
+    size_t writeIdx = sharedWriteIndex.load(std::memory_order_acquire);
+
+    // Read from oldest to newest
+    for (size_t i = 0; i < NUM_PEAKS; ++i)
+    {
+        size_t readIdx = (writeIdx + i) % NUM_PEAKS;
+        result[i] = prePeaks[readIdx].load(std::memory_order_relaxed);
+    }
+
+    return result;
 }
 
 std::vector<float> WaveformCapture::getPostPeaks() const
 {
-    return postBuffer.getPeaks();
+    std::vector<float> result(NUM_PEAKS);
+    size_t writeIdx = sharedWriteIndex.load(std::memory_order_acquire);
+
+    // Read from oldest to newest — same index as pre
+    for (size_t i = 0; i < NUM_PEAKS; ++i)
+    {
+        size_t readIdx = (writeIdx + i) % NUM_PEAKS;
+        result[i] = postPeaks[readIdx].load(std::memory_order_relaxed);
+    }
+
+    return result;
 }
 
 void WaveformCapture::reset()
 {
-    preBuffer.reset();
-    postBuffer.reset();
+    for (auto& p : prePeaks)
+        p.store(0.0f, std::memory_order_relaxed);
+    for (auto& p : postPeaks)
+        p.store(0.0f, std::memory_order_relaxed);
+    sharedWriteIndex.store(0, std::memory_order_relaxed);
 
     // Reset delay line
     delayLine.fill(0.0f);
     delayWritePos = 0;
     delayReadPos = 0;
+    peaksInDelayLine = 0;
     preAccumulator = 0.0f;
-    preSampleCount = 0;
+    postAccumulator = 0.0f;
+    sampleCount = 0;
 }

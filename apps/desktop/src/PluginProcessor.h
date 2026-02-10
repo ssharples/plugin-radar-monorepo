@@ -4,11 +4,14 @@
 #include "core/PluginManager.h"
 #include "core/ChainProcessor.h"
 #include "core/PresetManager.h"
+#include "core/InstanceRegistry.h"
 #include "audio/WaveformCapture.h"
 #include "audio/GainProcessor.h"
 #include "audio/AudioMeter.h"
 #include "audio/FFTProcessor.h"
 #include "automation/ParameterProxyPool.h"
+
+class MirrorManager;
 
 class PluginChainManagerProcessor : public juce::AudioProcessor
 {
@@ -42,6 +45,9 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    // DAW track properties (name, colour)
+    void updateTrackProperties(const TrackProperties& properties) override;
+
     // Access to core components
     PluginManager& getPluginManager() { return pluginManager; }
     ChainProcessor& getChainProcessor() { return chainProcessor; }
@@ -51,6 +57,11 @@ public:
     AudioMeter& getInputMeter() { return inputMeter; }
     AudioMeter& getOutputMeter() { return outputMeter; }
     FFTProcessor& getFFTProcessor() { return fftProcessor; }
+
+    // Instance awareness
+    InstanceRegistry& getInstanceRegistry() { return *instanceRegistry; }
+    InstanceId getInstanceId() const { return instanceId; }
+    MirrorManager& getMirrorManager() { return *mirrorManager; }
 
 private:
     PluginManager pluginManager;
@@ -62,6 +73,15 @@ private:
     AudioMeter outputMeter;
     FFTProcessor fftProcessor;
     ParameterProxyPool parameterPool;
+
+    // Instance awareness — SharedResourcePointer ensures one registry per process
+    juce::SharedResourcePointer<InstanceRegistry> instanceRegistry;
+    InstanceId instanceId = -1;
+    juce::String trackName;
+    std::unique_ptr<MirrorManager> mirrorManager;
+
+    /** Collect current chain info and push to registry. */
+    void updateRegistryInfo();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginChainManagerProcessor)
 };

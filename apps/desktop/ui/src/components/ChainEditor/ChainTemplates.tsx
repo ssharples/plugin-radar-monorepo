@@ -1,4 +1,5 @@
 import { Mic, Volume2, Headphones, Zap, Plus } from 'lucide-react';
+import { OtherInstancesList } from './OtherInstancesList';
 
 const TEMPLATES = [
   {
@@ -29,7 +30,7 @@ const TEMPLATES = [
 
 /**
  * Empty-state component shown when no plugins are in the chain.
- * Displays inspirational template cards and a browse button.
+ * Displays other running instances (copy/mirror), then inspirational template cards.
  */
 export function ChainTemplates() {
   const openBrowser = () => {
@@ -38,6 +39,11 @@ export function ChainTemplates() {
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-6">
+      {/* Other instances section — shown above templates when other tracks exist */}
+      <div className="w-full max-w-xs">
+        <OtherInstancesList />
+      </div>
+
       <div className="w-12 h-12 rounded-xl bg-plugin-accent/10 border border-plugin-accent/20 flex items-center justify-center mb-3">
         <Plus className="w-6 h-6 text-plugin-accent" />
       </div>

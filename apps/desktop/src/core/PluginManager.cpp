@@ -1,4 +1,5 @@
 #include "PluginManager.h"
+#include "ScannerUtils.h"
 #include "../utils/PlatformPaths.h"
 
 PluginManager::PluginManager()
@@ -81,6 +82,11 @@ void PluginManager::stopScan()
 {
     shouldStopScan.store(true);
     stopTimer();
+
+    // Wait for background scan thread to finish before cleaning up
+    if (scanThread.joinable())
+        scanThread.join();
+
     currentScanner.reset();
     scanning.store(false);
 }
@@ -202,6 +208,11 @@ void PluginManager::timerCallback()
 void PluginManager::finishScan()
 {
     stopTimer();
+
+    // Join background scan thread if it's still around
+    if (scanThread.joinable())
+        scanThread.join();
+
     currentScanner.reset();
 
     // Clear the dead man's pedal file since scan completed successfully
@@ -444,9 +455,9 @@ void PluginManager::checkForCrashedPlugin()
             knownPlugins.addToBlacklist(crashedPlugin);
             saveBlacklist();
 
-            // Notify listeners about the auto-blacklisted plugin
+            // Notify listeners about the auto-blacklisted plugin (crash from previous session)
             if (onPluginBlacklisted)
-                onPluginBlacklisted(crashedPlugin);
+                onPluginBlacklisted(crashedPlugin, ScanFailureReason::Crash);
         }
 
         // Clear the dead man's pedal file
@@ -557,12 +568,24 @@ void PluginManager::collectPluginsToScan()
         return;
     }
 
-    // Start scanning with timer
-    startTimer(10);  // 10ms between scans to keep UI responsive
+    // Start timer to poll for background scan completion
+    startTimer(50);  // 50ms poll interval — actual scanning runs in background thread
 }
 
 void PluginManager::scanNextPluginOutOfProcess()
 {
+    // If a background scan is still running, just wait for the next timer tick
+    if (backgroundScanInProgress.load())
+        return;
+
+    // Process the result from the previous background scan (on main thread)
+    if (hasPendingScanResult.load())
+    {
+        processPendingScanResult();
+        hasPendingScanResult.store(false);
+        currentPluginScanIndex++;
+    }
+
     if (shouldStopScan.load())
     {
         stopScan();
@@ -593,54 +616,79 @@ void PluginManager::scanNextPluginOutOfProcess()
     if (onScanProgress)
         onScanProgress(progress, pluginPath);
 
-    // Scan this plugin out-of-process
-    bool success = scanPluginWithHelper(currentFormatName, pluginPath);
+    // Write dead man's pedal BEFORE scanning — if the app crashes while the
+    // helper is running, this file persists and checkForCrashedPlugin() will
+    // auto-blacklist this plugin on next startup
+    getDeadMansPedalFile().replaceWithText(pluginPath);
 
-    if (!success)
+    // Launch scan in background thread so the UI stays responsive
+    backgroundScanInProgress.store(true);
+
+    if (scanThread.joinable())
+        scanThread.join();
+
+    scanThread = std::thread([this, format = currentFormatName, path = pluginPath]() {
+        auto result = scanPluginWithHelper(format, path);
+        {
+            std::lock_guard<std::mutex> lock(scanMutex);
+            pendingScanResult = std::move(result);
+        }
+        hasPendingScanResult.store(true);
+        backgroundScanInProgress.store(false);
+    });
+}
+
+void PluginManager::processPendingScanResult()
+{
+    BackgroundScanResult result;
+    {
+        std::lock_guard<std::mutex> lock(scanMutex);
+        result = std::move(pendingScanResult);
+    }
+
+    // Clear dead man's pedal — we handled this plugin (whether success or failure)
+    getDeadMansPedalFile().deleteFile();
+
+    if (!result.scanResult.success)
     {
         #if JUCE_DEBUG
-        std::cerr << "  -> Failed or crashed, blacklisting: " << pluginPath << std::endl;
+        std::cerr << "  -> Failed (reason: " << static_cast<int>(result.scanResult.failureReason)
+                  << "), blacklisting: " << result.pluginPath << std::endl;
         #endif
-        knownPlugins.addToBlacklist(pluginPath);
+        knownPlugins.addToBlacklist(result.pluginPath);
         saveBlacklist();
 
         if (onPluginBlacklisted)
-            onPluginBlacklisted(pluginPath);
+            onPluginBlacklisted(result.pluginPath, result.scanResult.failureReason);
     }
     else
     {
-        // Save progress incrementally
+        // Add discovered plugins to the known list (main thread only — not thread-safe)
+        for (const auto& desc : result.discoveredPlugins)
+        {
+            knownPlugins.addType(desc);
+            #if JUCE_DEBUG
+            std::cerr << "  Found: " << desc.name << " by " << desc.manufacturerName << std::endl;
+            #endif
+        }
         savePluginList();
     }
-
-    currentPluginScanIndex++;
 }
 
-bool PluginManager::scanPluginWithHelper(const juce::String& formatName, const juce::String& pluginPath)
+PluginManager::BackgroundScanResult PluginManager::scanPluginWithHelper(const juce::String& formatName, const juce::String& pluginPath)
 {
     auto helperPath = getScannerHelperPath();
 
     if (!helperPath.existsAsFile())
     {
-        std::cerr << "WARNING: Scanner helper not found at: " << helperPath.getFullPathName() << std::endl;
-        std::cerr << "WARNING: Falling back to in-process scanning for: " << pluginPath << std::endl;
-
-        // Fallback: try in-process (risky but better than nothing)
-        for (int i = 0; i < formatManager.getNumFormats(); ++i)
-        {
-            auto* format = formatManager.getFormat(i);
-            if (format->getName() == formatName)
-            {
-                juce::OwnedArray<juce::PluginDescription> results;
-                format->findAllTypesForFile(results, pluginPath);
-
-                for (auto* desc : results)
-                    knownPlugins.addType(*desc);
-
-                return !results.isEmpty();
-            }
-        }
-        return false;
+        // FAIL LOUDLY — never fall back to in-process scanning.
+        // In-process scanning defeats the entire purpose of crash isolation.
+        std::cerr << "ERROR: Scanner helper not found! Searched locations:" << std::endl;
+        std::cerr << "  Bundle:  <app>/Contents/Resources/PluginScannerHelper" << std::endl;
+        std::cerr << "  Beside:  <exe-dir>/PluginScannerHelper" << std::endl;
+        std::cerr << "  Dev:     <build-dir>/PluginScannerHelper" << std::endl;
+        std::cerr << "  Refusing to scan in-process — skipping: " << pluginPath << std::endl;
+        return { { false, ScanFailureReason::ScanFailure }, {}, pluginPath };
     }
 
     // Build command line
@@ -655,7 +703,7 @@ bool PluginManager::scanPluginWithHelper(const juce::String& formatName, const j
     if (!child.start(args, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
     {
         std::cerr << "ERROR: Failed to start scanner helper" << std::endl;
-        return false;
+        return { { false, ScanFailureReason::Crash }, {}, pluginPath };
     }
 
     // Wait for completion with timeout (30 seconds per plugin)
@@ -665,7 +713,7 @@ bool PluginManager::scanPluginWithHelper(const juce::String& formatName, const j
     {
         std::cerr << "ERROR: Scanner helper timed out for: " << pluginPath << std::endl;
         child.kill();
-        return false;
+        return { { false, ScanFailureReason::Timeout }, {}, pluginPath };
     }
 
     auto exitCode = child.getExitCode();
@@ -673,70 +721,19 @@ bool PluginManager::scanPluginWithHelper(const juce::String& formatName, const j
 
     if (exitCode != 0)
     {
-        std::cerr << "ERROR: Scanner helper crashed or failed (exit code " << exitCode << ") for: " << pluginPath << std::endl;
-        return false;
+        auto reason = ScannerUtils::classifyExitCode(exitCode);
+
+        std::cerr << "ERROR: Scanner helper failed (exit code " << exitCode << ", reason: "
+                  << ScannerUtils::failureReasonToString(reason) << ") for: " << pluginPath << std::endl;
+        return { { false, reason }, {}, pluginPath };
     }
 
-    // Parse the output
-    return parseHelperOutput(output, pluginPath);
+    // Parse the output — pure function, no shared state mutation
+    auto parsed = ScannerUtils::parseScannerOutput(output);
+
+    if (!parsed.success)
+        return { { false, ScanFailureReason::ScanFailure }, {}, pluginPath };
+
+    return { { true, ScanFailureReason::None }, std::move(parsed.plugins), pluginPath };
 }
 
-bool PluginManager::parseHelperOutput(const juce::String& output, const juce::String& pluginPath)
-{
-    juce::StringArray lines;
-    lines.addLines(output);
-
-    bool success = false;
-    juce::PluginDescription currentDesc;
-    bool inPlugin = false;
-
-    for (const auto& line : lines)
-    {
-        if (line.startsWith("SCAN_SUCCESS:"))
-        {
-            success = true;
-        }
-        else if (line.startsWith("SCAN_FAILED:"))
-        {
-            #if JUCE_DEBUG
-            std::cerr << "  Scan failed: " << line << std::endl;
-            #endif
-            return false;
-        }
-        else if (line == "PLUGIN_START")
-        {
-            inPlugin = true;
-            currentDesc = {};
-        }
-        else if (line == "PLUGIN_END")
-        {
-            if (inPlugin)
-            {
-                knownPlugins.addType(currentDesc);
-                #if JUCE_DEBUG
-                std::cerr << "  Found: " << currentDesc.name << " by " << currentDesc.manufacturerName << std::endl;
-                #endif
-            }
-            inPlugin = false;
-        }
-        else if (inPlugin && line.contains("="))
-        {
-            auto key = line.upToFirstOccurrenceOf("=", false, false);
-            auto value = line.fromFirstOccurrenceOf("=", false, false);
-
-            if (key == "name") currentDesc.name = value;
-            else if (key == "descriptiveName") currentDesc.descriptiveName = value;
-            else if (key == "pluginFormatName") currentDesc.pluginFormatName = value;
-            else if (key == "category") currentDesc.category = value;
-            else if (key == "manufacturerName") currentDesc.manufacturerName = value;
-            else if (key == "version") currentDesc.version = value;
-            else if (key == "fileOrIdentifier") currentDesc.fileOrIdentifier = value;
-            else if (key == "uniqueId") currentDesc.uniqueId = value.getIntValue();
-            else if (key == "isInstrument") currentDesc.isInstrument = (value == "1");
-            else if (key == "numInputChannels") currentDesc.numInputChannels = value.getIntValue();
-            else if (key == "numOutputChannels") currentDesc.numOutputChannels = value.getIntValue();
-        }
-    }
-
-    return success;
-}

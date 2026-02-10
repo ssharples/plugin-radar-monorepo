@@ -2,6 +2,53 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Rules — Read These First
+
+### Always Verify Builds
+After making code changes, **always run the relevant build** before reporting completion. Never assume changes compile cleanly.
+- **TypeScript (web):** `cd apps/web && npx next build` or `pnpm build:web`
+- **TypeScript (desktop UI):** `cd apps/desktop/ui && npx vite build`
+- **C++ (JUCE):** `cd apps/desktop/build && cmake --build . --target PluginChainManager_AU`
+- If the build fails, fix the errors before reporting the task as done.
+
+### Field Name Consistency Across Layers
+When adding or modifying data fields (Convex schema, mutations, queries, frontend calls, C++ bridge), **verify that ALL consumers use the exact same field names**. Use Grep to search for the old field name across the entire repo before finishing. Past bugs: `pluginName` vs `name`, `fileOrIdentifier` mismatches, nested response parsing errors.
+
+### Confirm Target Before Implementing
+This is a **monorepo**. Always confirm which app/package a change belongs to before writing code:
+- `apps/web/` — Next.js web app
+- `apps/desktop/ui/` — Desktop React UI (embedded in JUCE)
+- `apps/desktop/src/` — JUCE C++ plugin
+- `convex/` — Shared Convex backend
+- `packages/shared/` — Shared types/constants
+
+Default to working inside this monorepo. Never implement in a standalone repo unless explicitly told to.
+
+### UI/Styling: Check All Instances
+When making UI changes (colors, fonts, spacing, component patterns), use Grep to find **every instance** of the affected pattern across the codebase before reporting done. Past bugs: missed views when applying font changes, dead code left behind after refactoring, color tokens not applied consistently across web and desktop.
+
+### Keep Changes Minimal and Targeted
+During iterative UI refinement sessions, make only the requested change. Do not refactor surrounding code, add docstrings to unchanged code, or make "improvements" beyond what was asked. Surgical edits only.
+
+### Research Before Implementing Non-Trivial Features
+For features involving unfamiliar frameworks or complex interactions (dnd-kit, JUCE WebBrowserComponent bridge, Next.js Image, etc.), **research known gotchas first** and propose an approach before writing code. Past bugs: dnd-kit's `active.data.current` emptying on unmount, glass CSS effects being too complex for the context, JS-based animations being janky vs CSS.
+
+### Convex Schema Changes Checklist
+When modifying Convex schema or function signatures:
+1. Update `convex/schema.ts`
+2. Update the mutation/query in the relevant `convex/*.ts` file
+3. Grep for all callers in `apps/web/`, `apps/desktop/ui/src/api/convex-client.ts`, and `scripts/`
+4. Verify field names match exactly at every call site
+5. Desktop UI uses `anyApi` (untyped) — field mismatches won't be caught by TypeScript there
+
+### C++ / WebView Bridge Changes Checklist
+When modifying the JUCE ↔ JS bridge:
+1. Update the C++ handler in `bridge/WebViewBridge.cpp`
+2. Update the TypeScript wrapper in `ui/src/api/juce-bridge.ts`
+3. Update the types in `ui/src/api/types.ts`
+4. Group operations pass args as `JSON.stringify({...})` — make sure both sides agree on the JSON shape
+5. Build both the UI (`npx vite build`) and C++ (`cmake --build`) to verify
+
 ## Build & Development Commands
 
 ```bash
@@ -278,3 +325,16 @@ No formal test suite. Manual testing:
 - Web app uses `@phosphor-icons/react` for icons
 - Web app styling: shadcn/ui + Tailwind 4 + stone-950/amber-400 dark theme
 - Rate-limited mutations use `checkRateLimit()` from `convex/lib/rateLimit.ts`
+
+### Desktop UI Design System ("Propane")
+- Color tokens in `apps/desktop/ui/tailwind.config.js` — accent `#89572a`, serial `#c9944a`, parallel `#5a7842`
+- Fonts: Cutive Mono (mono), Nosifer (brand) — self-hosted WOFF2 in `ui/src/fonts/`
+- CRT text effect: `.crt-text` class in `index.css`
+- Category badge colors (eq=blue, compressor=orange, reverb=purple) are **semantic** — do not replace with Propane amber
+- Meter gradients (green-yellow-red) are **audio convention** — do not replace
+
+### Colors That Must NOT Be Changed
+Some colors have domain-specific meaning and must never be replaced during theming:
+- **Effect category badges**: eq=blue, compressor=orange, reverb=purple, etc.
+- **Audio meters**: green→yellow→red gradient (industry standard)
+- **Status indicators**: green=active, red=error, yellow=warning

@@ -9,6 +9,9 @@ import type {
   NodeMeterReadings,
   GainSettings,
   FFTData,
+  BlacklistedPluginEvent,
+  OtherInstanceInfo,
+  MirrorState,
 } from './types';
 
 type EventHandler<T> = (data: T) => void;
@@ -99,6 +102,11 @@ class JuceBridge {
       'gainChanged',
       'matchLockWarning',
       'nodeMeterData',
+      'pluginBlacklisted',
+      'blacklistChanged',
+      'instancesChanged',
+      'mirrorStateChanged',
+      'mirrorUpdateApplied',
     ];
 
     events.forEach((eventName) => {
@@ -364,6 +372,15 @@ class JuceBridge {
     return this.on('matchLockWarning', handler);
   }
 
+  // Plugin blacklist events (from scanner)
+  onPluginBlacklisted(handler: EventHandler<BlacklistedPluginEvent>): () => void {
+    return this.on('pluginBlacklisted', handler);
+  }
+
+  onBlacklistChanged(handler: EventHandler<unknown>): () => void {
+    return this.on('blacklistChanged', handler);
+  }
+
   // ============================================
   // Parameter Discovery / Auto-Mapping
   // ============================================
@@ -619,6 +636,71 @@ class JuceBridge {
     error?: string;
   }> {
     return this.callNative('setSlotPreset', slotIndex, presetData);
+  }
+
+  // ============================================
+  // Cross-Instance Awareness
+  // ============================================
+
+  /**
+   * Get all other running PluginChainManager instances in the DAW session.
+   */
+  async getOtherInstances(): Promise<OtherInstanceInfo[]> {
+    return this.callNative<OtherInstanceInfo[]>('getOtherInstances');
+  }
+
+  /**
+   * Copy the full chain (with presets) from another instance to this one.
+   */
+  async copyChainFromInstance(instanceId: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('copyChainFromInstance', instanceId);
+  }
+
+  /**
+   * Subscribe to instance list changes (other instances added/removed/updated).
+   */
+  onInstancesChanged(handler: EventHandler<OtherInstanceInfo[]>): () => void {
+    return this.on('instancesChanged', handler);
+  }
+
+  // ============================================
+  // Chain Mirroring
+  // ============================================
+
+  /**
+   * Start mirroring this instance's chain with another instance.
+   * Both instances will stay in sync bidirectionally.
+   */
+  async startMirror(targetInstanceId: number): Promise<{ success: boolean; mirrorGroupId?: number; error?: string }> {
+    return this.callNative('startMirror', targetInstanceId);
+  }
+
+  /**
+   * Stop mirroring (leave the mirror group).
+   */
+  async stopMirror(): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('stopMirror');
+  }
+
+  /**
+   * Get the current mirror state (whether mirrored, group ID, partners).
+   */
+  async getMirrorState(): Promise<MirrorState> {
+    return this.callNative<MirrorState>('getMirrorState');
+  }
+
+  /**
+   * Subscribe to mirror state changes (started, stopped, partner changes).
+   */
+  onMirrorStateChanged(handler: EventHandler<MirrorState>): () => void {
+    return this.on('mirrorStateChanged', handler);
+  }
+
+  /**
+   * Subscribe to mirror update events (when a remote change is applied).
+   */
+  onMirrorUpdateApplied(handler: EventHandler<void>): () => void {
+    return this.on('mirrorUpdateApplied', handler);
   }
 }
 

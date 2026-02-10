@@ -111,7 +111,6 @@ export function DropZone({
             border ${borderColor} ${bgColor}
             text-xs whitespace-nowrap
             animate-fade-in
-            backdrop-blur-sm
           `}
         >
           <GitBranch className={`w-3 h-3 ${isParallelContext ? 'text-plugin-parallel' : 'text-plugin-serial'}`} />

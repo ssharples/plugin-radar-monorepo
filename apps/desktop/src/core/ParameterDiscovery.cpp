@@ -1,6 +1,37 @@
 #include "ParameterDiscovery.h"
 
 // ============================================
+// Helper: Parse float from text string
+// ============================================
+float ParameterDiscovery::parseFloatFromText(const juce::String& text)
+{
+    juce::String numStr;
+    bool hasDecimal = false;
+    bool hasDigit = false;
+
+    for (int i = 0; i < text.length(); ++i)
+    {
+        auto c = text[i];
+        if (c == '-' && numStr.isEmpty())
+            numStr += c;
+        else if (c == '.' && !hasDecimal)
+        {
+            numStr += c;
+            hasDecimal = true;
+        }
+        else if (c >= '0' && c <= '9')
+        {
+            numStr += c;
+            hasDigit = true;
+        }
+        else if (hasDigit)
+            break;
+    }
+
+    return hasDigit ? numStr.getFloatValue() : 0.0f;
+}
+
+// ============================================
 // Helper: Check if input matches regex pattern (case-insensitive)
 // ============================================
 bool ParameterDiscovery::matchesPattern(const juce::String& input, const std::string& pattern)
@@ -27,38 +58,8 @@ void ParameterDiscovery::extractPhysicalRange(juce::AudioProcessorParameter* par
     textAtMin = param->getText(0.0f, 64);
     textAtMax = param->getText(1.0f, 64);
 
-    // Try to parse numeric values from the text
-    auto parseFloat = [](const juce::String& text) -> float
-    {
-        // Strip non-numeric characters (keep digits, minus, decimal point)
-        juce::String numStr;
-        bool hasDecimal = false;
-        bool hasDigit = false;
-
-        for (int i = 0; i < text.length(); ++i)
-        {
-            auto c = text[i];
-            if (c == '-' && numStr.isEmpty())
-                numStr += c;
-            else if (c == '.' && !hasDecimal)
-            {
-                numStr += c;
-                hasDecimal = true;
-            }
-            else if (c >= '0' && c <= '9')
-            {
-                numStr += c;
-                hasDigit = true;
-            }
-            else if (hasDigit)
-                break; // Stop at first non-numeric after digits
-        }
-
-        return hasDigit ? numStr.getFloatValue() : 0.0f;
-    };
-
-    outMin = parseFloat(textAtMin);
-    outMax = parseFloat(textAtMax);
+    outMin = parseFloatFromText(textAtMin);
+    outMax = parseFloatFromText(textAtMax);
 
     // Sanity check: if min >= max, fall back to 0-1
     if (outMin >= outMax)
@@ -449,6 +450,32 @@ ParameterDiscovery::DiscoveredMap ParameterDiscovery::discoverParameterMap(
         extractPhysicalRange(param, discovered.minValue, discovered.maxValue,
                              textAtMin, textAtMax);
 
+        // Extract NormalisableRange from RangedAudioParameter
+        if (auto* rangedParam = dynamic_cast<juce::RangedAudioParameter*>(param))
+        {
+            const auto& range = rangedParam->getNormalisableRange();
+            discovered.rangeStart = range.start;
+            discovered.rangeEnd = range.end;
+            discovered.skewFactor = range.skew;
+            discovered.symmetricSkew = range.symmetricSkew;
+            discovered.interval = range.interval;
+            discovered.hasNormalisableRange = true;
+
+            // Override min/max with actual NormalisableRange values (more reliable than getText parsing)
+            discovered.minValue = range.start;
+            discovered.maxValue = range.end;
+
+            // Sample getText at 5 points to capture the mapping curve
+            const float samplePoints[] = { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f };
+            for (float norm : samplePoints)
+            {
+                auto text = param->getText(norm, 64);
+                float physical = parseFloatFromText(text);
+                discovered.curveSamples.add({ norm, physical });
+            }
+
+        }
+
         // Semantic matching
         auto match = matchParameterName(discovered.juceParamId);
 
@@ -496,6 +523,15 @@ ParameterDiscovery::DiscoveredMap ParameterDiscovery::discoverParameterMap(
                 if (discovered.physicalUnit == "unknown")
                     discovered.physicalUnit = inferredUnit;
             }
+        }
+
+        // Detect Q representation (after semantic matching assigns the semantic)
+        if (discovered.hasNormalisableRange && discovered.semantic.contains("_q"))
+        {
+            if (discovered.rangeEnd > 5.0f)
+                discovered.qRepresentation = "q_factor";
+            else
+                discovered.qRepresentation = "bandwidth_octaves";
         }
 
         map.parameters.add(discovered);
@@ -548,6 +584,32 @@ juce::var ParameterDiscovery::toJson(const DiscoveredMap& map)
         paramObj->setProperty("numSteps", p.numSteps);
         paramObj->setProperty("label", p.label);
         paramObj->setProperty("matched", p.matched);
+
+        // NormalisableRange fields
+        paramObj->setProperty("hasNormalisableRange", p.hasNormalisableRange);
+        if (p.hasNormalisableRange)
+        {
+            paramObj->setProperty("rangeStart", p.rangeStart);
+            paramObj->setProperty("rangeEnd", p.rangeEnd);
+            paramObj->setProperty("skewFactor", p.skewFactor);
+            paramObj->setProperty("symmetricSkew", p.symmetricSkew);
+            paramObj->setProperty("interval", p.interval);
+
+            // Curve samples
+            juce::Array<juce::var> samplesArray;
+            for (const auto& sample : p.curveSamples)
+            {
+                auto* sampleObj = new juce::DynamicObject();
+                sampleObj->setProperty("normalized", sample.first);
+                sampleObj->setProperty("physical", sample.second);
+                samplesArray.add(juce::var(sampleObj));
+            }
+            paramObj->setProperty("curveSamples", samplesArray);
+
+            if (p.qRepresentation.isNotEmpty())
+                paramObj->setProperty("qRepresentation", p.qRepresentation);
+        }
+
         paramArray.add(juce::var(paramObj));
     }
 

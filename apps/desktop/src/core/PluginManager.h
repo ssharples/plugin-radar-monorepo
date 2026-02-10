@@ -4,6 +4,16 @@
 #include <functional>
 #include <atomic>
 #include <optional>
+#include <thread>
+#include <vector>
+
+enum class ScanFailureReason { None, Crash, ScanFailure, Timeout };
+
+struct ScanPluginResult
+{
+    bool success;
+    ScanFailureReason failureReason;
+};
 
 class PluginManager : public juce::ChangeListener, public juce::Timer
 {
@@ -45,7 +55,7 @@ public:
     // Callbacks
     std::function<void()> onScanComplete;
     std::function<void(float, const juce::String&)> onScanProgress;
-    std::function<void(const juce::String&)> onPluginBlacklisted;  // Called when a plugin is auto-blacklisted due to crash
+    std::function<void(const juce::String&, ScanFailureReason)> onPluginBlacklisted;  // Called when a plugin is auto-blacklisted
 
     // Persistence
     void savePluginList();
@@ -92,8 +102,24 @@ private:
     // Out-of-process scanning methods
     void collectPluginsToScan();
     void scanNextPluginOutOfProcess();
-    bool scanPluginWithHelper(const juce::String& formatName, const juce::String& pluginPath);
-    bool parseHelperOutput(const juce::String& output, const juce::String& pluginPath);
+    void processPendingScanResult();
+
+    // Result from a background scan — includes parsed plugins for thread-safe handoff
+    struct BackgroundScanResult
+    {
+        ScanPluginResult scanResult;
+        std::vector<juce::PluginDescription> discoveredPlugins;
+        juce::String pluginPath;
+    };
+
+    // Runs in background thread — must NOT mutate shared state (knownPlugins, etc.)
+    BackgroundScanResult scanPluginWithHelper(const juce::String& formatName, const juce::String& pluginPath);
+
+    // Background scanning state
+    std::thread scanThread;
+    std::atomic<bool> backgroundScanInProgress { false };
+    std::atomic<bool> hasPendingScanResult { false };
+    BackgroundScanResult pendingScanResult;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };

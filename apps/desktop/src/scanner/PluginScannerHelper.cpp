@@ -11,6 +11,20 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <iostream>
+#include <csignal>
+#include <unistd.h>
+
+//==============================================================================
+// Signal handler for crash recovery.
+// When a plugin causes a segfault/abort, this writes SCAN_FAILED to stdout
+// before dying so the host can detect the failure via exit code.
+// Only uses async-signal-safe functions (write, _exit).
+static void crashSignalHandler(int signal)
+{
+    const char* msg = "SCAN_FAILED:Signal\n";
+    (void)write(STDOUT_FILENO, msg, 19);
+    _exit(128 + signal);
+}
 
 //==============================================================================
 class ScannerApplication : public juce::JUCEApplicationBase
@@ -22,6 +36,13 @@ public:
 
     void initialise(const juce::String& commandLine) override
     {
+        // Install signal handlers FIRST so any crash during scanning writes
+        // SCAN_FAILED to stdout before the process dies
+        std::signal(SIGSEGV, crashSignalHandler);
+        std::signal(SIGABRT, crashSignalHandler);
+        std::signal(SIGBUS,  crashSignalHandler);
+        std::signal(SIGFPE,  crashSignalHandler);
+
         juce::StringArray args = juce::JUCEApplicationBase::getCommandLineParameterArray();
 
         if (args.size() < 2)
@@ -65,7 +86,7 @@ public:
         if (results.isEmpty())
         {
             std::cout << "SCAN_FAILED:No plugins found" << std::endl;
-            setApplicationReturnValue(1);
+            setApplicationReturnValue(1);  // Exit 1 = scan failure (likely license/auth issue)
             quit();
             return;
         }
@@ -104,7 +125,7 @@ public:
     void unhandledException(const std::exception*, const juce::String&, int) override
     {
         std::cout << "SCAN_FAILED:Exception" << std::endl;
-        setApplicationReturnValue(1);
+        setApplicationReturnValue(2);  // Exit 2 = exception caught (crash-like)
     }
 };
 

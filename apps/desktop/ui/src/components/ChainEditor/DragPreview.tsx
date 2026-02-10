@@ -50,7 +50,6 @@ export function DragPreview({ node }: DragPreviewProps) {
         className={`
           rounded-lg border ${accentColor} ${bgColor} animate-scale-in
           shadow-[0_4px_24px_rgba(137,87,42,0.3),0_0_0_1px_rgba(255,255,255,0.05)]
-          backdrop-blur-sm
           w-[220px] pointer-events-none
         `}
       >

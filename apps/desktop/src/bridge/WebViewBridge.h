@@ -5,6 +5,8 @@
 #include "../core/ChainProcessor.h"
 #include "../core/PresetManager.h"
 #include "../core/ParameterDiscovery.h"
+#include "../core/InstanceRegistry.h"
+#include "../core/MirrorManager.h"
 #include <atomic>
 
 class WaveformCapture;
@@ -12,7 +14,9 @@ class GainProcessor;
 class AudioMeter;
 class FFTProcessor;
 
-class WebViewBridge : private juce::Timer
+class WebViewBridge : private juce::Timer,
+                      private InstanceRegistry::Listener,
+                      private MirrorManager::Listener
 {
 public:
     WebViewBridge(PluginManager& pluginManager,
@@ -37,6 +41,19 @@ public:
     // Set FFT processor reference (for streaming spectrum data)
     void setFFTProcessor(FFTProcessor* processor) { fftProcessor = processor; }
 
+    // Set instance registry and mirror manager references
+    void setInstanceRegistry(InstanceRegistry* reg, InstanceId id) {
+        instanceRegistry = reg;
+        instanceId = id;
+        if (instanceRegistry)
+            instanceRegistry->addListener(this);
+    }
+    void setMirrorManager(MirrorManager* mm) {
+        mirrorManager = mm;
+        if (mirrorManager)
+            mirrorManager->addListener(this);
+    }
+
     // Event emission to JavaScript
     void emitEvent(const juce::String& eventName, const juce::var& data);
 
@@ -46,6 +63,13 @@ public:
 private:
     // Timer callback for waveform streaming
     void timerCallback() override;
+
+    // InstanceRegistry::Listener
+    void instanceRegistryChanged() override;
+
+    // MirrorManager::Listener
+    void mirrorStateChanged() override;
+    void mirrorUpdateApplied() override;
 
     // Native function implementations
     juce::var getPluginList();
@@ -104,6 +128,15 @@ private:
     // Parameter discovery
     juce::var discoverPluginParameters(int nodeId);
 
+    // Instance awareness
+    juce::var getOtherInstances();
+    juce::var copyChainFromInstance(int targetInstanceId);
+
+    // Mirror management
+    juce::var startMirrorOp(int targetInstanceId);
+    juce::var stopMirrorOp();
+    juce::var getMirrorStateOp();
+
     PluginManager& pluginManager;
     ChainProcessor& chainProcessor;
     PresetManager& presetManager;
@@ -113,6 +146,9 @@ private:
     AudioMeter* inputMeter = nullptr;
     AudioMeter* outputMeter = nullptr;
     FFTProcessor* fftProcessor = nullptr;
+    InstanceRegistry* instanceRegistry = nullptr;
+    InstanceId instanceId = -1;
+    MirrorManager* mirrorManager = nullptr;
     bool waveformStreamActive = false;
     std::atomic<bool> matchLockEnabled{false};
     std::atomic<float> matchLockReferenceOffset{0.0f};  // Target offset in dB, captured on enable

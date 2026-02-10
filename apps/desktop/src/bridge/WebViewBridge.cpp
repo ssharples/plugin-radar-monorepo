@@ -2,6 +2,7 @@
 #include "ResourceProvider.h"
 #include "../core/ChainNode.h"
 #include "../core/ParameterDiscovery.h"
+#include "../PluginProcessor.h"
 #include "../audio/WaveformCapture.h"
 #include "../audio/GainProcessor.h"
 #include "../audio/AudioMeter.h"
@@ -22,6 +23,10 @@ WebViewBridge::WebViewBridge(PluginManager& pm,
 WebViewBridge::~WebViewBridge()
 {
     stopTimer();
+    if (instanceRegistry)
+        instanceRegistry->removeListener(this);
+    if (mirrorManager)
+        mirrorManager->removeListener(this);
 }
 
 juce::WebBrowserComponent::Options WebViewBridge::getOptions()
@@ -637,6 +642,38 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 completion(juce::var(result));
             }
         })
+        // ============================================
+        // Instance Awareness & Chain Copy/Mirror
+        // ============================================
+        .withNativeFunction("getOtherInstances", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            completion(getOtherInstances());
+        })
+        .withNativeFunction("copyChainFromInstance", [this](const juce::Array<juce::var>& args,
+                                                             juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+                completion(copyChainFromInstance(static_cast<int>(args[0])));
+            else
+                completion(juce::var());
+        })
+        .withNativeFunction("startMirror", [this](const juce::Array<juce::var>& args,
+                                                   juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+                completion(startMirrorOp(static_cast<int>(args[0])));
+            else
+                completion(juce::var());
+        })
+        .withNativeFunction("stopMirror", [this](const juce::Array<juce::var>& args,
+                                                  juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            completion(stopMirrorOp());
+        })
+        .withNativeFunction("getMirrorState", [this](const juce::Array<juce::var>& args,
+                                                      juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            completion(getMirrorStateOp());
+        })
         .withResourceProvider([this](const juce::String& url) {
             return resourceHandler(url);
         }, juce::URL("https://ui.local").getOrigin());
@@ -671,7 +708,10 @@ void WebViewBridge::bindCallbacks()
         emitEvent("pluginListChanged", getPluginList());
     };
 
-    chainProcessor.onChainChanged = [this]() {
+    // Wrap existing onChainChanged callback (set by PluginProcessor for registry updates)
+    auto existingChainCallback = chainProcessor.onChainChanged;
+    chainProcessor.onChainChanged = [this, existingChainCallback]() {
+        if (existingChainCallback) existingChainCallback();
         emitEvent("chainChanged", getChainState());
     };
 
@@ -686,11 +726,22 @@ void WebViewBridge::bindCallbacks()
             emitEvent("presetLoaded", juce::var());
     };
 
-    pluginManager.onPluginBlacklisted = [this](const juce::String& pluginPath) {
+    pluginManager.onPluginBlacklisted = [this](const juce::String& pluginPath, ScanFailureReason reason) {
         auto* obj = new juce::DynamicObject();
         obj->setProperty("path", pluginPath);
         obj->setProperty("name", juce::File(pluginPath).getFileNameWithoutExtension());
-        obj->setProperty("reason", "Plugin caused a crash during scanning and was automatically blacklisted");
+
+        // Map enum to string for JS consumption
+        juce::String reasonStr;
+        switch (reason)
+        {
+            case ScanFailureReason::Crash:       reasonStr = "crash"; break;
+            case ScanFailureReason::ScanFailure: reasonStr = "scan-failure"; break;
+            case ScanFailureReason::Timeout:     reasonStr = "timeout"; break;
+            default:                             reasonStr = "crash"; break;
+        }
+        obj->setProperty("reason", reasonStr);
+
         emitEvent("pluginBlacklisted", juce::var(obj));
         emitEvent("blacklistChanged", getBlacklist());
     };
@@ -1751,6 +1802,171 @@ juce::var WebViewBridge::discoverPluginParameters(int nodeId)
 
     result->setProperty("success", true);
     result->setProperty("map", ParameterDiscovery::toJson(discoveredMap));
+
+    return juce::var(result);
+}
+
+//==============================================================================
+// Instance Awareness & Chain Copy/Mirror
+//==============================================================================
+
+void WebViewBridge::instanceRegistryChanged()
+{
+    if (!instanceRegistry)
+        return;
+
+    emitEvent("instancesChanged", getOtherInstances());
+}
+
+void WebViewBridge::mirrorStateChanged()
+{
+    emitEvent("mirrorStateChanged", getMirrorStateOp());
+}
+
+void WebViewBridge::mirrorUpdateApplied()
+{
+    emitEvent("mirrorUpdateApplied", juce::var());
+}
+
+juce::var WebViewBridge::getOtherInstances()
+{
+    if (!instanceRegistry)
+        return juce::var(juce::Array<juce::var>());
+
+    auto others = instanceRegistry->getOtherInstances(instanceId);
+
+    juce::Array<juce::var> result;
+    for (const auto& info : others)
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("id", info.id);
+        obj->setProperty("trackName", info.trackName);
+        obj->setProperty("pluginCount", info.pluginCount);
+
+        juce::Array<juce::var> namesArr;
+        for (const auto& name : info.pluginNames)
+            namesArr.add(name);
+        obj->setProperty("pluginNames", namesArr);
+
+        result.add(juce::var(obj));
+    }
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::copyChainFromInstance(int targetInstanceId)
+{
+    auto* result = new juce::DynamicObject();
+
+    if (!instanceRegistry)
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Instance registry not available");
+        return juce::var(result);
+    }
+
+    auto targetInfo = instanceRegistry->getInstanceInfo(targetInstanceId);
+    if (!targetInfo.processor)
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Target instance not found");
+        return juce::var(result);
+    }
+
+    // Get the source processor's ChainProcessor
+    auto* sourceProcessor = dynamic_cast<PluginChainManagerProcessor*>(targetInfo.processor);
+    if (!sourceProcessor)
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Invalid source processor");
+        return juce::var(result);
+    }
+
+    // Export chain from source (safe — message thread, const read)
+    auto chainData = sourceProcessor->getChainProcessor().exportChainWithPresets();
+
+    // Import into local chain
+    bool success = chainProcessor.importChainWithPresets(chainData);
+
+    result->setProperty("success", success);
+    if (success)
+        result->setProperty("chainState", getChainState());
+    else
+        result->setProperty("error", "Failed to import chain from source instance");
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::startMirrorOp(int targetInstanceId)
+{
+    auto* result = new juce::DynamicObject();
+
+    if (!mirrorManager)
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Mirror manager not available");
+        return juce::var(result);
+    }
+
+    int groupId = mirrorManager->startMirror(targetInstanceId);
+    if (groupId >= 0)
+    {
+        result->setProperty("success", true);
+        result->setProperty("mirrorGroupId", groupId);
+    }
+    else
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Failed to create mirror group");
+    }
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::stopMirrorOp()
+{
+    auto* result = new juce::DynamicObject();
+
+    if (!mirrorManager)
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Mirror manager not available");
+        return juce::var(result);
+    }
+
+    mirrorManager->leaveMirrorGroup();
+    result->setProperty("success", true);
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::getMirrorStateOp()
+{
+    auto* result = new juce::DynamicObject();
+
+    if (!mirrorManager)
+    {
+        result->setProperty("isMirrored", false);
+        return juce::var(result);
+    }
+
+    result->setProperty("isMirrored", mirrorManager->isMirrored());
+    result->setProperty("mirrorGroupId", mirrorManager->getMirrorGroupId());
+
+    auto partnerIds = mirrorManager->getPartnerIds();
+    juce::Array<juce::var> partners;
+    if (instanceRegistry)
+    {
+        for (auto pid : partnerIds)
+        {
+            auto partnerInfo = instanceRegistry->getInstanceInfo(pid);
+            auto* partnerObj = new juce::DynamicObject();
+            partnerObj->setProperty("id", pid);
+            partnerObj->setProperty("trackName", partnerInfo.trackName);
+            partners.add(juce::var(partnerObj));
+        }
+    }
+    result->setProperty("partners", partners);
 
     return juce::var(result);
 }

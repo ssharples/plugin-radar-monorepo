@@ -32,6 +32,16 @@ public:
         int numSteps = 0;               // 0 = continuous
         juce::String label;             // Unit label from JUCE (e.g., "Hz", "dB")
         bool matched = false;           // Whether semantic matching succeeded
+
+        // NormalisableRange data (from RangedAudioParameter)
+        float rangeStart = 0.0f;
+        float rangeEnd = 1.0f;
+        float skewFactor = 1.0f;
+        bool symmetricSkew = false;
+        float interval = 0.0f;
+        bool hasNormalisableRange = false;
+        juce::Array<std::pair<float, float>> curveSamples; // [{normalized, physical}]
+        juce::String qRepresentation;   // "q_factor" | "bandwidth_octaves" | ""
     };
 
     struct DiscoveredMap
@@ -108,6 +118,12 @@ private:
     static void extractPhysicalRange(juce::AudioProcessorParameter* param,
                                       float& outMin, float& outMax,
                                       juce::String& textAtMin, juce::String& textAtMax);
+
+public:
+    /** Parse a float from a text string (strips non-numeric chars). */
+    static float parseFloatFromText(const juce::String& text);
+
+private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ParameterDiscovery)
 };

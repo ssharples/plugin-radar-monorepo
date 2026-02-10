@@ -73,6 +73,100 @@ function normalize(
 }
 
 // ============================================
+// Helper: Denormalize using exact JUCE NormalisableRange skew formula
+// physical = start + (end - start) * proportion^(1/skew)
+// ============================================
+function denormalizeWithSkew(
+  normalized: number,
+  start: number,
+  end: number,
+  skew: number,
+  symmetricSkew: boolean
+): number {
+  const clamped = Math.max(0, Math.min(1, normalized));
+
+  if (skew === 1.0) {
+    // Linear case — no skew
+    return start + (end - start) * clamped;
+  }
+
+  if (symmetricSkew) {
+    // Symmetric skew: apply skew to each half separately
+    const mid = (start + end) * 0.5;
+    if (clamped < 0.5) {
+      const proportion = clamped * 2.0;
+      return start + (mid - start) * Math.pow(proportion, 1.0 / skew);
+    } else {
+      const proportion = (clamped - 0.5) * 2.0;
+      return mid + (end - mid) * Math.pow(proportion, 1.0 / skew);
+    }
+  }
+
+  // Standard skew: physical = start + (end - start) * normalized^(1/skew)
+  return start + (end - start) * Math.pow(clamped, 1.0 / skew);
+}
+
+// ============================================
+// Helper: Normalize using exact JUCE NormalisableRange skew formula
+// normalized = ((physical - start) / (end - start))^skew
+// ============================================
+function normalizeWithSkew(
+  physical: number,
+  start: number,
+  end: number,
+  skew: number,
+  symmetricSkew: boolean
+): number {
+  const range = end - start;
+  if (range <= 0) return 0;
+
+  const clampedPhysical = Math.max(start, Math.min(end, physical));
+
+  if (skew === 1.0) {
+    return (clampedPhysical - start) / range;
+  }
+
+  if (symmetricSkew) {
+    const mid = (start + end) * 0.5;
+    if (clampedPhysical < mid) {
+      const proportion = (clampedPhysical - start) / (mid - start);
+      return Math.pow(Math.max(0, proportion), skew) * 0.5;
+    } else {
+      const proportion = (clampedPhysical - mid) / (end - mid);
+      return 0.5 + Math.pow(Math.max(0, proportion), skew) * 0.5;
+    }
+  }
+
+  const proportion = (clampedPhysical - start) / range;
+  return Math.pow(Math.max(0, proportion), skew);
+}
+
+// ============================================
+// Helper: Convert between compatible units
+// ============================================
+function convertUnits(value: number, sourceUnit: string, targetUnit: string): number {
+  if (sourceUnit === targetUnit) return value;
+
+  // Q factor <-> bandwidth in octaves
+  // bandwidth = 2 * asinh(1 / (2 * Q)) / ln(2)
+  // Q = 1 / (2 * sinh(bandwidth * ln(2) / 2))
+  if (sourceUnit === "q_factor" && targetUnit === "bandwidth_octaves") {
+    if (value <= 0) return 1.0;
+    return (2 * Math.asinh(1 / (2 * value))) / Math.LN2;
+  }
+  if (sourceUnit === "bandwidth_octaves" && targetUnit === "q_factor") {
+    if (value <= 0) return 1.0;
+    return 1 / (2 * Math.sinh((value * Math.LN2) / 2));
+  }
+
+  // ms <-> s
+  if (sourceUnit === "ms" && targetUnit === "s") return value / 1000;
+  if (sourceUnit === "s" && targetUnit === "ms") return value * 1000;
+
+  return value; // No conversion possible
+}
+
+// ============================================
 // Helper: Map stepped parameter values between plugins
 // ============================================
 function translateSteppedValue(
@@ -190,6 +284,18 @@ export const upsertParameterMap = mutation({
         normalizedValue: v.number(),
         physicalValue: v.string(),
       }))),
+      // NormalisableRange data
+      rangeStart: v.optional(v.number()),
+      rangeEnd: v.optional(v.number()),
+      skewFactor: v.optional(v.number()),
+      symmetricSkew: v.optional(v.boolean()),
+      interval: v.optional(v.number()),
+      hasNormalisableRange: v.optional(v.boolean()),
+      curveSamples: v.optional(v.array(v.object({
+        normalized: v.number(),
+        physical: v.number(),
+      }))),
+      qRepresentation: v.optional(v.string()),
     })),
     eqBandCount: v.optional(v.number()),
     eqBandParameterPattern: v.optional(v.string()),
@@ -354,27 +460,60 @@ export const translateParameters = query({
         continue;
       } else {
         // Continuous-to-continuous translation
+        let physicalValue: number;
+
         // Step 1: Denormalize source value to physical units
-        const physicalValue = denormalize(
-          sourceParam.normalizedValue,
-          sourceDef.minValue,
-          sourceDef.maxValue,
-          sourceDef.mappingCurve
-        );
+        if (sourceDef.hasNormalisableRange && sourceDef.skewFactor !== undefined) {
+          // Use exact JUCE skew formula
+          physicalValue = denormalizeWithSkew(
+            sourceParam.normalizedValue,
+            sourceDef.rangeStart ?? sourceDef.minValue,
+            sourceDef.rangeEnd ?? sourceDef.maxValue,
+            sourceDef.skewFactor,
+            sourceDef.symmetricSkew ?? false
+          );
+        } else {
+          // Fall back to generic curve-based denormalization
+          physicalValue = denormalize(
+            sourceParam.normalizedValue,
+            sourceDef.minValue,
+            sourceDef.maxValue,
+            sourceDef.mappingCurve
+          );
+        }
 
-        // Step 2: Clamp to target range
-        const clampedPhysical = Math.max(
-          targetDef.minValue,
-          Math.min(targetDef.maxValue, physicalValue)
-        );
+        // Step 2: Unit conversion (e.g., Q factor <-> bandwidth octaves)
+        if (sourceDef.qRepresentation && targetDef.qRepresentation &&
+            sourceDef.qRepresentation !== targetDef.qRepresentation) {
+          physicalValue = convertUnits(physicalValue, sourceDef.qRepresentation, targetDef.qRepresentation);
+        } else if (sourceDef.physicalUnit !== targetDef.physicalUnit) {
+          physicalValue = convertUnits(physicalValue, sourceDef.physicalUnit, targetDef.physicalUnit);
+        }
 
-        // Step 3: Renormalize to target's 0-1 range
-        targetValue = normalize(
-          clampedPhysical,
-          targetDef.minValue,
-          targetDef.maxValue,
-          targetDef.mappingCurve
-        );
+        // Step 3: Clamp to target range
+        const targetMin = targetDef.rangeStart ?? targetDef.minValue;
+        const targetMax = targetDef.rangeEnd ?? targetDef.maxValue;
+        const clampedPhysical = Math.max(targetMin, Math.min(targetMax, physicalValue));
+
+        // Step 4: Renormalize to target's 0-1 range
+        if (targetDef.hasNormalisableRange && targetDef.skewFactor !== undefined) {
+          // Use exact JUCE skew formula
+          targetValue = normalizeWithSkew(
+            clampedPhysical,
+            targetMin,
+            targetMax,
+            targetDef.skewFactor,
+            targetDef.symmetricSkew ?? false
+          );
+        } else {
+          // Fall back to generic curve-based normalization
+          targetValue = normalize(
+            clampedPhysical,
+            targetDef.minValue,
+            targetDef.maxValue,
+            targetDef.mappingCurve
+          );
+        }
       }
 
       targetParams.push({

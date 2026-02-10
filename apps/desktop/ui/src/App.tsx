@@ -5,6 +5,8 @@ import { WaveformDisplay } from './components/WaveformDisplay';
 import { SpectrumAnalyzer } from './components/SpectrumAnalyzer';
 import { PresetModal } from './components/PresetBrowser';
 import { Footer } from './components/Footer';
+import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
+import { useOnboardingStore } from './stores/onboardingStore';
 import { usePresetStore } from './stores/presetStore';
 import { useSyncStore } from './stores/syncStore';
 import { useOfflineStore, startRetryLoop } from './stores/offlineStore';
@@ -64,9 +66,24 @@ function App() {
   const [specMode, setSpecMode] = useState<'bars' | 'line' | 'octave'>('bars');
   const [octaveMode, setOctaveMode] = useState<'third' | 'full'>('third');
 
+  const { isOnboardingComplete, initialize: initOnboarding } = useOnboardingStore();
   const { currentPreset, fetchPresets } = usePresetStore();
   const { initialize: initSync } = useSyncStore();
   const { initialize: initOffline } = useOfflineStore();
+
+  // Initialize onboarding check
+  useEffect(() => {
+    initOnboarding().catch(console.error);
+  }, [initOnboarding]);
+
+  // Show onboarding flow if not complete
+  if (!isOnboardingComplete) {
+    return (
+      <ErrorBoundary>
+        <OnboardingFlow />
+      </ErrorBoundary>
+    );
+  }
 
   useEffect(() => {
     fetchPresets();

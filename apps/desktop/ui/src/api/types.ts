@@ -180,6 +180,35 @@ export interface CollectionItem {
   notes?: string;
 }
 
+// Blacklisted plugin event (from scanner)
+export interface BlacklistedPluginEvent {
+  path: string
+  name: string
+  reason: string // 'crash' | 'scan-failure' | 'timeout'
+}
+
+// =============================================
+// Cross-Instance Awareness types
+// =============================================
+
+export interface OtherInstanceInfo {
+  id: number;
+  trackName: string;
+  pluginCount: number;
+  pluginNames: string[];
+}
+
+export interface MirrorPartner {
+  id: number;
+  trackName: string;
+}
+
+export interface MirrorState {
+  isMirrored: boolean;
+  mirrorGroupId: number | null;
+  partners: MirrorPartner[];
+}
+
 // Native function types for JUCE bridge
 export type NativeFunction = (...args: unknown[]) => Promise<unknown>;
 

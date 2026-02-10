@@ -1,0 +1,65 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript-tests:
+    name: TypeScript Tests (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop/ui
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Run Vitest
+        run: pnpm test
+
+  cpp-tests:
+    name: C++ Tests (Catch2 + JUCE)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CMake FetchContent (JUCE + Catch2)
+        uses: actions/cache@v4
+        with:
+          path: apps/desktop/build/_deps
+          key: fetchcontent-${{ runner.os }}-juce8.0.4-catch2v3.5.2
+          restore-keys: |
+            fetchcontent-${{ runner.os }}-
+
+      - name: CMake configure
+        working-directory: apps/desktop
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build test target
+        working-directory: apps/desktop
+        run: cmake --build build --target PluginChainManager_Tests --parallel
+
+      - name: Run tests
+        working-directory: apps/desktop/build
+        run: ctest --output-on-failure

@@ -40,6 +40,8 @@ target_sources(PluginChainManager
         src/core/ChainNode.cpp
         src/core/PresetManager.cpp
         src/core/ParameterDiscovery.cpp
+        src/core/InstanceRegistry.cpp
+        src/core/MirrorManager.cpp
         src/core/UserProfile.cpp
         src/core/ChainSharingManager.cpp
         src/bridge/WebViewBridge.cpp
@@ -133,3 +135,60 @@ add_custom_command(TARGET PluginScannerHelper POST_BUILD
 
 # Make sure scanner is built before the main plugin
 add_dependencies(PluginChainManager_Standalone PluginScannerHelper)
+
+#==============================================================================
+# Tests - Catch2 unit tests for scanner and plugin management logic
+#==============================================================================
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.5.2
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(Catch2)
+
+add_executable(PluginChainManager_Tests
+    tests/ScannerUtilsTests.cpp
+    tests/BlacklistTests.cpp
+    tests/ChainNodeTests.cpp
+    tests/DSPTests.cpp
+    tests/PresetSerializationTests.cpp
+    tests/ParameterDiscoveryTests.cpp
+    src/core/PluginManager.cpp
+    src/core/ChainNode.cpp
+    src/core/ParameterDiscovery.cpp
+    src/audio/DryWetMixProcessor.cpp
+    src/audio/BranchGainProcessor.cpp
+    src/audio/LatencyCompensationProcessor.cpp
+    src/audio/GainProcessor.cpp
+    src/audio/AudioMeter.cpp
+)
+
+target_include_directories(PluginChainManager_Tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(PluginChainManager_Tests
+    PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_PLUGINHOST_AU=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_DISPLAY_SPLASH_SCREEN=0
+)
+
+target_link_libraries(PluginChainManager_Tests
+    PRIVATE
+        Catch2::Catch2WithMain
+        juce::juce_audio_processors
+        juce::juce_audio_utils
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+)
+
+include(CTest)
+list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+include(Catch)
+catch_discover_tests(PluginChainManager_Tests)

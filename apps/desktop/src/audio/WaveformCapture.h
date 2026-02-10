@@ -12,8 +12,9 @@
  * Safe to call from the audio thread (pushPreSamples/pushPostSamples).
  * Safe to call from the UI thread (getPrePeaks/getPostPeaks).
  *
- * Supports latency compensation - the pre (input) signal can be delayed
- * to align with the post (output) signal when plugins introduce latency.
+ * Uses a shared write index so pre (input) and post (output) peaks are
+ * always time-aligned in the ring buffer. Supports latency compensation
+ * via a delay line on the pre signal.
  */
 class WaveformCapture
 {
@@ -44,103 +45,17 @@ public:
     void reset();
 
 private:
-    // Ring buffer for peak values
-    struct PeakBuffer
-    {
-        std::array<std::atomic<float>, NUM_PEAKS> peaks;
-        std::atomic<size_t> writeIndex{0};
+    // Shared write index — both pre and post write to the same slot
+    std::atomic<size_t> sharedWriteIndex{0};
 
-        // Accumulator for computing peaks
-        std::atomic<float> accumulator{0.0f};
-        std::atomic<int> sampleCount{0};
+    // Peak arrays (no per-buffer write index)
+    std::array<std::atomic<float>, NUM_PEAKS> prePeaks;
+    std::array<std::atomic<float>, NUM_PEAKS> postPeaks;
 
-        PeakBuffer()
-        {
-            for (auto& p : peaks)
-                p.store(0.0f, std::memory_order_relaxed);
-        }
-
-        void pushPeak(float peak)
-        {
-            // Update accumulator
-            float currentAcc = accumulator.load(std::memory_order_relaxed);
-            int currentCount = sampleCount.load(std::memory_order_relaxed);
-
-            currentAcc = std::max(currentAcc, peak);
-            currentCount += SAMPLES_PER_PEAK;  // We're receiving pre-computed peaks
-
-            if (currentCount >= SAMPLES_PER_PEAK)
-            {
-                size_t idx = writeIndex.load(std::memory_order_relaxed);
-                peaks[idx].store(currentAcc, std::memory_order_relaxed);
-                writeIndex.store((idx + 1) % NUM_PEAKS, std::memory_order_release);
-                accumulator.store(0.0f, std::memory_order_relaxed);
-                sampleCount.store(0, std::memory_order_relaxed);
-            }
-            else
-            {
-                accumulator.store(currentAcc, std::memory_order_relaxed);
-                sampleCount.store(currentCount, std::memory_order_relaxed);
-            }
-        }
-
-        void pushSamples(const juce::AudioBuffer<float>& buffer)
-        {
-            // Compute peak of incoming buffer (across all channels)
-            float peak = 0.0f;
-            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-            {
-                auto range = juce::FloatVectorOperations::findMinAndMax(
-                    buffer.getReadPointer(ch), buffer.getNumSamples());
-                peak = std::max(peak, std::max(std::abs(range.getStart()), std::abs(range.getEnd())));
-            }
-
-            // Update accumulator
-            float currentAcc = accumulator.load(std::memory_order_relaxed);
-            int currentCount = sampleCount.load(std::memory_order_relaxed);
-
-            currentAcc = std::max(currentAcc, peak);
-            currentCount += buffer.getNumSamples();
-
-            if (currentCount >= SAMPLES_PER_PEAK)
-            {
-                size_t idx = writeIndex.load(std::memory_order_relaxed);
-                peaks[idx].store(currentAcc, std::memory_order_relaxed);
-                writeIndex.store((idx + 1) % NUM_PEAKS, std::memory_order_release);
-                accumulator.store(0.0f, std::memory_order_relaxed);
-                sampleCount.store(0, std::memory_order_relaxed);
-            }
-            else
-            {
-                accumulator.store(currentAcc, std::memory_order_relaxed);
-                sampleCount.store(currentCount, std::memory_order_relaxed);
-            }
-        }
-
-        std::vector<float> getPeaks() const
-        {
-            std::vector<float> result(NUM_PEAKS);
-            size_t writeIdx = writeIndex.load(std::memory_order_acquire);
-
-            // Read from oldest to newest
-            for (size_t i = 0; i < NUM_PEAKS; ++i)
-            {
-                size_t readIdx = (writeIdx + i) % NUM_PEAKS;
-                result[i] = peaks[readIdx].load(std::memory_order_relaxed);
-            }
-
-            return result;
-        }
-
-        void reset()
-        {
-            for (auto& p : peaks)
-                p.store(0.0f, std::memory_order_relaxed);
-            writeIndex.store(0, std::memory_order_relaxed);
-            accumulator.store(0.0f, std::memory_order_relaxed);
-            sampleCount.store(0, std::memory_order_relaxed);
-        }
-    };
+    // Shared sample accumulator — driven by pushPostSamples (the "clock")
+    float preAccumulator = 0.0f;
+    float postAccumulator = 0.0f;
+    int sampleCount = 0;  // Single counter shared between pre and post
 
     // Delay line for latency compensation (stores peaks, not samples)
     static constexpr size_t MAX_DELAY_PEAKS = MAX_DELAY_SAMPLES / SAMPLES_PER_PEAK + 1;
@@ -148,13 +63,7 @@ private:
     size_t delayWritePos = 0;
     size_t delayReadPos = 0;
     std::atomic<int> delayInPeaks{0};
-
-    // Temporary accumulator for pre-samples before delay
-    float preAccumulator = 0.0f;
-    int preSampleCount = 0;
-
-    PeakBuffer preBuffer;
-    PeakBuffer postBuffer;
+    size_t peaksInDelayLine = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WaveformCapture)
 };

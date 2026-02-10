@@ -40,6 +40,10 @@ void PluginChainManagerEditor::initializeWebView()
     // Pass FFT processor to the bridge for spectrum analysis
     webViewBridge->setFFTProcessor(&processorRef.getFFTProcessor());
 
+    // Pass instance registry and mirror manager for cross-instance awareness
+    webViewBridge->setInstanceRegistry(&processorRef.getInstanceRegistry(), processorRef.getInstanceId());
+    webViewBridge->setMirrorManager(&processorRef.getMirrorManager());
+
     // Create WebBrowserComponent with native function bindings
     webBrowser = std::make_unique<juce::WebBrowserComponent>(webViewBridge->getOptions());
     webBrowser->setWantsKeyboardFocus(true);  // Allow WebView to receive keyboard events when focused

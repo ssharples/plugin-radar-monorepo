@@ -65,6 +65,11 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
   const [forkName, setForkName] = useState('');
   const [showForkInput, setShowForkInput] = useState(false);
   const [forking, setForking] = useState(false);
+  const [substitutions, setSubstitutions] = useState<Map<number, {
+    originalName: string;
+    altName: string;
+    altManufacturer: string;
+  }>>(new Map());
 
   // Fetch chains on filter change
   useEffect(() => {
@@ -106,29 +111,48 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
   const totalPages = Math.max(1, Math.ceil(filteredChains.length / PAGE_SIZE));
   const pageChains = filteredChains.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
+  const handleSubstitute = useCallback((position: number, originalName: string, alt: { name: string; manufacturer: string }) => {
+    setSubstitutions((prev) => {
+      const next = new Map(prev);
+      next.set(position, { originalName, altName: alt.name, altManufacturer: alt.manufacturer });
+      return next;
+    });
+  }, []);
+
+  const handleUndoSubstitute = useCallback((position: number) => {
+    setSubstitutions((prev) => {
+      const next = new Map(prev);
+      next.delete(position);
+      return next;
+    });
+  }, []);
+
   const handleLoadChain = useCallback(
     async (chain: any) => {
       // Record download
       downloadChain(chain._id);
 
-      // Build import data
+      // Build import data — apply substitutions
       const chainData = {
         version: 1,
         numSlots: chain.slots.length,
-        slots: chain.slots.map((slot: any, idx: number) => ({
-          type: 'plugin',
-          id: idx + 1,
-          index: slot.position ?? idx,
-          name: slot.pluginName,
-          manufacturer: slot.manufacturer,
-          format: slot.format || 'VST3',
-          uid: slot.uid || 0,
-          fileOrIdentifier: slot.fileOrIdentifier || '',
-          version: slot.version || '',
-          bypassed: slot.bypassed ?? false,
-          presetData: slot.presetData || '',
-          presetSizeBytes: slot.presetSizeBytes || 0,
-        })),
+        slots: chain.slots.map((slot: any, idx: number) => {
+          const sub = substitutions.get(slot.position ?? idx);
+          return {
+            type: 'plugin',
+            id: idx + 1,
+            index: slot.position ?? idx,
+            name: sub ? sub.altName : slot.pluginName,
+            manufacturer: sub ? sub.altManufacturer : slot.manufacturer,
+            format: slot.format || 'VST3',
+            uid: sub ? 0 : (slot.uid || 0),
+            fileOrIdentifier: sub ? '' : (slot.fileOrIdentifier || ''),
+            version: slot.version || '',
+            bypassed: slot.bypassed ?? false,
+            presetData: sub ? '' : (slot.presetData || ''),
+            presetSizeBytes: sub ? 0 : (slot.presetSizeBytes || 0),
+          };
+        }),
       };
 
       const result = await juceBridge.importChain(chainData);
@@ -138,11 +162,12 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
         onClose();
       }
     },
-    [downloadChain, setChainName, setTargetInputLufs, onClose]
+    [downloadChain, setChainName, setTargetInputLufs, onClose, substitutions]
   );
 
   const handlePreview = useCallback(
     async (chain: any) => {
+      setSubstitutions(new Map());
       const full = await loadChain(chain.slug);
       if (full) {
         setPreviewChain(full);
@@ -328,22 +353,53 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                     (m) =>
                       m.pluginName.toLowerCase() === slot.pluginName.toLowerCase()
                   );
+                  const missingSlot = isMissing
+                    ? detailedCompatibility?.slots?.find(
+                        (s) => s.pluginName.toLowerCase() === slot.pluginName.toLowerCase() && s.status === 'missing'
+                      )
+                    : undefined;
+                  const sub = substitutions.get(slot.position ?? idx);
                   return (
                     <div
                       key={idx}
-                      className={`flex items-center justify-between px-3 py-2 rounded text-xs ${
-                        isMissing ? 'bg-red-500/5 border border-red-500/10' : 'bg-white/3'
+                      className={`px-3 py-2 rounded text-xs ${
+                        isMissing && !sub ? 'bg-red-500/5 border border-red-500/10' : sub ? 'bg-green-500/5 border border-green-500/10' : 'bg-white/3'
                       }`}
                     >
-                      <div>
-                        <span className="text-plugin-text">{slot.pluginName}</span>
-                        <span className="text-plugin-dim ml-1.5">{slot.manufacturer}</span>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-plugin-text">{slot.pluginName}</span>
+                          <span className="text-plugin-dim ml-1.5">{slot.manufacturer}</span>
+                        </div>
+                        {sub ? (
+                          <span className="text-green-400 text-[10px]">✓ {sub.altName}</span>
+                        ) : isMissing ? (
+                          <span className="text-red-400 text-[10px]">Missing</span>
+                        ) : (
+                          <span className="text-green-400 text-[10px]">✓</span>
+                        )}
                       </div>
-                      {isMissing ? (
-                        <span className="text-red-400 text-[10px]">Missing</span>
-                      ) : (
-                        <span className="text-green-400 text-[10px]">✓</span>
-                      )}
+                      {isMissing && !sub && missingSlot?.alternatives?.length ? (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {missingSlot.alternatives.map((alt, j) => (
+                            <button
+                              key={j}
+                              onClick={() => handleSubstitute(slot.position ?? idx, slot.pluginName, alt)}
+                              className="px-1.5 py-0.5 bg-plugin-accent/20 text-plugin-accent
+                                         hover:bg-plugin-accent/30 rounded text-[10px] transition-colors"
+                            >
+                              Use {alt.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : sub ? (
+                        <button
+                          onClick={() => handleUndoSubstitute(slot.position ?? idx)}
+                          className="mt-0.5 text-plugin-muted hover:text-white text-[10px] underline"
+                        >
+                          undo
+                        </button>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -367,7 +423,9 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                 className="flex-1 flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded-lg px-4 py-2 text-xs font-mono uppercase font-bold transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
-                Load Chain
+                {substitutions.size > 0
+                  ? `Load with ${substitutions.size} swap${substitutions.size > 1 ? 's' : ''}`
+                  : 'Load Chain'}
               </button>
               {isLoggedIn && (
                 <button

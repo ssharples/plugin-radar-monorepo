@@ -53,6 +53,18 @@ interface CloudChainState {
       manufacturer: string;
       suggestion: string | null;
     }>;
+    slots?: Array<{
+      position: number;
+      pluginName: string;
+      manufacturer: string;
+      status: "owned" | "missing";
+      alternatives: Array<{
+        id: string;
+        name: string;
+        manufacturer: string;
+        slug?: string;
+      }>;
+    }>;
   } | null;
   loading: boolean;
   saving: boolean;

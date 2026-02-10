@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { Layers, GitBranch, X } from 'lucide-react';
+import { Layers, GitBranch, X, ArrowLeftRight } from 'lucide-react';
 import type { PluginNodeUI, ChainSlot as ChainSlotType } from '../../api/types';
 import { useChainStore } from '../../stores/chainStore';
 import { PluginSwapMenu } from './PluginSwapMenu';
@@ -426,6 +426,19 @@ export const ChainSlot = memo(function ChainSlot({
             >
               <img src={bypassIconSvg} alt="" className="w-full h-full" draggable={false} />
             </button>
+
+            {/* Swap icon button — only when matched to catalog */}
+            {matchedPluginId && (
+              <button
+                className="absolute opacity-50 hover:opacity-100 hover:text-plugin-accent transition-all text-white/60"
+                style={{ left: 45, top: 55, width: 12, height: 12 }}
+                onClick={(e) => { e.stopPropagation(); setShowSwapMenu(true); }}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Swap plugin"
+              >
+                <ArrowLeftRight className="w-full h-full" />
+              </button>
+            )}
 
             {/* L meter bar */}
             <div

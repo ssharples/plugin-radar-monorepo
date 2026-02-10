@@ -1185,6 +1185,18 @@ export default defineSchema({
         normalizedValue: v.number(),  // 0.0-1.0 JUCE value
         physicalValue: v.string(),    // "bell", "shelf_high", "hpf", etc.
       }))),
+      // NormalisableRange data (from JUCE RangedAudioParameter)
+      rangeStart: v.optional(v.number()),
+      rangeEnd: v.optional(v.number()),
+      skewFactor: v.optional(v.number()),
+      symmetricSkew: v.optional(v.boolean()),
+      interval: v.optional(v.number()),
+      hasNormalisableRange: v.optional(v.boolean()),
+      curveSamples: v.optional(v.array(v.object({
+        normalized: v.number(),
+        physical: v.number(),
+      }))),
+      qRepresentation: v.optional(v.string()),  // "q_factor" | "bandwidth_octaves"
     })),
 
     // EQ-specific metadata

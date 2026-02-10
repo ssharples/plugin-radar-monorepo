@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "core/MirrorManager.h"
 
 PluginChainManagerProcessor::PluginChainManagerProcessor()
     : AudioProcessor(BusesProperties()
@@ -22,10 +23,27 @@ PluginChainManagerProcessor::PluginChainManagerProcessor()
     chainProcessor.onParameterBindingChanged = [this]() {
         parameterPool.rebindAll(chainProcessor);
     };
+
+    // Register with the shared instance registry
+    instanceId = instanceRegistry->registerInstance(this);
+
+    // Set up chain changed callback for registry updates.
+    // WebViewBridge::bindCallbacks() will wrap this to also emit JS events.
+    chainProcessor.onChainChanged = [this]() {
+        updateRegistryInfo();
+    };
+
+    // Create mirror manager (Phase 3)
+    mirrorManager = std::make_unique<MirrorManager>(*this, *instanceRegistry);
 }
 
 PluginChainManagerProcessor::~PluginChainManagerProcessor()
 {
+    // Leave mirror group before deregistering
+    if (mirrorManager)
+        mirrorManager->leaveMirrorGroup();
+
+    instanceRegistry->deregisterInstance(instanceId);
 }
 
 const juce::String PluginChainManagerProcessor::getName() const
@@ -162,12 +180,93 @@ juce::AudioProcessorEditor* PluginChainManagerProcessor::createEditor()
 
 void PluginChainManagerProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    chainProcessor.getStateInformation(destData);
+    // Get chain state as binary (ChainProcessor encodes XML via copyXmlToBinary)
+    juce::MemoryBlock chainData;
+    chainProcessor.getStateInformation(chainData);
+
+    // Parse the chain XML to add mirror group info
+    if (auto xml = getXmlFromBinary(chainData.getData(), static_cast<int>(chainData.getSize())))
+    {
+        if (mirrorManager && mirrorManager->isMirrored())
+        {
+            auto* mirrorXml = xml->createNewChildElement("MirrorGroup");
+            mirrorXml->setAttribute("id", mirrorManager->getMirrorGroupId());
+        }
+
+        copyXmlToBinary(*xml, destData);
+    }
+    else
+    {
+        destData = chainData;
+    }
 }
 
 void PluginChainManagerProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    chainProcessor.setStateInformation(data, sizeInBytes);
+    int savedMirrorGroupId = -1;
+
+    // Check for mirror group info in the state XML
+    if (auto xml = getXmlFromBinary(data, sizeInBytes))
+    {
+        if (auto* mirrorXml = xml->getChildByName("MirrorGroup"))
+        {
+            savedMirrorGroupId = mirrorXml->getIntAttribute("id", -1);
+            xml->removeChildElement(mirrorXml, true);
+        }
+
+        // Re-encode without the MirrorGroup element and pass to chain processor
+        juce::MemoryBlock chainData;
+        copyXmlToBinary(*xml, chainData);
+        chainProcessor.setStateInformation(chainData.getData(), static_cast<int>(chainData.getSize()));
+    }
+    else
+    {
+        chainProcessor.setStateInformation(data, sizeInBytes);
+    }
+
+    // Attempt to reconnect mirror group from saved DAW session
+    if (savedMirrorGroupId > 0 && mirrorManager)
+    {
+        auto* mm = mirrorManager.get();
+        auto callback = [mm](int /*newGroupId*/) {
+            if (mm)
+                mm->rejoinMirror();
+        };
+
+        int result = instanceRegistry->requestMirrorReconnection(savedMirrorGroupId, instanceId, callback);
+        if (result >= 0)
+        {
+            // Match found immediately — partner already loaded
+            mirrorManager->rejoinMirror();
+        }
+    }
+
+    // Update registry with restored chain info
+    updateRegistryInfo();
+}
+
+void PluginChainManagerProcessor::updateTrackProperties(const TrackProperties& properties)
+{
+    trackName = properties.name.isNotEmpty() ? properties.name
+                                              : ("Instance #" + juce::String(instanceId));
+
+    updateRegistryInfo();
+}
+
+void PluginChainManagerProcessor::updateRegistryInfo()
+{
+    // Collect flat plugin names from the chain tree
+    auto flatPlugins = chainProcessor.getFlatPluginList();
+
+    InstanceInfo info;
+    info.id = instanceId;
+    info.trackName = trackName.isEmpty() ? ("Instance #" + juce::String(instanceId)) : trackName;
+    info.pluginCount = static_cast<int>(flatPlugins.size());
+
+    for (auto* leaf : flatPlugins)
+        info.pluginNames.add(leaf->description.name);
+
+    instanceRegistry->updateInstanceInfo(instanceId, info);
 }
 
 // This creates new instances of the plugin
