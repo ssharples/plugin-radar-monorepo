@@ -61,9 +61,11 @@ export interface WaveformData {
   post: number[];
 }
 
-// FFT data from spectrum analyzer
+// FFT data from spectrum analyzer (stereo)
 export interface FFTData {
-  magnitudes: number[];
+  magnitudes: number[];      // Mono average (backward compat)
+  magnitudesL?: number[];    // Left channel magnitudes
+  magnitudesR?: number[];    // Right channel magnitudes
   sampleRate: number;
   fftSize: number;
 }
@@ -318,6 +320,12 @@ export interface NewPluginsDetectedEvent {
 
 export interface PluginDescriptionWithStatus extends PluginDescription {
   isDeactivated?: boolean;
+}
+
+// Inline editor mode state (plugin editor embedded in host window)
+export interface InlineEditorState {
+  mode: 'webview' | 'plugin';
+  nodeId?: number;
 }
 
 // Unified chain item for merged local + cloud view

@@ -6,11 +6,27 @@
 
 ## TL;DR — The Five Things That Matter Most
 
-1. **Position as "GitHub for plugin chains"** — not "another plugin chainer." The social layer is the moat.
-2. **Lead with hip-hop/pop producers** — highest search volume, strongest sharing culture, youngest/most social demographic.
+1. **Position as "the fastest plugin workflow"** — single-window, keyboard-first mixing. The speed is the moat.
+2. **Lead with pro engineers and power producers** — efficiency seekers who value speed over social features.
 3. **Seed 200+ quality chains before launch** — cold start is the #1 risk. A ghost town kills the product.
 4. **Own "plugin chain" keywords** — no competitor invests in content marketing. The SEO opportunity is wide open.
 5. **Anti-Waves positioning** — open (any plugin), one-time ($25), community-owned. Waves' subscription backlash is your tailwind.
+
+---
+
+## Part 0: The Speed Angle
+
+The inline editor is the core differentiator. It eliminates window juggling entirely:
+
+- **Cmd+1 jumps to plugin 1, Cmd+2 to plugin 2, Cmd+0 back to chain view.** No clicking, no searching, no window management.
+- **Single-window mixing is a workflow revolution** for engineers on deadlines. Every plugin in your chain is one keystroke away. You never leave the ProChain window.
+- **No competitor offers this.** PatchWork opens separate plugin windows. StudioVerse is a separate app entirely. DAW native plugin editors are per-track and require clicking through menus. ProChain is the only chain host where you can navigate and edit plugins without ever switching windows.
+- **Key messaging:** "Mix without moving your mouse. One window. Keyboard shortcuts. Ship mixes faster."
+
+The speed angle reframes ProChain from "another plugin chainer" to "the fastest way to mix." This matters because:
+- Engineers who mix 3-5 tracks per day lose 20-30 minutes daily to window management
+- Keyboard-first workflow appeals to the same efficiency mindset as Vim, Raycast, and Arc Browser
+- "Fast" is easier to demo in a 30-second TikTok than "social chain sharing"
 
 ---
 
@@ -28,6 +44,8 @@
 
 ### What No Competitor Has
 
+- Single-window inline editor with keyboard navigation (Cmd+N to switch plugins)
+- Zero context-switching between plugin UIs and chain management
 - Vendor-agnostic chain sharing with social features (ratings, comments, forking)
 - Plugin compatibility checking ("you own 7/8 plugins in this chain")
 - Cross-instance mirroring between DAW tracks
@@ -35,9 +53,9 @@
 
 ### The Positioning Statement
 
-> **"The open plugin chain platform. Build, share, and discover signal chains for any plugin."**
+> **"The fastest mixing workflow. Build, navigate, and tweak plugin chains without ever leaving one window."**
 
-PatchWork is open but not social. StudioVerse is social but not open. ProChain is both.
+PatchWork is open but not social. StudioVerse is social but not open. ProChain is both — and faster than either.
 
 ---
 
@@ -53,6 +71,7 @@ PatchWork is open but not social. StudioVerse is social but not open. ProChain i
 | S4 | **Cross-instance mirroring** | Completely unique, solves a real multi-track workflow pain |
 | S5 | **Offline-first design** | Works in studios with no internet — critical for trust |
 | S6 | **Parameter translation engine** (crowdsourced) | Future moat for cross-plugin preset translation |
+| S7 | **Single-window keyboard-first workflow** | Inline editor + Cmd+1-9 switching. No competitor offers zero-context-switch plugin editing within a chain host. |
 
 ### Weaknesses
 
@@ -105,29 +124,39 @@ PatchWork is open but not social. StudioVerse is social but not open. ProChain i
 
 ## Part 3: Target Audience Strategy
 
-### Primary: Home Studio Producers (Hip-Hop / Pop / EDM)
+### Primary: Efficiency-Focused Mix Engineers
 
 **Why them first:**
-- Largest addressable market (millions vs. thousands of pro engineers)
-- Highest "vocal chain" search volume of any audience
-- Strongest sharing culture (Reddit, Discord, YouTube, TikTok)
-- $25 is an impulse buy for this demographic
-- Plugin Radar's free plugin database is the perfect top-of-funnel
+- Professionals who mix multiple tracks per day. Every second of window management adds up.
+- Care about: speed, keyboard shortcuts, minimal mouse usage, staying in flow state.
+- The inline editor and Cmd+1-9 navigation directly solve their biggest pain point: context-switching between plugin UIs.
+- A single endorsement from a known engineer is worth 100 blog posts — and engineers talk about workflow tools.
+- Reach through: Gearspace, Production Expert, Sound On Sound, Mix With The Masters community.
 
-**Messaging:** "Share your chain. Steal theirs. $25, no subscription."
+**Messaging:** "I need to check 8 plugins across 3 tracks in 30 seconds." ProChain makes that possible.
 
-### Secondary: Professional Mix Engineers
+### Secondary: Power Producers (Hip-Hop / Pop / EDM)
 
-- Smaller market but higher lifetime value and word-of-mouth authority
-- Care about: per-plugin metering, latency compensation, cross-instance mirroring
-- A single endorsement from a known engineer is worth 100 blog posts
-- Reach through: Gearspace, Production Expert, Sound On Sound
+- High output, deadline pressure, value workflow tools that save time.
+- Largest addressable market (millions vs. thousands of pro engineers).
+- Strongest sharing culture (Reddit, Discord, YouTube, TikTok).
+- $25 is an impulse buy for this demographic.
+- Plugin Radar's free plugin database is the perfect top-of-funnel.
 
-### Tertiary: Mastering Engineers
+**Messaging:** "Stop juggling plugin windows. Build your chain, navigate with shortcuts, ship more tracks."
 
-- Niche but high willingness to pay for precision tools
-- Care about: precise chain order, metering at every stage, parallel mid/side
-- Reach through: mastering-specific content, Ian Shepherd / Bob Katz communities
+### Tertiary: Recording Engineers
+
+- Need to make real-time mixing decisions during tracking sessions.
+- Single-window workflow means they can adjust a chain without leaving the session view.
+- Care about: speed during live takes, not disrupting performer flow, quick plugin access.
+- Reach through: recording studio communities, gear forums, studio owner networks.
+
+**Messaging:** "On-the-fly mixing without leaving your session. ProChain keeps up with the performance."
+
+### Long-Term Community Play
+
+Chain sharing and social features (ratings, comments, forking, following) remain a long-term community play, not the launch hook. Build the speed-first audience, then layer in social as the community grows.
 
 ### Genre Expansion Order
 
@@ -290,9 +319,11 @@ Each page: top community chains for that category + plugin links + "Load in ProC
 
 ### Why Should They Buy This Plugin?
 
-**For bedroom producers:** "Stop Googling vocal chains. Download real chains from real producers. Rate them, fork them, make them yours. Works with any plugin you own. Free during open beta."
+**For mix engineers:** "8 plugins, one window, zero mouse clicks. Cmd+1 through Cmd+8 to fly through your chain. Mix faster than you ever thought possible."
 
-**For mix engineers:** "Your chains deserve better than screenshots and text lists. Per-plugin metering, parallel routing with auto latency compensation, cross-instance mirroring between tracks. Share your workflow or keep it private."
+**For producers:** "Stop juggling plugin windows. Build your chain, navigate with keyboard shortcuts, tweak and move on. Ship more tracks."
+
+**For recording engineers:** "On-the-fly mixing in real time. Switch between plugins instantly without leaving your session. ProChain keeps up with the performance."
 
 **For educators:** "Teach signal flow visually. Share exact chains with students. Grade by comparing chains. The 'GitHub for plugin chains' that makes production education tangible."
 
@@ -367,6 +398,40 @@ The following pre-launch website work has been completed to align with this stra
 - [ ] Monitor chain load success rate (target: >90%)
 - [ ] Analyze Google Search Console data, optimize top-impression keywords
 - [ ] A/B test landing page CTAs based on traffic sources
+
+---
+
+## Part 9: The Inline Editor Advantage
+
+### Current Feature Set
+
+The inline editor is ProChain's signature differentiator. It embeds plugin UIs directly inside the ProChain window, eliminating the need to open separate floating windows for each plugin.
+
+- **Inline plugin editing:** Click any chain slot to open the plugin's UI inline, right inside the ProChain sidebar. No separate window, no window management.
+- **Cmd+1 through Cmd+9:** Jump directly to plugin 1-9 in the chain. Instant, keyboard-driven navigation.
+- **Cmd+0:** Return to the chain overview from any inline editor view.
+- **Shift+click:** Open the plugin in an external floating window as a fallback (for plugins with UI sizing issues or when a larger view is needed).
+
+### Planned Features
+
+- **Snapshot A/B/C/D from inline mode:** Compare up to 4 parameter snapshots per plugin without leaving the inline view. Toggle between snapshots with Cmd+Shift+1-4.
+- **Plugin reorder from sidebar:** Drag to rearrange chain order directly from the inline editor sidebar, without returning to the chain overview.
+- **Search overlay for quick swap (Cmd+K):** Press Shift+Enter to open a search overlay, type a plugin name, and swap the current slot instantly. No menus, no browsing.
+- **Metering panel:** Per-plugin input/output metering visible alongside the inline editor, so you can see the effect of every tweak in real time.
+
+### Competitive Comparison
+
+No other plugin chainer offers single-window editing with keyboard navigation:
+
+| Feature | ProChain | PatchWork | StudioVerse | MetaPlugin |
+|---------|----------|-----------|-------------|------------|
+| Inline plugin editor | Yes | No (separate windows) | No (separate app) | No (separate windows) |
+| Keyboard plugin switching | Cmd+1-9 | No | No | No |
+| Single-window workflow | Yes | No | No | No |
+| Snapshot A/B/C/D from inline | Yes | No | No | No |
+| Quick search/swap (Shift+Enter) | Planned | No | No | No |
+
+This is the feature that makes ProChain feel fundamentally different from every competitor. It transforms plugin chain management from a window-juggling chore into a keyboard-first, single-window workflow.
 
 ---
 

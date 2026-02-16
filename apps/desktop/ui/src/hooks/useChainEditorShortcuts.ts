@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useKeyboardStore, ShortcutPriority } from '../stores/keyboardStore';
+import { useChainStore } from '../stores/chainStore';
+import { collectPlugins } from '../utils/chainHelpers';
 
 interface ChainEditorShortcutsOptions {
   undo: () => void;
@@ -11,6 +13,7 @@ interface ChainEditorShortcutsOptions {
   clearSelection: () => void;
   saveSnapshot: (index: number) => void;
   recallSnapshot: (index: number) => void;
+  openInlineEditor: (nodeId: number) => void;
 }
 
 /**
@@ -21,8 +24,9 @@ interface ChainEditorShortcutsOptions {
  * - Cmd+Shift+Z / Cmd+Y → Redo
  * - Cmd+G → Create serial group (2+ nodes selected)
  * - Cmd+Shift+G → Create parallel group
- * - Cmd+1/2/3 → Recall snapshot
- * - Cmd+Shift+1/2/3 → Save snapshot
+ * - Cmd+Option+1/2/3/4 → Recall snapshot
+ * - Cmd+Option+Shift+1/2/3/4 → Save snapshot
+ * - Cmd+1-9 → Jump to plugin N (inline editor)
  */
 export function useChainEditorShortcuts({
   undo,
@@ -33,7 +37,8 @@ export function useChainEditorShortcuts({
   createGroup,
   clearSelection,
   saveSnapshot,
-  recallSnapshot
+  recallSnapshot,
+  openInlineEditor
 }: ChainEditorShortcutsOptions) {
   const registerShortcut = useKeyboardStore((state) => state.registerShortcut);
 
@@ -128,7 +133,33 @@ export function useChainEditorShortcuts({
     });
   }, [registerShortcut, selectedIds, createGroup, clearSelection]);
 
-  // Cmd+1 → Recall snapshot 1
+  // Cmd+1-9 → Jump to plugin N (open inline editor)
+  useEffect(() => {
+    const cleanups: (() => void)[] = [];
+
+    for (let n = 1; n <= 9; n++) {
+      cleanups.push(registerShortcut({
+        id: `chain-editor-plugin-jump-${n}`,
+        key: String(n),
+        priority: ShortcutPriority.COMPONENT,
+        allowInInputs: false,
+        handler: (e) => {
+          // Cmd+N without Alt (Alt+N is for snapshots)
+          if ((!e.metaKey && !e.ctrlKey) || e.altKey) return;
+
+          e.preventDefault();
+          const nodes = useChainStore.getState().nodes;
+          const plugins = collectPlugins(nodes);
+          const target = plugins[n - 1];
+          if (target) openInlineEditor(target.id);
+        },
+      }));
+    }
+
+    return () => cleanups.forEach(fn => fn());
+  }, [registerShortcut, openInlineEditor]);
+
+  // Cmd+Option+1 → Recall snapshot A
   useEffect(() => {
     return registerShortcut({
       id: 'chain-editor-recall-snapshot-1',
@@ -136,16 +167,14 @@ export function useChainEditorShortcuts({
       priority: ShortcutPriority.COMPONENT,
       allowInInputs: false,
       handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux), but NOT Shift
-        if ((!e.metaKey && !e.ctrlKey) || e.shiftKey) return;
-
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || e.shiftKey) return;
         e.preventDefault();
         recallSnapshot(0);
       }
     });
   }, [registerShortcut, recallSnapshot]);
 
-  // Cmd+2 → Recall snapshot 2
+  // Cmd+Option+2 → Recall snapshot B
   useEffect(() => {
     return registerShortcut({
       id: 'chain-editor-recall-snapshot-2',
@@ -153,16 +182,14 @@ export function useChainEditorShortcuts({
       priority: ShortcutPriority.COMPONENT,
       allowInInputs: false,
       handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux), but NOT Shift
-        if ((!e.metaKey && !e.ctrlKey) || e.shiftKey) return;
-
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || e.shiftKey) return;
         e.preventDefault();
         recallSnapshot(1);
       }
     });
   }, [registerShortcut, recallSnapshot]);
 
-  // Cmd+3 → Recall snapshot 3
+  // Cmd+Option+3 → Recall snapshot C
   useEffect(() => {
     return registerShortcut({
       id: 'chain-editor-recall-snapshot-3',
@@ -170,67 +197,14 @@ export function useChainEditorShortcuts({
       priority: ShortcutPriority.COMPONENT,
       allowInInputs: false,
       handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux), but NOT Shift
-        if ((!e.metaKey && !e.ctrlKey) || e.shiftKey) return;
-
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || e.shiftKey) return;
         e.preventDefault();
         recallSnapshot(2);
       }
     });
   }, [registerShortcut, recallSnapshot]);
 
-  // Cmd+Shift+1 → Save snapshot 1
-  useEffect(() => {
-    return registerShortcut({
-      id: 'chain-editor-save-snapshot-1',
-      key: '!', // Shift+1 produces '!'
-      priority: ShortcutPriority.COMPONENT,
-      allowInInputs: false,
-      handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux) AND Shift
-        if ((!e.metaKey && !e.ctrlKey) || !e.shiftKey) return;
-
-        e.preventDefault();
-        saveSnapshot(0);
-      }
-    });
-  }, [registerShortcut, saveSnapshot]);
-
-  // Cmd+Shift+2 → Save snapshot 2
-  useEffect(() => {
-    return registerShortcut({
-      id: 'chain-editor-save-snapshot-2',
-      key: '@', // Shift+2 produces '@'
-      priority: ShortcutPriority.COMPONENT,
-      allowInInputs: false,
-      handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux) AND Shift
-        if ((!e.metaKey && !e.ctrlKey) || !e.shiftKey) return;
-
-        e.preventDefault();
-        saveSnapshot(1);
-      }
-    });
-  }, [registerShortcut, saveSnapshot]);
-
-  // Cmd+Shift+3 → Save snapshot 3
-  useEffect(() => {
-    return registerShortcut({
-      id: 'chain-editor-save-snapshot-3',
-      key: '#', // Shift+3 produces '#'
-      priority: ShortcutPriority.COMPONENT,
-      allowInInputs: false,
-      handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux) AND Shift
-        if ((!e.metaKey && !e.ctrlKey) || !e.shiftKey) return;
-
-        e.preventDefault();
-        saveSnapshot(2);
-      }
-    });
-  }, [registerShortcut, saveSnapshot]);
-
-  // Cmd+4 → Recall snapshot 4
+  // Cmd+Option+4 → Recall snapshot D
   useEffect(() => {
     return registerShortcut({
       id: 'chain-editor-recall-snapshot-4',
@@ -238,16 +212,59 @@ export function useChainEditorShortcuts({
       priority: ShortcutPriority.COMPONENT,
       allowInInputs: false,
       handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux), but NOT Shift
-        if ((!e.metaKey && !e.ctrlKey) || e.shiftKey) return;
-
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || e.shiftKey) return;
         e.preventDefault();
         recallSnapshot(3);
       }
     });
   }, [registerShortcut, recallSnapshot]);
 
-  // Cmd+Shift+4 → Save snapshot 4
+  // Cmd+Option+Shift+1 → Save snapshot A
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-save-snapshot-1',
+      key: '!', // Shift+1 produces '!'
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || !e.shiftKey) return;
+        e.preventDefault();
+        saveSnapshot(0);
+      }
+    });
+  }, [registerShortcut, saveSnapshot]);
+
+  // Cmd+Option+Shift+2 → Save snapshot B
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-save-snapshot-2',
+      key: '@', // Shift+2 produces '@'
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || !e.shiftKey) return;
+        e.preventDefault();
+        saveSnapshot(1);
+      }
+    });
+  }, [registerShortcut, saveSnapshot]);
+
+  // Cmd+Option+Shift+3 → Save snapshot C
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-save-snapshot-3',
+      key: '#', // Shift+3 produces '#'
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || !e.shiftKey) return;
+        e.preventDefault();
+        saveSnapshot(2);
+      }
+    });
+  }, [registerShortcut, saveSnapshot]);
+
+  // Cmd+Option+Shift+4 → Save snapshot D
   useEffect(() => {
     return registerShortcut({
       id: 'chain-editor-save-snapshot-4',
@@ -255,9 +272,7 @@ export function useChainEditorShortcuts({
       priority: ShortcutPriority.COMPONENT,
       allowInInputs: false,
       handler: (e) => {
-        // Check for Cmd (Mac) or Ctrl (Windows/Linux) AND Shift
-        if ((!e.metaKey && !e.ctrlKey) || !e.shiftKey) return;
-
+        if ((!e.metaKey && !e.ctrlKey) || !e.altKey || !e.shiftKey) return;
         e.preventDefault();
         saveSnapshot(3);
       }

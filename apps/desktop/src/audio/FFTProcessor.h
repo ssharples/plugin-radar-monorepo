@@ -7,15 +7,15 @@
 #include <vector>
 
 /**
- * FFTProcessor - Lock-free FFT spectrum analysis for real-time visualization
+ * FFTProcessor - Lock-free stereo FFT spectrum analysis for real-time visualization
  *
- * Audio thread pushes samples into a FIFO. When full, a Hann window is applied
- * and the FFT is computed. Results are stored in a double-buffer with an atomic
- * swap flag so the UI thread can read stable magnitude data without locking.
+ * Audio thread pushes samples into L and R FIFOs independently. When full, a Hann window
+ * is applied and the FFT is computed per channel. Results are stored in double-buffers
+ * with atomic swap flags so the UI thread can read stable magnitude data without locking.
  *
  * Thread safety:
  * - process() is called from the audio thread only
- * - getMagnitudes() is safe to call from any thread (UI timer callback)
+ * - getMagnitudesL/R/getMagnitudes() are safe to call from any thread (UI timer callback)
  * - prepareToPlay()/reset() are called from the message thread before audio starts
  */
 class FFTProcessor
@@ -31,13 +31,24 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock);
     void reset();
 
-    /** Call from audio thread. Accepts stereo buffer, downmixes to mono for FFT. */
+    /** Call from audio thread. Processes L and R channels independently for stereo FFT. */
     void process(const juce::AudioBuffer<float>& buffer);
 
     /**
-     * Thread-safe getter for UI. Returns magnitude spectrum reference (numBins values).
+     * Thread-safe getter for UI. Returns LEFT channel magnitude spectrum (numBins values).
      * Range is linear magnitudes (frontend converts to dB).
-     * The caller receives the most recently completed FFT frame.
+     */
+    const std::array<float, numBins>& getMagnitudesL() const;
+
+    /**
+     * Thread-safe getter for UI. Returns RIGHT channel magnitude spectrum (numBins values).
+     * Range is linear magnitudes (frontend converts to dB).
+     */
+    const std::array<float, numBins>& getMagnitudesR() const;
+
+    /**
+     * Backward-compatible mono getter. Returns average of L and R channels.
+     * Copies into an internal buffer, so slightly less efficient than L/R getters.
      */
     const std::array<float, numBins>& getMagnitudes() const;
 
@@ -53,27 +64,39 @@ public:
     bool isEnabled() const { return enabled.load(std::memory_order_relaxed); }
 
 private:
+    /** Compute FFT for a single channel's FIFO data and write to the target buffer. */
+    void computeFFT(const std::array<float, fftSize>& channelFifo, int channelWritePos,
+                    std::array<float, numBins>& targetBufferA,
+                    std::array<float, numBins>& targetBufferB,
+                    std::atomic<int>& activeRead);
+
     juce::dsp::FFT forwardFFT;
     juce::dsp::WindowingFunction<float> windowFunction;
 
-    // FIFO for collecting samples on the audio thread (ring buffer)
-    std::array<float, fftSize> fifo;
-    int writePos = 0;
-    int samplesInFifo = 0;
+    // Per-channel FIFOs
+    std::array<float, fftSize> fifoL;
+    std::array<float, fftSize> fifoR;
+    int writePosL = 0;
+    int writePosR = 0;
+    int samplesInFifo = 0;  // Shared counter (L and R advance together)
 
     // FFT working buffer (2x size for real-only forward transform)
     std::array<float, fftSize * 2> fftWorkBuffer;
 
-    // Double-buffer for magnitude data: audio thread writes to writeBuffer,
-    // UI thread reads from the other buffer
-    std::array<float, numBins> magnitudeBufferA;
-    std::array<float, numBins> magnitudeBufferB;
+    // Double-buffers for L channel magnitudes
+    std::array<float, numBins> magnitudeLBufferA;
+    std::array<float, numBins> magnitudeLBufferB;
+    std::atomic<int> activeReadBufferL{0};
 
-    // 0 = A is the readable buffer, B is writable
-    // 1 = B is the readable buffer, A is writable
-    std::atomic<int> activeReadBuffer{0};
+    // Double-buffers for R channel magnitudes
+    std::array<float, numBins> magnitudeRBufferA;
+    std::array<float, numBins> magnitudeRBufferB;
+    std::atomic<int> activeReadBufferR{0};
 
-    // Flag: set by audio thread when new data is written, cleared by swap
+    // Mono average buffer (for backward compat getMagnitudes())
+    mutable std::array<float, numBins> monoAverageBuffer;
+
+    // Flag: set by audio thread when new data is written
     std::atomic<bool> newDataReady{false};
 
     double currentSampleRate = 44100.0;

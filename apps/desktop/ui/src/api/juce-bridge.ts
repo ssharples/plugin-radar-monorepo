@@ -18,6 +18,7 @@ import type {
   DeactivatedPlugin,
   AutoScanState,
   NewPluginsDetectedEvent,
+  InlineEditorState,
 } from './types';
 
 type EventHandler<T> = (data: T) => void;
@@ -119,6 +120,7 @@ class JuceBridge {
       'deactivationChanged',
       'newPluginsDetected',
       'autoScanStateChanged',
+      'inlineEditorChanged',
     ];
 
     events.forEach((eventName) => {
@@ -989,6 +991,71 @@ class JuceBridge {
 
   onAutoScanStateChanged(handler: EventHandler<AutoScanState>): () => void {
     return this.on('autoScanStateChanged', handler);
+  }
+
+  // ============================================
+  // Inline Editor Mode
+  // ============================================
+
+  /**
+   * Open a plugin's native editor inline, hiding the webview.
+   * The host window resizes to fit the plugin editor + navigation sidebar.
+   */
+  async openPluginInline(nodeId: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('openPluginInline', nodeId);
+  }
+
+  /**
+   * Close the inline plugin editor and return to webview mode.
+   */
+  async closePluginInline(): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('closePluginInline');
+  }
+
+  /**
+   * Get the current inline editor state (webview or plugin mode).
+   */
+  async getInlineEditorState(): Promise<InlineEditorState> {
+    return this.callNative<InlineEditorState>('getInlineEditorState');
+  }
+
+  /**
+   * Subscribe to inline editor mode changes.
+   */
+  onInlineEditorChanged(handler: EventHandler<InlineEditorState>): () => void {
+    return this.on('inlineEditorChanged', handler);
+  }
+
+  // ============================================
+  // Search Overlay
+  // ============================================
+
+  /**
+   * Show search overlay: hide inline editor, expand WebView to full window.
+   */
+  async showSearchOverlay(): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('showSearchOverlay');
+  }
+
+  /**
+   * Hide search overlay: restore sidebar + inline editor layout.
+   */
+  async hideSearchOverlay(): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('hideSearchOverlay');
+  }
+
+  /**
+   * Subscribe to search overlay opened events.
+   */
+  onSearchOverlayOpened(handler: EventHandler<void>): () => void {
+    return this.on('searchOverlayOpened', handler);
+  }
+
+  /**
+   * Subscribe to search overlay closed events.
+   */
+  onSearchOverlayClosed(handler: EventHandler<void>): () => void {
+    return this.on('searchOverlayClosed', handler);
   }
 }
 

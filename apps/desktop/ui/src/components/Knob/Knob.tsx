@@ -12,6 +12,10 @@ interface KnobProps {
   onChange: (value: number) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  /** Hide the value display below the knob (render it yourself externally) */
+  hideValue?: boolean;
+  /** Hide the label display below the value */
+  hideLabel?: boolean;
 }
 
 const TICK_COUNT = 31;
@@ -29,6 +33,8 @@ export function Knob({
   onChange,
   onDragStart,
   onDragEnd,
+  hideValue = false,
+  hideLabel = false,
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ y: 0, value: 0 });
@@ -175,19 +181,21 @@ export function Knob({
       </div>
 
       {/* Value */}
-      <div
-        className="tabular-nums leading-tight transition-colors"
-        style={{
-          fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
-          fontSize: 'var(--text-xs, 10px)',
-          color: isDragging ? NEON : 'var(--color-text-secondary, #a0a0a0)',
-          textShadow: isDragging ? `0 0 8px rgba(222, 255, 10, 0.5)` : 'none',
-        }}
-      >
-        {formatValue(safeValue)}
-      </div>
+      {!hideValue && (
+        <div
+          className="tabular-nums leading-tight transition-colors"
+          style={{
+            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+            fontSize: 'var(--text-xs, 10px)',
+            color: isDragging ? NEON : 'var(--color-text-secondary, #a0a0a0)',
+            textShadow: isDragging ? `0 0 8px rgba(222, 255, 10, 0.5)` : 'none',
+          }}
+        >
+          {formatValue(safeValue)}
+        </div>
+      )}
 
-      {label && (
+      {label && !hideLabel && (
         <div
           className="uppercase tracking-widest font-medium"
           style={{

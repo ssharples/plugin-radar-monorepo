@@ -46,7 +46,7 @@ export function ChainNodeList({
   const selectedNodeId = useChainStore(s => s.selectedNodeId);
   const inlineSearchState = useChainStore(s => s.inlineSearchState);
 
-  const { removeNode, toggleNodeBypass, togglePluginEditor, hideInlineSearch } = useChainActions();
+  const { removeNode, toggleNodeBypass, togglePluginEditor, openInlineEditor, hideInlineSearch } = useChainActions();
 
   // Filter out the dragged node from display (it shows as overlay)
   const visibleNodes = nodes.filter(n => n.id !== draggedNodeId);
@@ -152,6 +152,7 @@ export function ChainNodeList({
                     removeNode={removeNode}
                     toggleNodeBypass={toggleNodeBypass}
                     togglePluginEditor={togglePluginEditor}
+                    openInlineEditor={openInlineEditor}
                     isDragActive={isDragActive}
                     groupSelectMode={groupSelectMode}
                     onNodeSelect={onNodeSelect}
@@ -209,6 +210,7 @@ function ChainSlotCyberWrapper({
   removeNode,
   toggleNodeBypass,
   togglePluginEditor,
+  openInlineEditor,
   isDragActive,
   groupSelectMode,
   onNodeSelect,
@@ -224,6 +226,7 @@ function ChainSlotCyberWrapper({
   removeNode: (id: number) => void;
   toggleNodeBypass: (id: number) => void;
   togglePluginEditor: (id: number) => void;
+  openInlineEditor: (id: number) => Promise<void>;
   isDragActive: boolean;
   groupSelectMode: boolean;
   onNodeSelect?: (e: React.MouseEvent, nodeId: number) => void;
@@ -234,6 +237,7 @@ function ChainSlotCyberWrapper({
   const handleRemove = useCallback(() => removeNode(node.id), [removeNode, node.id]);
   const handleToggleBypass = useCallback(() => toggleNodeBypass(node.id), [toggleNodeBypass, node.id]);
   const handleToggleEditor = useCallback(() => togglePluginEditor(node.id), [togglePluginEditor, node.id]);
+  const handleOpenInline = useCallback(() => openInlineEditor(node.id), [openInlineEditor, node.id]);
   const handleSelect = useCallback(
     (e: React.MouseEvent) => onNodeSelect?.(e, node.id),
     [onNodeSelect, node.id]
@@ -249,6 +253,7 @@ function ChainSlotCyberWrapper({
       onRemove={handleRemove}
       onToggleBypass={handleToggleBypass}
       onToggleEditor={handleToggleEditor}
+      onOpenInline={handleOpenInline}
       isDragActive={isDragActive}
       groupSelectMode={groupSelectMode}
       onSelect={onNodeSelect ? handleSelect : undefined}

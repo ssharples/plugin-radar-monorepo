@@ -3,6 +3,7 @@
 #include "../core/ChainNode.h"
 #include "../core/ParameterDiscovery.h"
 #include "../PluginProcessor.h"
+#include "../PluginEditor.h"
 #include "../audio/WaveformCapture.h"
 #include "../audio/GainProcessor.h"
 #include "../audio/AudioMeter.h"
@@ -1095,6 +1096,95 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 fftProcessor->setEnabled(static_cast<bool>(args[0]));
             completion(juce::var());
         })
+        // ============================================
+        // Inline Editor Mode
+        // ============================================
+        .withNativeFunction("openPluginInline", [this](const juce::Array<juce::var>& args,
+                                                        juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            auto* result = new juce::DynamicObject();
+            if (editor && args.size() >= 1)
+            {
+                int nodeId = static_cast<int>(args[0]);
+                bool success = editor->showInlineEditor(nodeId);
+                result->setProperty("success", success);
+                if (!success)
+                    result->setProperty("error", "Plugin has no GUI or node not found");
+            }
+            else
+            {
+                result->setProperty("success", false);
+                result->setProperty("error", "Missing nodeId argument or editor not available");
+            }
+            completion(juce::var(result));
+        })
+        .withNativeFunction("closePluginInline", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            auto* result = new juce::DynamicObject();
+            if (editor)
+            {
+                editor->hideInlineEditor();
+                result->setProperty("success", true);
+            }
+            else
+            {
+                result->setProperty("success", false);
+                result->setProperty("error", "Editor not available");
+            }
+            completion(juce::var(result));
+        })
+        .withNativeFunction("getInlineEditorState", [this](const juce::Array<juce::var>& args,
+                                                            juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            auto* result = new juce::DynamicObject();
+            if (editor)
+            {
+                result->setProperty("mode", editor->isInInlineEditorMode() ? "plugin" : "webview");
+                if (editor->isInInlineEditorMode())
+                    result->setProperty("nodeId", editor->getInlineEditorNodeId());
+            }
+            else
+            {
+                result->setProperty("mode", "webview");
+            }
+            completion(juce::var(result));
+        })
+        // (Dynamic sidebar width removed — sidebar is fixed at 44px)
+        // ============================================
+        // Search Overlay
+        // ============================================
+        .withNativeFunction("showSearchOverlay", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            auto* result = new juce::DynamicObject();
+            if (editor && editor->isInInlineEditorMode())
+            {
+                editor->showSearchOverlay();
+                result->setProperty("success", true);
+            }
+            else
+            {
+                result->setProperty("success", false);
+                result->setProperty("error", "Not in inline editor mode or editor not available");
+            }
+            completion(juce::var(result));
+        })
+        .withNativeFunction("hideSearchOverlay", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            auto* result = new juce::DynamicObject();
+            if (editor)
+            {
+                editor->hideSearchOverlay();
+                result->setProperty("success", true);
+            }
+            else
+            {
+                result->setProperty("success", false);
+                result->setProperty("error", "Editor not available");
+            }
+            completion(juce::var(result));
+        })
         .withUserScript("document.documentElement.style.backgroundColor='#000000';document.body&&(document.body.style.backgroundColor='#000000');")
         .withResourceProvider([this](const juce::String& url) {
             return resourceHandler(url);
@@ -1138,6 +1228,15 @@ void WebViewBridge::bindCallbacks()
         // Propagate structural changes to mirror partners
         if (mirrorManager)
             mirrorManager->onLocalChainChanged();
+
+        // Auto-close inline editor if the displayed node was removed from the chain
+        if (editor && editor->isInInlineEditorMode())
+        {
+            auto activeNodeId = editor->getInlineEditorNodeId();
+            auto* node = ChainNodeHelpers::findById(chainProcessor.getRootNode(), activeNodeId);
+            if (!node || !node->isPlugin())
+                editor->hideInlineEditor();
+        }
     };
 
     // Emit event when child plugin parameters settle (for undo/redo tracking)
@@ -1290,19 +1389,33 @@ void WebViewBridge::timerCallback()
         emitEvent("meterData", juce::var(meterObj));
     }
 
-    // Emit FFT spectrum data if processor is available
+    // Emit stereo FFT spectrum data if processor is available
     if (fftProcessor)
     {
-        auto magnitudes = fftProcessor->getMagnitudes();
+        auto magnitudesL = fftProcessor->getMagnitudesL();
+        auto magnitudesR = fftProcessor->getMagnitudesR();
 
-        // PHASE 3: Reuse preallocated cache instead of allocating new array at 30Hz
-        fftMagnitudeCache.clearQuick();  // Doesn't deallocate, just resets size
-        fftMagnitudeCache.ensureStorageAllocated(static_cast<int>(magnitudes.size()));
-        for (float v : magnitudes)
-            fftMagnitudeCache.add(v);
+        // Reuse preallocated caches instead of allocating at 30Hz
+        fftMagnitudeCacheL.clearQuick();
+        fftMagnitudeCacheL.ensureStorageAllocated(static_cast<int>(magnitudesL.size()));
+        for (float v : magnitudesL)
+            fftMagnitudeCacheL.add(v);
+
+        fftMagnitudeCacheR.clearQuick();
+        fftMagnitudeCacheR.ensureStorageAllocated(static_cast<int>(magnitudesR.size()));
+        for (float v : magnitudesR)
+            fftMagnitudeCacheR.add(v);
+
+        // Build mono average for backward compat (SpectrumAnalyzer uses this)
+        juce::Array<juce::var> monoCache;
+        monoCache.ensureStorageAllocated(static_cast<int>(magnitudesL.size()));
+        for (size_t i = 0; i < magnitudesL.size(); ++i)
+            monoCache.add((magnitudesL[i] + magnitudesR[i]) * 0.5f);
 
         auto* fftObj = new juce::DynamicObject();
-        fftObj->setProperty("magnitudes", fftMagnitudeCache);
+        fftObj->setProperty("magnitudes", monoCache);
+        fftObj->setProperty("magnitudesL", fftMagnitudeCacheL);
+        fftObj->setProperty("magnitudesR", fftMagnitudeCacheR);
         fftObj->setProperty("numBins", fftProcessor->getNumBins());
         fftObj->setProperty("fftSize", fftProcessor->getNumBins() * 2);
         fftObj->setProperty("sampleRate", fftProcessor->getSampleRate());

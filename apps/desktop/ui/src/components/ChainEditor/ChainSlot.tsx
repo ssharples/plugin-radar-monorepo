@@ -59,6 +59,8 @@ interface ChainSlotProps {
   onRemove: () => void;
   onToggleBypass: () => void;
   onToggleEditor: () => void;
+  /** Open plugin editor inline (embedded in host window). Falls back to onToggleEditor if not provided. */
+  onOpenInline?: () => void;
   /** Called when a plugin swap completes successfully */
   onSwapComplete?: (newPluginName: string, confidence: number) => void;
   /** Whether any drag is currently active (for dimming non-dragged items) */
@@ -86,6 +88,7 @@ export const ChainSlot = memo(function ChainSlot({
   onRemove,
   onToggleBypass,
   onToggleEditor,
+  onOpenInline,
   onSwapComplete,
   isDragActive: _isDragActive = false,
   groupSelectMode = false,
@@ -493,6 +496,12 @@ export const ChainSlot = memo(function ChainSlot({
           setShowContextMenu(null);
           if ((groupSelectMode || e.ctrlKey || e.metaKey) && onSelect) {
             onSelect(e);
+          } else if (e.shiftKey) {
+            // Shift+click: open external window (backward compat)
+            onToggleEditor();
+          } else if (onOpenInline) {
+            // Regular click: open inline editor
+            onOpenInline();
           } else {
             onToggleEditor();
           }

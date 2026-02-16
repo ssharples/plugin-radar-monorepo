@@ -31,6 +31,8 @@ interface ChainSlotCyberProps {
   onRemove: () => void;
   onToggleBypass: () => void;
   onToggleEditor: () => void;
+  /** Open plugin editor inline (embedded in host window). Falls back to onToggleEditor if not provided. */
+  onOpenInline?: () => void;
   /** Whether any drag is currently active */
   isDragActive?: boolean;
   /** Whether group select mode is active */
@@ -55,6 +57,7 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
   onRemove,
   onToggleBypass,
   onToggleEditor,
+  onOpenInline,
   isDragActive = false,
   groupSelectMode = false,
   onSelect,
@@ -314,8 +317,16 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
 
     if (groupSelectMode || e.metaKey || e.ctrlKey) {
       onSelect?.(e);
+    } else if (e.shiftKey) {
+      // Shift+click: open external window (backward compat)
+      e.stopPropagation();
+      onToggleEditor();
+    } else if (onOpenInline) {
+      // Normal click: open inline editor
+      e.stopPropagation();
+      onOpenInline();
     } else {
-      // Normal click - open plugin editor window
+      // Fallback: open external window
       e.stopPropagation();
       onToggleEditor();
     }

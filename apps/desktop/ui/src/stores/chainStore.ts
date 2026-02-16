@@ -74,6 +74,10 @@ interface ChainStoreState {
 
   // Per-plugin expandable controls panel
   expandedNodeIds: Set<number>;
+
+  // Inline editor mode (plugin editor embedded in host window, null = webview mode)
+  inlineEditorNodeId: number | null;
+  searchOverlayActive: boolean;
 }
 
 interface ChainActions {
@@ -156,6 +160,12 @@ interface ChainActions {
   // Inline plugin search
   showInlineSearchBelow: (nodeId: number, parentId: number, insertIndex: number) => void;
   hideInlineSearch: () => void;
+
+  // Inline editor mode (plugin editor embedded in host window)
+  openInlineEditor: (nodeId: number) => Promise<void>;
+  closeInlineEditor: () => Promise<void>;
+  showSearchOverlay: () => Promise<void>;
+  hideSearchOverlay: () => Promise<void>;
 }
 
 function applyState(state: ChainStateV2) {
@@ -320,6 +330,8 @@ const initialState: ChainStoreState = {
   toastMessage: null,
   inlineSearchState: null,
   expandedNodeIds: new Set<number>(),
+  inlineEditorNodeId: null,
+  searchOverlayActive: false,
 };
 
 export const useChainStore = create<ChainStoreState & ChainActions>((set, get) => ({
@@ -1084,6 +1096,55 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   // =============================================
+  // Inline Editor Mode
+  // =============================================
+
+  openInlineEditor: async (nodeId: number) => {
+    try {
+      const result = await juceBridge.openPluginInline(nodeId);
+      if (result.success) {
+        set({ inlineEditorNodeId: nodeId });
+      } else {
+        // Plugin has no GUI — fall back to external window
+        get().openPluginEditor(nodeId);
+      }
+    } catch (err) {
+      console.error('[chainStore] openInlineEditor failed:', err);
+      // Fallback to external window
+      get().openPluginEditor(nodeId);
+    }
+  },
+
+  closeInlineEditor: async () => {
+    try {
+      await juceBridge.closePluginInline();
+      set({ inlineEditorNodeId: null, searchOverlayActive: false });
+    } catch (err) {
+      console.error('[chainStore] closeInlineEditor failed:', err);
+    }
+  },
+
+  showSearchOverlay: async () => {
+    try {
+      const result = await juceBridge.showSearchOverlay();
+      if (result.success) {
+        set({ searchOverlayActive: true });
+      }
+    } catch (err) {
+      console.error('[chainStore] showSearchOverlay failed:', err);
+    }
+  },
+
+  hideSearchOverlay: async () => {
+    try {
+      await juceBridge.hideSearchOverlay();
+      set({ searchOverlayActive: false });
+    } catch (err) {
+      console.error('[chainStore] hideSearchOverlay failed:', err);
+    }
+  },
+
+  // =============================================
   // Continuous gesture helpers (debounce sliders/knobs)
   // =============================================
 
@@ -1181,6 +1242,10 @@ export const useChainActions = () => useChainStore(useShallow(state => ({
   showToast: state.showToast,
   showInlineSearchBelow: state.showInlineSearchBelow,
   hideInlineSearch: state.hideInlineSearch,
+  openInlineEditor: state.openInlineEditor,
+  closeInlineEditor: state.closeInlineEditor,
+  showSearchOverlay: state.showSearchOverlay,
+  hideSearchOverlay: state.hideSearchOverlay,
 })));
 
 // Set up event listener - handles both V1 and V2 chain state
@@ -1222,6 +1287,13 @@ juceBridge.onNodeMeterData((data: Record<string, NodeMeterReadings>) => {
   if (changed) {
     useChainStore.setState({ nodeMeterData: next });
   }
+});
+
+// Inline editor mode changes (C++ → JS sync)
+juceBridge.onInlineEditorChanged((state: { mode: string; nodeId?: number }) => {
+  useChainStore.setState({
+    inlineEditorNodeId: state.mode === 'plugin' ? (state.nodeId ?? null) : null,
+  });
 });
 
 // Safety timer: auto-end continuous gesture if mouseUp was missed (e.g., pointer left window)

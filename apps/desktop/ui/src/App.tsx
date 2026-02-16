@@ -5,6 +5,8 @@ import { PresetModal } from './components/PresetBrowser';
 import { Footer } from './components/Footer';
 import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
 import { KeyboardShortcutOverlay } from './components/KeyboardShortcutOverlay';
+import { LeftToolbar } from './components/LeftToolbar';
+import { GalaxyVisualizer } from './components/GalaxyVisualizer/GalaxyVisualizer';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { usePresetStore } from './stores/presetStore';
 import { useSyncStore } from './stores/syncStore';
@@ -14,6 +16,10 @@ import { useKeyboardStore, ShortcutPriority } from './stores/keyboardStore';
 import { executeQueuedWrite } from './api/convex-client';
 import { juceBridge } from './api/juce-bridge';
 import { GrainientBackground } from './components/GrainientBackground';
+import { InlineEditorSidebar } from './components/InlineEditorSidebar';
+import { InlineEditorToolbar } from './components/InlineEditorToolbar';
+import { InlineSearchOverlay } from './components/InlineSearchOverlay';
+import { useChainStore } from './stores/chainStore';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -51,13 +57,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 function App() {
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
-
+  const [galaxyActive, setGalaxyActive] = useState(false);
 
   const { isOnboardingComplete, isInitializing, initialize: initOnboarding } = useOnboardingStore();
   const { currentPreset, fetchPresets } = usePresetStore();
   const { initialize: initSync, isLoggedIn, autoSync } = useSyncStore();
   const { initialize: initOffline } = useOfflineStore();
   const { fetchPlugins, plugins } = usePluginStore();
+  const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
   const autoSyncFired = useRef(false);
 
   // Initialize onboarding check
@@ -144,6 +151,30 @@ function App() {
   }
 
   const FOOTER_HEIGHT = 66;
+  const isInlineMode = inlineEditorNodeId !== null;
+
+  // In inline editor mode: L-shaped layout — sidebar on left (full height), toolbar on bottom
+  // The WebView spans the full window, plugin editor overlaid on top with offsets
+  if (isInlineMode) {
+    return (
+      <ErrorBoundary>
+        <div
+          className="flex flex-col w-full h-full select-none overflow-hidden"
+          style={{ background: '#0a0a0a' }}
+        >
+          {/* Top area: sidebar (left) + transparent plugin overlay space (right) */}
+          <div className="flex flex-1 min-h-0">
+            <InlineEditorSidebar />
+            {/* Plugin editor is rendered natively by C++ in this space — leave transparent */}
+            <div className="flex-1" />
+          </div>
+          {/* Bottom toolbar — full width */}
+          <InlineEditorToolbar />
+          <InlineSearchOverlay />
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -158,11 +189,23 @@ function App() {
           color3="#787878"
         />
 
-        {/* Chain area — fills remaining space */}
-        <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
-          <ErrorBoundary>
-            <ChainEditor />
-          </ErrorBoundary>
+        {/* Main content area: left toolbar + chain/galaxy */}
+        <div className="flex-1 min-h-0 overflow-hidden relative z-[1] flex">
+          <LeftToolbar
+            galaxyActive={galaxyActive}
+            onToggleGalaxy={() => setGalaxyActive(prev => !prev)}
+          />
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {galaxyActive ? (
+              <ErrorBoundary>
+                <GalaxyVisualizer />
+              </ErrorBoundary>
+            ) : (
+              <ErrorBoundary>
+                <ChainEditor />
+              </ErrorBoundary>
+            )}
+          </div>
         </div>
 
         {/* Footer — fixed height */}

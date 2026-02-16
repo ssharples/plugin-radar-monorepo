@@ -200,6 +200,7 @@ export function ChainEditor() {
   const {
     fetchChainState, moveNode, createGroup, dissolveGroupSilent,
     selectNode, undo, redo, canUndo, canRedo, saveSnapshot, recallSnapshot,
+    openInlineEditor,
   } = useChainActions();
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -230,7 +231,8 @@ export function ChainEditor() {
     createGroup,
     clearSelection: () => setSelectedIds(new Set()),
     saveSnapshot,
-    recallSnapshot
+    recallSnapshot,
+    openInlineEditor,
   });
 
   useEffect(() => {
@@ -638,8 +640,8 @@ export function ChainEditor() {
                   }}
                   title={
                     snapshot
-                      ? `${isActive ? 'Active snapshot' : 'Recall snapshot'} ${label} \u2022 Saved ${formatRelativeTime(snapshot.savedAt)} \u2022 Shift+click to overwrite \u2022 \u2318${i + 1}`
-                      : `Save snapshot ${label} \u2022 \u2318\u21E7${i + 1}`
+                      ? `${isActive ? 'Active snapshot' : 'Recall snapshot'} ${label} \u2022 Saved ${formatRelativeTime(snapshot.savedAt)} \u2022 Shift+click to overwrite \u2022 \u2318\u2325${i + 1}`
+                      : `Save snapshot ${label} \u2022 \u2318\u2325\u21E7${i + 1}`
                   }
                 >
                   {label}

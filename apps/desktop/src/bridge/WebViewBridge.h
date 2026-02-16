@@ -15,6 +15,7 @@ class WaveformCapture;
 class GainProcessor;
 class AudioMeter;
 class FFTProcessor;
+class PluginChainManagerEditor;
 
 class WebViewBridge : private juce::Timer,
                       private InstanceRegistry::Listener,
@@ -59,6 +60,9 @@ public:
         if (mirrorManager)
             mirrorManager->addListener(this);
     }
+
+    // Set the editor reference (for inline editor mode)
+    void setEditor(PluginChainManagerEditor* ed) { editor = ed; }
 
     // Event emission to JavaScript
     void emitEvent(const juce::String& eventName, const juce::var& data);
@@ -189,6 +193,7 @@ private:
     PresetManager& presetManager;
     GroupTemplateManager& groupTemplateManager;
     juce::WebBrowserComponent* webBrowser = nullptr;
+    PluginChainManagerEditor* editor = nullptr;
     WaveformCapture* waveformCapture = nullptr;
     GainProcessor* gainProcessor = nullptr;
     AudioMeter* inputMeter = nullptr;
@@ -208,8 +213,9 @@ private:
     std::atomic<int> lastReportedLatency{0};
     std::atomic<int> latencyCheckCounter{0};
 
-    // PHASE 3: Preallocated FFT magnitude cache (eliminates 30Hz allocation)
-    mutable juce::Array<juce::var> fftMagnitudeCache;
+    // PHASE 3: Preallocated FFT magnitude caches (eliminates 30Hz allocation)
+    mutable juce::Array<juce::var> fftMagnitudeCacheL;
+    mutable juce::Array<juce::var> fftMagnitudeCacheR;
 
     // Alive flag for safe async operations (weak_ptr captured in lambdas)
     std::shared_ptr<std::atomic<bool>> aliveFlag = std::make_shared<std::atomic<bool>>(true);
