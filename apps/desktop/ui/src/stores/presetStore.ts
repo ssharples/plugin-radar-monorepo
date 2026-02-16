@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { PresetInfo } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
+import { useChainStore } from './chainStore';
 
 interface PresetState {
   presets: PresetInfo[];
@@ -18,6 +19,7 @@ interface PresetActions {
   savePreset: (name: string, category: string) => Promise<boolean>;
   loadPreset: (path: string) => Promise<boolean>;
   deletePreset: (path: string) => Promise<boolean>;
+  renamePreset: (path: string, newName: string) => Promise<boolean>;
   setSelectedCategory: (category: string | null) => void;
 }
 
@@ -78,10 +80,14 @@ export const usePresetStore = create<PresetState & PresetActions>((set, get) => 
     try {
       const result = await juceBridge.loadPreset(path);
       if (result.success) {
+        const preset = result.preset || null;
         set({
-          currentPreset: result.preset || null,
+          currentPreset: preset,
           loading: false,
         });
+        if (preset?.name) {
+          useChainStore.getState().setChainName(preset.name);
+        }
         return true;
       } else {
         set({ error: result.error || 'Failed to load preset', loading: false });
@@ -118,6 +124,31 @@ export const usePresetStore = create<PresetState & PresetActions>((set, get) => 
     }
   },
 
+  renamePreset: async (path: string, newName: string) => {
+    set({ loading: true, error: null });
+    try {
+      const result = await juceBridge.renamePreset(path, newName);
+      if (result.success) {
+        if (result.presetList) {
+          set({ presets: result.presetList, loading: false });
+        }
+        // Update current preset name if it was renamed
+        const { currentPreset } = get();
+        if (currentPreset?.path === path) {
+          set({ currentPreset: { ...currentPreset, name: newName } });
+        }
+        get().fetchCategories();
+        return true;
+      } else {
+        set({ error: result.error || 'Failed to rename preset', loading: false });
+        return false;
+      }
+    } catch (err) {
+      set({ error: String(err), loading: false });
+      return false;
+    }
+  },
+
   setSelectedCategory: (category: string | null) => {
     set({ selectedCategory: category });
   },
@@ -131,4 +162,7 @@ juceBridge.onPresetListChanged((presets) => {
 
 juceBridge.onPresetLoaded((preset) => {
   usePresetStore.setState({ currentPreset: preset });
+  if (preset?.name) {
+    useChainStore.getState().setChainName(preset.name);
+  }
 });

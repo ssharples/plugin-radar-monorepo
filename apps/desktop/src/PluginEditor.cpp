@@ -1,6 +1,6 @@
 #include "PluginEditor.h"
 #include "bridge/ResourceProvider.h"
-#include <iostream>
+#include "platform/KeyboardInterceptor.h"
 
 PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p)
@@ -8,14 +8,15 @@ PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& 
     // Initialize WebView (creates webBrowser)
     initializeWebView();
 
-    // Set the size - this triggers resized() which sets WebView to full bounds
+    // Set the size — this triggers resized() which sets WebView to full bounds
     setResizable(true, true);
-    setResizeLimits(500, 800, 3840, 2160);
-    setSize(500, 1000);
+    setResizeLimits(500, 750, 3840, 2160);
+    setSize(500, 750);
 }
 
 PluginChainManagerEditor::~PluginChainManagerEditor()
 {
+    KeyboardInterceptor::remove(webBrowser.get());
     webBrowser.reset();
     webViewBridge.reset();
 }
@@ -26,35 +27,28 @@ void PluginChainManagerEditor::initializeWebView()
     webViewBridge = std::make_unique<WebViewBridge>(
         processorRef.getPluginManager(),
         processorRef.getChainProcessor(),
-        processorRef.getPresetManager()
+        processorRef.getPresetManager(),
+        processorRef.getGroupTemplateManager()
     );
 
     // Pass waveform capture to the bridge for streaming
     webViewBridge->setWaveformCapture(&processorRef.getWaveformCapture());
-
-    // Pass gain processor and meters to the bridge
     webViewBridge->setGainProcessor(&processorRef.getGainProcessor());
     webViewBridge->setInputMeter(&processorRef.getInputMeter());
     webViewBridge->setOutputMeter(&processorRef.getOutputMeter());
-
-    // Pass FFT processor to the bridge for spectrum analysis
+    webViewBridge->setMainProcessor(&processorRef);
     webViewBridge->setFFTProcessor(&processorRef.getFFTProcessor());
-
-    // Pass instance registry and mirror manager for cross-instance awareness
     webViewBridge->setInstanceRegistry(&processorRef.getInstanceRegistry(), processorRef.getInstanceId());
     webViewBridge->setMirrorManager(&processorRef.getMirrorManager());
 
     // Create WebBrowserComponent with native function bindings
     webBrowser = std::make_unique<juce::WebBrowserComponent>(webViewBridge->getOptions());
-    webBrowser->setWantsKeyboardFocus(true);  // Allow WebView to receive keyboard events when focused
+    webBrowser->setWantsKeyboardFocus(true);
     webViewBridge->setBrowserComponent(webBrowser.get());
     addAndMakeVisible(*webBrowser);
 
     // Use the resource provider root URL which enables native function integration
     auto url = webBrowser->getResourceProviderRoot();
-    #if JUCE_DEBUG
-    std::cerr << "PluginEditor: Loading URL: " << url << std::endl;
-    #endif
     webBrowser->goToURL(url);
 }
 
@@ -68,10 +62,6 @@ void PluginChainManagerEditor::resized()
     if (webBrowser)
     {
         auto bounds = getLocalBounds();
-
-        // Give the WebBrowser the full bounds. The React UI handles its own
-        // layout within 100vw/100vh. A small edge margin is no longer needed
-        // since the JUCE corner resizer is brought to front below.
         webBrowser->setBounds(bounds);
 
         // Ensure the corner resizer (if present) stays on top of the WebView
@@ -81,5 +71,17 @@ void PluginChainManagerEditor::resized()
             if (child != webBrowser.get())
                 child->toFront(false);
         }
+    }
+}
+
+void PluginChainManagerEditor::parentHierarchyChanged()
+{
+    AudioProcessorEditor::parentHierarchyChanged();
+
+    // Install the native keyboard interceptor once we have a native peer.
+    if (!keyboardInterceptorInstalled && webBrowser && getPeer())
+    {
+        KeyboardInterceptor::install(webBrowser.get(), this);
+        keyboardInterceptorInstalled = true;
     }
 }

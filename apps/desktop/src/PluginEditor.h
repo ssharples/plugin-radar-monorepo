@@ -13,12 +13,15 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void parentHierarchyChanged() override;
 
 private:
     PluginChainManagerProcessor& processorRef;
 
     std::unique_ptr<WebViewBridge> webViewBridge;
     std::unique_ptr<juce::WebBrowserComponent> webBrowser;
+
+    bool keyboardInterceptorInstalled = false;
 
     void initializeWebView();
 

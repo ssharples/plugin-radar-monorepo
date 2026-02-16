@@ -32,6 +32,7 @@ public:
     bool savePreset(const juce::String& name, const juce::String& category);
     bool loadPreset(const juce::File& presetFile);
     bool deletePreset(const juce::File& presetFile);
+    bool renamePreset(const juce::File& presetFile, const juce::String& newName);
 
     // Preset discovery
     void scanPresets();

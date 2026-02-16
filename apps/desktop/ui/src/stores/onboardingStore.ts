@@ -10,6 +10,7 @@ import { ONBOARDING_STORAGE_KEY } from './onboardingTypes'
 
 const initialState: OnboardingState = {
   isOnboardingComplete: false,
+  isInitializing: true,
   currentStep: 'auth' as OnboardingStep,
   authMode: 'login',
   authLoading: false,
@@ -36,16 +37,16 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
         const { initializeAuth } = await import('../api/convex-client')
         const hasSession = await initializeAuth()
         if (hasSession) {
-          set({ isOnboardingComplete: true, hasEverCompleted: true })
+          set({ isOnboardingComplete: true, hasEverCompleted: true, isInitializing: false })
           return
         }
       } catch {
         // Session check failed, show auth
       }
       // Has completed before but session expired — show auth, then skip to scan
-      set({ hasEverCompleted: true, currentStep: 'auth' })
+      set({ hasEverCompleted: true, currentStep: 'auth', isInitializing: false })
     } else {
-      set({ hasEverCompleted: false, currentStep: 'auth' })
+      set({ hasEverCompleted: false, currentStep: 'auth', isInitializing: false })
     }
   },
 
@@ -68,7 +69,13 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
       }
 
       if (result.success) {
-        set({ authLoading: false, authError: null, currentStep: 'scan' })
+        const { hasEverCompleted } = get()
+        // Returning users already have plugins scanned — skip straight to completion
+        set({
+          authLoading: false,
+          authError: null,
+          currentStep: hasEverCompleted ? 'complete' : 'scan',
+        })
         return true
       } else {
         set({ authLoading: false, authError: result.error || 'Authentication failed' })
@@ -115,8 +122,12 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
     set({ scanProgress: progress, currentPluginName: currentPlugin })
   },
 
-  handlePluginDiscovered: () => {
-    set((state) => ({ pluginsDiscovered: state.pluginsDiscovered + 1 }))
+  handlePluginDiscovered: (count?: number) => {
+    if (count !== undefined) {
+      set({ pluginsDiscovered: count })
+    } else {
+      set((state) => ({ pluginsDiscovered: state.pluginsDiscovered + 1 }))
+    }
   },
 
   handlePluginBlacklisted: (plugin: BlacklistedPlugin) => {
@@ -125,11 +136,27 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
     }))
   },
 
-  handleScanComplete: () => {
+  handleScanComplete: async () => {
     const state = get()
     const scanStartTime = (state as any)._scanStartTime ?? Date.now()
+
+    // If pluginsDiscovered is 0, fetch real count from JUCE bridge
+    // This handles fast rescans where pluginListChanged fires after completion
+    let totalDiscovered = state.pluginsDiscovered
+    if (totalDiscovered === 0) {
+      try {
+        const { juceBridge } = await import('../api/juce-bridge')
+        const plugins = await juceBridge.getPluginList()
+        if (Array.isArray(plugins)) {
+          totalDiscovered = plugins.length
+        }
+      } catch {
+        // Fall back to counter
+      }
+    }
+
     const result: ScanResult = {
-      totalDiscovered: state.pluginsDiscovered,
+      totalDiscovered,
       totalBlacklisted: state.blacklistedPlugins.length,
       blacklistedPlugins: state.blacklistedPlugins,
       scanDurationMs: Date.now() - scanStartTime,

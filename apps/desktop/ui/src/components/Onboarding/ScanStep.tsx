@@ -29,8 +29,8 @@ export function ScanStep() {
       handleScanProgress(data.progress, data.currentPlugin)
     })
 
-    const unsubPluginList = juceBridge.onPluginListChanged(() => {
-      handlePluginDiscovered()
+    const unsubPluginList = juceBridge.onPluginListChanged((plugins) => {
+      handlePluginDiscovered(Array.isArray(plugins) ? plugins.length : undefined)
     })
 
     const unsubBlacklisted = juceBridge.onPluginBlacklisted((data) => {
@@ -68,16 +68,19 @@ export function ScanStep() {
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
-      <h2 className="font-mono text-lg text-plugin-text crt-text uppercase tracking-wider mb-2">
+      <h2
+        className="crt-text mb-2"
+        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
+      >
         Scanning Your Plugins
       </h2>
-      <p className="text-plugin-dim text-xxs font-mono text-center mb-8 max-w-xs leading-relaxed">
+      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', textAlign: 'center', marginBottom: '2rem', maxWidth: '20rem', lineHeight: 1.6 }}>
         Finding all AU & VST3 plugins on your system. Plugins that crash or need authorization will be noted.
       </p>
 
       {scanError ? (
         <div className="w-full">
-          <div className="text-red-400 text-xs font-mono bg-red-500/10 border border-red-500/20 rounded-propane px-4 py-3 mb-4">
+          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '12px 16px', marginBottom: '16px' }}>
             {scanError}
           </div>
           <button
@@ -85,7 +88,7 @@ export function ScanStep() {
               startScan()
               juceBridge.startScan(false).catch((err) => handleScanError(String(err)))
             }}
-            className="w-full py-2 bg-plugin-accent hover:bg-plugin-accent-bright text-black font-mono text-xs uppercase rounded-propane transition-colors"
+            className="btn btn-primary w-full"
           >
             Retry Scan
           </button>
@@ -93,37 +96,38 @@ export function ScanStep() {
       ) : (
         <>
           {/* Progress bar */}
-          <div className="w-full h-2 bg-plugin-border rounded-full overflow-hidden mb-3">
+          <div className="meter w-full mb-3" style={{ height: '8px' }}>
             <div
-              className="h-full bg-plugin-accent rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
+              className="meter-fill"
+              style={{ width: `${progressPercent}%`, background: 'var(--color-accent-cyan)', transition: 'width 0.3s ease' }}
             />
           </div>
 
           {/* Percentage */}
-          <div className="text-2xl font-mono text-plugin-accent mb-2">
+          <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-mono)', color: 'var(--color-accent-cyan)', marginBottom: '8px' }}>
             {progressPercent}%
           </div>
 
           {/* Currently scanning */}
           {scanActive && truncatedName && (
-            <div className="text-plugin-dim font-mono text-xxs truncate max-w-full mb-4">
+            <div className="truncate max-w-full" style={{ color: 'var(--color-text-disabled)', fontFamily: 'var(--font-mono)', fontSize: '10px', marginBottom: '16px' }}>
               {truncatedName}
             </div>
           )}
 
           {/* Discovered counter */}
-          <div className="text-plugin-muted font-mono text-xs mb-4">
+          <div style={{ color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', marginBottom: '16px' }}>
             {pluginsDiscovered} plugins found
           </div>
 
           {/* Blacklisted warnings */}
           {blacklistedPlugins.length > 0 && (
-            <div className="w-full max-h-24 overflow-y-auto mb-4">
+            <div className="w-full max-h-24 overflow-y-auto scrollbar-cyber mb-4">
               {blacklistedPlugins.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 text-xxs font-mono text-plugin-warning bg-plugin-warning/10 border border-plugin-warning/20 rounded-propane px-3 py-1.5 mb-1"
+                  className="flex items-center gap-2 truncate"
+                  style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-status-warning)', background: 'rgba(255, 170, 0, 0.1)', border: '1px solid rgba(255, 170, 0, 0.2)', borderRadius: 'var(--radius-base)', padding: '6px 12px', marginBottom: '4px' }}
                 >
                   <span className="shrink-0">!</span>
                   <span className="truncate">{p.name}</span>
@@ -135,7 +139,9 @@ export function ScanStep() {
           {/* Skip link */}
           <button
             onClick={skipScan}
-            className="text-plugin-dim text-xxs font-mono hover:text-plugin-muted transition-colors mt-2"
+            style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', transition: 'color var(--duration-fast)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-disabled)')}
           >
             Skip for now
           </button>

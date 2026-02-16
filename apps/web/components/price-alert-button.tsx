@@ -22,7 +22,7 @@ export function PriceAlertButton({
   showLabel = true,
 }: PriceAlertButtonProps) {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, sessionToken } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [priceThreshold, setTargetPrice] = useState(
     currentPrice ? Math.floor((currentPrice * 0.8) / 100) : 0
@@ -31,7 +31,7 @@ export function PriceAlertButton({
 
   const existingAlerts = useQuery(
     api.alerts.getForPlugin,
-    user ? { user: user._id, plugin: pluginId } : "skip"
+    sessionToken ? { sessionToken, plugin: pluginId } : "skip"
   );
 
   const createAlert = useMutation(api.alerts.create);
@@ -48,7 +48,7 @@ export function PriceAlertButton({
     if (hasAlert) {
       // Remove existing alerts
       existingAlerts?.forEach((alert) => {
-        removeAlert({ id: alert._id });
+        removeAlert({ sessionToken: sessionToken!, id: alert._id });
       });
     } else {
       setShowModal(true);
@@ -59,7 +59,7 @@ export function PriceAlertButton({
     if (!user) return;
 
     await createAlert({
-      user: user._id,
+      sessionToken: sessionToken!,
       plugin: pluginId,
       type: alertType,
       priceThreshold: alertType === "price_drop" ? priceThreshold * 100 : undefined,
@@ -86,7 +86,7 @@ export function PriceAlertButton({
         onClick={handleClick}
         className={`${sizeClasses[size]} rounded-xl transition flex items-center gap-2 ${
           hasAlert
-            ? "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30"
+            ? "bg-white/20 text-white hover:bg-white/30"
             : "bg-stone-800 text-white hover:bg-stone-700"
         }`}
         title={hasAlert ? "Remove price alert" : "Set price alert"}
@@ -128,7 +128,7 @@ export function PriceAlertButton({
                     onClick={() => setAlertType("price_drop")}
                     className={`flex-1 px-4 py-2 rounded-lg transition ${
                       alertType === "price_drop"
-                        ? "bg-emerald-500 text-white"
+                        ? "bg-white text-white"
                         : "bg-stone-800 text-stone-300 hover:bg-stone-700"
                     }`}
                   >
@@ -138,7 +138,7 @@ export function PriceAlertButton({
                     onClick={() => setAlertType("any_sale")}
                     className={`flex-1 px-4 py-2 rounded-lg transition ${
                       alertType === "any_sale"
-                        ? "bg-emerald-500 text-white"
+                        ? "bg-white text-white"
                         : "bg-stone-800 text-stone-300 hover:bg-stone-700"
                     }`}
                   >
@@ -158,7 +158,7 @@ export function PriceAlertButton({
                     value={priceThreshold}
                     onChange={(e) => setTargetPrice(Number(e.target.value))}
                     min={0}
-                    className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-white focus:outline-none focus:border-white"
                   />
                   {currentPrice && (
                     <p className="text-stone-500 text-xs mt-1">
@@ -171,7 +171,7 @@ export function PriceAlertButton({
               {/* Submit */}
               <button
                 onClick={handleCreateAlert}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition"
+                className="w-full bg-white hover:bg-white text-white font-semibold py-3 rounded-lg transition"
               >
                 Create Alert
               </button>

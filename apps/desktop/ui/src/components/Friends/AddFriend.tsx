@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, UserPlus, CheckCircle, AlertCircle } from 'lucide-react';
-import * as convexClient from '../../api/convex-client';
+import { convex, getStoredSession } from '../../api/convex-client';
 import { api } from '@convex/_generated/api';
 
 interface SearchResult {
@@ -9,6 +9,21 @@ interface SearchResult {
   username: string;
   matchedOn: string;
 }
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--color-bg-secondary)',
+  borderRadius: 'var(--radius-lg)',
+  padding: 'var(--space-4)',
+  border: '1px solid var(--color-border-default)',
+};
+
+const headingStyle: React.CSSProperties = {
+  color: 'var(--color-text-primary)',
+  fontFamily: 'var(--font-mono)',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: 'var(--tracking-wide)',
+};
 
 export function AddFriend() {
   const [query, setQuery] = useState('');
@@ -24,7 +39,7 @@ export function AddFriend() {
     setError('');
     setResults([]);
 
-    const token = localStorage.getItem('pluginradar_session');
+    const token = getStoredSession();
     if (!token) {
       setError('Not logged in');
       setSearching(false);
@@ -32,7 +47,7 @@ export function AddFriend() {
     }
 
     try {
-      const res = await convexClient.convex.query(api.userProfiles.searchUsers, {
+      const res = await convex.query(api.userProfiles.searchUsers, {
         sessionToken: token,
         query: query.trim(),
       });
@@ -52,11 +67,11 @@ export function AddFriend() {
     setError('');
     setSuccess('');
 
-    const token = localStorage.getItem('pluginradar_session');
+    const token = getStoredSession();
     if (!token) return;
 
     try {
-      const result = await convexClient.convex.mutation(api.friends.sendFriendRequest, {
+      const result = await convex.mutation(api.friends.sendFriendRequest, {
         sessionToken: token,
         friendId: userId as any,
       });
@@ -65,7 +80,6 @@ export function AddFriend() {
       } else {
         setSuccess(`Friend request sent to ${username}`);
       }
-      // Remove from results
       setResults((prev) => prev.filter((r) => r.userId !== userId));
     } catch (err: any) {
       setError(err.message || 'Failed to send request');
@@ -82,10 +96,10 @@ export function AddFriend() {
   };
 
   return (
-    <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
+    <div style={cardStyle}>
       <div className="flex items-center gap-2 mb-4">
-        <UserPlus size={18} className="text-plugin-accent" />
-        <h3 className="text-white font-mono font-medium">Add Friend</h3>
+        <UserPlus size={18} style={{ color: 'var(--color-accent-cyan)' }} />
+        <h3 style={headingStyle}>Add Friend</h3>
       </div>
 
       <div className="flex gap-2 mb-3">
@@ -95,33 +109,33 @@ export function AddFriend() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Search by username, email, phone, or @instagram"
-          className="flex-1 bg-black/30 border border-plugin-border rounded px-3 py-2 text-white text-sm"
+          className="input flex-1"
         />
         <button
           onClick={handleSearch}
           disabled={searching || query.trim().length < 2}
-          className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-accent/50 text-white rounded px-3 py-2"
+          className="btn btn-primary"
         >
           <Search size={16} />
         </button>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-red-400 text-sm mb-3">
+        <div className="flex items-center gap-2 mb-3" style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-sm)' }}>
           <AlertCircle size={14} />
           {error}
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-2 text-green-400 text-sm mb-3">
+        <div className="flex items-center gap-2 mb-3" style={{ color: 'var(--color-status-active)', fontSize: 'var(--text-sm)' }}>
           <CheckCircle size={14} />
           {success}
         </div>
       )}
 
       {searching && (
-        <div className="text-gray-400 text-sm">Searching...</div>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>Searching...</div>
       )}
 
       {results.length > 0 && (
@@ -129,22 +143,20 @@ export function AddFriend() {
           {results.map((user) => (
             <div
               key={user.userId}
-              className="flex items-center justify-between bg-black/20 rounded p-3"
+              className="flex items-center justify-between"
+              style={{ background: 'var(--color-bg-input)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}
             >
               <div>
-                <div className="text-white text-sm font-medium">{user.username}</div>
-                <div className="text-gray-500 text-xs">
+                <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{user.username}</div>
+                <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)' }}>
                   Found by {user.matchedOn}
                 </div>
               </div>
               <button
                 onClick={() => handleSendRequest(user.userId, user.username)}
                 disabled={sending === user.userId}
-                className={`flex items-center gap-1 text-sm rounded px-3 py-1 ${
-                  sending === user.userId
-                    ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
-                }`}
+                className={`btn flex items-center gap-1 ${sending === user.userId ? '' : 'btn-primary'}`}
+                style={sending === user.userId ? { opacity: 0.6, cursor: 'wait' } : { fontSize: 'var(--text-sm)' }}
               >
                 <UserPlus size={14} />
                 {sending === user.userId ? 'Sending...' : 'Add'}

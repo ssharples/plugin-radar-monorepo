@@ -1,0 +1,76 @@
+/* Custom Dropdown Animations - Vintage Studio Hardware Aesthetic */
+
+/* Dropdown slide-down animation (overrides Tailwind animate-slide-up) */
+@keyframes dropdown-slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-panel {
+  animation: dropdown-slide-down 150ms ease-out;
+}
+
+/* LED glow pulse for active indicators */
+@keyframes led-glow {
+  0%, 100% {
+    box-shadow: 0 0 2px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 6px currentColor;
+  }
+}
+
+.led-indicator.active {
+  animation: led-glow 2s ease-in-out infinite;
+}
+
+/* Custom scrollbar for dropdown panels */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Scanline texture overlay (applied in DropdownPanel) */
+.scanline-overlay {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.1) 2px
+  );
+}
+
+/* Mechanical button press effect */
+.dropdown-trigger:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Focus ring for accessibility */
+.dropdown-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Option hover transition */
+.dropdown-option {
+  transition: background-color 80ms ease-out, color 80ms ease-out;
+}

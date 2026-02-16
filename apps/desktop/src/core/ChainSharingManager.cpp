@@ -4,7 +4,12 @@ ChainSharingManager::ChainSharingManager() {}
 
 ChainSharingManager::~ChainSharingManager()
 {
+    isShuttingDown.store(true, std::memory_order_release);
     stopPolling();
+
+    // Wait for any in-flight background threads to finish
+    std::unique_lock<std::mutex> lock(shutdownMutex);
+    shutdownCondition.wait(lock, [this]() { return activeThreadCount.load() == 0; });
 }
 
 void ChainSharingManager::startPolling()
@@ -38,25 +43,38 @@ void ChainSharingManager::setConvexUrl(const juce::String& url)
 
 void ChainSharingManager::timerCallback()
 {
+    if (isShuttingDown.load(std::memory_order_acquire))
+        return;
+
+    activeThreadCount.fetch_add(1);
+    auto tokenCopy = sessionToken;
     // Run on a background thread to avoid blocking the message thread
-    juce::Thread::launch([this]()
+    juce::Thread::launch([this, tokenCopy]()
     {
-        checkForReceivedChains();
+        if (!isShuttingDown.load(std::memory_order_acquire))
+            checkForReceivedChainsWithToken(tokenCopy);
+
+        activeThreadCount.fetch_sub(1);
+        shutdownCondition.notify_one();
     });
 }
 
 void ChainSharingManager::checkForReceivedChains()
 {
-    if (sessionToken.isEmpty()) return;
+    checkForReceivedChainsWithToken(sessionToken);
+}
 
-    auto result = httpPost("/api/query", juce::var(new juce::DynamicObject()));
+void ChainSharingManager::checkForReceivedChainsWithToken(const juce::String& token)
+{
+    if (token.isEmpty()) return;
+    if (isShuttingDown.load(std::memory_order_acquire)) return;
 
     // Build the query args
     auto* args = new juce::DynamicObject();
     args->setProperty("path", "privateChains:getReceivedChains");
     
     auto* queryArgs = new juce::DynamicObject();
-    queryArgs->setProperty("sessionToken", sessionToken);
+    queryArgs->setProperty("sessionToken", token);
     args->setProperty("args", juce::var(queryArgs));
 
     auto response = httpPost("/api/query", juce::var(args));
@@ -83,12 +101,12 @@ void ChainSharingManager::checkForReceivedChains()
         pendingCount.store((int) chains.size());
 
         // Dispatch callback on message thread
-        if (onChainsReceived && !chains.empty())
+        if (onChainsReceived && !chains.empty() && !isShuttingDown.load(std::memory_order_acquire))
         {
             auto chainsCopy = chains;
             juce::MessageManager::callAsync([this, chainsCopy]()
             {
-                if (onChainsReceived)
+                if (!isShuttingDown.load(std::memory_order_acquire) && onChainsReceived)
                     onChainsReceived(chainsCopy);
             });
         }
@@ -99,70 +117,98 @@ void ChainSharingManager::sendChainToUser(const juce::String& recipientIdentifie
                                             const juce::String& chainId)
 {
     if (sessionToken.isEmpty()) return;
+    if (isShuttingDown.load(std::memory_order_acquire)) return;
 
-    juce::Thread::launch([this, recipientIdentifier, chainId]()
+    auto tokenCopy = sessionToken;
+    activeThreadCount.fetch_add(1);
+    juce::Thread::launch([this, recipientIdentifier, chainId, tokenCopy]()
     {
-        auto* args = new juce::DynamicObject();
-        args->setProperty("path", "privateChains:sendChain");
-        
-        auto* mutationArgs = new juce::DynamicObject();
-        mutationArgs->setProperty("sessionToken", sessionToken);
-        mutationArgs->setProperty("recipientIdentifier", recipientIdentifier);
-        mutationArgs->setProperty("chainId", chainId);
-        args->setProperty("args", juce::var(mutationArgs));
+        if (!isShuttingDown.load(std::memory_order_acquire))
+        {
+            auto* args = new juce::DynamicObject();
+            args->setProperty("path", "privateChains:sendChain");
 
-        httpPost("/api/mutation", juce::var(args));
+            auto* mutationArgs = new juce::DynamicObject();
+            mutationArgs->setProperty("sessionToken", tokenCopy);
+            mutationArgs->setProperty("recipientIdentifier", recipientIdentifier);
+            mutationArgs->setProperty("chainId", chainId);
+            args->setProperty("args", juce::var(mutationArgs));
+
+            httpPost("/api/mutation", juce::var(args));
+        }
+
+        activeThreadCount.fetch_sub(1);
+        shutdownCondition.notify_one();
     });
 }
 
 void ChainSharingManager::acceptChain(const juce::String& shareId)
 {
     if (sessionToken.isEmpty()) return;
+    if (isShuttingDown.load(std::memory_order_acquire)) return;
 
-    juce::Thread::launch([this, shareId]()
+    auto tokenCopy = sessionToken;
+    activeThreadCount.fetch_add(1);
+    juce::Thread::launch([this, shareId, tokenCopy]()
     {
-        auto* args = new juce::DynamicObject();
-        args->setProperty("path", "privateChains:acceptChain");
-        
-        auto* mutationArgs = new juce::DynamicObject();
-        mutationArgs->setProperty("sessionToken", sessionToken);
-        mutationArgs->setProperty("shareId", shareId);
-        args->setProperty("args", juce::var(mutationArgs));
-
-        auto response = httpPost("/api/mutation", juce::var(args));
-
-        if (response.isObject())
+        if (!isShuttingDown.load(std::memory_order_acquire))
         {
-            auto chainData = response["chainData"].toString();
-            auto chainName = response["chainName"].toString();
+            auto* args = new juce::DynamicObject();
+            args->setProperty("path", "privateChains:acceptChain");
 
-            juce::MessageManager::callAsync([this, chainData, chainName]()
+            auto* mutationArgs = new juce::DynamicObject();
+            mutationArgs->setProperty("sessionToken", tokenCopy);
+            mutationArgs->setProperty("shareId", shareId);
+            args->setProperty("args", juce::var(mutationArgs));
+
+            auto response = httpPost("/api/mutation", juce::var(args));
+
+            if (response.isObject() && !isShuttingDown.load(std::memory_order_acquire))
             {
-                if (onChainImported)
-                    onChainImported(chainData, chainName);
-            });
+                auto chainData = response["chainData"].toString();
+                auto chainName = response["chainName"].toString();
+
+                juce::MessageManager::callAsync([this, chainData, chainName]()
+                {
+                    if (onChainImported)
+                        onChainImported(chainData, chainName);
+                });
+            }
         }
+
+        activeThreadCount.fetch_sub(1);
+        shutdownCondition.notify_one();
     });
 }
 
 void ChainSharingManager::rejectChain(const juce::String& shareId)
 {
     if (sessionToken.isEmpty()) return;
+    if (isShuttingDown.load(std::memory_order_acquire)) return;
 
-    juce::Thread::launch([this, shareId]()
+    auto tokenCopy = sessionToken;
+    activeThreadCount.fetch_add(1);
+    juce::Thread::launch([this, shareId, tokenCopy]()
     {
-        auto* args = new juce::DynamicObject();
-        args->setProperty("path", "privateChains:rejectChain");
-        
-        auto* mutationArgs = new juce::DynamicObject();
-        mutationArgs->setProperty("sessionToken", sessionToken);
-        mutationArgs->setProperty("shareId", shareId);
-        args->setProperty("args", juce::var(mutationArgs));
+        if (!isShuttingDown.load(std::memory_order_acquire))
+        {
+            auto* args = new juce::DynamicObject();
+            args->setProperty("path", "privateChains:rejectChain");
 
-        httpPost("/api/mutation", juce::var(args));
+            auto* mutationArgs = new juce::DynamicObject();
+            mutationArgs->setProperty("sessionToken", tokenCopy);
+            mutationArgs->setProperty("shareId", shareId);
+            args->setProperty("args", juce::var(mutationArgs));
 
-        // Refresh the list
-        checkForReceivedChains();
+            httpPost("/api/mutation", juce::var(args));
+
+            // Refresh the list
+            if (!isShuttingDown.load(std::memory_order_acquire))
+                checkForReceivedChains();
+        }
+
+        activeThreadCount.fetch_sub(1);
+        shutdownCondition.notify_one();
     });
 }
 

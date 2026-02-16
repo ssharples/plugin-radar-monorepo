@@ -3,9 +3,30 @@ import { Send, X, Loader2, Check, AlertCircle } from 'lucide-react';
 import { useChainStore } from '../../stores/chainStore';
 import { useSyncStore } from '../../stores/syncStore';
 import * as convexClient from '../../api/convex-client';
+const { getStoredSession } = convexClient;
 import { api } from '@convex/_generated/api';
 import { juceBridge } from '../../api/juce-bridge';
 import { captureSlotParameters } from '../../utils/captureParameters';
+
+const glassPanel: React.CSSProperties = {
+  background: 'rgba(15, 15, 15, 0.9)',
+  backdropFilter: 'blur(12px)',
+  border: '1px solid var(--color-border-default)',
+  boxShadow: 'var(--shadow-elevated)',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--color-bg-input)',
+  border: '1px solid var(--color-border-default)',
+  borderRadius: 'var(--radius-base)',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 'var(--text-sm)',
+  color: 'var(--color-text-primary)',
+  padding: '6px 10px',
+  outline: 'none',
+  transition: 'border-color 150ms, box-shadow 150ms',
+};
 
 interface QuickSharePanelProps {
   onClose: () => void;
@@ -21,10 +42,12 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
 
   if (!isLoggedIn) {
     return (
-      <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up p-4">
+      <div className="w-80 rounded-md p-4 scale-in" style={glassPanel}>
         <div className="text-center">
-          <AlertCircle className="w-5 h-5 text-plugin-dim mx-auto mb-2" />
-          <p className="text-xs text-plugin-muted">Log in to share chains</p>
+          <AlertCircle className="w-5 h-5 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            Log in to share chains
+          </p>
         </div>
       </div>
     );
@@ -32,10 +55,12 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
 
   if (slots.length === 0) {
     return (
-      <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up p-4">
+      <div className="w-80 rounded-md p-4 scale-in" style={glassPanel}>
         <div className="text-center">
-          <AlertCircle className="w-5 h-5 text-plugin-dim mx-auto mb-2" />
-          <p className="text-xs text-plugin-muted">Add plugins before sharing</p>
+          <AlertCircle className="w-5 h-5 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            Add plugins before sharing
+          </p>
         </div>
       </div>
     );
@@ -94,7 +119,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
 
       // Send to recipient
       setStatus('sending');
-      const token = localStorage.getItem('pluginradar_session');
+      const token = getStoredSession();
       if (!token) {
         setStatus('error');
         setErrorMsg('Not logged in');
@@ -136,14 +161,29 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
   const isBusy = status === 'saving' || status === 'sending';
 
   return (
-    <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up">
+    <div className="w-80 rounded-md scale-in" style={glassPanel}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-plugin-border">
+      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: '1px solid var(--color-border-default)' }}>
         <div className="flex items-center gap-2">
-          <Send className="w-3.5 h-3.5 text-plugin-accent" />
-          <span className="text-xs font-mono uppercase font-semibold text-plugin-text">Share Chain</span>
+          <Send className="w-3.5 h-3.5" style={{ color: 'var(--color-accent-cyan)' }} />
+          <span style={{
+            fontSize: 'var(--text-sm)',
+            fontFamily: 'var(--font-extended)',
+            fontWeight: 900,
+            color: 'var(--color-text-primary)',
+            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-wider)',
+          }}>
+            Share Chain
+          </span>
         </div>
-        <button onClick={onClose} className="text-plugin-dim hover:text-plugin-text">
+        <button
+          onClick={onClose}
+          className="transition-colors duration-150"
+          style={{ color: 'var(--color-text-tertiary)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
+        >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -151,7 +191,18 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
       <div className="p-4 space-y-3">
         {/* Recipient input */}
         <div>
-          <label className="block text-[10px] font-mono text-plugin-dim mb-1">Send to</label>
+          <label
+            className="block mb-1"
+            style={{
+              fontSize: 'var(--text-xs)',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--color-text-tertiary)',
+              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-wide)',
+            }}
+          >
+            Send to
+          </label>
           <input
             type="text"
             value={recipient}
@@ -159,39 +210,56 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
             onKeyDown={handleKeyDown}
             placeholder="Username, email, phone, or @instagram"
             disabled={isBusy}
-            className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent disabled:opacity-50"
+            style={{
+              ...inputStyle,
+              opacity: isBusy ? 0.5 : 1,
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent-cyan)'; e.currentTarget.style.boxShadow = '0 0 0 1px var(--color-accent-cyan)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.boxShadow = 'none'; }}
             autoFocus
           />
         </div>
 
         {/* Chain preview */}
-        <div className="bg-black/20 rounded px-2.5 py-1.5">
-          <div className="text-[10px] text-plugin-dim">
+        <div
+          className="rounded-md px-2.5 py-1.5"
+          style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border-subtle)' }}
+        >
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
             {chainName} ({slots.length} plugin{slots.length !== 1 ? 's' : ''})
           </div>
         </div>
 
         {/* Status messages */}
         {status === 'saving' && (
-          <div className="flex items-center gap-1.5 text-[10px] text-plugin-muted">
+          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
             <Loader2 className="w-3 h-3 animate-spin" />
             Saving chain to cloud...
           </div>
         )}
         {status === 'sending' && (
-          <div className="flex items-center gap-1.5 text-[10px] text-plugin-muted">
+          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
             <Loader2 className="w-3 h-3 animate-spin" />
             Sending to {recipient}...
           </div>
         )}
         {status === 'success' && (
-          <div className="flex items-center gap-1.5 text-[10px] text-green-400">
+          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-active)', fontFamily: 'var(--font-mono)' }}>
             <Check className="w-3 h-3" />
             Chain sent!
           </div>
         )}
         {status === 'error' && (
-          <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
+          <div
+            className="rounded px-2 py-1.5"
+            style={{
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-status-error)',
+              background: 'rgba(255, 0, 51, 0.1)',
+              border: '1px solid rgba(255, 0, 51, 0.2)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
             {errorMsg}
           </div>
         )}
@@ -200,10 +268,13 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
         <button
           onClick={handleShare}
           disabled={isBusy || !recipient.trim()}
-          className="w-full flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded px-3 py-1.5 text-[11px] font-mono uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="btn btn-primary w-full"
+          style={{ opacity: isBusy || !recipient.trim() ? 0.4 : 1 }}
         >
-          <Send className="w-3 h-3" />
-          Send
+          <span className="flex items-center justify-center gap-1.5">
+            <Send className="w-3 h-3" />
+            Send
+          </span>
         </button>
       </div>
     </div>

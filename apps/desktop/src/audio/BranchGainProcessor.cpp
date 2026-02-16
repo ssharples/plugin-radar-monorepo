@@ -1,4 +1,5 @@
 #include "BranchGainProcessor.h"
+#include "FastMath.h"  // PHASE 4: Fast dB to linear conversion
 #include <cmath>
 
 BranchGainProcessor::BranchGainProcessor()
@@ -44,9 +45,8 @@ void BranchGainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 }
 
-float BranchGainProcessor::dbToLinear(float dB)
+// PHASE 4: Use FastMath lookup table (10-20x faster than std::pow)
+float BranchGainProcessor::dbToLinear(float dB) noexcept
 {
-    if (dB <= -60.0f)
-        return 0.0f;
-    return std::pow(10.0f, dB / 20.0f);
+    return FastMath::dbToLinear(dB);
 }

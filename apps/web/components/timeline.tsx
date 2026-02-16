@@ -60,11 +60,11 @@ function getEventIcon(type: string) {
 function getEventColor(type: string) {
   switch (type) {
     case "release":
-      return "bg-emerald-500";
+      return "bg-white";
     case "update":
       return "bg-blue-500";
     case "sale_started":
-      return "bg-amber-500";
+      return "bg-white";
     case "sale_ended":
       return "bg-stone-500";
     case "announcement":
@@ -151,7 +151,7 @@ export function Timeline({
                 {showPluginLinks && event.pluginData ? (
                   <Link
                     href={`/plugins/${event.pluginData.slug}`}
-                    className="hover:text-emerald-400 transition"
+                    className="hover:text-white transition"
                   >
                     {event.title}
                   </Link>
@@ -163,7 +163,7 @@ export function Timeline({
               {/* Extra details for sales */}
               {(event.type === "sale_started" || event.type === "price_change") &&
                 event.discountPercent && (
-                  <p className="text-emerald-400 text-xs mt-1">
+                  <p className="text-white text-xs mt-1">
                     {event.discountPercent}% off
                     {event.newPrice && (
                       <span className="text-stone-500">

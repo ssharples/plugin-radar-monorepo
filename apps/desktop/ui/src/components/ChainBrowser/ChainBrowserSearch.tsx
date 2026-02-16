@@ -22,18 +22,22 @@ export function ChainBrowserSearch({ onSearch, debounceMs = 300 }: ChainBrowserS
 
   return (
     <div className="relative">
-      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-plugin-dim" />
+      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: 'var(--color-text-disabled)' }} />
       <input
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Search chains..."
-        className="w-full bg-black/40 border border-plugin-border rounded-propane font-mono pl-7 pr-7 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+        className="input w-full"
+        style={{ paddingLeft: '28px', paddingRight: '28px', fontSize: 'var(--text-xs)' }}
       />
       {value && (
         <button
           onClick={() => setValue('')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-plugin-dim hover:text-plugin-text"
+          className="absolute right-2 top-1/2 -translate-y-1/2"
+          style={{ color: 'var(--color-text-disabled)', background: 'none', border: 'none', cursor: 'pointer' }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-disabled)')}
         >
           <X className="w-3 h-3" />
         </button>

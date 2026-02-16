@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeftRight, Dice5, X, Loader2, ScanLine } from 'lucide-react';
-import { findCompatibleSwaps, translateParameters, getParameterMap, uploadDiscoveredParameterMap } from '../../api/convex-client';
+import { ArrowLeftRight, Dice5, X, Loader2, ScanLine, Users } from 'lucide-react';
+import { findCompatibleSwaps, translateParameters, getParameterMap, contributeParameterDiscovery } from '../../api/convex-client';
 import { juceBridge } from '../../api/juce-bridge';
 
 interface SwapCandidate {
@@ -25,11 +25,11 @@ interface PluginSwapMenuProps {
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
   if (confidence > 80) {
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400">🟢 {confidence}%</span>;
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" />{confidence}%</span>;
   } else if (confidence > 50) {
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">🟡 {confidence}%</span>;
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />{confidence}%</span>;
   } else {
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">🔴 {confidence}%</span>;
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />{confidence}%</span>;
   }
 }
 
@@ -111,6 +111,7 @@ export function PluginSwapMenu({
   const [error, setError] = useState<string | null>(null);
   const [mapSource, setMapSource] = useState<MapSource>('none');
   const [mapConfidence, setMapConfidence] = useState<number | undefined>();
+  const [mapContributorCount, setMapContributorCount] = useState<number>(0);
   const [scanning, setScanning] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +137,7 @@ export function PluginSwapMenu({
       if (map) {
         setMapSource((map.source || 'manual') as MapSource);
         setMapConfidence(map.confidence);
+        setMapContributorCount(map.contributorCount ?? 0);
       } else {
         setMapSource('none');
       }
@@ -152,10 +154,20 @@ export function PluginSwapMenu({
       const result = await juceBridge.discoverPluginParameters(nodeId);
       if (result.success && result.map) {
         if (result.map.confidence >= 30) {
-          const uploadResult = await uploadDiscoveredParameterMap(result.map, matchedPluginId);
-          if (uploadResult.success) {
+          const matchedCount = result.map.parameters?.filter(
+            (p: any) => p.semantic !== 'unknown'
+          ).length ?? result.map.matchedCount;
+
+          const contribResult = await contributeParameterDiscovery(matchedPluginId, {
+            ...result.map,
+            matchedCount,
+            totalCount: result.map.parameters?.length ?? result.map.totalCount,
+            source: 'juce-scanned',
+          });
+          if (contribResult) {
             setMapSource('juce-scanned');
             setMapConfidence(result.map.confidence);
+            setMapContributorCount(contribResult.contributorCount);
             // Refresh swaps list since we now have a map
             const newSwaps = await findCompatibleSwaps(matchedPluginId);
             setSwaps(newSwaps);
@@ -306,6 +318,12 @@ export function PluginSwapMenu({
             onScan={mapSource === 'none' ? handleScanParameters : undefined}
             scanning={scanning}
           />
+          {mapContributorCount > 0 && (
+            <div className="flex items-center gap-1 text-[10px] text-plugin-muted">
+              <Users className="w-3 h-3" />
+              {mapContributorCount} contributor{mapContributorCount > 1 ? 's' : ''}
+            </div>
+          )}
         </div>
       </div>
 
@@ -358,8 +376,13 @@ export function PluginSwapMenu({
       {/* Footer */}
       {swaps.length > 0 && (
         <div className="px-3 py-1.5 border-t border-plugin-border bg-plugin-bg/50">
-          <p className="text-[10px] text-plugin-muted/50">
-            🟢 &gt;80% • 🟡 50-80% • 🔴 &lt;50% match confidence
+          <p className="text-[10px] text-plugin-muted/50 flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />&gt;80%</span>
+            <span className="opacity-30">|</span>
+            <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block" />50-80%</span>
+            <span className="opacity-30">|</span>
+            <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />&lt;50%</span>
+            match confidence
           </p>
         </div>
       )}

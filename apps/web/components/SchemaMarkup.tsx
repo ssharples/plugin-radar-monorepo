@@ -288,6 +288,44 @@ export function WebsiteSchema() {
 }
 
 // =============================================
+// PROCHAIN PRODUCT SCHEMA
+// =============================================
+
+export function ProChainSchema() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ProChain",
+    "applicationCategory": "MultimediaApplication",
+    "applicationSubCategory": "Plugin Chain Manager",
+    "operatingSystem": "macOS, Windows",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/PreOrder",
+      "description": "Free during open beta"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "Plugin Radar",
+      "url": "https://pluginradar.com"
+    },
+    "url": "https://pluginradar.com/download",
+    "description": "Build, share, and discover plugin chains for any VST3, AU, or AAX plugin. Rate, comment, and fork chains like GitHub repos.",
+    "featureList": "Serial and parallel plugin chains, per-plugin metering, cloud sharing, cross-DAW presets, community ratings, chain forking"
+  };
+
+  return (
+    <Script
+      id="schema-prochain"
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
+// =============================================
 // HELPER FUNCTIONS
 // =============================================
 

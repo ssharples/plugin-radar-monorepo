@@ -49,9 +49,16 @@ static void extractUiFiles()
         return;
     }
 
-    // Create temp directory for extracted UI
+    // Create temp directory for extracted UI with unique name based on binary size
+    // This forces cache invalidation when the plugin is rebuilt
+    auto baseName = juce::String("PluginChainManagerUI_") + juce::String(BinaryData::ui_zipSize);
     extractedUiDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
-        .getChildFile("PluginChainManagerUI");
+        .getChildFile(baseName);
+
+    // Skip extraction if index.html already exists (same binary size = same content)
+    auto indexFile = extractedUiDir.getChildFile("index.html");
+    if (indexFile.existsAsFile())
+        return;
 
     // Clean and recreate
     if (extractedUiDir.exists())
@@ -114,10 +121,11 @@ juce::String getBaseUrl()
     initialize();
 
     // Always use the resource provider - this enables native function integration
+    // Add cache-busting parameter based on binary size to force reload on rebuild
     #if JUCE_DEBUG
     std::cerr << "Loading UI from resource provider" << std::endl;
     #endif
-    return "https://ui.local/index.html";
+    return "https://ui.local/index.html?v=" + juce::String(BinaryData::ui_zipSize);
 }
 
 std::optional<juce::WebBrowserComponent::Resource> getResource(const juce::String& url)

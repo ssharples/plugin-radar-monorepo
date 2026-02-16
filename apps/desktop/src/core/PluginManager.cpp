@@ -4,15 +4,17 @@
 
 PluginManager::PluginManager()
 {
-    // Only scan AU plugins for now
     #if JUCE_PLUGINHOST_AU
     formatManager.addFormat(new juce::AudioUnitPluginFormat());
     #if JUCE_DEBUG
     std::cerr << "PluginManager: Added AudioUnit format" << std::endl;
     #endif
-    #else
+    #endif
+
+    #if JUCE_PLUGINHOST_VST3
+    formatManager.addFormat(new juce::VST3PluginFormat());
     #if JUCE_DEBUG
-    std::cerr << "PluginManager: JUCE_PLUGINHOST_AU not defined!" << std::endl;
+    std::cerr << "PluginManager: Added VST3 format" << std::endl;
     #endif
     #endif
 
@@ -34,12 +36,25 @@ PluginManager::PluginManager()
     loadBlacklist();
     checkForCrashedPlugin();  // Auto-blacklist any plugin that crashed during previous scan
     loadPluginList();
+    loadCustomScanPaths();
+    loadDeactivatedList();
+    loadAutoScanSettings();
 }
 
-PluginManager::~PluginManager()
+PluginManager::~PluginManager() noexcept
 {
+    autoScanTimer.stopTimer();
     stopTimer();
-    stopScan();
+    shouldStopScan.store(true);
+
+    // Wait for scanner thread to finish with proper cleanup
+    if (scanThread.joinable())
+    {
+        scanThread.join();
+    }
+
+    currentScanner.reset();
+    scanning.store(false);
 }
 
 void PluginManager::startScan(bool /*rescanAll*/)
@@ -93,7 +108,7 @@ void PluginManager::stopScan()
 
 juce::String PluginManager::getCurrentlyScanning() const
 {
-    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(scanMutex));
+    std::lock_guard<std::mutex> lock(scanMutex);
     return currentlyScanning;
 }
 
@@ -281,9 +296,12 @@ juce::var PluginManager::getPluginListAsJson() const
     for (const auto& desc : knownPlugins.getTypes())
     {
         // Only include audio effect plugins, not instruments/synths
-        // Check both isInstrument flag AND input channels (instruments typically have 0 audio inputs)
         bool isLikelyInstrument = desc.isInstrument || desc.numInputChannels == 0;
         if (isLikelyInstrument)
+            continue;
+
+        // Filter out deactivated plugins from the main list
+        if (deactivatedPlugins.contains(desc.fileOrIdentifier))
             continue;
 
         auto* obj = new juce::DynamicObject();
@@ -343,6 +361,17 @@ juce::FileSearchPath PluginManager::getSearchPathsForFormat(juce::AudioPluginFor
         paths.add(juce::File("/Library/Audio/Plug-Ins/Components"));
         paths.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
             .getChildFile("Library/Audio/Plug-Ins/Components"));
+    }
+
+    // Append custom scan paths that match this format (or "All")
+    for (const auto& custom : customScanPaths)
+    {
+        if (custom.format == format->getName() || custom.format == "All")
+        {
+            juce::File dir(custom.path);
+            if (dir.isDirectory())
+                paths.add(dir);
+        }
     }
 
     return paths;
@@ -619,7 +648,12 @@ void PluginManager::scanNextPluginOutOfProcess()
     // Write dead man's pedal BEFORE scanning — if the app crashes while the
     // helper is running, this file persists and checkForCrashedPlugin() will
     // auto-blacklist this plugin on next startup
-    getDeadMansPedalFile().replaceWithText(pluginPath);
+    // Use atomic write pattern (temp file + rename)
+    auto deadMansPedal = getDeadMansPedalFile();
+    auto tempFile = deadMansPedal.getSiblingFile(deadMansPedal.getFileName() + ".tmp");
+
+    tempFile.replaceWithText(pluginPath);
+    tempFile.moveFileTo(deadMansPedal);  // Atomic rename
 
     // Launch scan in background thread so the UI stays responsive
     backgroundScanInProgress.store(true);
@@ -713,6 +747,14 @@ PluginManager::BackgroundScanResult PluginManager::scanPluginWithHelper(const ju
     {
         std::cerr << "ERROR: Scanner helper timed out for: " << pluginPath << std::endl;
         child.kill();
+
+        // Wait for process to be reaped (up to 5 seconds)
+        bool reaped = child.waitForProcessToFinish(5000);
+        if (!reaped)
+        {
+            DBG("Scanner process failed to terminate: " + pluginPath);
+        }
+
         return { { false, ScanFailureReason::Timeout }, {}, pluginPath };
     }
 
@@ -735,5 +777,494 @@ PluginManager::BackgroundScanResult PluginManager::scanPluginWithHelper(const ju
         return { { false, ScanFailureReason::ScanFailure }, {}, pluginPath };
 
     return { { true, ScanFailureReason::None }, std::move(parsed.plugins), pluginPath };
+}
+
+//==============================================================================
+// Custom Scan Paths
+//==============================================================================
+
+juce::File PluginManager::getCustomScanPathsFile() const
+{
+    return PlatformPaths::getPluginCacheDirectory().getChildFile("custom-scan-paths.json");
+}
+
+void PluginManager::saveCustomScanPaths()
+{
+    auto file = getCustomScanPathsFile();
+    file.getParentDirectory().createDirectory();
+
+    juce::Array<juce::var> arr;
+    for (const auto& p : customScanPaths)
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("path", p.path);
+        obj->setProperty("format", p.format);
+        arr.add(juce::var(obj));
+    }
+
+    auto jsonStr = juce::JSON::toString(juce::var(arr));
+    file.replaceWithText(jsonStr);
+}
+
+void PluginManager::loadCustomScanPaths()
+{
+    auto file = getCustomScanPathsFile();
+    if (!file.existsAsFile())
+        return;
+
+    auto parsed = juce::JSON::parse(file.loadFileAsString());
+    if (!parsed.isArray())
+        return;
+
+    customScanPaths.clear();
+    for (int i = 0; i < parsed.size(); ++i)
+    {
+        auto entry = parsed[i];
+        CustomScanPath p;
+        p.path = entry.getProperty("path", "").toString();
+        p.format = entry.getProperty("format", "").toString();
+        if (p.path.isNotEmpty() && p.format.isNotEmpty())
+            customScanPaths.push_back(p);
+    }
+
+    #if JUCE_DEBUG
+    std::cerr << "Loaded " << customScanPaths.size() << " custom scan paths" << std::endl;
+    #endif
+}
+
+juce::var PluginManager::getCustomScanPathsAsJson() const
+{
+    auto* result = new juce::DynamicObject();
+    juce::Array<juce::var> pathsArray;
+
+    // Add default paths for each format
+    for (int i = 0; i < formatManager.getNumFormats(); ++i)
+    {
+        auto* format = formatManager.getFormat(i);
+        auto defaultPaths = format->getDefaultLocationsToSearch();
+
+        // Handle AU fallback
+        if (defaultPaths.getNumPaths() == 0 && format->getName() == "AudioUnit")
+        {
+            defaultPaths.add(juce::File("/Library/Audio/Plug-Ins/Components"));
+            defaultPaths.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+                .getChildFile("Library/Audio/Plug-Ins/Components"));
+        }
+
+        for (int j = 0; j < defaultPaths.getNumPaths(); ++j)
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty("path", defaultPaths[j].getFullPathName());
+            obj->setProperty("format", format->getName());
+            obj->setProperty("isDefault", true);
+            pathsArray.add(juce::var(obj));
+        }
+    }
+
+    // Add custom paths
+    for (const auto& p : customScanPaths)
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("path", p.path);
+        obj->setProperty("format", p.format);
+        obj->setProperty("isDefault", false);
+        pathsArray.add(juce::var(obj));
+    }
+
+    result->setProperty("paths", pathsArray);
+    return juce::var(result);
+}
+
+bool PluginManager::addCustomScanPath(const juce::String& path, const juce::String& format)
+{
+    // Validate directory exists
+    juce::File dir(path);
+    if (!dir.isDirectory())
+        return false;
+
+    // Validate format
+    if (format != "VST3" && format != "AudioUnit" && format != "All")
+        return false;
+
+    // Check for duplicates
+    for (const auto& existing : customScanPaths)
+    {
+        if (existing.path == path && existing.format == format)
+            return false;
+    }
+
+    customScanPaths.push_back({ path, format });
+    saveCustomScanPaths();
+
+    #if JUCE_DEBUG
+    std::cerr << "Added custom scan path: " << path << " (" << format << ")" << std::endl;
+    #endif
+
+    return true;
+}
+
+bool PluginManager::removeCustomScanPath(const juce::String& path, const juce::String& format)
+{
+    for (auto it = customScanPaths.begin(); it != customScanPaths.end(); ++it)
+    {
+        if (it->path == path && it->format == format)
+        {
+            customScanPaths.erase(it);
+            saveCustomScanPaths();
+
+            #if JUCE_DEBUG
+            std::cerr << "Removed custom scan path: " << path << " (" << format << ")" << std::endl;
+            #endif
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+//==============================================================================
+// Plugin Deactivation
+//==============================================================================
+
+juce::File PluginManager::getDeactivatedPluginsFile() const
+{
+    return PlatformPaths::getPluginCacheDirectory().getChildFile("deactivated-plugins.txt");
+}
+
+void PluginManager::saveDeactivatedList()
+{
+    auto file = getDeactivatedPluginsFile();
+    file.getParentDirectory().createDirectory();
+    file.replaceWithText(deactivatedPlugins.joinIntoString("\n"));
+}
+
+void PluginManager::loadDeactivatedList()
+{
+    auto file = getDeactivatedPluginsFile();
+    if (!file.existsAsFile())
+        return;
+
+    juce::StringArray lines;
+    file.readLines(lines);
+
+    deactivatedPlugins.clear();
+    for (const auto& line : lines)
+    {
+        if (line.trim().isNotEmpty())
+            deactivatedPlugins.add(line.trim());
+    }
+
+    #if JUCE_DEBUG
+    std::cerr << "Loaded " << deactivatedPlugins.size() << " deactivated plugins" << std::endl;
+    #endif
+}
+
+bool PluginManager::isDeactivated(const juce::String& identifier) const
+{
+    return deactivatedPlugins.contains(identifier);
+}
+
+bool PluginManager::deactivatePlugin(const juce::String& identifier)
+{
+    if (deactivatedPlugins.contains(identifier))
+        return true;  // Already deactivated
+
+    // Verify the plugin exists in known plugins
+    bool found = false;
+    for (const auto& desc : knownPlugins.getTypes())
+    {
+        if (desc.fileOrIdentifier == identifier)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
+        return false;
+
+    deactivatedPlugins.add(identifier);
+    saveDeactivatedList();
+
+    #if JUCE_DEBUG
+    std::cerr << "Deactivated plugin: " << identifier << std::endl;
+    #endif
+
+    if (onDeactivationChanged)
+        onDeactivationChanged();
+
+    return true;
+}
+
+bool PluginManager::reactivatePlugin(const juce::String& identifier)
+{
+    int idx = deactivatedPlugins.indexOf(identifier);
+    if (idx < 0)
+        return false;  // Not deactivated
+
+    deactivatedPlugins.remove(idx);
+    saveDeactivatedList();
+
+    #if JUCE_DEBUG
+    std::cerr << "Reactivated plugin: " << identifier << std::endl;
+    #endif
+
+    if (onDeactivationChanged)
+        onDeactivationChanged();
+
+    return true;
+}
+
+juce::var PluginManager::getDeactivatedPluginsAsJson() const
+{
+    juce::Array<juce::var> arr;
+
+    for (const auto& identifier : deactivatedPlugins)
+    {
+        // Look up metadata from knownPlugins
+        for (const auto& desc : knownPlugins.getTypes())
+        {
+            if (desc.fileOrIdentifier == identifier)
+            {
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("identifier", desc.fileOrIdentifier);
+                obj->setProperty("name", desc.name);
+                obj->setProperty("manufacturer", desc.manufacturerName);
+                obj->setProperty("format", desc.pluginFormatName);
+                arr.add(juce::var(obj));
+                break;
+            }
+        }
+    }
+
+    return juce::var(arr);
+}
+
+bool PluginManager::removeKnownPlugin(const juce::String& identifier)
+{
+    // Find and remove the plugin from knownPlugins
+    bool removed = false;
+    auto types = knownPlugins.getTypes();
+
+    for (int i = 0; i < static_cast<int>(types.size()); ++i)
+    {
+        if (types[i].fileOrIdentifier == identifier)
+        {
+            knownPlugins.removeType(types[i]);
+            removed = true;
+            break;
+        }
+    }
+
+    if (!removed)
+        return false;
+
+    // Also remove from deactivated list if present
+    int deactIdx = deactivatedPlugins.indexOf(identifier);
+    if (deactIdx >= 0)
+        deactivatedPlugins.remove(deactIdx);
+
+    savePluginList();
+    saveDeactivatedList();
+
+    #if JUCE_DEBUG
+    std::cerr << "Removed known plugin: " << identifier << std::endl;
+    #endif
+
+    return true;
+}
+
+juce::var PluginManager::getPluginListIncludingDeactivatedAsJson() const
+{
+    juce::Array<juce::var> pluginArray;
+
+    for (const auto& desc : knownPlugins.getTypes())
+    {
+        // Still filter out instruments (same as getPluginListAsJson)
+        bool isLikelyInstrument = desc.isInstrument || desc.numInputChannels == 0;
+        if (isLikelyInstrument)
+            continue;
+
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("id", desc.createIdentifierString());
+        obj->setProperty("name", desc.name);
+        obj->setProperty("manufacturer", desc.manufacturerName);
+        obj->setProperty("category", desc.category);
+        obj->setProperty("format", desc.pluginFormatName);
+        obj->setProperty("uid", desc.uniqueId);
+        obj->setProperty("fileOrIdentifier", desc.fileOrIdentifier);
+        obj->setProperty("isInstrument", desc.isInstrument);
+        obj->setProperty("numInputChannels", desc.numInputChannels);
+        obj->setProperty("numOutputChannels", desc.numOutputChannels);
+        obj->setProperty("version", desc.version);
+        obj->setProperty("isDeactivated", deactivatedPlugins.contains(desc.fileOrIdentifier));
+        pluginArray.add(juce::var(obj));
+    }
+
+    return juce::var(pluginArray);
+}
+
+//==============================================================================
+// Auto-Scan Detection
+//==============================================================================
+
+juce::File PluginManager::getAutoScanSettingsFile() const
+{
+    return PlatformPaths::getPluginCacheDirectory().getChildFile("auto-scan-settings.json");
+}
+
+void PluginManager::saveAutoScanSettings()
+{
+    auto file = getAutoScanSettingsFile();
+    file.getParentDirectory().createDirectory();
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty("enabled", autoScanEnabled);
+    obj->setProperty("intervalMs", autoScanIntervalMs);
+    obj->setProperty("lastCheckTime", lastAutoScanCheckTime);
+
+    auto jsonStr = juce::JSON::toString(juce::var(obj));
+    file.replaceWithText(jsonStr);
+}
+
+void PluginManager::loadAutoScanSettings()
+{
+    auto file = getAutoScanSettingsFile();
+    if (!file.existsAsFile())
+        return;
+
+    auto parsed = juce::JSON::parse(file.loadFileAsString());
+    if (parsed.isVoid())
+        return;
+
+    autoScanEnabled = static_cast<bool>(parsed.getProperty("enabled", false));
+    autoScanIntervalMs = static_cast<int>(parsed.getProperty("intervalMs", 300000));
+    lastAutoScanCheckTime = static_cast<juce::int64>(parsed.getProperty("lastCheckTime", 0));
+
+    // Restart timer if it was enabled
+    if (autoScanEnabled && autoScanIntervalMs > 0)
+        autoScanTimer.startTimer(autoScanIntervalMs);
+
+    #if JUCE_DEBUG
+    std::cerr << "Loaded auto-scan settings: enabled=" << (autoScanEnabled ? "true" : "false")
+              << " interval=" << autoScanIntervalMs << "ms" << std::endl;
+    #endif
+}
+
+bool PluginManager::enableAutoScan(int intervalMs)
+{
+    if (intervalMs < 10000)  // Minimum 10 seconds
+        return false;
+
+    autoScanEnabled = true;
+    autoScanIntervalMs = intervalMs;
+    autoScanTimer.startTimer(intervalMs);
+    saveAutoScanSettings();
+
+    #if JUCE_DEBUG
+    std::cerr << "Auto-scan enabled: interval=" << intervalMs << "ms" << std::endl;
+    #endif
+
+    if (onAutoScanStateChanged)
+        onAutoScanStateChanged();
+
+    return true;
+}
+
+bool PluginManager::disableAutoScan()
+{
+    autoScanEnabled = false;
+    autoScanTimer.stopTimer();
+    saveAutoScanSettings();
+
+    #if JUCE_DEBUG
+    std::cerr << "Auto-scan disabled" << std::endl;
+    #endif
+
+    if (onAutoScanStateChanged)
+        onAutoScanStateChanged();
+
+    return true;
+}
+
+juce::var PluginManager::getAutoScanStateAsJson() const
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty("enabled", autoScanEnabled);
+    obj->setProperty("intervalMs", autoScanIntervalMs);
+    obj->setProperty("lastCheckTime", lastAutoScanCheckTime);
+    return juce::var(obj);
+}
+
+juce::var PluginManager::checkForNewPlugins()
+{
+    juce::Array<juce::var> newPluginsArray;
+
+    for (int i = 0; i < formatManager.getNumFormats(); ++i)
+    {
+        auto* format = formatManager.getFormat(i);
+        auto searchPaths = getSearchPathsForFormat(format);
+
+        for (int j = 0; j < searchPaths.getNumPaths(); ++j)
+        {
+            auto files = format->searchPathsForPlugins(
+                juce::FileSearchPath(searchPaths[j].getFullPathName()), true, true);
+
+            for (const auto& file : files)
+            {
+                // Check if already known
+                bool alreadyKnown = false;
+                for (const auto& desc : knownPlugins.getTypes())
+                {
+                    if (desc.fileOrIdentifier == file)
+                    {
+                        alreadyKnown = true;
+                        break;
+                    }
+                }
+
+                // Skip blacklisted
+                if (knownPlugins.getBlacklistedFiles().contains(file))
+                    continue;
+
+                if (!alreadyKnown)
+                {
+                    auto* obj = new juce::DynamicObject();
+                    obj->setProperty("path", file);
+                    obj->setProperty("format", format->getName());
+                    newPluginsArray.add(juce::var(obj));
+                }
+            }
+        }
+    }
+
+    lastAutoScanCheckTime = juce::Time::currentTimeMillis();
+    saveAutoScanSettings();
+
+    auto* result = new juce::DynamicObject();
+    result->setProperty("newCount", newPluginsArray.size());
+    result->setProperty("newPlugins", newPluginsArray);
+    return juce::var(result);
+}
+
+void PluginManager::AutoScanTimer::timerCallback()
+{
+    // Don't check if a scan is already in progress
+    if (pluginMgr.scanning.load())
+        return;
+
+    auto result = pluginMgr.checkForNewPlugins();
+    int count = static_cast<int>(result.getProperty("newCount", 0));
+
+    if (count > 0)
+    {
+        #if JUCE_DEBUG
+        std::cerr << "Auto-scan detected " << count << " new plugin(s)" << std::endl;
+        #endif
+
+        if (pluginMgr.onNewPluginsDetected)
+            pluginMgr.onNewPluginsDetected(count, result.getProperty("newPlugins", juce::var()));
+    }
 }
 

@@ -122,6 +122,64 @@ bool PresetManager::loadPreset(const juce::File& presetFile)
 
     lastMissingPlugins.clear();
 
+    // Check plugin availability before loading
+    juce::StringArray missingPlugins;
+    std::function<void(const juce::XmlElement&)> checkNode = [&](const juce::XmlElement& nodeXml)
+    {
+        auto type = nodeXml.getStringAttribute("type");
+        if (type == "plugin")
+        {
+            if (auto* descXml = nodeXml.getChildByName("PLUGIN"))
+            {
+                juce::PluginDescription desc;
+                desc.loadFromXml(*descXml);
+
+                if (!chain.getPluginManager().findPluginByIdentifier(desc.fileOrIdentifier))
+                {
+                    // Fallback: try matching by name+manufacturer (handles cross-format presets)
+                    bool foundByName = false;
+                    for (const auto& knownDesc : chain.getPluginManager().getKnownPlugins().getTypes())
+                    {
+                        if (knownDesc.name.equalsIgnoreCase(desc.name) &&
+                            knownDesc.manufacturerName.equalsIgnoreCase(desc.manufacturerName))
+                        {
+                            foundByName = true;
+                            break;
+                        }
+                    }
+                    if (!foundByName)
+                        missingPlugins.add(desc.name);
+                }
+            }
+        }
+        else if (type == "group")
+        {
+            for (auto* childXml : nodeXml.getChildWithTagNameIterator("Node"))
+                checkNode(*childXml);
+        }
+    };
+
+    if (auto* chainTree = xml->getChildByName("ChainTree"))
+    {
+        for (auto* nodeXml : chainTree->getChildWithTagNameIterator("Node"))
+            checkNode(*nodeXml);
+    }
+
+    if (missingPlugins.size() > 0)
+    {
+        juce::String msg = "Missing plugins:\n";
+        for (auto& name : missingPlugins)
+            msg += "- " + name + "\n";
+
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::WarningIcon,
+            "Incompatible Preset",
+            msg
+        );
+
+        return false;
+    }
+
     if (!parsePresetXml(*xml, lastMissingPlugins))
         return false;
 
@@ -160,6 +218,47 @@ bool PresetManager::deletePreset(const juce::File& presetFile)
     // Clear current preset if it was the deleted one
     if (currentPreset && currentPreset->file == presetFile)
         currentPreset.reset();
+
+    scanPresets();
+    return true;
+}
+
+bool PresetManager::renamePreset(const juce::File& presetFile, const juce::String& newName)
+{
+    if (!presetFile.existsAsFile())
+        return false;
+
+    // Parse the XML to update the metadata name
+    auto xml = juce::XmlDocument::parse(presetFile);
+    if (!xml || !xml->hasTagName("PluginChainPreset"))
+        return false;
+
+    // Update metadata name
+    if (auto* meta = xml->getChildByName("MetaData"))
+        meta->setAttribute("name", newName);
+
+    // Build new file path (same directory, new name)
+    auto parentDir = presetFile.getParentDirectory();
+    auto newFile = parentDir.getChildFile(newName + PRESET_EXTENSION);
+
+    // Don't overwrite a different file
+    if (newFile.existsAsFile() && newFile != presetFile)
+        return false;
+
+    // Write updated XML to new file
+    if (!xml->writeTo(newFile))
+        return false;
+
+    // Delete old file if name changed (different path)
+    if (newFile != presetFile)
+        presetFile.deleteFile();
+
+    // Update current preset if it was the renamed one
+    if (currentPreset && currentPreset->file == presetFile)
+    {
+        currentPreset->name = newName;
+        currentPreset->file = newFile;
+    }
 
     scanPresets();
     return true;

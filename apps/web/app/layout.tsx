@@ -1,25 +1,37 @@
 import type { Metadata } from "next";
-import { Cutive_Mono, Nosifer } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/components/convex-provider";
+import { OwnedPluginsProvider } from "@/components/owned-plugins-provider";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { GrainientBackground } from "@/components/GrainientBackground";
 
-const cutiveMono = Cutive_Mono({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-sans",
-  weight: "400",
-});
-
-const nosifer = Nosifer({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: "400",
+  variable: "--font-mono",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
-  title: "Propane — Build & Share Plugin Chains Across Any DAW",
-  description: "Build effect chains with any VST/AU/AAX plugin. Share with friends cross-DAW. Discover vocal chains, mix bus setups, and mastering presets from the community.",
+  title: "ProChain — The Open Plugin Chain Platform",
+  description:
+    "Build, share, and discover plugin chains for any VST3, AU, or AAX plugin. Free during open beta. Rate, comment, and fork chains like GitHub repos.",
+  metadataBase: new URL("https://pluginradar.com"),
+  openGraph: {
+    type: "website",
+    siteName: "ProChain",
+    title: "ProChain — The Open Plugin Chain Platform",
+    description:
+      "Build, share, and discover plugin chains for any VST3, AU, or AAX plugin. Free during open beta.",
+    url: "https://pluginradar.com",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ProChain — The Open Plugin Chain Platform",
+    description:
+      "Build, share, and discover plugin chains for any VST3, AU, or AAX plugin. Free during open beta.",
+  },
 };
 
 export default function RootLayout({
@@ -28,12 +40,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${cutiveMono.variable} ${nosifer.variable}`}>
-      <body className="font-sans antialiased bg-black min-h-screen flex flex-col text-stone-300">
+    <html lang="en" className={jetbrainsMono.variable}>
+      <body className="font-mono antialiased bg-neutral-950 min-h-screen flex flex-col text-neutral-200">
+        <div className="fixed inset-0 -z-10">
+          <GrainientBackground />
+        </div>
         <ConvexClientProvider>
-          <Navigation />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <OwnedPluginsProvider>
+            <Navigation />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </OwnedPluginsProvider>
         </ConvexClientProvider>
       </body>
     </html>

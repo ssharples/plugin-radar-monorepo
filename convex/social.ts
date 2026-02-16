@@ -20,6 +20,11 @@ export const addComment = mutation({
   handler: async (ctx, args) => {
     const { userId, user } = await getSessionUser(ctx, args.sessionToken);
 
+    // Validate content length
+    if (args.content.length > 2000) {
+      throw new Error("Comment too long (max 2000 characters)");
+    }
+
     // Rate limit: 10 comments per minute per user
     await checkRateLimit(ctx, `comment:${userId}`, 10, 60 * 1000);
 
@@ -66,7 +71,7 @@ export const getComments = query({
         return {
           ...comment,
           author: author
-            ? { name: author.name, email: author.email, avatarUrl: author.avatarUrl }
+            ? { name: author.name, avatarUrl: author.avatarUrl }
             : null,
         };
       })
@@ -121,6 +126,9 @@ export const rateChain = mutation({
     }
 
     const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Rate limit: 10 ratings per minute per user
+    await checkRateLimit(ctx, `rate:${userId}`, 10, 60 * 1000);
 
     const chain = await ctx.db.get(args.chainId);
     if (!chain) throw new Error("Chain not found");
@@ -214,6 +222,9 @@ export const followUser = mutation({
   handler: async (ctx, args) => {
     const { userId: followerId } = await getSessionUser(ctx, args.sessionToken);
 
+    // Rate limit: 20 follows per minute per user
+    await checkRateLimit(ctx, `follow:${followerId}`, 20, 60 * 1000);
+
     if (followerId === args.userId) {
       throw new Error("You cannot follow yourself");
     }
@@ -254,6 +265,9 @@ export const unfollowUser = mutation({
   },
   handler: async (ctx, args) => {
     const { userId: followerId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Rate limit: 20 unfollows per minute per user
+    await checkRateLimit(ctx, `unfollow:${followerId}`, 20, 60 * 1000);
 
     const existing = await ctx.db
       .query("userFollows")
@@ -313,7 +327,6 @@ export const getFollowers = query({
           ? {
               _id: user._id,
               name: user.name,
-              email: user.email,
               avatarUrl: user.avatarUrl,
               followedAt: f.createdAt,
             }
@@ -345,7 +358,6 @@ export const getFollowing = query({
           ? {
               _id: user._id,
               name: user.name,
-              email: user.email,
               avatarUrl: user.avatarUrl,
               followedAt: f.createdAt,
             }
@@ -372,6 +384,9 @@ export const forkChain = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Rate limit: 5 forks per minute per user
+    await checkRateLimit(ctx, `fork:${userId}`, 5, 60 * 1000);
 
     const original = await ctx.db.get(args.chainId);
     if (!original) throw new Error("Chain not found");

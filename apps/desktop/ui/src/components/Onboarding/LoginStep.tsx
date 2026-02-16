@@ -20,34 +20,53 @@ export function LoginStep() {
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-sm px-6 animate-fade-in">
       {/* Propane brand */}
-      <h1 className="font-brand text-3xl text-plugin-accent crt-text mb-1 tracking-wider">
+      <h1
+        className="font-brand crt-text mb-1"
+        style={{ fontSize: '1.875rem', color: 'var(--color-accent-cyan)', letterSpacing: 'var(--tracking-wider)' }}
+      >
         PROPANE
       </h1>
-      <p className="text-plugin-dim text-xxs font-mono uppercase tracking-widest mb-8">
+      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)', marginBottom: '2rem' }}>
         Plugin Chain Manager
       </p>
 
       {/* Auth mode tabs */}
-      <div className="flex w-full mb-6 border border-plugin-border rounded-propane overflow-hidden">
+      <div className="flex w-full mb-6" style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
         <button
           type="button"
           onClick={() => setAuthMode('login')}
-          className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${
-            authMode === 'login'
-              ? 'bg-plugin-accent text-black'
-              : 'bg-black/40 text-plugin-muted hover:text-plugin-text'
-          }`}
+          className="flex-1 fast-snap"
+          style={{
+            padding: '8px 0',
+            fontSize: 'var(--text-xs)',
+            fontFamily: 'var(--font-mono)',
+            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-wider)',
+            border: 'none',
+            cursor: 'pointer',
+            background: authMode === 'login' ? 'var(--color-accent-cyan)' : 'rgba(0, 0, 0, 0.4)',
+            color: authMode === 'login' ? 'black' : 'var(--color-text-disabled)',
+            transition: 'all var(--duration-fast)',
+          }}
         >
           Login
         </button>
         <button
           type="button"
           onClick={() => setAuthMode('register')}
-          className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${
-            authMode === 'register'
-              ? 'bg-plugin-accent text-black'
-              : 'bg-black/40 text-plugin-muted hover:text-plugin-text'
-          }`}
+          className="flex-1 fast-snap"
+          style={{
+            padding: '8px 0',
+            fontSize: 'var(--text-xs)',
+            fontFamily: 'var(--font-mono)',
+            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-wider)',
+            border: 'none',
+            cursor: 'pointer',
+            background: authMode === 'register' ? 'var(--color-accent-cyan)' : 'rgba(0, 0, 0, 0.4)',
+            color: authMode === 'register' ? 'black' : 'var(--color-text-disabled)',
+            transition: 'all var(--duration-fast)',
+          }}
         >
           Register
         </button>
@@ -61,7 +80,7 @@ export function LoginStep() {
             placeholder="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2.5 bg-black/40 border border-plugin-border rounded-propane font-mono text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
+            className="input w-full"
             autoComplete="name"
           />
         )}
@@ -70,7 +89,7 @@ export function LoginStep() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-3 py-2.5 bg-black/40 border border-plugin-border rounded-propane font-mono text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
+          className="input w-full"
           autoComplete="email"
         />
         <input
@@ -78,12 +97,12 @@ export function LoginStep() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-3 py-2.5 bg-black/40 border border-plugin-border rounded-propane font-mono text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
+          className="input w-full"
           autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
         />
 
         {authError && (
-          <div className="text-red-400 text-xs font-mono bg-red-500/10 border border-red-500/20 rounded-propane px-3 py-2">
+          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '8px 12px' }}>
             {authError}
           </div>
         )}
@@ -91,7 +110,8 @@ export function LoginStep() {
         <button
           type="submit"
           disabled={isDisabled || authLoading}
-          className="w-full py-2.5 mt-1 bg-plugin-accent hover:bg-plugin-accent-bright text-black font-mono text-sm uppercase tracking-wider rounded-propane transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="btn btn-primary w-full"
+          style={{ marginTop: '4px', opacity: isDisabled || authLoading ? 0.4 : 1, cursor: isDisabled || authLoading ? 'not-allowed' : 'pointer' }}
         >
           {authLoading ? 'Loading...' : authMode === 'login' ? 'Sign In' : 'Create Account'}
         </button>

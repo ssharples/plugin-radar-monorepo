@@ -33,3 +33,15 @@ pnpm-debug.log*
 # Data files (large)
 data/plugins.db
 data/enrichment/
+
+# Desktop UI build artifacts (CMake output that leaked into ui/)
+apps/desktop/ui/CMakeCache.txt
+apps/desktop/ui/CMakeFiles/
+apps/desktop/ui/CTestTestfile.cmake
+apps/desktop/ui/DartConfiguration.tcl
+apps/desktop/ui/Makefile
+apps/desktop/ui/cmake_install.cmake
+apps/desktop/ui/_deps/
+apps/desktop/ui/*_artefacts/
+apps/desktop/ui/juce_binarydata_*/
+apps/desktop/ui/*.cmake

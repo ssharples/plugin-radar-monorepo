@@ -7,9 +7,23 @@ WaveformCapture::WaveformCapture()
 
 void WaveformCapture::setLatencyCompensation(int samples)
 {
-    // Convert samples to peaks and clamp
-    int peaks = samples / SAMPLES_PER_PEAK;
+    // Convert samples to peaks with rounding (not truncation) to minimize error
+    // Example: 8200 samples → 16.01 peaks → round to 16 peaks (error: 8 samples vs 200 if truncated)
+    int peaks = (samples + SAMPLES_PER_PEAK / 2) / SAMPLES_PER_PEAK;
     peaks = std::max(0, std::min(peaks, static_cast<int>(MAX_DELAY_PEAKS) - 1));
+
+    int oldPeaks = delayInPeaks.load(std::memory_order_relaxed);
+
+    // Reset delay line when latency changes to prevent stale peaks from
+    // causing misalignment (e.g., when FabFilter Pro-Q3 toggles linear phase mode)
+    if (peaks != oldPeaks)
+    {
+        delayLine.fill(0.0f);
+        delayWritePos = 0;
+        delayReadPos = 0;
+        peaksInDelayLine = 0;
+    }
+
     delayInPeaks.store(peaks, std::memory_order_relaxed);
 }
 
@@ -89,6 +103,23 @@ void WaveformCapture::pushPostSamples(const juce::AudioBuffer<float>& buffer)
         postAccumulator = 0.0f;
         sampleCount -= SAMPLES_PER_PEAK;
     }
+}
+
+// PHASE 3: Zero-allocation snapshot (single read, no heap churn)
+WaveformCapture::PeakSnapshot WaveformCapture::getSnapshot() const
+{
+    PeakSnapshot snapshot;
+    size_t writeIdx = sharedWriteIndex.load(std::memory_order_acquire);
+
+    // Read from oldest to newest for both pre and post in one pass
+    for (size_t i = 0; i < NUM_PEAKS; ++i)
+    {
+        size_t readIdx = (writeIdx + i) % NUM_PEAKS;
+        snapshot.prePeaks[i] = prePeaks[readIdx].load(std::memory_order_relaxed);
+        snapshot.postPeaks[i] = postPeaks[readIdx].load(std::memory_order_relaxed);
+    }
+
+    return snapshot;
 }
 
 std::vector<float> WaveformCapture::getPrePeaks() const

@@ -42,18 +42,30 @@ const MIN_FREQ = 20;
 const MAX_FREQ = 20000;
 
 // ============================================
-// Gradient colors (inspired by audioMotion classic)
+// Cyber color scheme for spectrum
 // ============================================
 
 const GRADIENT_STOPS: [number, string][] = [
-  [0.0, '#1b9e3e'],
-  [0.35, '#22c55e'],
-  [0.55, '#a3e635'],
-  [0.70, '#eab308'],
-  [0.82, '#f97316'],
-  [0.92, '#ef4444'],
-  [1.0, '#ef4444'],
+  [0.0,  '#004466'],   // Deep dark cyan-blue (low freqs, quiet)
+  [0.25, '#006688'],   // Deeper teal
+  [0.45, '#00aacc'],   // Mid cyan
+  [0.60, '#deff0a'],   // Bright cyan (accent)
+  [0.75, '#66ffcc'],   // Cyan-lime transition
+  [0.85, '#ccff00'],   // Lime accent
+  [0.95, '#ff006e'],   // Magenta (hot/clip zone)
+  [1.0,  '#ff006e'],   // Magenta (max)
 ];
+
+// ============================================
+// Design system color references
+// ============================================
+
+const GRID_LINE_COLOR = 'rgba(222, 255, 10, 0.06)';
+const GRID_LINE_ZERO_DB = 'rgba(222, 255, 10, 0.15)';
+const LABEL_COLOR = 'rgba(222, 255, 10, 0.35)';
+const FREQ_GRID_COLOR = 'rgba(222, 255, 10, 0.04)';
+const PEAK_COLOR_BASE = '0, 240, 255';
+const LINE_STROKE_COLOR = '#deff0a';
 
 // ============================================
 // Octave band generation (1/3 octave & full octave)
@@ -63,10 +75,6 @@ function generateOctaveBands(fraction: number): OctaveBand[] {
   const bands: OctaveBand[] = [];
   const ratio = Math.pow(2, 1 / (2 * fraction));
 
-  // Start from 15.625 Hz (ANSI standard base)
-  // Generate center frequencies: f_n = 1000 * 2^((n - 30) / (3 * fraction))
-  // For 1/3 octave (fraction=3), n ranges produce bands from ~16Hz to ~20kHz
-  // For full octave (fraction=1), fewer bands
   const nMin = Math.floor(fraction * 3 * Math.log2(MIN_FREQ / 1000)) + 30;
   const nMax = Math.ceil(fraction * 3 * Math.log2(MAX_FREQ / 1000)) + 30;
 
@@ -109,7 +117,7 @@ function freqToX(freq: number, width: number, leftPad: number, rightPad: number)
 }
 
 function formatFreq(freq: number): string {
-  if (freq >= 1000) return `${(freq / 1000).toFixed(freq >= 10000 ? 0 : 0)}k`;
+  if (freq >= 1000) return `${(freq / 1000).toFixed(0)}k`;
   return `${freq}`;
 }
 
@@ -125,6 +133,7 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
   const fftSizeRef = useRef(2048);
   const smoothedRef = useRef<number[]>([]);
   const peaksRef = useRef<PeakEntry[]>([]);
+  const dimsRef = useRef({ width: 0, height: 0 });
 
   // ============================================
   // Aggregate magnitudes into octave bands
@@ -188,17 +197,19 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    const dims = dimsRef.current;
+    if (dims.width === 0 || dims.height === 0) return;
 
-    if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+    const dpr = window.devicePixelRatio || 1;
+
+    if (canvas.width !== dims.width * dpr || canvas.height !== dims.height * dpr) {
+      canvas.width = dims.width * dpr;
+      canvas.height = dims.height * dpr;
       ctx.scale(dpr, dpr);
     }
 
-    const width = rect.width;
-    const canvasHeight = rect.height;
+    const width = dims.width;
+    const canvasHeight = dims.height;
 
     const leftPad = 28;
     const rightPad = 8;
@@ -233,7 +244,7 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
   }, [mode, octaveMode, createGradient, getOctaveBandLevels]);
 
   // ============================================
-  // Grid drawing
+  // Grid drawing - Cyber styled
   // ============================================
 
   const drawGrid = useCallback((
@@ -246,10 +257,10 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
     bottomPad: number,
   ) => {
     // dB horizontal grid lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.strokeStyle = GRID_LINE_COLOR;
     ctx.lineWidth = 1;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.font = '8px monospace';
+    ctx.fillStyle = LABEL_COLOR;
+    ctx.font = '8px "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
 
@@ -263,7 +274,7 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
     }
 
     // Frequency vertical grid lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.strokeStyle = FREQ_GRID_COLOR;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
@@ -277,9 +288,9 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
       ctx.fillText(formatFreq(freq), x, canvasHeight - bottomPad + 2);
     }
 
-    // 0dB line slightly brighter
+    // 0dB line -- brighter cyan accent
     const zeroY = dbToY(0, canvasHeight, topPad, bottomPad);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.strokeStyle = GRID_LINE_ZERO_DB;
     ctx.beginPath();
     ctx.moveTo(leftPad, zeroY);
     ctx.lineTo(width - rightPad, zeroY);
@@ -360,14 +371,14 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
         }
       }
 
-      // Draw peak indicator
+      // Draw peak indicator -- cyan accent
       if (peak.value > MIN_DB + 3) {
         const peakY = dbToY(peak.value, canvasHeight, topPad, bottomPad);
         const x = leftPad + i * barSpacing;
         const age = now - peak.timestamp;
         const alpha = age < PEAK_HOLD_MS ? 0.9 : Math.max(0, 0.9 - (age - PEAK_HOLD_MS) * 0.002);
         if (alpha > 0.01) {
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.fillStyle = `rgba(${PEAK_COLOR_BASE}, ${alpha})`;
           ctx.fillRect(x, peakY, barWidth, 1.5);
           ctx.fillStyle = gradient;
         }
@@ -422,7 +433,7 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
 
     if (points.length < 2) return;
 
-    // Area fill
+    // Area fill with gradient
     ctx.beginPath();
     ctx.moveTo(points[0].x, bottomY);
     for (const p of points) {
@@ -431,19 +442,22 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
     ctx.lineTo(points[points.length - 1].x, bottomY);
     ctx.closePath();
     ctx.fillStyle = gradient;
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.25;
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    // Line stroke
+    // Line stroke -- bright cyan
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
       ctx.lineTo(points[i].x, points[i].y);
     }
-    ctx.strokeStyle = '#89572a';
+    ctx.strokeStyle = LINE_STROKE_COLOR;
     ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(222, 255, 10, 0.4)';
+    ctx.shadowBlur = 4;
     ctx.stroke();
+    ctx.shadowBlur = 0;
   }, []);
 
   // ============================================
@@ -511,7 +525,7 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
         const age = now - peak.timestamp;
         const alpha = age < PEAK_HOLD_MS ? 0.9 : Math.max(0, 0.9 - (age - PEAK_HOLD_MS) * 0.002);
         if (alpha > 0.01) {
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.fillStyle = `rgba(${PEAK_COLOR_BASE}, ${alpha})`;
           ctx.fillRect(barX, peakY, barW, 1.5);
         }
       }
@@ -521,6 +535,23 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
   // ============================================
   // Effects
   // ============================================
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) {
+        dimsRef.current = {
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        };
+      }
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = juceBridge.onFFTData((data: FFTData) => {

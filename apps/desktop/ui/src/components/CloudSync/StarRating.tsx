@@ -68,9 +68,12 @@ export function StarRating({ rating, count, interactive = false, onRate, size = 
               onMouseEnter={() => interactive && setHoverRating(star)}
               className={`${
                 interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'
-              } transition-transform ${
-                filled || half ? 'text-[#89572a]' : 'text-[#323232]'
-              } ${starSize}`}
+              } transition-transform ${starSize}`}
+              style={{
+                color: filled || half
+                  ? 'var(--color-status-warning)'
+                  : 'var(--color-border-strong)',
+              }}
             >
               <StarIcon filled={filled} half={half} className="w-full h-full" />
             </button>
@@ -78,7 +81,13 @@ export function StarRating({ rating, count, interactive = false, onRate, size = 
         })}
       </div>
       {typeof count === 'number' && (
-        <span className="text-plugin-muted text-xs font-mono">
+        <span
+          className="text-xs"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--color-text-tertiary)',
+          }}
+        >
           {rating > 0 ? rating.toFixed(1) : '--'} ({count})
         </span>
       )}

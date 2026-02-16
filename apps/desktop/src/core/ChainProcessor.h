@@ -4,6 +4,8 @@
 #include "ChainNode.h"
 #include "PluginSlot.h"
 #include "PluginManager.h"
+#include "ParameterDiscovery.h"
+#include "../audio/PluginParameterWatcher.h"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -19,7 +21,19 @@ class ChainProcessor : public juce::AudioProcessorGraph
 {
 public:
     ChainProcessor(PluginManager& pluginManager);
-    ~ChainProcessor() override;
+    ~ChainProcessor() noexcept override;
+
+    // =============================================
+    // Meter Mode (PHASE 2: Conditional Metering)
+    // =============================================
+
+    enum class MeterMode
+    {
+        PeakOnly,   // Peak/RMS only, skip LUFS calculation (low CPU)
+        FullLUFS    // Full LUFS calculation (default)
+    };
+
+    void setGlobalMeterMode(MeterMode mode);
 
     // =============================================
     // Tree-based API (new)
@@ -39,20 +53,38 @@ public:
     bool dissolveGroup(ChainNodeId groupId);
     bool setGroupMode(ChainNodeId groupId, GroupMode mode);
     bool setGroupDryWet(ChainNodeId groupId, float mix);
+    bool setGroupDucking(ChainNodeId groupId, float amount, float releaseMs);
 
     // Per-branch controls
     bool setBranchGain(ChainNodeId nodeId, float gainDb);
     bool setBranchSolo(ChainNodeId nodeId, bool solo);
     bool setBranchMute(ChainNodeId nodeId, bool mute);
 
+    // Per-plugin controls (gain staging, dry/wet, sidechain)
+    bool setNodeInputGain(ChainNodeId nodeId, float gainDb);
+    bool setNodeOutputGain(ChainNodeId nodeId, float gainDb);
+    bool setNodeDryWet(ChainNodeId nodeId, float mix);
+    bool setNodeSidechainSource(ChainNodeId nodeId, int source);
+    bool setNodeMidSideMode(ChainNodeId nodeId, int mode);
+
+    // Sidechain buffer from host
+    void setSidechainBuffer(juce::AudioBuffer<float>* buf) { externalSidechainBuffer = buf; }
+
     // Set bypass on a node (must be a plugin leaf)
     void setNodeBypassed(ChainNodeId nodeId, bool bypassed);
 
     // Get the root node for read access
     const ChainNode& getRootNode() const { return rootNode; }
+    
+    // Insert a pre-built node tree (for group templates)
+    ChainNodeId insertNodeTree(std::unique_ptr<ChainNode> node, ChainNodeId parentId, int insertIndex);
 
     // DFS-ordered list of all plugin leaves (for proxy parameter binding)
     std::vector<PluginLeaf*> getFlatPluginList();
+    std::vector<const PluginLeaf*> getFlatPluginList() const;
+
+    // DFS-ordered list of ChainNodeIds for plugin leaves (parallel to getFlatPluginList)
+    std::vector<ChainNodeId> getFlatPluginNodeIds() const;
 
     // =============================================
     // Backward-compatible flat API (delegates to tree)
@@ -108,16 +140,35 @@ public:
     // Per-node meter data collection (called by WebViewBridge timer)
     struct NodeMeterData {
         ChainNodeId nodeId;
-        float peakL, peakR, peakHoldL, peakHoldR;                     // output
-        float inputPeakL, inputPeakR, inputPeakHoldL, inputPeakHoldR; // input
+        float peakL, peakR, peakHoldL, peakHoldR;                     // output peak
+        float rmsL, rmsR;                                              // output RMS
+        float inputPeakL, inputPeakR, inputPeakHoldL, inputPeakHoldR; // input peak
+        float inputRmsL, inputRmsR;                                    // input RMS
+        float latencyMs;                                               // latency in milliseconds
     };
     std::vector<NodeMeterData> getNodeMeterReadings() const;
+    void resetAllNodePeaks();
 
     // Duplicate a plugin node (inserts copy right after the original)
     bool duplicateNode(ChainNodeId nodeId);
 
     // Latency reporting
     int getTotalLatencySamples() const;
+
+    // PHASE 7: Force latency refresh (for plugins like Auto-Tune that change latency dynamically)
+    // Call this after toggling plugin settings that affect latency
+    void refreshLatencyCompensation();
+
+    // Check if the audio thread is currently inside processBlock
+    bool isAudioThreadBusy() const { return audioThreadBusy.load(std::memory_order_acquire); }
+
+    // Check/clear the latency refresh flag (set by audio thread, polled by message thread)
+    bool needsLatencyRefresh() const { return latencyRefreshNeeded.load(std::memory_order_acquire); }
+    void clearLatencyRefreshFlag() { latencyRefreshNeeded.store(false, std::memory_order_relaxed); }
+
+    // Remove all connections and nodes, then rebuild the (now-empty) render sequence.
+    // Used by the destructor to make the graph inert before member destruction.
+    void clearGraph();
 
     // State (serialization)
     juce::var getChainStateAsJson() const;
@@ -136,13 +187,31 @@ public:
 
     // Cloud sharing
     juce::var exportChainWithPresets() const;
-    bool importChainWithPresets(const juce::var& data);
+
+    struct SlotFailure
+    {
+        int position;
+        juce::String pluginName;
+        juce::String reason; // "not_found", "load_error", "preset_error"
+    };
+
+    struct ImportResult
+    {
+        bool success = false;
+        int totalSlots = 0;
+        int loadedSlots = 0;
+        int failedSlots = 0;
+        std::vector<SlotFailure> failures;
+    };
+
+    ImportResult importChainWithPresets(const juce::var& data);
     juce::String getSlotPresetData(int slotIndex) const;
     bool setSlotPresetData(int slotIndex, const juce::String& base64Data);
 
-    // Prepare/release
+    // Prepare/release/processBlock
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
+    void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override;
 
     // Access child processor by flat slot index (backward compat)
     juce::AudioProcessor* getSlotProcessor(int slotIndex);
@@ -150,12 +219,29 @@ public:
     // Access child processor by node ID
     juce::AudioProcessor* getNodeProcessor(ChainNodeId nodeId);
 
+    // Access plugin manager
+    PluginManager& getPluginManager() { return pluginManager; }
+
     // Callbacks
     std::function<void()> onChainChanged;
     std::function<void(int)> onLatencyChanged;
     std::function<void()> onParameterBindingChanged;
+    std::function<void(int)> onUnbindSlot;  // Called after duplication to clear automation
+
+    /** Fired when child plugin parameters settle after user edits.
+     *  Argument is the Base64 snapshot from *before* the parameter changes. */
+    std::function<void(const juce::String& beforeSnapshotBase64)> onPluginParameterChangeSettled;
+
+    /** Suppress/unsuppress parameter watcher (use during undo/redo restores). */
+    void setParameterWatcherSuppressed(bool suppressed);
 
 private:
+    // Crash recovery - async state persistence
+    juce::File getCrashRecoveryFile() const;
+    void saveCrashRecoveryStateAsync();
+    void performCrashRecoverySave(const juce::MemoryBlock& stateData);
+    bool tryRestoreCrashRecoveryState();
+    void cleanupCrashRecoveryFile();
     void rebuildGraph();
     WireResult wireNode(ChainNode& node, NodeID audioIn, NodeID midiIn);
     WireResult wireSerialGroup(ChainNode& node, NodeID audioIn, NodeID midiIn);
@@ -164,8 +250,14 @@ private:
     void removeUtilityNodes(UpdateKind update = UpdateKind::sync);
     void notifyChainChanged();
 
+    // Helper to check if a node is in a parallel group
+    bool isInParallelGroup(ChainNodeId id) const;
+
+    // Cycle detection in the audio graph
+    bool detectCycles() const;
+
     // Latency helpers
-    int computeNodeLatency(const ChainNode& node) const;
+    int computeNodeLatency(const ChainNode& node, int depth = 0) const;
 
     // Serialization helpers
     void nodeToXml(const ChainNode& node, juce::XmlElement& parent) const;
@@ -174,12 +266,25 @@ private:
     juce::var nodeToJsonWithPresets(const ChainNode& node) const;
     std::unique_ptr<ChainNode> jsonToNode(const juce::var& json);
 
+    // Apply pending parameters from seeded chains (semantic match + fuzzy fallback)
+    void applyPendingParameters(juce::AudioProcessor* processor,
+                                const std::vector<PendingParameter>& pending,
+                                const juce::String& pluginName,
+                                const juce::String& manufacturer);
+
+    // Temporary accumulator for per-slot failures during importChainWithPresets
+    std::vector<SlotFailure> importFailures;
+    int importSlotCounter = 0;
+
     // Flat index helpers (for backward compat)
     PluginLeaf* getPluginByFlatIndex(int index);
     const PluginLeaf* getPluginByFlatIndex(int index) const;
     ChainNodeId getNodeIdByFlatIndex(int index) const;
 
     PluginManager& pluginManager;
+
+    // Plugin parameter watcher for undo/redo of child plugin knob changes
+    std::unique_ptr<PluginParameterWatcher> parameterWatcher;
 
     // The tree root — always a Serial group
     ChainNode rootNode;
@@ -193,19 +298,53 @@ private:
     mutable bool cachedSlotsDirty = true;
     void rebuildCachedSlots() const;
 
+    // PHASE 3: Preallocated meter readings cache (eliminates 30Hz allocation)
+    mutable std::vector<NodeMeterData> cachedMeterReadings;
+
+    // Cached PluginWithMeterWrapper pointers — avoids DFS + dynamic_cast in processBlock and getNodeMeterReadings
+    std::vector<std::pair<ChainNodeId, class PluginWithMeterWrapper*>> cachedMeterWrappers;
+    void updateMeterWrapperCache();
+
+    // PHASE 5: Latency caching (eliminates redundant O(N) tree traversals)
+    mutable std::atomic<int> cachedTotalLatency{0};
+    mutable std::atomic<bool> latencyCacheDirty{true};
+    void invalidateLatencyCache();
+
     NodeID audioInputNode;
     NodeID audioOutputNode;
     NodeID midiInputNode;
     NodeID midiOutputNode;
 
+    // Sidechain buffer from host (set before processBlock, not owned)
+    juce::AudioBuffer<float>* externalSidechainBuffer = nullptr;
+
     double currentSampleRate = 44100.0;
     int currentBlockSize = 512;
 
-    std::shared_ptr<bool> aliveFlag { std::make_shared<bool>(true) };
+    std::shared_ptr<std::atomic<bool>> aliveFlag { std::make_shared<std::atomic<bool>>(true) };
+
+    // Mutex for state serialization (prevents concurrent saves)
+    mutable std::mutex stateMutex;
 
     // Plugin window management
     class PluginWindow;
     juce::OwnedArray<PluginWindow> pluginWindows;
+
+    // Thread safety: SpinLock protects the tree during mutations
+    mutable juce::SpinLock treeLock;
+
+    // Audio-thread-busy flag — used by rebuildGraph() to spin-wait until
+    // the current audio callback finishes before modifying the graph.
+    std::atomic<bool> audioThreadBusy{false};
+
+    // Set by the audio thread when any hosted plugin reports a latency change.
+    // Polled by the message thread (WebViewBridge timer) to trigger graph rebuild.
+    std::atomic<bool> latencyRefreshNeeded{false};
+
+    // Crash recovery state - throttling and background save tracking
+    std::atomic<bool> pendingCrashRecoverySave{false};
+    std::atomic<int64_t> lastCrashRecoverySaveTime{0};
+    static constexpr int64_t kMinCrashRecoverySaveIntervalMs = 2000; // Max once per 2 seconds
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ChainProcessor)
 };

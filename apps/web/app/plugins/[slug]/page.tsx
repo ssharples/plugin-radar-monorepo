@@ -19,14 +19,13 @@ import {
   TrendUp,
   ArrowLeft,
 } from "@phosphor-icons/react";
-import { PriceHistoryChart } from "@/components/price-history-chart";
 import { WishlistButton } from "@/components/wishlist-button";
-import { PriceAlertButton } from "@/components/price-alert-button";
 import { OwnButton } from "@/components/own-button";
 import { Timeline } from "@/components/timeline";
 import { AdminEnrichButton } from "@/components/admin-enrich-button";
 import { SimilarPlugins } from "@/components/similar-plugins";
 import { ComparisonLinks } from "@/components/comparison-links";
+import { PluginCard } from "@/components/plugin-card";
 
 interface YouTubeVideo {
   id: string;
@@ -75,11 +74,6 @@ export default function PluginPage() {
     licenseType?: string;
     isIndustryStandard?: boolean;
   };
-  const activeSales = useQuery(
-    api.sales.getActiveForPlugin,
-    plugin ? { plugin: plugin._id } : "skip"
-  );
-
   const mentionVideos = useQuery(
     api.mentions.getYouTubeVideos,
     plugin ? { plugin: plugin._id, limit: 8 } : "skip"
@@ -116,13 +110,15 @@ export default function PluginPage() {
       <div className="container mx-auto px-4 lg:px-6 py-10">
         <div className="animate-pulse">
           <div className="h-4 bg-white/[0.04] rounded w-1/4 mb-8" />
-          <div className="grid lg:grid-cols-[1fr,400px] gap-10">
-            <div className="aspect-[4/3] bg-white/[0.03] rounded-2xl" />
+          <div className="grid md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr] gap-8">
+            <div className="aspect-square bg-white/[0.03] rounded-2xl" />
             <div>
               <div className="h-5 bg-white/[0.04] rounded w-1/4 mb-4" />
               <div className="h-10 bg-white/[0.04] rounded w-3/4 mb-3" />
-              <div className="h-4 bg-white/[0.04] rounded w-1/3 mb-8" />
-              <div className="h-14 bg-white/[0.04] rounded w-full" />
+              <div className="h-4 bg-white/[0.04] rounded w-1/3 mb-6" />
+              <div className="h-10 bg-white/[0.04] rounded w-1/4 mb-6" />
+              <div className="h-14 bg-white/[0.04] rounded w-full mb-6" />
+              <div className="h-20 bg-white/[0.03] rounded w-full" />
             </div>
           </div>
         </div>
@@ -145,7 +141,7 @@ export default function PluginPage() {
         <p className="text-stone-500 mb-6">The plugin you&apos;re looking for doesn&apos;t exist.</p>
         <Link
           href="/plugins"
-          className="inline-flex items-center gap-2 text-amber-400 hover:text-amber-300 transition"
+          className="inline-flex items-center gap-2 text-white hover:text-[#deff0a] transition"
         >
           <ArrowLeft className="w-4 h-4" />
           Browse all plugins
@@ -154,44 +150,27 @@ export default function PluginPage() {
     );
   }
 
-  const sale = activeSales?.[0];
-  const price = plugin.isFree
-    ? "Free"
-    : sale
-    ? `$${(sale.salePrice / 100).toFixed(0)}`
-    : plugin.currentPrice
-    ? `$${(plugin.currentPrice / 100).toFixed(0)}`
-    : plugin.msrp
-    ? `$${(plugin.msrp / 100).toFixed(0)}`
-    : "—";
-
-  const originalPrice = sale
-    ? `$${(sale.originalPrice / 100).toFixed(0)}`
-    : plugin.msrp && plugin.currentPrice && plugin.currentPrice < plugin.msrp
-    ? `$${(plugin.msrp / 100).toFixed(0)}`
-    : null;
-
   return (
     <div>
       {/* ===== HERO SECTION ===== */}
       <section className="relative overflow-hidden">
         {/* Background glow */}
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent" />
 
         <div className="container mx-auto px-4 lg:px-6 pt-6 pb-10 relative">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-2 text-sm text-stone-500 mb-8">
-            <Link href="/" className="hover:text-amber-400 transition">
+            <Link href="/" className="hover:text-white transition">
               Home
             </Link>
             <CaretRight className="w-3 h-3" />
-            <Link href="/plugins" className="hover:text-amber-400 transition">
+            <Link href="/plugins" className="hover:text-white transition">
               Plugins
             </Link>
             <CaretRight className="w-3 h-3" />
             <Link
               href={`/manufacturers/${plugin.manufacturerData?.slug}`}
-              className="hover:text-amber-400 transition"
+              className="hover:text-white transition"
             >
               {plugin.manufacturerData?.name}
             </Link>
@@ -199,51 +178,76 @@ export default function PluginPage() {
             <span className="text-stone-300 truncate max-w-[200px]">{plugin.name}</span>
           </nav>
 
-          {/* Two-column hero */}
-          <div className="grid lg:grid-cols-[1fr,420px] gap-10 items-start">
-            {/* Image */}
-            <div className="relative rounded-2xl overflow-hidden bg-[#1e1b18]">
-              <div className="aspect-[4/3] relative">
+          {/* Two-column hero: image left (secondary), info right (primary) */}
+          <div className="grid md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr] gap-8 items-start">
+            {/* Image — compact left column */}
+            <div className="relative rounded-2xl overflow-hidden bg-[#1e1b18] md:sticky md:top-24">
+              <div className="aspect-square relative">
                 {plugin.resolvedImageUrl || plugin.imageUrl ? (
                   <img
                     src={plugin.resolvedImageUrl || plugin.imageUrl}
                     alt={plugin.name}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain p-3"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <div className="w-20 h-20 rounded-full bg-white/[0.03] flex items-center justify-center">
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" className="text-stone-600">
+                    <div className="w-16 h-16 rounded-full bg-white/[0.03] flex items-center justify-center">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-stone-600">
                         <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
                         <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.5" />
                       </svg>
                     </div>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1a1714]/60 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1a1714]/40 via-transparent to-transparent pointer-events-none" />
               </div>
 
-              {/* Sale badge */}
-              {sale && (
-                <div className="absolute top-4 left-4">
-                  <span className="price-tag-sale px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg">
-                    -{sale.discountPercent}% OFF
-                  </span>
-                </div>
-              )}
-
               {/* Category badge */}
-              <div className="absolute top-4 right-4">
+              <div className="absolute top-3 right-3">
                 <Link
                   href={`/category/${plugin.category}`}
-                  className="px-3 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-xs text-stone-300 hover:text-amber-400 transition capitalize"
+                  className="px-2.5 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-[11px] text-stone-300 hover:text-white transition capitalize"
                 >
                   {plugin.category}
                 </Link>
               </div>
+
+              {/* Formats & Platforms — tucked under image */}
+              <div className="px-4 pb-4 space-y-3">
+                {plugin.formats && plugin.formats.length > 0 && (
+                  <div>
+                    <h3 className="text-stone-600 text-[10px] uppercase tracking-wider mb-1.5">Formats</h3>
+                    <div className="flex flex-wrap gap-1">
+                      {plugin.formats.map((f: string) => (
+                        <span
+                          key={f}
+                          className="px-2 py-0.5 bg-white/[0.04] rounded text-[11px] text-stone-400 uppercase tracking-wider"
+                        >
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {plugin.platforms && plugin.platforms.length > 0 && (
+                  <div>
+                    <h3 className="text-stone-600 text-[10px] uppercase tracking-wider mb-1.5">Platforms</h3>
+                    <div className="flex flex-wrap gap-1">
+                      {plugin.platforms.map((p: string) => (
+                        <span
+                          key={p}
+                          className="px-2 py-0.5 bg-white/[0.04] rounded text-[11px] text-stone-400"
+                        >
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Info panel */}
+            {/* Info panel — primary focus, right column */}
             <div>
               {/* Badges */}
               <div className="flex items-center gap-2 mb-3">
@@ -252,13 +256,8 @@ export default function PluginPage() {
                     Free
                   </span>
                 )}
-                {sale && (
-                  <span className="price-tag-sale px-3 py-1 rounded-lg text-xs">
-                    On Sale
-                  </span>
-                )}
                 {plugin.isIndustryStandard && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-400">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 border border-[#deff0a]/20 rounded-lg text-xs text-white">
                     <Star className="w-3 h-3" weight="fill" />
                     Industry Standard
                   </span>
@@ -273,87 +272,40 @@ export default function PluginPage() {
               </h1>
               <Link
                 href={`/manufacturers/${plugin.manufacturerData?.slug}`}
-                className="text-stone-400 hover:text-amber-400 transition text-sm"
+                className="text-stone-400 hover:text-white transition text-sm"
               >
                 by {plugin.manufacturerData?.name}
               </Link>
 
-              {/* Sale countdown */}
-              {sale && sale.endsAt && (
-                <div className="mt-4 p-3 bg-red-500/[0.08] border border-red-500/20 rounded-xl">
-                  <p className="text-red-400 text-sm font-medium">
-                    {sale.saleName || "Sale"} ends{" "}
-                    {new Date(sale.endsAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                    })}
-                  </p>
-                  {sale.promoCode && (
-                    <p className="text-stone-300 text-sm mt-1.5">
-                      Code:{" "}
-                      <span className="font-mono px-2 py-0.5 bg-white/[0.04] rounded text-amber-400/80">
-                        {sale.promoCode}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Price */}
-              <div className="flex items-baseline gap-3 mt-6 mb-6">
-                <span
-                  className={`text-4xl font-bold ${
-                    plugin.isFree
-                      ? "text-green-400"
-                      : sale
-                      ? "text-amber-400"
-                      : "text-stone-100"
-                  }`}
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {price}
-                </span>
-                {originalPrice && (
-                  <span className="text-stone-500 line-through text-xl">{originalPrice}</span>
+              {/* CTA buttons */}
+              <div className="flex flex-wrap gap-2.5 mt-5 mb-6">
+                {plugin.productUrl && (
+                  <a
+                    href={plugin.productUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 min-w-[180px] bg-white hover:bg-[#ccff00] text-stone-900 font-semibold py-3 px-6 rounded-xl text-center transition-all shadow-lg shadow-[#deff0a]/20 hover:shadow-[#deff0a]/30 flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Globe className="w-4 h-4" />
+                    Visit Product Page
+                  </a>
                 )}
-                {sale && (
-                  <span className="text-green-400/70 text-sm">
-                    Save ${((sale.originalPrice - sale.salePrice) / 100).toFixed(0)}
-                  </span>
-                )}
+                <WishlistButton pluginId={plugin._id} />
+                <OwnButton pluginId={plugin._id} />
               </div>
 
-              {/* Formats & Platforms */}
-              {plugin.formats && plugin.formats.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-stone-500 text-xs uppercase tracking-wider mb-2">Formats</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {plugin.formats.map((f: string) => (
-                      <span
-                        key={f}
-                        className="px-2.5 py-1 bg-white/[0.04] rounded-lg text-xs text-stone-300 uppercase tracking-wider"
-                      >
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <AdminEnrichButton
+                pluginId={plugin._id}
+                pluginSlug={plugin.slug}
+                pluginName={plugin.name}
+                className="mb-6"
+              />
 
-              {plugin.platforms && plugin.platforms.length > 0 && (
-                <div className="mb-5">
-                  <h3 className="text-stone-500 text-xs uppercase tracking-wider mb-2">Platforms</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {plugin.platforms.map((p: string) => (
-                      <span
-                        key={p}
-                        className="px-2.5 py-1 bg-white/[0.04] rounded-lg text-xs text-stone-300"
-                      >
-                        {p}
-                      </span>
-                    ))}
-                  </div>
+              {/* Description — inline in the info column */}
+              {plugin.description && (
+                <div className="mb-6 pb-6 border-b border-white/[0.06]">
+                  <h2 className="text-sm font-semibold text-stone-300 uppercase tracking-wider mb-2">About</h2>
+                  <p className="text-stone-400 leading-relaxed text-[15px]">{plugin.description}</p>
                 </div>
               )}
 
@@ -391,29 +343,6 @@ export default function PluginPage() {
                   )}
                 </div>
               )}
-
-              {/* CTA buttons */}
-              <div className="flex flex-wrap gap-2.5">
-                <a
-                  href={sale?.url || plugin.productUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 min-w-[180px] bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold py-3 px-6 rounded-xl text-center transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 flex items-center justify-center gap-2 text-sm"
-                >
-                  <Globe className="w-4 h-4" />
-                  {sale ? "Get Deal" : "Visit Product Page"}
-                </a>
-                <WishlistButton pluginId={plugin._id} />
-                <PriceAlertButton pluginId={plugin._id} currentPrice={plugin.currentPrice ?? plugin.msrp} />
-                <OwnButton pluginId={plugin._id} />
-              </div>
-
-              <AdminEnrichButton
-                pluginId={plugin._id}
-                pluginSlug={plugin.slug}
-                pluginName={plugin.name}
-                className="mt-4"
-              />
             </div>
           </div>
         </div>
@@ -429,14 +358,14 @@ export default function PluginPage() {
             {plugin.worksWellOn && plugin.worksWellOn.length > 0 && (
               <div className="glass-card rounded-xl p-5">
                 <h3 className="text-stone-400 text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Waveform className="w-4 h-4 text-amber-400" />
+                  <Waveform className="w-4 h-4 text-white" />
                   Works Well On
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
                   {plugin.worksWellOn.map((w: string) => (
                     <span
                       key={w}
-                      className="px-2.5 py-1 bg-amber-500/[0.08] border border-amber-500/15 rounded-lg text-xs text-amber-400/80 capitalize"
+                      className="px-2.5 py-1 bg-white/[0.08] border border-[#deff0a]/15 rounded-lg text-xs text-white/80 capitalize"
                     >
                       {w.replace(/-/g, " ")}
                     </span>
@@ -489,31 +418,7 @@ export default function PluginPage() {
         </section>
       )}
 
-      {/* ===== DESCRIPTION ===== */}
-      {plugin.description && (
-        <section className="container mx-auto px-4 lg:px-6 pb-10">
-          <h2 className="text-lg font-semibold text-stone-100 mb-3" style={{ fontFamily: "var(--font-display)" }}>
-            About
-          </h2>
-          <p className="text-stone-400 leading-relaxed max-w-3xl text-[15px]">{plugin.description}</p>
-        </section>
-      )}
-
       <div className="section-line" />
-
-      {/* ===== PRICE HISTORY ===== */}
-      <section className="container mx-auto px-4 lg:px-6 py-10">
-        <h2 className="text-lg font-semibold text-stone-100 mb-6" style={{ fontFamily: "var(--font-display)" }}>
-          Price History
-        </h2>
-        <div className="glass-card rounded-xl p-5">
-          <PriceHistoryChart
-            pluginId={plugin._id}
-            currentPrice={plugin.currentPrice}
-            msrp={plugin.msrp}
-          />
-        </div>
-      </section>
 
       {/* ===== TIMELINE ===== */}
       <section className="container mx-auto px-4 lg:px-6 pb-10">
@@ -537,7 +442,7 @@ export default function PluginPage() {
             Tutorials & Reviews
           </h2>
           {plugin.mentionCount7d !== undefined && plugin.mentionCount7d > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/[0.08] border border-amber-500/15 rounded-lg text-xs text-amber-400">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/[0.08] border border-[#deff0a]/15 rounded-lg text-xs text-white">
               <TrendUp className="w-3.5 h-3.5" />
               {plugin.mentionCount7d} new this week
             </span>
@@ -581,12 +486,12 @@ export default function PluginPage() {
                     </div>
                   )}
                   {video.mentionType && (
-                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-amber-500/90 rounded text-[10px] text-stone-900 font-semibold capitalize">
+                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-white/90 rounded text-[10px] text-stone-900 font-semibold capitalize">
                       {video.mentionType}
                     </div>
                   )}
                 </div>
-                <h3 className="text-sm text-stone-200 group-hover:text-amber-400 transition line-clamp-2 leading-snug">
+                <h3 className="text-sm text-stone-200 group-hover:text-white transition line-clamp-2 leading-snug">
                   {video.title}
                 </h3>
                 <div className="flex items-center justify-between mt-1">
@@ -632,20 +537,58 @@ export default function PluginPage() {
 
       {/* More from Manufacturer */}
       {plugin.manufacturerData && (
-        <section className="container mx-auto px-4 lg:px-6 pb-14">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-stone-100" style={{ fontFamily: "var(--font-display)" }}>
-              More from {plugin.manufacturerData.name}
-            </h2>
-            <Link
-              href={`/manufacturers/${plugin.manufacturerData.slug}`}
-              className="text-sm text-stone-500 hover:text-amber-400 transition-colors"
-            >
-              View all →
-            </Link>
-          </div>
-        </section>
+        <MoreFromManufacturer
+          manufacturerId={plugin.manufacturer}
+          manufacturerName={plugin.manufacturerData.name}
+          manufacturerSlug={plugin.manufacturerData.slug}
+          excludePluginId={plugin._id}
+        />
       )}
     </div>
+  );
+}
+
+function MoreFromManufacturer({
+  manufacturerId,
+  manufacturerName,
+  manufacturerSlug,
+  excludePluginId,
+}: {
+  manufacturerId: any;
+  manufacturerName: string;
+  manufacturerSlug: string;
+  excludePluginId: any;
+}) {
+  const result = useQuery(api.plugins.browse, {
+    manufacturer: manufacturerId,
+    limit: 7,
+  });
+
+  const plugins = result?.items?.filter((p: any) => p._id !== excludePluginId);
+
+  if (!plugins || plugins.length === 0) return null;
+
+  return (
+    <section className="container mx-auto px-4 lg:px-6 pb-14">
+      <div className="flex items-center justify-between mb-6">
+        <h2
+          className="text-lg font-semibold text-stone-100"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          More from {manufacturerName}
+        </h2>
+        <Link
+          href={`/manufacturers/${manufacturerSlug}`}
+          className="text-sm text-stone-500 hover:text-white transition-colors"
+        >
+          View all &rarr;
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        {plugins.slice(0, 6).map((p: any) => (
+          <PluginCard key={p._id} plugin={p} />
+        ))}
+      </div>
+    </section>
   );
 }

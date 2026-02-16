@@ -11,12 +11,16 @@ interface SliderProps {
   width?: string;
   onChange: (value: number) => void;
   title?: string;
+  /** Called when user starts dragging (mouseDown) */
+  onDragStart?: () => void;
+  /** Called when user stops dragging (mouseUp) */
+  onDragEnd?: () => void;
 }
 
-const colorMap = {
-  accent: { fill: 'bg-plugin-accent', thumb: 'border-plugin-accent', hover: 'bg-plugin-accent-bright' },
-  blue: { fill: 'bg-plugin-serial', thumb: 'border-plugin-serial', hover: 'bg-plugin-serial' },
-  orange: { fill: 'bg-plugin-parallel', thumb: 'border-plugin-parallel', hover: 'bg-plugin-parallel' },
+const colorMap: Record<string, { fill: string; glow: string }> = {
+  accent: { fill: '#deff0a', glow: 'rgba(222, 255, 10, 0.5)' },
+  blue:   { fill: '#deff0a', glow: 'rgba(222, 255, 10, 0.4)' },
+  orange: { fill: '#ccff00', glow: 'rgba(204, 255, 0, 0.4)' },
 };
 
 export function Slider({
@@ -28,11 +32,13 @@ export function Slider({
   width = 'w-16',
   onChange,
   title,
+  onDragStart,
+  onDragEnd,
 }: SliderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
-  const colors = colorMap[color];
+  const colors = colorMap[color] || colorMap.accent;
 
   const fraction = Math.max(0, Math.min(1, (value - min) / (max - min)));
 
@@ -52,8 +58,9 @@ export function Slider({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
+    onDragStart?.();
     updateFromPointer(e.clientX);
-  }, [updateFromPointer]);
+  }, [updateFromPointer, onDragStart]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -63,6 +70,7 @@ export function Slider({
     };
     const handleMouseUp = () => {
       setIsDragging(false);
+      onDragEnd?.();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -71,9 +79,10 @@ export function Slider({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, updateFromPointer]);
+  }, [isDragging, updateFromPointer, onDragEnd]);
 
   const showTooltip = isDragging || isHovering;
+  const isActive = isDragging || isHovering;
 
   return (
     <div
@@ -85,33 +94,53 @@ export function Slider({
       {/* Track */}
       <div
         ref={trackRef}
-        className="relative w-full h-[3px] bg-plugin-border rounded-full cursor-pointer"
+        className="relative w-full h-[3px] rounded-full cursor-pointer"
+        style={{
+          background: 'var(--color-bg-input, #1a1a1a)',
+        }}
         onMouseDown={handleMouseDown}
       >
         {/* Filled portion */}
         <div
-          className={`absolute inset-y-0 left-0 rounded-full ${colors.fill} transition-colors`}
-          style={{ width: `${fraction * 100}%` }}
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{
+            width: `${fraction * 100}%`,
+            background: colors.fill,
+            boxShadow: isActive ? `0 0 6px ${colors.glow}` : 'none',
+            transition: 'box-shadow 150ms ease',
+          }}
         />
 
         {/* Thumb */}
         <div
-          className={`
-            absolute top-1/2 -translate-y-1/2 -translate-x-1/2
-            w-[10px] h-[10px] rounded-full
-            bg-plugin-surface-alt border-2 ${colors.thumb}
-            shadow-sm transition-transform
-            ${isDragging ? 'scale-125' : 'group-hover:scale-110'}
-          `}
-          style={{ left: `${fraction * 100}%` }}
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+          style={{
+            left: `${fraction * 100}%`,
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: 'var(--color-bg-elevated, #151515)',
+            border: `2px solid ${isActive ? colors.fill : 'var(--color-border-strong, #303030)'}`,
+            boxShadow: isDragging ? `0 0 8px ${colors.glow}` : 'none',
+            transform: `translate(-50%, -50%) scale(${isDragging ? 1.25 : isHovering ? 1.1 : 1})`,
+            transition: 'transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease',
+          }}
         />
       </div>
 
-      {/* Value tooltip */}
+      {/* Value tooltip - monospace */}
       {showTooltip && (
         <div
-          className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded bg-plugin-bg border border-plugin-border text-[9px] font-mono text-plugin-text whitespace-nowrap pointer-events-none z-50"
-          style={{ left: `${fraction * 100}%` }}
+          className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none z-50"
+          style={{
+            left: `${fraction * 100}%`,
+            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+            fontSize: 'var(--text-xs, 10px)',
+            color: colors.fill,
+            background: 'var(--color-bg-primary, #0a0a0a)',
+            border: `1px solid ${colors.fill}`,
+            boxShadow: `0 0 6px ${colors.glow}`,
+          }}
         >
           {typeof value === 'number' ? (step >= 1 ? value.toFixed(0) : value.toFixed(step < 0.1 ? 2 : 1)) : value}
         </div>

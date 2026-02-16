@@ -5,6 +5,7 @@
 #include <mutex>
 #include <atomic>
 #include <functional>
+#include <memory>
 
 using InstanceId = int;
 
@@ -15,7 +16,7 @@ struct InstanceInfo
     juce::Colour trackColour;
     int pluginCount = 0;
     juce::StringArray pluginNames;
-    juce::AudioProcessor* processor = nullptr;
+    juce::AudioProcessor* processor = nullptr;  // Raw pointer - deregistered on processor destruction
 };
 
 /**
@@ -30,7 +31,7 @@ class InstanceRegistry
 {
 public:
     InstanceRegistry() = default;
-    ~InstanceRegistry() = default;
+    ~InstanceRegistry();
 
     /** Register a new instance. Returns a unique InstanceId. */
     InstanceId registerInstance(juce::AudioProcessor* processor, const juce::String& trackName = {});
@@ -73,11 +74,12 @@ public:
     {
         int groupId = -1;
         std::set<InstanceId> members;
+        InstanceId leaderId = -1;
         uint64_t version = 0;
     };
 
-    /** Create a mirror group between two instances. Returns the group ID. */
-    int createMirrorGroup(InstanceId initiator, InstanceId partner);
+    /** Create a mirror group between two instances (or join an existing group). Returns the group ID. */
+    int createMirrorGroup(InstanceId initiator, InstanceId partner, InstanceId leaderId);
 
     /** Add a member to an existing mirror group. */
     bool joinMirrorGroup(int groupId, InstanceId id);
@@ -85,14 +87,21 @@ public:
     /** Remove a member from its mirror group. Dissolves group if only 1 member remains. */
     void leaveMirrorGroup(InstanceId id);
 
-    /** Get the mirror group for an instance, or nullptr if not mirrored. */
-    const MirrorGroup* getMirrorGroupForInstance(InstanceId id) const;
+    /** Get the mirror group for an instance, or std::nullopt if not mirrored. */
+    std::optional<MirrorGroup> getMirrorGroupForInstance(InstanceId id) const;
 
     /** Get a mutable mirror group (for version increment). */
-    MirrorGroup* getMirrorGroupForInstanceMutable(InstanceId id);
+    std::optional<MirrorGroup> getMirrorGroupForInstanceMutable(InstanceId id);
+
+    /** Atomically increment the version of the mirror group containing this instance.
+     *  Returns the new version, or 0 if not mirrored. */
+    uint64_t incrementMirrorGroupVersion(InstanceId id);
 
     /** Get a mirror group by ID. */
-    const MirrorGroup* getMirrorGroup(int groupId) const;
+    std::optional<MirrorGroup> getMirrorGroup(int groupId) const;
+
+    /** Get the leader ID for the mirror group containing this instance, or -1 if not mirrored. */
+    InstanceId getLeaderForInstance(InstanceId id) const;
 
     /**
      * Request reconnection to a mirror group saved in a DAW session.
@@ -101,10 +110,14 @@ public:
      * @return the new group ID, or -1 if deferred (waiting for partner).
      */
     int requestMirrorReconnection(int savedGroupId, InstanceId instanceId,
+                                  bool wasLeader,
                                   std::function<void(int newGroupId)> callback = nullptr);
 
     /** Cancel any pending deferred reconnection for an instance. */
     void cancelDeferredReconnection(InstanceId id);
+
+    /** Clean up stale deferred reconnections older than 30 seconds. */
+    void cleanupStaleReconnections();
 
 private:
     mutable std::mutex mutex;
@@ -120,11 +133,16 @@ private:
     {
         int savedGroupId;
         InstanceId instanceId;
+        bool wasLeader = false;
         std::function<void(int newGroupId)> callback;
+        juce::Time timestamp;
     };
     std::vector<DeferredMirrorReconnection> deferredReconnections;
 
     juce::ListenerList<Listener> listeners;
+
+    // Weak lifetime guard for async callbacks
+    std::shared_ptr<std::atomic<bool>> aliveFlag = std::make_shared<std::atomic<bool>>(true);
 
     void notifyListeners();
 

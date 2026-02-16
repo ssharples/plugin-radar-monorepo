@@ -1,5 +1,10 @@
 #include "InstanceRegistry.h"
 
+InstanceRegistry::~InstanceRegistry()
+{
+    aliveFlag->store(false, std::memory_order_release);
+}
+
 InstanceId InstanceRegistry::registerInstance(juce::AudioProcessor* processor, const juce::String& trackName)
 {
     InstanceId id = nextId.fetch_add(1);
@@ -27,9 +32,16 @@ void InstanceRegistry::deregisterInstance(InstanceId id)
         {
             it->members.erase(id);
             if (it->members.size() <= 1)
+            {
                 it = mirrorGroups.erase(it);
+            }
             else
+            {
+                // Leader succession
+                if (it->leaderId == id && !it->members.empty())
+                    it->leaderId = *it->members.begin();
                 ++it;
+            }
         }
 
         // Remove any pending deferred reconnection
@@ -87,6 +99,20 @@ std::vector<InstanceInfo> InstanceRegistry::getOtherInstances(InstanceId exclude
     return result;
 }
 
+void InstanceRegistry::cleanupStaleReconnections()
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    auto now = juce::Time::getCurrentTime();
+
+    deferredReconnections.erase(
+        std::remove_if(deferredReconnections.begin(), deferredReconnections.end(),
+            [now](const DeferredMirrorReconnection& r) {
+                return (now - r.timestamp).inSeconds() > 30;
+            }),
+        deferredReconnections.end()
+    );
+}
+
 InstanceInfo InstanceRegistry::getInstanceInfo(InstanceId id) const
 {
     std::lock_guard<std::mutex> lock(mutex);
@@ -117,8 +143,12 @@ void InstanceRegistry::removeListener(Listener* listener)
 void InstanceRegistry::notifyListeners()
 {
     // Dispatch on message thread to avoid callback from audio thread or mutex holder
-    juce::MessageManager::callAsync([this]()
+    std::weak_ptr<std::atomic<bool>> weak = aliveFlag;
+    juce::MessageManager::callAsync([this, weak]()
     {
+        auto alive = weak.lock();
+        if (!alive || !alive->load(std::memory_order_acquire))
+            return;  // InstanceRegistry was destroyed
         listeners.call([](Listener& l) { l.instanceRegistryChanged(); });
     });
 }
@@ -127,25 +157,66 @@ void InstanceRegistry::notifyListeners()
 // Mirror group management
 // ============================================
 
-int InstanceRegistry::createMirrorGroup(InstanceId initiator, InstanceId partner)
+int InstanceRegistry::createMirrorGroup(InstanceId initiator, InstanceId partner, InstanceId leaderId)
 {
     std::lock_guard<std::mutex> lock(mutex);
 
-    // Remove both from any existing mirror groups
-    for (auto it = mirrorGroups.begin(); it != mirrorGroups.end();)
+    // Check if partner is already in an existing group — join it instead of creating new
+    for (auto& group : mirrorGroups)
     {
-        it->members.erase(initiator);
-        it->members.erase(partner);
-        if (it->members.size() <= 1)
-            it = mirrorGroups.erase(it);
-        else
-            ++it;
+        if (group.members.count(partner) > 0)
+        {
+            // Remove initiator from any OTHER group it might be in
+            for (auto it = mirrorGroups.begin(); it != mirrorGroups.end();)
+            {
+                if (it->groupId != group.groupId)
+                {
+                    it->members.erase(initiator);
+                    if (it->members.size() <= 1)
+                        it = mirrorGroups.erase(it);
+                    else
+                        ++it;
+                }
+                else
+                    ++it;
+            }
+            // Add initiator to partner's existing group, preserve existing leader
+            group.members.insert(initiator);
+            return group.groupId;
+        }
     }
 
+    // Check if initiator is already in an existing group — add partner to it
+    for (auto& group : mirrorGroups)
+    {
+        if (group.members.count(initiator) > 0)
+        {
+            // Remove partner from any OTHER group
+            for (auto it = mirrorGroups.begin(); it != mirrorGroups.end();)
+            {
+                if (it->groupId != group.groupId)
+                {
+                    it->members.erase(partner);
+                    if (it->members.size() <= 1)
+                        it = mirrorGroups.erase(it);
+                    else
+                        ++it;
+                }
+                else
+                    ++it;
+            }
+            // Add partner to initiator's existing group, preserve existing leader
+            group.members.insert(partner);
+            return group.groupId;
+        }
+    }
+
+    // Neither is in a group — create fresh
     MirrorGroup group;
     group.groupId = nextMirrorGroupId++;
     group.members.insert(initiator);
     group.members.insert(partner);
+    group.leaderId = leaderId;
     group.version = 0;
     mirrorGroups.push_back(group);
 
@@ -173,46 +244,65 @@ void InstanceRegistry::leaveMirrorGroup(InstanceId id)
     {
         it->members.erase(id);
         if (it->members.size() <= 1)
+        {
             it = mirrorGroups.erase(it);
+        }
         else
+        {
+            // Leader succession: if the departing member was leader, promote lowest ID
+            if (it->leaderId == id && !it->members.empty())
+                it->leaderId = *it->members.begin();  // std::set is sorted, lowest ID first
             ++it;
+        }
     }
 }
 
-const InstanceRegistry::MirrorGroup* InstanceRegistry::getMirrorGroupForInstance(InstanceId id) const
+std::optional<InstanceRegistry::MirrorGroup> InstanceRegistry::getMirrorGroupForInstance(InstanceId id) const
 {
     std::lock_guard<std::mutex> lock(mutex);
     for (const auto& group : mirrorGroups)
     {
         if (group.members.count(id) > 0)
-            return &group;
+            return group;  // Return copy
     }
-    return nullptr;
+    return std::nullopt;
 }
 
-InstanceRegistry::MirrorGroup* InstanceRegistry::getMirrorGroupForInstanceMutable(InstanceId id)
+std::optional<InstanceRegistry::MirrorGroup> InstanceRegistry::getMirrorGroupForInstanceMutable(InstanceId id)
 {
     std::lock_guard<std::mutex> lock(mutex);
     for (auto& group : mirrorGroups)
     {
         if (group.members.count(id) > 0)
-            return &group;
+            return group;
     }
-    return nullptr;
+    return std::nullopt;
 }
 
-const InstanceRegistry::MirrorGroup* InstanceRegistry::getMirrorGroup(int groupId) const
+uint64_t InstanceRegistry::incrementMirrorGroupVersion(InstanceId id)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    for (auto& group : mirrorGroups)
+    {
+        if (group.members.count(id) > 0)
+            return ++group.version;
+    }
+    return 0;
+}
+
+std::optional<InstanceRegistry::MirrorGroup> InstanceRegistry::getMirrorGroup(int groupId) const
 {
     std::lock_guard<std::mutex> lock(mutex);
     for (const auto& group : mirrorGroups)
     {
         if (group.groupId == groupId)
-            return &group;
+            return group;  // Return copy
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 int InstanceRegistry::requestMirrorReconnection(int savedGroupId, InstanceId instanceId,
+                                                 bool wasLeader,
                                                  std::function<void(int newGroupId)> callback)
 {
     std::function<void(int)> partnerCallback;
@@ -227,6 +317,7 @@ int InstanceRegistry::requestMirrorReconnection(int savedGroupId, InstanceId ins
             if (it->savedGroupId == savedGroupId)
             {
                 auto partnerId = it->instanceId;
+                bool partnerWasLeader = it->wasLeader;
                 partnerCallback = std::move(it->callback);
                 deferredReconnections.erase(it);
 
@@ -241,10 +332,21 @@ int InstanceRegistry::requestMirrorReconnection(int savedGroupId, InstanceId ins
                         ++git;
                 }
 
+                // Determine leader: if exactly one claims leadership, they win.
+                // If both or neither, lowest ID wins.
+                InstanceId newLeader;
+                if (wasLeader && !partnerWasLeader)
+                    newLeader = instanceId;
+                else if (partnerWasLeader && !wasLeader)
+                    newLeader = partnerId;
+                else
+                    newLeader = std::min(instanceId, partnerId);
+
                 MirrorGroup group;
                 group.groupId = nextMirrorGroupId++;
                 group.members.insert(instanceId);
                 group.members.insert(partnerId);
+                group.leaderId = newLeader;
                 group.version = 0;
                 mirrorGroups.push_back(group);
                 newGroupId = group.groupId;
@@ -253,7 +355,7 @@ int InstanceRegistry::requestMirrorReconnection(int savedGroupId, InstanceId ins
         }
 
         if (newGroupId < 0)
-            deferredReconnections.push_back({ savedGroupId, instanceId, std::move(callback) });
+            deferredReconnections.push_back({ savedGroupId, instanceId, wasLeader, std::move(callback), juce::Time::getCurrentTime() });
     }
 
     // Outside lock: invoke callbacks on message thread and notify listeners
@@ -267,6 +369,17 @@ int InstanceRegistry::requestMirrorReconnection(int savedGroupId, InstanceId ins
     }
 
     return newGroupId;
+}
+
+InstanceId InstanceRegistry::getLeaderForInstance(InstanceId id) const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    for (const auto& group : mirrorGroups)
+    {
+        if (group.members.count(id) > 0)
+            return group.leaderId;
+    }
+    return -1;
 }
 
 void InstanceRegistry::cancelDeferredReconnection(InstanceId id)

@@ -12,19 +12,21 @@ import {
 import { useCloudChainStore } from '../../stores/cloudChainStore';
 import { useChainStore } from '../../stores/chainStore';
 import { useSyncStore } from '../../stores/syncStore';
+import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
 import { juceBridge } from '../../api/juce-bridge';
+import { recordChainLoadResult } from '../../api/convex-client';
+import { autoDiscoverAllPlugins } from '../../stores/chainStore';
+import { CustomDropdown } from '../Dropdown';
 
 const CATEGORIES = [
   { value: '', label: 'All' },
-  { value: 'vocal', label: '🎤 Vocal' },
-  { value: 'drums', label: '🥁 Drums' },
-  { value: 'bass', label: '🎸 Bass' },
-  { value: 'guitar', label: '🎸 Guitar' },
-  { value: 'keys', label: '🎹 Keys' },
-  { value: 'mixing', label: '🎚️ Mixing' },
-  { value: 'mastering', label: '🏆 Mastering' },
-  { value: 'creative', label: '✨ Creative' },
-  { value: 'live', label: '🎤 Live' },
+  { value: 'vocals', label: 'Vocals' },
+  { value: 'drums', label: 'Drums' },
+  { value: 'bass', label: 'Bass' },
+  { value: 'keys-synths', label: 'Keys & Synths' },
+  { value: 'guitar', label: 'Guitar' },
+  { value: 'fx-creative', label: 'FX & Creative' },
+  { value: 'mixing-mastering', label: 'Mixing & Mastering' },
 ];
 
 const SORT_OPTIONS = [
@@ -35,6 +37,27 @@ const SORT_OPTIONS = [
 ];
 
 const PAGE_SIZE = 10;
+
+const glassPanel: React.CSSProperties = {
+  background: 'rgba(15, 15, 15, 0.95)',
+  backdropFilter: 'blur(16px)',
+  border: '1px solid var(--color-border-default)',
+  boxShadow: 'var(--shadow-elevated)',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--color-bg-input)',
+  border: '1px solid var(--color-border-default)',
+  borderRadius: 'var(--radius-base)',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 'var(--text-sm)',
+  color: 'var(--color-text-primary)',
+  padding: '6px 10px',
+  paddingLeft: '28px',
+  outline: 'none',
+  transition: 'border-color 150ms, box-shadow 150ms',
+};
 
 interface BrowseModalProps {
   onClose: () => void;
@@ -54,7 +77,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
     forkChain,
   } = useCloudChainStore();
 
-  const { setChainName, setTargetInputLufs } = useChainStore();
+  const { setChainName, setTargetInputPeakRange } = useChainStore();
   const { isLoggedIn } = useSyncStore();
 
   const [search, setSearch] = useState('');
@@ -80,19 +103,23 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
     setPage(0);
   }, [category, sortBy, browseChains]);
 
-  // Escape closes
+  // Escape closes (modal priority)
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const registerShortcut = useKeyboardStore.getState().registerShortcut;
+    return registerShortcut({
+      id: 'browse-modal-escape',
+      key: 'Escape',
+      priority: ShortcutPriority.MODAL,
+      allowInInputs: true,
+      handler: (e) => {
+        e.preventDefault();
         if (previewChain) {
           setPreviewChain(null);
         } else {
           onClose();
         }
       }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    });
   }, [onClose, previewChain]);
 
   // Filter by search
@@ -129,10 +156,8 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
 
   const handleLoadChain = useCallback(
     async (chain: any) => {
-      // Record download
       downloadChain(chain._id);
 
-      // Build import data — apply substitutions
       const chainData = {
         version: 1,
         numSlots: chain.slots.length,
@@ -151,18 +176,51 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             bypassed: slot.bypassed ?? false,
             presetData: sub ? '' : (slot.presetData || ''),
             presetSizeBytes: sub ? 0 : (slot.presetSizeBytes || 0),
+            parameters: (!sub && slot.parameters) ? slot.parameters.map((p: any) => ({
+              name: p.name || '',
+              semantic: p.semantic || '',
+              unit: p.unit || '',
+              value: String(p.value ?? ''),
+              normalizedValue: p.normalizedValue ?? 0,
+            })) : [],
           };
         }),
       };
 
+      const loadStart = performance.now();
       const result = await juceBridge.importChain(chainData);
+      const loadTimeMs = Math.round(performance.now() - loadStart);
+
+      // Report load result (best-effort)
+      recordChainLoadResult({
+        chainId: chain._id,
+        totalSlots: (result as any).totalSlots ?? chain.slots.length,
+        loadedSlots: (result as any).loadedSlots ?? chain.slots.length,
+        failedSlots: (result as any).failedSlots ?? 0,
+        substitutedSlots: substitutions.size,
+        failures: (result as any).failures,
+        loadTimeMs,
+      });
+
       if (result.success) {
         setChainName(chain.name);
-        setTargetInputLufs(chain.targetInputLufs ?? null);
+        // Set peak range (with fallback from legacy LUFS)
+        if (chain.targetInputPeakMin != null && chain.targetInputPeakMax != null) {
+          setTargetInputPeakRange(chain.targetInputPeakMin, chain.targetInputPeakMax);
+        } else if (chain.targetInputLufs != null) {
+          // Legacy fallback: LUFS → estimated peak range [lufs, lufs+6]
+          setTargetInputPeakRange(chain.targetInputLufs, chain.targetInputLufs + 6);
+        } else {
+          setTargetInputPeakRange(null, null);
+        }
+        // Fire-and-forget: crowdpool parameter discovery for all plugins in chain
+        if (result.chainState?.nodes) {
+          autoDiscoverAllPlugins(result.chainState.nodes).catch(() => {});
+        }
         onClose();
       }
     },
-    [downloadChain, setChainName, setTargetInputLufs, onClose, substitutions]
+    [downloadChain, setChainName, setTargetInputPeakRange, onClose, substitutions]
   );
 
   const handlePreview = useCallback(
@@ -194,149 +252,168 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
     [forkChain, forkName]
   );
 
-  const getCategoryIcon = (cat: string) => {
-    const icons: Record<string, string> = {
-      vocal: '🎤',
-      drums: '🥁',
-      bass: '🎸',
-      guitar: '🎸',
-      keys: '🎹',
-      mixing: '🎚️',
-      mastering: '🏆',
-      creative: '✨',
-      live: '🎤',
-    };
-    return icons[cat] || '🔗';
-  };
-
   return (
     <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in"
+      className="fixed inset-0 flex items-center justify-center z-50 fade-in"
+      style={{ background: 'rgba(0, 0, 0, 0.75)' }}
       onClick={onClose}
     >
       <div
-        className="bg-plugin-surface rounded-propane-lg w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col border border-plugin-border shadow-2xl animate-slide-up"
+        className="rounded-md w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col scale-in"
+        style={glassPanel}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-plugin-border flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--color-border-default)' }}>
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-plugin-accent" />
-            <span className="text-sm font-mono uppercase font-bold text-plugin-text">Community Chains</span>
+            <Globe className="w-4 h-4" style={{ color: 'var(--color-accent-cyan)' }} />
+            <span style={{
+              fontSize: 'var(--text-base)',
+              fontFamily: 'var(--font-extended)',
+              fontWeight: 900,
+              color: 'var(--color-text-primary)',
+              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-wider)',
+            }}>
+              Community Chains
+            </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-plugin-dim hover:text-plugin-text rounded hover:bg-white/5 transition-colors"
+            className="p-1 rounded transition-all duration-150"
+            style={{ color: 'var(--color-text-tertiary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.background = 'transparent'; }}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Filters bar */}
-        <div className="flex items-center gap-2 px-5 py-2.5 border-b border-plugin-border flex-shrink-0">
+        <div className="flex items-center gap-2 px-5 py-2.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--color-border-default)' }}>
           {/* Search */}
           <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-plugin-dim" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
             <input
               type="text"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder="Search chains..."
-              className="w-full bg-black/40 border border-plugin-border rounded-propane font-mono pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              style={inputStyle}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent-cyan)'; e.currentTarget.style.boxShadow = '0 0 0 1px var(--color-accent-cyan)'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.boxShadow = 'none'; }}
             />
           </div>
 
           {/* Category */}
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="bg-black/40 border border-plugin-border rounded-propane font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+          <div style={{ width: '120px' }}>
+            <CustomDropdown
+              value={category}
+              options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+              onChange={setCategory}
+              size="sm"
+            />
+          </div>
 
           {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-black/40 border border-plugin-border rounded-propane font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
-          >
-            {SORT_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
+          <div style={{ width: '120px' }}>
+            <CustomDropdown
+              value={sortBy}
+              options={SORT_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
+              onChange={(val) => setSortBy(val as any)}
+              size="sm"
+            />
+          </div>
         </div>
 
         {/* Preview panel */}
         {previewChain ? (
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex-1 overflow-y-auto p-5 scrollbar-cyber">
             <button
               onClick={() => setPreviewChain(null)}
-              className="flex items-center gap-1 text-xs text-plugin-muted hover:text-plugin-text mb-3"
+              className="flex items-center gap-1 mb-3 transition-colors duration-150"
+              style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}
             >
-              <ChevronLeft className="w-3 h-3" /> Back to Browse
+              <ChevronLeft className="w-3 h-3" /> Back
             </button>
 
-            <h3 className="text-lg font-bold text-plugin-text mb-1">
-              {getCategoryIcon(previewChain.category)} "{previewChain.name}"
+            <h3 style={{
+              fontSize: 'var(--text-2xl)',
+              fontFamily: 'var(--font-extended)',
+              fontWeight: 900,
+              color: 'var(--color-text-primary)',
+              marginBottom: '4px',
+            }}>
+              "{previewChain.name}"
             </h3>
             {previewChain.author?.name && (
-              <p className="text-xs text-plugin-muted mb-2">
+              <p className="mb-2" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
                 by @{previewChain.author.name}
               </p>
             )}
             {previewChain.description && (
-              <p className="text-xs text-plugin-muted mb-3">{previewChain.description}</p>
+              <p className="mb-3" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                {previewChain.description}
+              </p>
             )}
 
             {/* Tags */}
             {previewChain.tags?.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
                 {previewChain.tags.map((tag: string) => (
-                  <span key={tag} className="px-1.5 py-0.5 bg-plugin-accent/15 text-plugin-accent rounded text-[10px]">
+                  <span
+                    key={tag}
+                    className="badge badge-cyan"
+                  >
                     {tag}
                   </span>
                 ))}
               </div>
             )}
 
-            {/* Target LUFS */}
-            {previewChain.targetInputLufs != null && (
-              <div className="flex items-center gap-2 mb-3 text-xs">
-                <span className="text-plugin-muted">🎚️ Target:</span>
-                <span className="font-mono font-medium text-plugin-accent">
-                  {previewChain.targetInputLufs} LUFS
+            {/* Target Input Peak Range */}
+            {(previewChain.targetInputPeakMin != null && previewChain.targetInputPeakMax != null) ? (
+              <div className="flex items-center gap-2 mb-3">
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>Target:</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                  {previewChain.targetInputPeakMin} to {previewChain.targetInputPeakMax} dBpk
                 </span>
               </div>
-            )}
+            ) : previewChain.targetInputLufs != null ? (
+              <div className="flex items-center gap-2 mb-3">
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>Target:</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                  {previewChain.targetInputLufs} to {previewChain.targetInputLufs + 6} dBpk
+                </span>
+              </div>
+            ) : null}
 
             {/* Compatibility */}
             {compatibility && (
               <div
-                className={`rounded-lg p-3 mb-3 ${
-                  compatibility.canFullyLoad
-                    ? 'bg-green-500/10 border border-green-500/20'
-                    : 'bg-yellow-500/10 border border-yellow-500/20'
-                }`}
+                className="rounded-md p-3 mb-3"
+                style={{
+                  background: compatibility.canFullyLoad ? 'rgba(0, 255, 136, 0.08)' : 'rgba(255, 170, 0, 0.08)',
+                  border: `1px solid ${compatibility.canFullyLoad ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 170, 0, 0.2)'}`,
+                }}
               >
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className={compatibility.canFullyLoad ? 'text-green-400' : 'text-yellow-400'}>
+                <div className="flex items-center justify-between mb-1.5" style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>
+                  <span style={{ color: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)' }}>
                     {compatibility.canFullyLoad
-                      ? '✅ All plugins available'
-                      : `⚠️ Missing ${compatibility.missingCount} plugins`}
+                      ? 'All plugins available'
+                      : `Missing ${compatibility.missingCount} plugins`}
                   </span>
-                  <span className="font-mono font-bold text-plugin-text">
+                  <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
                     {compatibility.percentage}%
                   </span>
                 </div>
-                <div className="w-full bg-black/30 rounded-full h-1">
+                <div className="w-full h-1 rounded-full" style={{ background: 'rgba(0,0,0,0.3)' }}>
                   <div
-                    className={`h-1 rounded-full ${
-                      compatibility.canFullyLoad ? 'bg-green-500' : 'bg-yellow-500'
-                    }`}
-                    style={{ width: `${compatibility.percentage}%` }}
+                    className="h-1 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${compatibility.percentage}%`,
+                      background: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)',
+                    }}
                   />
                 </div>
               </div>
@@ -344,7 +421,13 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
 
             {/* Plugin slots */}
             <div className="mb-4">
-              <h4 className="text-[10px] font-mono text-plugin-dim uppercase tracking-wider mb-2">
+              <h4 className="mb-2" style={{
+                fontSize: 'var(--text-xs)',
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--color-text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-wider)',
+              }}>
                 Plugins ({previewChain.slots?.length ?? 0})
               </h4>
               <div className="space-y-1">
@@ -362,21 +445,25 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                   return (
                     <div
                       key={idx}
-                      className={`px-3 py-2 rounded text-xs ${
-                        isMissing && !sub ? 'bg-red-500/5 border border-red-500/10' : sub ? 'bg-green-500/5 border border-green-500/10' : 'bg-white/3'
-                      }`}
+                      className="px-3 py-2 rounded"
+                      style={{
+                        fontSize: 'var(--text-sm)',
+                        fontFamily: 'var(--font-mono)',
+                        background: isMissing && !sub ? 'rgba(255, 0, 51, 0.05)' : sub ? 'rgba(0, 255, 136, 0.05)' : 'var(--color-bg-elevated)',
+                        border: `1px solid ${isMissing && !sub ? 'rgba(255, 0, 51, 0.1)' : sub ? 'rgba(0, 255, 136, 0.1)' : 'var(--color-border-subtle)'}`,
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="text-plugin-text">{slot.pluginName}</span>
-                          <span className="text-plugin-dim ml-1.5">{slot.manufacturer}</span>
+                          <span style={{ color: 'var(--color-text-primary)' }}>{slot.pluginName}</span>
+                          <span className="ml-1.5" style={{ color: 'var(--color-text-tertiary)' }}>{slot.manufacturer}</span>
                         </div>
                         {sub ? (
-                          <span className="text-green-400 text-[10px]">✓ {sub.altName}</span>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-active)' }}>OK {sub.altName}</span>
                         ) : isMissing ? (
-                          <span className="text-red-400 text-[10px]">Missing</span>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-error)' }}>Missing</span>
                         ) : (
-                          <span className="text-green-400 text-[10px]">✓</span>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-active)' }}>OK</span>
                         )}
                       </div>
                       {isMissing && !sub && missingSlot?.alternatives?.length ? (
@@ -385,8 +472,8 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                             <button
                               key={j}
                               onClick={() => handleSubstitute(slot.position ?? idx, slot.pluginName, alt)}
-                              className="px-1.5 py-0.5 bg-plugin-accent/20 text-plugin-accent
-                                         hover:bg-plugin-accent/30 rounded text-[10px] transition-colors"
+                              className="badge badge-cyan"
+                              style={{ cursor: 'pointer' }}
                             >
                               Use {alt.name}
                             </button>
@@ -395,7 +482,8 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                       ) : sub ? (
                         <button
                           onClick={() => handleUndoSubstitute(slot.position ?? idx)}
-                          className="mt-0.5 text-plugin-muted hover:text-white text-[10px] underline"
+                          className="mt-0.5 underline transition-colors duration-150"
+                          style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}
                         >
                           undo
                         </button>
@@ -407,7 +495,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-4 text-xs text-plugin-muted mb-4">
+            <div className="flex items-center gap-4 mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
               <span className="flex items-center gap-1">
                 <Download className="w-3 h-3" /> {previewChain.downloads}
               </span>
@@ -420,12 +508,14 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => handleLoadChain(previewChain)}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded-lg px-4 py-2 text-xs font-mono uppercase font-bold transition-colors"
+                className="btn btn-primary flex-1"
               >
-                <Download className="w-3.5 h-3.5" />
-                {substitutions.size > 0
-                  ? `Load with ${substitutions.size} swap${substitutions.size > 1 ? 's' : ''}`
-                  : 'Load Chain'}
+                <span className="flex items-center justify-center gap-1.5">
+                  <Download className="w-3.5 h-3.5" />
+                  {substitutions.size > 0
+                    ? `Load with ${substitutions.size} swap${substitutions.size > 1 ? 's' : ''}`
+                    : 'Load Chain'}
+                </span>
               </button>
               {isLoggedIn && (
                 <button
@@ -433,10 +523,12 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                     setForkName(`${previewChain.name} (fork)`);
                     setShowForkInput(true);
                   }}
-                  className="flex items-center gap-1.5 border border-plugin-border hover:border-plugin-accent/40 text-plugin-muted hover:text-plugin-text rounded-lg px-4 py-2 text-xs font-mono uppercase transition-colors"
+                  className="btn"
                 >
-                  <GitFork className="w-3.5 h-3.5" />
-                  Fork
+                  <span className="flex items-center gap-1.5">
+                    <GitFork className="w-3.5 h-3.5" />
+                    Fork
+                  </span>
                 </button>
               )}
             </div>
@@ -449,19 +541,22 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                   value={forkName}
                   onChange={(e) => setForkName(e.target.value)}
                   placeholder="Fork name..."
-                  className="flex-1 bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+                  style={{ ...inputStyle, paddingLeft: '10px', flex: 1 }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent-cyan)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; }}
                   autoFocus
                 />
                 <button
                   onClick={() => handleFork(previewChain)}
                   disabled={forking || !forkName.trim()}
-                  className="px-3 py-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded text-xs font-mono uppercase font-bold disabled:opacity-40"
+                  className="btn btn-primary"
+                  style={{ opacity: forking || !forkName.trim() ? 0.4 : 1 }}
                 >
                   {forking ? '...' : 'Fork'}
                 </button>
                 <button
                   onClick={() => setShowForkInput(false)}
-                  className="px-2 text-xs text-plugin-dim hover:text-plugin-text"
+                  className="btn"
                 >
                   Cancel
                 </button>
@@ -470,16 +565,18 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
           </div>
         ) : (
           /* Chain list */
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto scrollbar-cyber">
             {loading ? (
-              <div className="py-12 text-center text-xs text-plugin-muted">Loading...</div>
+              <div className="py-12 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                Loading...
+              </div>
             ) : filteredChains.length === 0 ? (
-              <div className="py-12 text-center text-xs text-plugin-muted">
-                <Globe className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                No chains found
+              <div className="py-12 text-center">
+                <Globe className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)', opacity: 0.3 }} />
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>No chains found</p>
               </div>
             ) : (
-              <div className="divide-y divide-plugin-border/50">
+              <div className="stagger-children">
                 {pageChains.map((chain) => (
                   <ChainCard
                     key={chain._id}
@@ -491,7 +588,6 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                       setForkName(`${chain.name} (fork)`);
                       setShowForkInput(true);
                     }}
-                    getCategoryIcon={getCategoryIcon}
                     isLoggedIn={isLoggedIn}
                   />
                 ))}
@@ -502,21 +598,37 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
 
         {/* Pagination */}
         {!previewChain && filteredChains.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between px-5 py-2.5 border-t border-plugin-border flex-shrink-0">
+          <div className="flex items-center justify-between px-5 py-2.5 flex-shrink-0" style={{ borderTop: '1px solid var(--color-border-default)' }}>
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="flex items-center gap-1 text-xs text-plugin-muted hover:text-plugin-text disabled:text-plugin-dim disabled:cursor-not-allowed"
+              className="flex items-center gap-1 transition-colors duration-150"
+              style={{
+                fontSize: 'var(--text-sm)',
+                fontFamily: 'var(--font-mono)',
+                color: page === 0 ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
+                cursor: page === 0 ? 'not-allowed' : 'pointer',
+                background: 'none',
+                border: 'none',
+              }}
             >
               <ChevronLeft className="w-3 h-3" /> Prev
             </button>
-            <span className="text-[10px] text-plugin-dim">
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
               Page {page + 1} of {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="flex items-center gap-1 text-xs text-plugin-muted hover:text-plugin-text disabled:text-plugin-dim disabled:cursor-not-allowed"
+              className="flex items-center gap-1 transition-colors duration-150"
+              style={{
+                fontSize: 'var(--text-sm)',
+                fontFamily: 'var(--font-mono)',
+                color: page >= totalPages - 1 ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
+                cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer',
+                background: 'none',
+                border: 'none',
+              }}
             >
               Next <ChevronRight className="w-3 h-3" />
             </button>
@@ -533,35 +645,42 @@ function ChainCard({
   onLoad,
   onPreview,
   onFork,
-  getCategoryIcon,
   isLoggedIn,
 }: {
   chain: any;
   onLoad: () => void;
   onPreview: () => void;
   onFork: () => void;
-  getCategoryIcon: (cat: string) => string;
   isLoggedIn: boolean;
 }) {
   const pluginPreview = chain.slots
     ?.slice(0, 4)
     .map((s: any) => s.pluginName)
-    .join(' → ');
+    .join(' > ');
   const pluginCount = chain.slots?.length ?? chain.pluginCount;
 
   return (
-    <div className="px-5 py-3 hover:bg-white/2 transition-colors">
+    <div
+      className="px-5 py-3 transition-all duration-150"
+      style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(222, 255, 10, 0.03)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >
       {/* Title row */}
       <div className="flex items-start justify-between mb-1">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm">{getCategoryIcon(chain.category)}</span>
-            <span className="text-sm font-medium text-plugin-text truncate">
+            <span style={{
+              fontSize: 'var(--text-base)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              color: 'var(--color-text-primary)',
+            }} className="truncate">
               "{chain.name}"
             </span>
           </div>
           {chain.author?.name && (
-            <span className="text-[10px] text-plugin-dim ml-6">
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
               by @{chain.author.name}
             </span>
           )}
@@ -569,45 +688,40 @@ function ChainCard({
       </div>
 
       {/* Plugin preview */}
-      <div className="text-[11px] text-plugin-muted mb-1.5 ml-6 truncate">
+      <div className="mb-1.5 truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
         {pluginPreview}
         {pluginCount > 4 ? ` ... (${pluginCount} plugins)` : ` (${pluginCount} plugins)`}
       </div>
 
       {/* Stats row */}
-      <div className="flex items-center gap-3 ml-6 mb-2">
-        {chain.targetInputLufs != null && (
-          <span className="text-[10px] text-plugin-accent font-mono">
-            🎚️ {chain.targetInputLufs} LUFS
+      <div className="flex items-center gap-3 mb-2">
+        {(chain.targetInputPeakMin != null && chain.targetInputPeakMax != null) ? (
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+            {chain.targetInputPeakMin} to {chain.targetInputPeakMax} dBpk
           </span>
-        )}
-        <span className="flex items-center gap-0.5 text-[10px] text-plugin-dim">
+        ) : chain.targetInputLufs != null ? (
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+            {chain.targetInputLufs}→{chain.targetInputLufs + 6} dBpk
+          </span>
+        ) : null}
+        <span className="flex items-center gap-0.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
           <Download className="w-2.5 h-2.5" /> {chain.downloads}
         </span>
-        <span className="flex items-center gap-0.5 text-[10px] text-plugin-dim">
+        <span className="flex items-center gap-0.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
           <Heart className="w-2.5 h-2.5" /> {chain.likes}
         </span>
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1.5 ml-6">
-        <button
-          onClick={onLoad}
-          className="px-2.5 py-1 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded text-[10px] font-mono uppercase font-bold transition-colors"
-        >
+      <div className="flex items-center gap-1.5">
+        <button onClick={onLoad} className="btn btn-primary" style={{ padding: '4px 10px', fontSize: 'var(--text-xs)' }}>
           Load
         </button>
-        <button
-          onClick={onPreview}
-          className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] font-mono uppercase transition-colors"
-        >
+        <button onClick={onPreview} className="btn" style={{ padding: '4px 10px', fontSize: 'var(--text-xs)' }}>
           Preview
         </button>
         {isLoggedIn && (
-          <button
-            onClick={onFork}
-            className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] font-mono uppercase transition-colors"
-          >
+          <button onClick={onFork} className="btn" style={{ padding: '4px 10px', fontSize: 'var(--text-xs)' }}>
             Fork
           </button>
         )}

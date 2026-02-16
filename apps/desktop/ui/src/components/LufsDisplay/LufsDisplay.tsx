@@ -7,6 +7,11 @@ interface LufsDisplayProps {
   target?: number | null; // Target LUFS level (from chain metadata)
 }
 
+// Design system status colors
+const STATUS_ACTIVE = '#00ff41';
+const STATUS_WARNING = '#ffaa00';
+const STATUS_ERROR = '#ff0033';
+
 export function LufsDisplay({
   lufs,
   label,
@@ -19,20 +24,20 @@ export function LufsDisplay({
   };
 
   const getColor = (value: number): string => {
-    if (value <= -60 || !isFinite(value)) return 'text-plugin-dim';
+    if (value <= -60 || !isFinite(value)) return 'var(--color-text-tertiary, #606060)';
 
     // If we have a target, color-code based on distance from target
     if (target != null && value > -60 && isFinite(value)) {
       const diff = Math.abs(value - target);
-      if (diff <= 2) return 'text-green-400';  // Within ±2 dB — on target
-      if (diff <= 4) return 'text-yellow-400';  // Within ±4 dB — close
-      return 'text-red-400';                     // More than ±4 dB — adjust
+      if (diff <= 2) return STATUS_ACTIVE;   // Within +/-2 dB -- on target
+      if (diff <= 4) return STATUS_WARNING;   // Within +/-4 dB -- close
+      return STATUS_ERROR;                     // More than +/-4 dB -- adjust
     }
 
     // Default coloring (no target)
-    if (value > -8) return 'text-red-400';
-    if (value > -14) return 'text-yellow-400';
-    return 'text-plugin-text';
+    if (value > -8) return STATUS_ERROR;
+    if (value > -14) return STATUS_WARNING;
+    return 'var(--color-text-primary, #ffffff)';
   };
 
   const getDirectionArrow = () => {
@@ -41,31 +46,63 @@ export function LufsDisplay({
     if (Math.abs(diff) <= 2) return null; // On target, no arrow
 
     if (diff > 0) {
-      // Input is too hot — turn down
+      // Input is too hot -- turn down
       return (
-        <ArrowDown className="w-2.5 h-2.5 text-yellow-400 animate-pulse" />
+        <ArrowDown
+          className="animate-pulse"
+          style={{ width: 10, height: 10, color: STATUS_WARNING }}
+        />
       );
     } else {
-      // Input is too quiet — turn up
+      // Input is too quiet -- turn up
       return (
-        <ArrowUp className="w-2.5 h-2.5 text-yellow-400 animate-pulse" />
+        <ArrowUp
+          className="animate-pulse"
+          style={{ width: 10, height: 10, color: STATUS_WARNING }}
+        />
       );
     }
   };
 
+  const monoFont = "var(--font-mono, 'JetBrains Mono', monospace)";
+
   if (compact) {
     return (
-      <div className="flex flex-col items-center min-w-[32px]">
+      <div className="flex flex-col items-center" style={{ minWidth: 32 }}>
         <div className="flex items-center gap-0.5">
-          <span className={`font-mono text-xxs tabular-nums leading-tight ${getColor(lufs)}`}>
+          <span
+            className="tabular-nums leading-tight"
+            style={{
+              fontFamily: monoFont,
+              fontSize: 'var(--text-xs, 10px)',
+              color: getColor(lufs),
+            }}
+          >
             {formatLufs(lufs)}
           </span>
           {getDirectionArrow()}
         </div>
-        <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-mono font-medium">LUFS</span>
+        <span
+          className="uppercase"
+          style={{
+            fontFamily: monoFont,
+            fontSize: 'var(--text-xs, 10px)',
+            letterSpacing: 'var(--tracking-wider, 0.1em)',
+            color: 'var(--color-text-tertiary, #606060)',
+          }}
+        >
+          LUFS
+        </span>
         {target != null && (
-          <span className="text-[9px] text-plugin-dim font-mono leading-none mt-px">
-            ⊕{target}
+          <span
+            className="leading-none mt-px"
+            style={{
+              fontFamily: monoFont,
+              fontSize: 'var(--text-xs, 10px)',
+              color: 'var(--color-text-tertiary, #606060)',
+            }}
+          >
+            T:{target}
           </span>
         )}
       </div>
@@ -75,20 +112,52 @@ export function LufsDisplay({
   return (
     <div className="flex flex-col items-center gap-0.5">
       {label && (
-        <span className="text-[9px] text-plugin-dim uppercase tracking-widest font-mono font-medium">
+        <span
+          className="uppercase font-medium"
+          style={{
+            fontFamily: monoFont,
+            fontSize: 'var(--text-xs, 10px)',
+            letterSpacing: 'var(--tracking-widest, 0.15em)',
+            color: 'var(--color-text-tertiary, #606060)',
+          }}
+        >
           {label}
         </span>
       )}
       <div className="flex items-baseline gap-0.5">
-        <span className={`font-mono text-sm font-medium tabular-nums ${getColor(lufs)}`}>
+        <span
+          className="font-medium tabular-nums"
+          style={{
+            fontFamily: monoFont,
+            fontSize: 'var(--text-lg, 13px)',
+            color: getColor(lufs),
+            textShadow: lufs > -14 ? `0 0 8px ${getColor(lufs)}40` : 'none',
+          }}
+        >
           {formatLufs(lufs)}
         </span>
-        <span className="text-[9px] text-plugin-dim font-mono uppercase">LUFS</span>
+        <span
+          className="uppercase"
+          style={{
+            fontFamily: monoFont,
+            fontSize: 'var(--text-xs, 10px)',
+            color: 'var(--color-text-tertiary, #606060)',
+          }}
+        >
+          LUFS
+        </span>
         {getDirectionArrow()}
       </div>
       {target != null && (
         <div className="flex items-center gap-1">
-          <span className="text-[9px] text-plugin-dim font-mono uppercase">
+          <span
+            className="uppercase"
+            style={{
+              fontFamily: monoFont,
+              fontSize: 'var(--text-xs, 10px)',
+              color: 'var(--color-text-tertiary, #606060)',
+            }}
+          >
             Target: {target}
           </span>
         </div>

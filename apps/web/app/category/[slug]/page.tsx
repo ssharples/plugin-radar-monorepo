@@ -67,7 +67,7 @@ export default function CategoryPage() {
   return (
     <div className="relative">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-6 py-10 relative">
         {/* Breadcrumb */}
@@ -94,7 +94,7 @@ export default function CategoryPage() {
           </h1>
           <p className="text-stone-400">{categoryInfo.description}</p>
           {currentCategory && (
-            <p className="text-amber-400 text-sm mt-2">
+            <p className="text-white text-sm mt-2">
               {currentCategory.count} plugin{currentCategory.count !== 1 ? "s" : ""} available
             </p>
           )}
@@ -111,7 +111,7 @@ export default function CategoryPage() {
                 href={`/category/${cat.name}`}
                 className={`px-4 py-2 rounded-xl transition text-sm ${
                   cat.name === slug
-                    ? "bg-amber-500 text-stone-900 font-semibold shadow-lg shadow-amber-500/20"
+                    ? "bg-white text-black font-semibold shadow-lg shadow-[#deff0a]/20"
                     : "bg-white/[0.04] text-stone-300 hover:bg-white/[0.08] hover:text-stone-100 border border-white/[0.06]"
                 }`}
               >

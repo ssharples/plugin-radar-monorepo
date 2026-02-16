@@ -7,41 +7,13 @@ interface ParallelBranchControlsProps {
 }
 
 export function ParallelBranchControls({ node }: ParallelBranchControlsProps) {
-  const { setBranchGain, setBranchSolo, setBranchMute } = useChainStore();
+  const { setBranchGain, _endContinuousGesture } = useChainStore();
 
-  const isSoloed = node.type === 'plugin' ? node.solo : false;
-  const isMuted = node.type === 'plugin' ? node.mute : false;
   const gainDb = node.type === 'plugin' ? node.branchGainDb : 0;
 
   return (
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-      {/* Solo */}
-      <button
-        onClick={() => setBranchSolo(node.id, !isSoloed)}
-        className={`w-6 h-5 flex items-center justify-center rounded text-xxs font-bold transition-colors ${
-          isSoloed
-            ? 'bg-yellow-500/30 text-yellow-400 border border-yellow-500/50'
-            : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text border border-plugin-border'
-        }`}
-        title={isSoloed ? 'Unsolo' : 'Solo'}
-      >
-        S
-      </button>
-
-      {/* Mute */}
-      <button
-        onClick={() => setBranchMute(node.id, !isMuted)}
-        className={`w-6 h-5 flex items-center justify-center rounded text-xxs font-bold transition-colors ${
-          isMuted
-            ? 'bg-red-500/30 text-red-400 border border-red-500/50'
-            : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text border border-plugin-border'
-        }`}
-        title={isMuted ? 'Unmute' : 'Mute'}
-      >
-        M
-      </button>
-
-      {/* Gain slider */}
+      {/* Gain slider - embedded in rack, solo/mute now on plugin slot */}
       <div className="flex items-center gap-1">
         <Slider
           value={gainDb}
@@ -51,9 +23,17 @@ export function ParallelBranchControls({ node }: ParallelBranchControlsProps) {
           color="accent"
           width="w-16"
           onChange={(v) => setBranchGain(node.id, v)}
+          onDragEnd={_endContinuousGesture}
           title={`${gainDb.toFixed(1)} dB`}
         />
-        <span className="text-xxs text-plugin-muted w-10 text-right tabular-nums">
+        <span
+          className="text-xxs w-10 text-right tabular-nums"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--color-text-tertiary)',
+            letterSpacing: 'var(--tracking-wide)',
+          }}
+        >
           {gainDb >= 0 ? '+' : ''}{gainDb.toFixed(1)}
         </span>
       </div>

@@ -1,0 +1,606 @@
+/**
+ * ChainSlot Cyber Styles
+ * "Digital Underground" aesthetic
+ */
+
+@import '../../styles/design-system.css';
+
+/* ============================================
+   CHAIN SLOT BASE
+   ============================================ */
+
+.chain-slot-cyber {
+  position: relative;
+  z-index: 2; /* Sit above DropZone hitboxes (z-index:1) so drag listeners receive pointer events */
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--duration-fast) var(--ease-snap),
+              transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-height: 40px;
+  will-change: transform;
+}
+
+.chain-slot-cyber:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-focus);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.chain-slot-cyber:active {
+  transform: translateY(0);
+}
+
+/* ============================================
+   SELECTION STATE
+   ============================================ */
+
+.chain-slot-cyber.selected {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-accent-cyan);
+  box-shadow: 0 0 0 1px var(--color-accent-cyan),
+              0 0 16px rgba(222, 255, 10, 0.3);
+}
+
+.chain-slot-cyber.selected:hover {
+  box-shadow: 0 0 0 1px var(--color-accent-cyan),
+              0 0 20px rgba(222, 255, 10, 0.5);
+}
+
+.selection-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent-cyan);
+  box-shadow: 0 0 8px var(--color-accent-cyan);
+  animation: neon-pulse-cyan 2s ease-in-out infinite;
+}
+
+/* ============================================
+   SLOT NUMBER BADGE
+   ============================================ */
+
+.slot-number {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  transition: all var(--duration-fast) var(--ease-snap);
+}
+
+.chain-slot-cyber:hover .slot-number {
+  color: var(--color-accent-cyan);
+  border-color: var(--color-accent-cyan);
+  box-shadow: 0 0 8px rgba(222, 255, 10, 0.3);
+}
+
+/* ============================================
+   PLUGIN NAME
+   ============================================ */
+
+.slot-name {
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+  font-family: var(--font-extended);
+  font-weight: 900;
+  font-size: var(--text-base);
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all var(--duration-fast) var(--ease-snap);
+}
+
+/* Glitch effect on state changes */
+.slot-name.glitch-trigger {
+  animation: glitch var(--duration-slow) ease-out;
+}
+
+.chain-slot-cyber:hover .slot-name {
+  color: var(--color-accent-cyan);
+  text-shadow: 0 0 8px rgba(222, 255, 10, 0.4);
+}
+
+.chain-slot-cyber.selected .slot-name {
+  color: var(--color-accent-cyan);
+}
+
+/* ============================================
+   INLINE METER
+   ============================================ */
+
+.slot-meter {
+  width: 60px;
+  height: 4px;
+  background: var(--color-bg-input);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.meter-rms-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--meter-gradient);
+  opacity: 0.35;
+  transition: width 80ms linear;
+}
+
+.meter-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--meter-gradient);
+  transition: width 50ms linear;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* ============================================
+   TECHNICAL INFO
+   ============================================ */
+
+.slot-info {
+  display: flex;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.slot-info .level {
+  color: var(--color-text-primary);
+  min-width: 45px;
+  text-align: right;
+}
+
+.slot-info .latency {
+  color: var(--color-status-warning);
+  min-width: 35px;
+  text-align: right;
+}
+
+/* ============================================
+   KEYBOARD SHORTCUTS
+   ============================================ */
+
+.slot-shortcuts {
+  display: flex;
+  gap: var(--space-1);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all var(--duration-fast) var(--ease-snap);
+  flex-shrink: 0;
+}
+
+.slot-shortcuts.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.slot-shortcuts kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  min-width: 20px;
+  text-align: center;
+  transition: all var(--duration-fast) var(--ease-snap);
+}
+
+.slot-shortcuts kbd:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-focus);
+}
+
+.slot-shortcuts kbd.active {
+  color: var(--color-accent-cyan);
+  border-color: var(--color-accent-cyan);
+  box-shadow: 0 0 8px rgba(222, 255, 10, 0.3);
+}
+
+/* ============================================
+   CONTROL BUTTONS
+   ============================================ */
+
+.slot-controls {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.ctrl-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--duration-fast) var(--ease-snap);
+}
+
+.ctrl-btn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-focus);
+  background: var(--color-bg-hover);
+  transform: translateY(-1px);
+}
+
+.ctrl-btn:active {
+  transform: translateY(0);
+}
+
+/* Button Active States with Neon Colors */
+.ctrl-btn.solo.active {
+  color: var(--color-bg-primary);
+  background: var(--color-solo);
+  border-color: var(--color-solo);
+  box-shadow: 0 0 12px rgba(222, 255, 10, 0.5);
+  animation: neon-pulse-cyan 2s ease-in-out infinite;
+}
+
+.ctrl-btn.mute.active {
+  color: var(--color-bg-primary);
+  background: var(--color-mute);
+  border-color: var(--color-mute);
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.5);
+}
+
+.ctrl-btn.bypass.active {
+  color: var(--color-bg-primary);
+  background: var(--color-bypass);
+  border-color: var(--color-bypass);
+  box-shadow: 0 0 12px rgba(255, 0, 51, 0.5);
+}
+
+.ctrl-btn.menu {
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+
+.ctrl-btn.active-menu {
+  color: var(--color-accent-cyan);
+  border-color: var(--color-accent-cyan);
+  background: rgba(222, 255, 10, 0.12);
+}
+
+/* ============================================
+   EXPAND CHEVRON (Per-Plugin Controls)
+   ============================================ */
+
+.expand-chevron {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--duration-fast) var(--ease-snap);
+  padding: 0;
+}
+
+.expand-chevron.visible,
+.chain-slot-cyber:hover .expand-chevron {
+  opacity: 1;
+}
+
+.expand-chevron:hover {
+  color: var(--color-accent-cyan);
+  border-color: var(--color-accent-cyan);
+  background: rgba(222, 255, 10, 0.08);
+}
+
+.expand-chevron.rotated {
+  transform: rotate(180deg);
+  color: var(--color-accent-cyan);
+  opacity: 1;
+}
+
+/* ============================================
+   EXPANDABLE CONTROLS PANEL
+   ============================================ */
+
+.chain-slot-wrapper {
+  position: relative;
+}
+
+.plugin-controls-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 150ms ease-out, opacity 150ms ease-out;
+  opacity: 0;
+  background: rgba(10, 10, 10, 0.8);
+  border: 1px solid var(--color-border-default);
+  border-top: none;
+  border-radius: 0 0 var(--radius-base) var(--radius-base);
+  margin-top: -1px;
+}
+
+.plugin-controls-panel.expanded {
+  max-height: 80px;
+  opacity: 1;
+}
+
+.plugin-controls-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Sidechain Control */
+.sc-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sc-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+}
+
+.sc-select {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--duration-fast) var(--ease-snap);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.sc-select:hover {
+  border-color: var(--color-accent-cyan);
+  box-shadow: 0 0 6px rgba(222, 255, 10, 0.2);
+}
+
+.sc-select:focus {
+  border-color: var(--color-accent-cyan);
+}
+
+.sc-select option {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+/* Dim slots during drag */
+.chain-slot-cyber.dim-during-drag.is-dimmed {
+  opacity: 0.6;
+}
+
+/* ============================================
+   STATUS BADGES
+   ============================================ */
+
+.slot-badges {
+  position: absolute;
+  top: -8px;
+  right: var(--space-3);
+  display: flex;
+  gap: var(--space-1);
+  pointer-events: none;
+}
+
+.slot-badges .badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  animation: slide-in-bottom var(--duration-base) var(--ease-snap);
+}
+
+.badge-solo {
+  color: var(--color-bg-primary);
+  background: var(--color-solo);
+  border: 1px solid var(--color-solo);
+}
+
+.badge-mute {
+  color: var(--color-bg-primary);
+  background: var(--color-mute);
+  border: 1px solid var(--color-mute);
+}
+
+.badge-bypass {
+  color: var(--color-bg-primary);
+  background: var(--color-bypass);
+  border: 1px solid var(--color-bypass);
+}
+
+/* ============================================
+   STATE MODIFIERS
+   ============================================ */
+
+/* Bypassed State */
+.chain-slot-cyber.bypassed {
+  opacity: 0.5;
+}
+
+.chain-slot-cyber.bypassed .slot-name {
+  color: var(--color-status-error);
+}
+
+.chain-slot-cyber.bypassed .meter-fill,
+.chain-slot-cyber.bypassed .meter-rms-fill {
+  filter: grayscale(1) brightness(0.6);
+}
+
+/* Soloed State */
+.chain-slot-cyber.soloed {
+  border-color: var(--color-solo);
+  box-shadow: 0 0 16px rgba(222, 255, 10, 0.4);
+}
+
+/* Muted State */
+.chain-slot-cyber.muted .meter-fill,
+.chain-slot-cyber.muted .meter-rms-fill {
+  opacity: 0.15;
+}
+
+/* Global: Dim non-soloed slots when any slot is soloed */
+.plugins-soloed .chain-slot-cyber:not(.soloed) {
+  opacity: 0.35;
+  filter: grayscale(0.5);
+}
+
+.plugins-soloed .chain-slot-cyber.soloed {
+  opacity: 1;
+  filter: none;
+}
+
+/* ============================================
+   DRAG & DROP STATES
+   ============================================ */
+
+.chain-slot-cyber.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+  cursor: grabbing;
+}
+
+.chain-slot-cyber.drag-over {
+  border-color: var(--color-accent-cyan);
+  box-shadow: 0 0 20px rgba(222, 255, 10, 0.6);
+  transform: scale(1.02);
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 640px) {
+  .chain-slot-cyber {
+    padding: var(--space-1) var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .slot-name {
+    font-size: var(--text-sm);
+  }
+
+  .slot-meter {
+    width: 40px;
+  }
+
+  .slot-shortcuts {
+    display: none; /* Hide on small screens */
+  }
+
+  .ctrl-btn {
+    width: 24px;
+    height: 24px;
+    font-size: var(--text-sm);
+  }
+}
+
+@media (min-width: 1920px) {
+  .chain-slot-cyber {
+    padding: var(--space-3) var(--space-4);
+    min-height: 44px;
+  }
+
+  .slot-name {
+    font-size: var(--text-lg);
+  }
+
+  .slot-meter {
+    width: 80px;
+  }
+
+  .ctrl-btn {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+.chain-slot-cyber:focus-visible {
+  outline: 2px solid var(--color-accent-cyan);
+  outline-offset: 2px;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .chain-slot-cyber,
+  .chain-slot-cyber *,
+  .slot-name.glitch-trigger,
+  .ctrl-btn,
+  .selection-indicator {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* High contrast mode adjustments */
+@media (prefers-contrast: high) {
+  .chain-slot-cyber {
+    border-width: 2px;
+  }
+
+  .ctrl-btn {
+    border-width: 2px;
+  }
+}

@@ -38,7 +38,6 @@ async function withOfflineFallback<T>(
       }
       return result;
     } catch (err) {
-      console.warn(`[ConvexClient] Cloud call failed, falling back to cache for "${cacheKey}":`, err);
       const cached = offlineStore.getCachedChain(cacheKey);
       if (cached) return cached.data as T;
       throw err; // No cache either — propagate the error
@@ -107,7 +106,6 @@ export async function executeQueuedWrite(action: string, args: any[]): Promise<a
     case 'unfollowUser':
       return unfollowUser(args[0]);
     default:
-      console.warn(`[ConvexClient] Unknown queued action: ${action}`);
       return null;
   }
 }
@@ -164,7 +162,7 @@ function clearSession() {
   cachedUserId = null;
 }
 
-function getStoredSession(): string | null {
+export function getStoredSession(): string | null {
   return localStorage.getItem(SESSION_KEY);
 }
 
@@ -300,12 +298,12 @@ export function getUserId(): string | null {
 export async function syncPlugins(
   plugins: ScannedPlugin[]
 ): Promise<{ synced: number; inCatalog: number; newPlugins: string[]; error?: string }> {
-  const userId = getUserId();
-  if (!userId) return { synced: 0, inCatalog: 0, newPlugins: [], error: "Not logged in" };
+  const token = getStoredSession();
+  if (!token) return { synced: 0, inCatalog: 0, newPlugins: [], error: "Not logged in" };
 
   try {
     const result = await convex.mutation(api.pluginDirectory.syncScannedPlugins, {
-      userId: asId(userId),
+      sessionToken: token,
       plugins,
     });
     return {
@@ -360,6 +358,14 @@ export interface EnrichedPluginData {
   licenseType?: string;
   learningCurve?: string;
   isIndustryStandard?: boolean;
+  // Manufacturer data (populated from manufacturer document)
+  manufacturerData?: {
+    _id: string;
+    name: string;
+    slug: string;
+    logoUrl?: string;
+    resolvedLogoUrl?: string;
+  };
 }
 
 // In-memory cache for enriched data to avoid re-fetching
@@ -409,8 +415,8 @@ export async function fetchEnrichedPluginData(
         }
       }
       enrichedDataTimestamp = now;
-    } catch (err) {
-      console.error("[ConvexClient] Failed to fetch enrichment data:", err);
+    } catch {
+      // Error handled by caller
     }
   }
 
@@ -431,15 +437,14 @@ export function clearEnrichmentCache() {
  * Get user's synced plugins with match data
  */
 export async function getScannedPlugins(): Promise<any[]> {
-  const userId = getUserId();
-  if (!userId) return [];
+  const token = getStoredSession();
+  if (!token) return [];
 
   try {
     return await convex.query(api.pluginDirectory.getUserScannedPlugins, {
-      userId: asId(userId),
+      sessionToken: token,
     });
-  } catch (err) {
-    console.error("Failed to get scanned plugins:", err);
+  } catch {
     return [];
   }
 }
@@ -462,6 +467,8 @@ export async function saveChain(
     tags?: string[];
     isPublic?: boolean;
     targetInputLufs?: number;
+    targetInputPeakMin?: number;
+    targetInputPeakMax?: number;
   } = {}
 ): Promise<{
   chainId?: string;
@@ -469,8 +476,8 @@ export async function saveChain(
   shareCode?: string;
   error?: string;
 }> {
-  const userId = getUserId();
-  if (!userId) return { error: "Not logged in" };
+  const token = getStoredSession();
+  if (!token) return { error: "Not logged in" };
 
   // Always cache locally
   const offlineStore = useOfflineStore.getState();
@@ -482,7 +489,7 @@ export async function saveChain(
       'saveChain',
       [name, slots, options],
       () => convex.mutation(api.pluginDirectory.saveChain, {
-        userId: asId(userId),
+        sessionToken: token,
         name,
         slots,
         category: options.category ?? "mixing",
@@ -490,6 +497,8 @@ export async function saveChain(
         description: options.description,
         isPublic: options.isPublic ?? false,
         targetInputLufs: options.targetInputLufs,
+        targetInputPeakMin: options.targetInputPeakMin,
+        targetInputPeakMax: options.targetInputPeakMax,
         useCase: options.useCase,
       })
     );
@@ -544,16 +553,15 @@ export async function checkChainCompatibility(
   missingCount: number;
   percentage: number;
 } | null> {
-  const userId = getUserId();
-  if (!userId) return null;
+  const token = getStoredSession();
+  if (!token) return null;
 
   try {
     return await convex.query(api.pluginDirectory.checkChainCompatibility, {
       chainId: asId(chainId),
-      userId: asId(userId),
+      sessionToken: token,
     });
-  } catch (err) {
-    console.error("Failed to check compatibility:", err);
+  } catch {
     return null;
   }
 }
@@ -588,16 +596,15 @@ export async function fetchDetailedCompatibility(
     }>;
   }>;
 } | null> {
-  const userId = getUserId();
-  if (!userId) return null;
+  const token = getStoredSession();
+  if (!token) return null;
 
   try {
     return await convex.query(api.pluginDirectory.getDetailedCompatibility, {
       chainId: asId(chainId),
-      userId: asId(userId),
+      sessionToken: token,
     });
-  } catch (err) {
-    console.error("Failed to fetch detailed compatibility:", err);
+  } catch {
     return null;
   }
 }
@@ -625,17 +632,16 @@ export async function browseChains(
  * Download a chain
  */
 export async function downloadChain(chainId: string): Promise<boolean> {
-  const userId = getUserId();
-  if (!userId) return false;
+  const token = getStoredSession();
+  if (!token) return false;
 
   try {
     await convex.mutation(api.pluginDirectory.downloadChain, {
       chainId: asId(chainId),
-      userId: asId(userId),
+      sessionToken: token,
     });
     return true;
-  } catch (err) {
-    console.error("Failed to record download:", err);
+  } catch {
     return false;
   }
 }
@@ -646,16 +652,71 @@ export async function downloadChain(chainId: string): Promise<boolean> {
 export async function toggleLike(
   chainId: string
 ): Promise<{ liked: boolean } | null> {
-  const userId = getUserId();
-  if (!userId) return null;
+  const token = getStoredSession();
+  if (!token) return null;
 
   try {
     return await convex.mutation(api.pluginDirectory.toggleChainLike, {
       chainId: asId(chainId),
-      userId: asId(userId),
+      sessionToken: token,
     });
-  } catch (err) {
-    console.error("Failed to toggle like:", err);
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
+// CHAIN MANAGEMENT
+// ============================================
+
+export async function renameCloudChain(
+  chainId: string,
+  newName: string
+): Promise<{ success: boolean; slug?: string } | null> {
+  const token = getStoredSession();
+  if (!token) return null;
+
+  try {
+    return await convex.mutation(api.pluginDirectory.renameChain, {
+      chainId: asId(chainId),
+      newName,
+      sessionToken: token,
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteCloudChain(
+  chainId: string
+): Promise<{ success: boolean } | null> {
+  const token = getStoredSession();
+  if (!token) return null;
+
+  try {
+    return await convex.mutation(api.pluginDirectory.deleteChain, {
+      chainId: asId(chainId),
+      sessionToken: token,
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function updateChainVisibility(
+  chainId: string,
+  isPublic: boolean
+): Promise<{ success: boolean; isPublic?: boolean } | null> {
+  const token = getStoredSession();
+  if (!token) return null;
+
+  try {
+    return await convex.mutation(api.pluginDirectory.updateChainVisibility, {
+      chainId: asId(chainId),
+      isPublic,
+      sessionToken: token,
+    });
+  } catch {
     return null;
   }
 }
@@ -672,8 +733,7 @@ export async function getComments(chainId: string): Promise<any[]> {
     return await convex.query(api.social.getComments, {
       chainId: asId(chainId),
     });
-  } catch (err) {
-    console.error("Failed to get comments:", err);
+  } catch {
     return [];
   }
 }
@@ -697,8 +757,7 @@ export async function addComment(
       parentCommentId: parentCommentId ? asId(parentCommentId) : undefined,
     });
     return result as string;
-  } catch (err) {
-    console.error("Failed to add comment:", err);
+  } catch {
     return null;
   }
 }
@@ -716,8 +775,7 @@ export async function deleteComment(commentId: string): Promise<boolean> {
       commentId: asId(commentId),
     });
     return true;
-  } catch (err) {
-    console.error("Failed to delete comment:", err);
+  } catch {
     return false;
   }
 }
@@ -735,8 +793,7 @@ export async function getChainRating(
       chainId: asId(chainId),
       sessionToken: token ?? undefined,
     });
-  } catch (err) {
-    console.error("Failed to get chain rating:", err);
+  } catch {
     return null;
   }
 }
@@ -758,8 +815,7 @@ export async function rateChain(
       rating,
     });
     return true;
-  } catch (err) {
-    console.error("Failed to rate chain:", err);
+  } catch {
     return false;
   }
 }
@@ -777,8 +833,7 @@ export async function followUser(userId: string): Promise<boolean> {
       userId: asId(userId),
     });
     return true;
-  } catch (err) {
-    console.error("Failed to follow user:", err);
+  } catch {
     return false;
   }
 }
@@ -796,8 +851,7 @@ export async function unfollowUser(userId: string): Promise<boolean> {
       userId: asId(userId),
     });
     return true;
-  } catch (err) {
-    console.error("Failed to unfollow user:", err);
+  } catch {
     return false;
   }
 }
@@ -814,8 +868,7 @@ export async function isFollowing(userId: string): Promise<boolean> {
       sessionToken: token,
       userId: asId(userId),
     });
-  } catch (err) {
-    console.error("Failed to check follow status:", err);
+  } catch {
     return false;
   }
 }
@@ -841,8 +894,7 @@ export async function forkChain(
       slug: result.slug,
       shareCode: result.shareCode,
     };
-  } catch (err) {
-    console.error("Failed to fork chain:", err);
+  } catch {
     return null;
   }
 }
@@ -858,8 +910,7 @@ export async function getChainsByUser(userId: string): Promise<any[]> {
       userId: asId(userId),
       sessionToken: token ?? undefined,
     });
-  } catch (err) {
-    console.error("Failed to get user chains:", err);
+  } catch {
     return [];
   }
 }
@@ -874,8 +925,7 @@ export async function getUserStats(
     return await convex.query(api.pluginDirectory.getUserStats, {
       userId: asId(userId),
     });
-  } catch (err) {
-    console.error("Failed to get user stats:", err);
+  } catch {
     return null;
   }
 }
@@ -905,8 +955,7 @@ export async function findCompatibleSwaps(
       pluginId: pluginId as any,
       userId: userId as any,
     });
-  } catch (err) {
-    console.error("Failed to find compatible swaps:", err);
+  } catch {
     return [];
   }
 }
@@ -932,8 +981,7 @@ export async function getRandomSwap(
       userId: userId as any,
       randomSeed: Math.floor(Math.random() * 1000000),
     });
-  } catch (err) {
-    console.error("Failed to get random swap:", err);
+  } catch {
     return null;
   }
 }
@@ -959,8 +1007,7 @@ export async function translateParameters(
       targetPluginId: targetPluginId as any,
       sourceParams,
     });
-  } catch (err) {
-    console.error("Failed to translate parameters:", err);
+  } catch {
     return null;
   }
 }
@@ -973,8 +1020,7 @@ export async function getParameterMap(pluginId: string): Promise<any | null> {
     return await convex.query(api.parameterTranslation.getParameterMap, {
       pluginId: pluginId as any,
     });
-  } catch (err) {
-    console.error("Failed to get parameter map:", err);
+  } catch {
     return null;
   }
 }
@@ -987,9 +1033,136 @@ export async function getParameterMapByName(pluginName: string): Promise<any | n
     return await convex.query(api.parameterTranslation.getParameterMapByName, {
       pluginName,
     });
-  } catch (err) {
-    console.error("Failed to get parameter map by name:", err);
+  } catch {
     return null;
+  }
+}
+
+/**
+ * Upload a discovered parameter map to Convex
+ */
+export async function upsertParameterMap(data: {
+  pluginId: string;
+  pluginName: string;
+  category: string;
+  parameters: Array<{
+    juceParamId: string;
+    juceParamIndex?: number;
+    semantic: string;
+    physicalUnit: string;
+    mappingCurve: string;
+    minValue: number;
+    maxValue: number;
+    defaultValue?: number;
+    steps?: Array<{ normalizedValue: number; physicalValue: string }>;
+    rangeStart?: number;
+    rangeEnd?: number;
+    skewFactor?: number;
+    symmetricSkew?: boolean;
+    interval?: number;
+    hasNormalisableRange?: boolean;
+    curveSamples?: Array<{ normalized: number; physical: number }>;
+    qRepresentation?: string;
+  }>;
+  eqBandCount?: number;
+  eqBandParameterPattern?: string;
+  compHasAutoMakeup?: boolean;
+  compHasParallelMix?: boolean;
+  compHasLookahead?: boolean;
+  confidence: number;
+  source: string;
+}): Promise<string | null> {
+  try {
+    return await convex.mutation(api.parameterTranslation.upsertParameterMap, {
+      plugin: data.pluginId as any,
+      pluginName: data.pluginName,
+      category: data.category,
+      parameters: data.parameters,
+      eqBandCount: data.eqBandCount,
+      eqBandParameterPattern: data.eqBandParameterPattern,
+      compHasAutoMakeup: data.compHasAutoMakeup,
+      compHasParallelMix: data.compHasParallelMix,
+      compHasLookahead: data.compHasLookahead,
+      confidence: data.confidence,
+      source: data.source,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Discover and upload parameter map for a loaded plugin
+ *
+ * This function:
+ * 1. Checks if a parameter map already exists in Convex
+ * 2. If not, discovers parameters via JUCE
+ * 3. Uploads the discovered map to Convex
+ *
+ * @param nodeId - The chain node ID of the loaded plugin
+ * @param matchedPluginId - The Convex plugin ID (from scannedPlugins.matchedPlugin)
+ * @param options - Configuration options
+ * @returns The discovered map or null if discovery failed
+ */
+export async function discoverAndUploadParameterMap(
+  nodeId: number,
+  matchedPluginId: string | null,
+  options: {
+    force?: boolean; // Force rediscovery even if map exists
+    minConfidence?: number; // Minimum confidence to upload (default: 30)
+  } = {}
+): Promise<{ success: boolean; confidence?: number; error?: string }> {
+  const { force = false, minConfidence = 30 } = options;
+
+  // Must have a matched plugin ID to upload
+  if (!matchedPluginId) {
+    return { success: false, error: 'No matched plugin ID' };
+  }
+
+  try {
+    // Check if map already exists (unless forcing)
+    if (!force) {
+      const existing = await getParameterMap(matchedPluginId);
+      if (existing) {
+        return { success: true, confidence: existing.confidence };
+      }
+    }
+
+    // Import juceBridge dynamically to avoid circular dependency
+    const { juceBridge } = await import('./juce-bridge');
+
+    // Discover parameters via JUCE
+    const discovery = await juceBridge.discoverPluginParameters(nodeId);
+
+    if (!discovery.success || !discovery.map) {
+      return { success: false, error: discovery.error || 'Discovery failed' };
+    }
+
+    const map = discovery.map;
+
+    // Check confidence threshold
+    if (map.confidence < minConfidence) {
+      return { success: false, error: `Confidence too low: ${map.confidence}%` };
+    }
+
+    // Upload to Convex
+    await upsertParameterMap({
+      pluginId: matchedPluginId,
+      pluginName: map.pluginName,
+      category: map.category,
+      parameters: map.parameters,
+      eqBandCount: map.eqBandCount,
+      eqBandParameterPattern: map.eqBandParameterPattern,
+      compHasAutoMakeup: map.compHasAutoMakeup,
+      compHasParallelMix: map.compHasParallelMix,
+      compHasLookahead: map.compHasLookahead,
+      confidence: map.confidence,
+      source: 'juce-scanned',
+    });
+
+    return { success: true, confidence: map.confidence };
+  } catch (err) {
+    return { success: false, error: String(err) };
   }
 }
 
@@ -1097,8 +1270,116 @@ export async function uploadDiscoveredParameterMap(
 
     return { success: true, action: existing ? "updated" : "created" };
   } catch (err) {
-    console.error("[ConvexClient] Failed to upload discovered parameter map:", err);
     return { success: false, error: String(err) };
+  }
+}
+
+// ============================================
+// SUBSTITUTION PLAN + CROWDPOOL
+// ============================================
+
+/**
+ * Fetch a substitution plan for a chain — suggests owned alternatives for missing plugins
+ * with combined similarity + parameter translation confidence scoring.
+ */
+export async function fetchSubstitutionPlan(chainId: string): Promise<{
+  slots: Array<{
+    slotPosition: number;
+    pluginName: string;
+    manufacturer: string;
+    matchedPluginId?: string;
+    status: "owned" | "missing";
+    paramMapInfo?: { hasMap: boolean; contributorCount: number; source: string };
+    bestSubstitute?: {
+      pluginId: string;
+      pluginName: string;
+      manufacturer: string;
+      slug?: string;
+      similarityScore: number;
+      paramTranslationConfidence: number;
+      combinedScore: number;
+      reasons: string;
+      hasParameterMap: boolean;
+    };
+    alternates: Array<{
+      pluginId: string;
+      pluginName: string;
+      manufacturer: string;
+      slug?: string;
+      similarityScore: number;
+      paramTranslationConfidence: number;
+      combinedScore: number;
+      reasons: string;
+      hasParameterMap: boolean;
+    }>;
+  }>;
+  overallConfidence: number;
+  canAutoSubstitute: boolean;
+  missingCount: number;
+  ownedCount: number;
+} | null> {
+  const token = getStoredSession();
+  if (!token) return null;
+
+  try {
+    return await convex.query(api.pluginDirectory.generateSubstitutionPlan, {
+      chainId: asId(chainId),
+      sessionToken: token,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Contribute discovered parameter data to the crowdpool.
+ * Rate limited to 1 per user per plugin per hour on the backend.
+ */
+export async function contributeParameterDiscovery(
+  pluginId: string,
+  discoveredMap: {
+    pluginName: string;
+    category: string;
+    confidence: number;
+    matchedCount: number;
+    totalCount: number;
+    source: string;
+    parameters: Array<{
+      juceParamId: string;
+      juceParamIndex?: number;
+      semantic: string;
+      physicalUnit: string;
+      mappingCurve: string;
+      minValue: number;
+      maxValue: number;
+      defaultValue?: number;
+      rangeStart?: number;
+      rangeEnd?: number;
+      skewFactor?: number;
+      symmetricSkew?: boolean;
+      interval?: number;
+      hasNormalisableRange?: boolean;
+      curveSamples?: Array<{ normalized: number; physical: number }>;
+      qRepresentation?: string;
+    }>;
+    eqBandCount?: number;
+    eqBandParameterPattern?: string;
+    compHasAutoMakeup?: boolean;
+    compHasParallelMix?: boolean;
+    compHasLookahead?: boolean;
+  }
+): Promise<{ action: string; contributorCount: number } | null> {
+  const token = getStoredSession();
+  if (!token) return null;
+
+  try {
+    return await convex.mutation(api.parameterTranslation.contributeParameterDiscovery, {
+      plugin: asId(pluginId),
+      sessionToken: token,
+      discoveredMap,
+    });
+  } catch {
+    return null;
   }
 }
 
@@ -1155,7 +1436,6 @@ export async function addToCollection(
       notes,
     });
   } catch (err) {
-    console.error("Failed to add to collection:", err);
     return { error: String(err) };
   }
 }
@@ -1173,8 +1453,7 @@ export async function removeFromCollection(chainId: string): Promise<boolean> {
       chainId: asId(chainId),
     });
     return true;
-  } catch (err) {
-    console.error("Failed to remove from collection:", err);
+  } catch {
     return false;
   }
 }
@@ -1191,8 +1470,7 @@ export async function getMyCollection(limit?: number): Promise<any[]> {
       sessionToken: token,
       limit,
     });
-  } catch (err) {
-    console.error("Failed to get collection:", err);
+  } catch {
     return [];
   }
 }
@@ -1209,8 +1487,7 @@ export async function isInCollection(chainId: string): Promise<boolean> {
       sessionToken: token,
       chainId: asId(chainId),
     });
-  } catch (err) {
-    console.error("Failed to check collection status:", err);
+  } catch {
     return false;
   }
 }
@@ -1231,8 +1508,7 @@ export async function getPendingChainCount(): Promise<number> {
       sessionToken: token,
     });
     return received.length;
-  } catch (err) {
-    console.error("Failed to get pending chain count:", err);
+  } catch {
     return 0;
   }
 }
@@ -1249,8 +1525,43 @@ export async function getPendingFriendRequestCount(): Promise<number> {
       sessionToken: token,
     });
     return requests.length;
-  } catch (err) {
-    console.error("Failed to get pending request count:", err);
+  } catch {
     return 0;
+  }
+}
+
+// ============================================
+// CHAIN LOAD TRACKING
+// ============================================
+
+/**
+ * Record the result of a chain load in the DAW.
+ * Best-effort — never blocks the user or throws.
+ */
+export async function recordChainLoadResult(params: {
+  chainId: string;
+  totalSlots: number;
+  loadedSlots: number;
+  failedSlots: number;
+  substitutedSlots: number;
+  failures?: Array<{ position: number; pluginName: string; reason: string }>;
+  loadTimeMs?: number;
+}): Promise<void> {
+  const token = getStoredSession();
+  if (!token) return;
+
+  try {
+    await convex.mutation(api.pluginDirectory.recordChainLoadResult, {
+      sessionToken: token,
+      chainId: params.chainId as any,
+      totalSlots: params.totalSlots,
+      loadedSlots: params.loadedSlots,
+      failedSlots: params.failedSlots,
+      substitutedSlots: params.substitutedSlots,
+      failures: params.failures,
+      loadTimeMs: params.loadTimeMs,
+    });
+  } catch (e) {
+    console.warn('[recordChainLoadResult] failed:', e);
   }
 }

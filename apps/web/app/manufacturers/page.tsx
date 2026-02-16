@@ -31,20 +31,20 @@ export default function ManufacturersPage() {
   return (
     <div className="relative">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-6 py-10 relative">
         {/* Header */}
         <div className="mb-8">
-          <p className="text-xs text-stone-500 uppercase tracking-wider mb-3">Browse Companies</p>
+          <p className="text-xs text-stone-500 uppercase tracking-wider mb-3">Directory</p>
           <h1
             className="text-3xl font-bold text-stone-100 mb-2"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Manufacturers
+            Plugin Manufacturers
           </h1>
           <p className="text-stone-400">
-            Browse audio software companies and their plugins
+            Every audio plugin company in one place. Browse catalogs, compare products, and track prices.
           </p>
         </div>
 
@@ -58,7 +58,7 @@ export default function ManufacturersPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search manufacturers..."
-            className="w-full pl-10 pr-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 backdrop-blur transition"
+            className="w-full pl-10 pr-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-[#deff0a]/50 backdrop-blur transition"
           />
         </div>
 
@@ -70,7 +70,7 @@ export default function ManufacturersPage() {
                 .sort()
                 .map((letter) => (
                   <div key={letter}>
-                    <h2 className="text-lg font-semibold text-amber-400 mb-4 sticky top-16 bg-[#1a1714] py-2 z-10">
+                    <h2 className="text-lg font-semibold text-white mb-4 sticky top-16 bg-neutral-950 py-2 z-10">
                       {letter}
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -108,7 +108,7 @@ function ManufacturerCard({ manufacturer }: { manufacturer: any }) {
   return (
     <Link
       href={`/manufacturers/${manufacturer.slug}`}
-      className="group glass-card rounded-xl p-4 hover:border-amber-500/30 transition"
+      className="group glass-card rounded-xl p-4 hover:border-[#deff0a]/30 transition"
     >
       <div className="flex items-start gap-3">
         {manufacturer.logoUrl ? (
@@ -123,7 +123,7 @@ function ManufacturerCard({ manufacturer }: { manufacturer: any }) {
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-stone-100 group-hover:text-amber-400 transition truncate">
+          <h3 className="font-medium text-stone-100 group-hover:text-white transition truncate">
             {manufacturer.name}
           </h3>
           <p className="text-stone-500 text-sm">

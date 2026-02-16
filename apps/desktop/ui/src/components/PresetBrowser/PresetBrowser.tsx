@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Folder, Save, Trash2, FileText, ChevronDown } from 'lucide-react';
+import { Folder, Save, Trash2, FileText } from 'lucide-react';
 import { usePresetStore } from '../../stores/presetStore';
 import { SavePresetModal } from './SavePresetModal';
+import { CustomDropdown } from '../Dropdown';
 
 export function PresetBrowser() {
   const {
@@ -68,21 +69,15 @@ export function PresetBrowser() {
 
       {/* Category filter */}
       <div className="p-3 border-b border-plugin-border">
-        <div className="relative">
-          <select
-            value={selectedCategory || ''}
-            onChange={(e) => setSelectedCategory(e.target.value || null)}
-            className="w-full appearance-none px-3 py-1.5 pr-8 bg-plugin-bg rounded text-sm text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
-          >
-            <option value="">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-plugin-muted pointer-events-none" />
-        </div>
+        <CustomDropdown
+          value={selectedCategory || ''}
+          options={[
+            { value: '', label: 'All Categories' },
+            ...categories.map((cat) => ({ value: cat, label: cat })),
+          ]}
+          onChange={(val) => setSelectedCategory(val || null)}
+          size="sm"
+        />
       </div>
 
       {/* Preset list */}

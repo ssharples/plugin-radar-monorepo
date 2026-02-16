@@ -1,7 +1,9 @@
 import type {
   PluginDescription,
+  PluginDescriptionWithStatus,
   ChainStateV2,
   PresetInfo,
+  GroupTemplateInfo,
   ScanProgress,
   ApiResponse,
   WaveformData,
@@ -12,6 +14,10 @@ import type {
   BlacklistedPluginEvent,
   OtherInstanceInfo,
   MirrorState,
+  CustomScanPath,
+  DeactivatedPlugin,
+  AutoScanState,
+  NewPluginsDetectedEvent,
 } from './types';
 
 type EventHandler<T> = (data: T) => void;
@@ -107,6 +113,12 @@ class JuceBridge {
       'instancesChanged',
       'mirrorStateChanged',
       'mirrorUpdateApplied',
+      'sendChainComplete',
+      'pluginParameterChangeSettled',
+      'templateListChanged',
+      'deactivationChanged',
+      'newPluginsDetected',
+      'autoScanStateChanged',
     ];
 
     events.forEach((eventName) => {
@@ -252,6 +264,10 @@ class JuceBridge {
     return this.callNative<ChainStateV2>('getChainState');
   }
 
+  async getTotalLatencySamples(): Promise<number> {
+    return this.callNative<number>('getTotalLatencySamples');
+  }
+
   async addPlugin(pluginId: string, insertIndex = -1): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('addPlugin', pluginId, insertIndex);
   }
@@ -297,8 +313,37 @@ class JuceBridge {
     return this.callNative<ApiResponse>('deletePreset', path);
   }
 
+  async renamePreset(path: string, newName: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('renamePreset', path, newName);
+  }
+
   async getCategories(): Promise<string[]> {
     return this.callNative<string[]>('getCategories');
+  }
+
+  // Group Templates
+  async getGroupTemplateList(): Promise<GroupTemplateInfo[]> {
+    return this.callNative<GroupTemplateInfo[]>('getGroupTemplateList');
+  }
+
+  async saveGroupTemplate(groupId: number, name: string, category: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('saveGroupTemplate', JSON.stringify({ groupId, name, category }));
+  }
+
+  async loadGroupTemplate(path: string, parentId: number, insertIndex: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('loadGroupTemplate', JSON.stringify({ path, parentId, insertIndex }));
+  }
+
+  async deleteGroupTemplate(path: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('deleteGroupTemplate', path);
+  }
+
+  async getGroupTemplateCategories(): Promise<string[]> {
+    return this.callNative<string[]>('getGroupTemplateCategories');
+  }
+
+  onTemplateListChanged(handler: EventHandler<GroupTemplateInfo[]>): () => void {
+    return this.on('templateListChanged', handler);
   }
 
   onPresetListChanged(handler: EventHandler<PresetInfo[]>): () => void {
@@ -352,6 +397,36 @@ class JuceBridge {
     return this.callNative<{ matchLockEnabled: boolean }>('getMatchLockState');
   }
 
+  async setMasterDryWet(value: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setMasterDryWet', value);
+  }
+
+  async getMasterDryWet(): Promise<number> {
+    return this.callNative<number>('getMasterDryWet');
+  }
+
+  async getSampleRate(): Promise<number> {
+    return this.callNative<number>('getSampleRate');
+  }
+
+  async resetAllNodePeaks(): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('resetAllNodePeaks');
+  }
+
+  async setNodeMute(nodeId: number, muted: boolean): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeMute', JSON.stringify({ nodeId, muted }));
+  }
+
+  // FFT enable/disable - toggle spectrum analyzer processing
+  async setFFTEnabled(enabled: boolean): Promise<void> {
+    return this.callNative<void>('setFFTEnabled', enabled);
+  }
+
+  // PHASE 2: Conditional metering - set global meter mode
+  async setMeterMode(mode: 'peak' | 'full'): Promise<boolean> {
+    return this.callNative<boolean>('setMeterMode', mode);
+  }
+
   // Meter data
   onMeterData(handler: EventHandler<MeterData>): () => void {
     return this.on('meterData', handler);
@@ -362,9 +437,20 @@ class JuceBridge {
     return this.on('nodeMeterData', handler);
   }
 
-  // Gain change events (from match lock auto-adjustment)
-  onGainChanged(handler: EventHandler<{ outputGainDB: number }>): () => void {
+  // Gain change events (from match lock auto-adjustment or autoCalibrate)
+  onGainChanged(handler: EventHandler<{ inputGainDB?: number; outputGainDB?: number }>): () => void {
     return this.on('gainChanged', handler);
+  }
+
+  // Auto-calibrate input gain to match a target peak level
+  async autoCalibrate(targetMidpointDb: number): Promise<{
+    success: boolean;
+    inputGainDB?: number;
+    avgPeakDb?: number;
+    adjustment?: number;
+    error?: string;
+  }> {
+    return this.callNative('autoCalibrate', targetMidpointDb);
   }
 
   // Match lock warning events (when auto-disabled due to gain limit)
@@ -379,6 +465,34 @@ class JuceBridge {
 
   onBlacklistChanged(handler: EventHandler<unknown>): () => void {
     return this.on('blacklistChanged', handler);
+  }
+
+  // ============================================
+  // Blacklist Management
+  // ============================================
+
+  async getBlacklist(): Promise<unknown> {
+    return this.callNative<unknown>('getBlacklist');
+  }
+
+  async addToBlacklist(pluginId: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('addToBlacklist', pluginId);
+  }
+
+  async removeFromBlacklist(pluginId: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('removeFromBlacklist', pluginId);
+  }
+
+  async clearBlacklist(): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('clearBlacklist');
+  }
+
+  // ============================================
+  // Latency Management
+  // ============================================
+
+  async refreshLatency(): Promise<boolean> {
+    return this.callNative<boolean>('refreshLatency');
   }
 
   // ============================================
@@ -505,6 +619,10 @@ class JuceBridge {
     return this.callNative<ApiResponse>('setGroupDryWet', JSON.stringify({ groupId, mix }));
   }
 
+  async setGroupDucking(groupId: number, amount: number, releaseMs: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setGroupDucking', JSON.stringify({ groupId, amount, releaseMs }));
+  }
+
   async setBranchGain(nodeId: number, gainDb: number): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('setBranchGain', JSON.stringify({ nodeId, gainDb }));
   }
@@ -531,6 +649,27 @@ class JuceBridge {
 
   async setNodeBypassed(nodeId: number, bypassed: boolean): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('setNodeBypassed', JSON.stringify({ nodeId, bypassed }));
+  }
+
+  // Per-plugin controls
+  async setNodeInputGain(nodeId: number, gainDb: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeInputGain', JSON.stringify({ nodeId, gainDb }));
+  }
+
+  async setNodeOutputGain(nodeId: number, gainDb: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeOutputGain', JSON.stringify({ nodeId, gainDb }));
+  }
+
+  async setNodeDryWet(nodeId: number, mix: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeDryWet', JSON.stringify({ nodeId, mix }));
+  }
+
+  async setNodeSidechainSource(nodeId: number, source: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeSidechainSource', JSON.stringify({ nodeId, source }));
+  }
+
+  async setNodeMidSideMode(nodeId: number, mode: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeMidSideMode', JSON.stringify({ nodeId, mode }));
   }
 
   async duplicateNode(nodeId: number): Promise<ApiResponse> {
@@ -618,6 +757,22 @@ class JuceBridge {
   }
 
   /**
+   * Capture binary snapshot (fast A/B/C/D recall, 2-5x faster than exportChain)
+   * Returns Base64-encoded snapshot data
+   */
+  async captureSnapshot(): Promise<string> {
+    return this.callNative<string>('captureSnapshot');
+  }
+
+  /**
+   * Restore binary snapshot (fast A/B/C/D recall)
+   * @param snapshotData Base64-encoded snapshot data from captureSnapshot
+   */
+  async restoreSnapshot(snapshotData: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('restoreSnapshot', snapshotData);
+  }
+
+  /**
    * Get preset data for a single slot (Base64)
    */
   async getSlotPreset(slotIndex: number): Promise<{
@@ -663,6 +818,25 @@ class JuceBridge {
     return this.on('instancesChanged', handler);
   }
 
+  /**
+   * Copy plugin state (preset data) from one node to another of the same plugin type.
+   * NOTE: No C++ handler exists yet — returns failure immediately to avoid timeout.
+   */
+  async copyNodeState(_sourceNodeId: number, _targetNodeId: number): Promise<ApiResponse> {
+    return { success: false, error: 'copyNodeState not implemented in C++ backend' };
+  }
+
+  /**
+   * Send the current chain to another ProChain instance (push operation).
+   */
+  async sendChainToInstance(targetInstanceId: number): Promise<ApiResponse> {
+    try {
+      return await this.callNative<ApiResponse>('sendChainToInstance', targetInstanceId);
+    } catch {
+      return { success: false, error: 'sendChainToInstance not available in this build' };
+    }
+  }
+
   // ============================================
   // Chain Mirroring
   // ============================================
@@ -690,6 +864,13 @@ class JuceBridge {
   }
 
   /**
+   * Subscribe to send chain completion events (async result from sendChainToInstance).
+   */
+  onSendChainComplete(handler: EventHandler<{ success: boolean; error?: string }>): () => void {
+    return this.on('sendChainComplete', handler);
+  }
+
+  /**
    * Subscribe to mirror state changes (started, stopped, partner changes).
    */
   onMirrorStateChanged(handler: EventHandler<MirrorState>): () => void {
@@ -701,6 +882,113 @@ class JuceBridge {
    */
   onMirrorUpdateApplied(handler: EventHandler<void>): () => void {
     return this.on('mirrorUpdateApplied', handler);
+  }
+
+  // ============================================
+  // Oversampling Control
+  // ============================================
+
+  /**
+   * Get the current oversampling factor (0=off, 1=2x, 2=4x).
+   */
+  async getOversamplingFactor(): Promise<number> {
+    return this.callNative<number>('getOversamplingFactor');
+  }
+
+  /**
+   * Set the oversampling factor. Triggers a full chain re-prepare.
+   * @param factor 0=off, 1=2x, 2=4x
+   */
+  async setOversamplingFactor(factor: number): Promise<{
+    success: boolean;
+    factor?: number;
+    latencyMs?: number;
+    error?: string;
+  }> {
+    return this.callNative('setOversamplingFactor', factor);
+  }
+
+  /**
+   * Get the current oversampling filter latency in milliseconds.
+   */
+  async getOversamplingLatencyMs(): Promise<number> {
+    return this.callNative<number>('getOversamplingLatencyMs');
+  }
+
+  // ============================================
+  // Custom Scan Paths
+  // ============================================
+
+  async getCustomScanPaths(): Promise<{ paths: CustomScanPath[] }> {
+    return this.callNative<{ paths: CustomScanPath[] }>('getCustomScanPaths');
+  }
+
+  async addCustomScanPath(path: string, format: string): Promise<{ success: boolean; error?: string }> {
+    return this.callNative<{ success: boolean; error?: string }>('addCustomScanPath', JSON.stringify({ path, format }));
+  }
+
+  async removeCustomScanPath(path: string, format: string): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('removeCustomScanPath', JSON.stringify({ path, format }));
+  }
+
+  // ============================================
+  // Plugin Deactivation / Removal
+  // ============================================
+
+  async deactivatePlugin(identifier: string): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('deactivatePlugin', identifier);
+  }
+
+  async reactivatePlugin(identifier: string): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('reactivatePlugin', identifier);
+  }
+
+  async getDeactivatedPlugins(): Promise<DeactivatedPlugin[]> {
+    return this.callNative<DeactivatedPlugin[]>('getDeactivatedPlugins');
+  }
+
+  async removeKnownPlugin(identifier: string): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('removeKnownPlugin', identifier);
+  }
+
+  async getPluginListIncludingDeactivated(): Promise<PluginDescriptionWithStatus[]> {
+    return this.callNative<PluginDescriptionWithStatus[]>('getPluginListIncludingDeactivated');
+  }
+
+  // ============================================
+  // Auto-Scan
+  // ============================================
+
+  async enableAutoScan(intervalMs: number): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('enableAutoScan', intervalMs);
+  }
+
+  async disableAutoScan(): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('disableAutoScan');
+  }
+
+  async getAutoScanState(): Promise<AutoScanState> {
+    return this.callNative<AutoScanState>('getAutoScanState');
+  }
+
+  async checkForNewPlugins(): Promise<{ newCount: number; newPlugins: Array<{ path: string; format: string }> }> {
+    return this.callNative<{ newCount: number; newPlugins: Array<{ path: string; format: string }> }>('checkForNewPlugins');
+  }
+
+  // ============================================
+  // Scanner Event Subscriptions
+  // ============================================
+
+  onDeactivationChanged(handler: EventHandler<DeactivatedPlugin[]>): () => void {
+    return this.on('deactivationChanged', handler);
+  }
+
+  onNewPluginsDetected(handler: EventHandler<NewPluginsDetectedEvent>): () => void {
+    return this.on('newPluginsDetected', handler);
+  }
+
+  onAutoScanStateChanged(handler: EventHandler<AutoScanState>): () => void {
+    return this.on('autoScanStateChanged', handler);
   }
 }
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as convexClient from '../api/convex-client';
 import { juceBridge } from '../api/juce-bridge';
-import type { ChainSlot } from '../api/types';
+import type { ChainSlot, BrowseChainSlot } from '../api/types';
 import { captureSlotParameters } from '../utils/captureParameters';
 
 interface CloudChain {
@@ -16,15 +16,22 @@ interface CloudChain {
   likes: number;
   isPublic: boolean;
   shareCode?: string;
-  slots: any[];
+  slots: BrowseChainSlot[];
   author?: { name?: string; avatarUrl?: string };
   authorId?: string;
   forkedFrom?: string;
   targetInputLufs?: number;
+  targetInputPeakMin?: number;
+  targetInputPeakMax?: number;
   useCase?: string;
   useCaseGroup?: string;
   pluginIds?: string[];
   createdAt?: number;
+  forks?: number;
+  views?: number;
+  genre?: string;
+  averageRating?: number;
+  updatedAt?: number;
 }
 
 interface CollectionItem {
@@ -66,6 +73,42 @@ interface CloudChainState {
       }>;
     }>;
   } | null;
+  substitutionPlan: {
+    slots: Array<{
+      slotPosition: number;
+      pluginName: string;
+      manufacturer: string;
+      matchedPluginId?: string;
+      status: "owned" | "missing";
+      paramMapInfo?: { hasMap: boolean; contributorCount: number; source: string };
+      bestSubstitute?: {
+        pluginId: string;
+        pluginName: string;
+        manufacturer: string;
+        slug?: string;
+        similarityScore: number;
+        paramTranslationConfidence: number;
+        combinedScore: number;
+        reasons: string;
+        hasParameterMap: boolean;
+      };
+      alternates: Array<{
+        pluginId: string;
+        pluginName: string;
+        manufacturer: string;
+        slug?: string;
+        similarityScore: number;
+        paramTranslationConfidence: number;
+        combinedScore: number;
+        reasons: string;
+        hasParameterMap: boolean;
+      }>;
+    }>;
+    overallConfidence: number;
+    canAutoSubstitute: boolean;
+    missingCount: number;
+    ownedCount: number;
+  } | null;
   loading: boolean;
   saving: boolean;
   error: string | null;
@@ -105,9 +148,12 @@ interface CloudChainActions {
       tags?: string[];
       isPublic?: boolean;
       targetInputLufs?: number;
+      targetInputPeakMin?: number;
+      targetInputPeakMax?: number;
     }
   ) => Promise<{ chainId?: string; slug?: string; shareCode?: string; error?: string }>;
   fetchDetailedCompatibility: (chainId: string) => Promise<void>;
+  fetchSubstitutionPlan: (chainId: string) => Promise<void>;
   downloadChain: (chainId: string) => Promise<void>;
   toggleLike: (chainId: string) => Promise<boolean | null>;
   // Collection
@@ -128,6 +174,10 @@ interface CloudChainActions {
   unfollowAuthor: (chainId: string) => Promise<boolean>;
   isFollowingAuthor: (chainId: string) => Promise<boolean>;
   forkChain: (chainId: string, newName: string) => Promise<{ chainId: string; slug: string; shareCode: string } | null>;
+  // Chain management
+  renameChain: (chainId: string, newName: string) => Promise<boolean>;
+  deleteChain: (chainId: string) => Promise<boolean>;
+  updateVisibility: (chainId: string, isPublic: boolean) => Promise<boolean>;
 }
 
 const initialState: CloudChainState = {
@@ -135,6 +185,7 @@ const initialState: CloudChainState = {
   currentChain: null,
   compatibility: null,
   detailedCompatibility: null,
+  substitutionPlan: null,
   loading: false,
   saving: false,
   error: null,
@@ -176,7 +227,7 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
   },
 
   loadChain: async (slugOrCode: string) => {
-    set({ loading: true, error: null, currentChain: null, compatibility: null, detailedCompatibility: null });
+    set({ loading: true, error: null, currentChain: null, compatibility: null, detailedCompatibility: null, substitutionPlan: null });
     try {
       const chain = await convexClient.loadChain(slugOrCode);
       set({ currentChain: chain, loading: false });
@@ -197,8 +248,8 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
     try {
       const compat = await convexClient.checkChainCompatibility(chainId);
       set({ compatibility: compat });
-    } catch (err) {
-      console.error("Failed to check compatibility:", err);
+    } catch (_err) {
+      // Silently ignored — compatibility check is non-critical
     }
   },
 
@@ -245,8 +296,16 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
       const result = await convexClient.fetchDetailedCompatibility(chainId);
       set({ detailedCompatibility: result });
     } catch (err) {
-      console.error("Failed to fetch detailed compatibility:", err);
       set({ detailedCompatibility: null });
+    }
+  },
+
+  fetchSubstitutionPlan: async (chainId: string) => {
+    try {
+      const result = await convexClient.fetchSubstitutionPlan(chainId);
+      set({ substitutionPlan: result });
+    } catch {
+      set({ substitutionPlan: null });
     }
   },
 
@@ -280,7 +339,6 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
       const items = await convexClient.getMyCollection();
       set({ collection: items as CollectionItem[], collectionLoading: false });
     } catch (err) {
-      console.error("Failed to fetch collection:", err);
       set({ collectionLoading: false });
     }
   },
@@ -319,7 +377,6 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
         set({ myChainsLoading: false });
       }
     } catch (err) {
-      console.error("Failed to fetch my chains:", err);
       set({ myChainsLoading: false });
     }
   },
@@ -334,8 +391,8 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
         }
       }
       set({ ownedPluginIds: ids });
-    } catch (err) {
-      console.error("Failed to fetch owned plugin IDs:", err);
+    } catch (_err) {
+      // Silently ignored — owned plugin IDs are best-effort
     }
   },
 
@@ -384,5 +441,57 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
 
   forkChain: async (chainId: string, newName: string) => {
     return await convexClient.forkChain(chainId, newName);
+  },
+
+  renameChain: async (chainId: string, newName: string) => {
+    try {
+      const result = await convexClient.renameCloudChain(chainId, newName);
+      if (result?.success) {
+        // Update local state optimistically
+        set((state) => ({
+          myChains: state.myChains.map((c) =>
+            c._id === chainId ? { ...c, name: newName, slug: result.slug ?? c.slug } : c
+          ),
+        }));
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  deleteChain: async (chainId: string) => {
+    try {
+      const result = await convexClient.deleteCloudChain(chainId);
+      if (result?.success) {
+        // Remove from local state
+        set((state) => ({
+          myChains: state.myChains.filter((c) => c._id !== chainId),
+        }));
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  updateVisibility: async (chainId: string, isPublic: boolean) => {
+    try {
+      const result = await convexClient.updateChainVisibility(chainId, isPublic);
+      if (result?.success) {
+        // Update local state
+        set((state) => ({
+          myChains: state.myChains.map((c) =>
+            c._id === chainId ? { ...c, isPublic } : c
+          ),
+        }));
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   },
 }));

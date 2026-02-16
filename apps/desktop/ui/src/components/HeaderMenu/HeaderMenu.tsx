@@ -1,14 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Save, FolderOpen, Globe, Settings, Check, X, Share2 } from 'lucide-react';
+import { Save, FolderOpen, Settings, X, Send, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SaveDropdown } from './SaveDropdown';
-import { LoadDropdown } from './LoadDropdown';
 import { AvatarDropdown } from './AvatarDropdown';
 import { QuickSharePanel } from './QuickSharePanel';
 import { ChainBrowser } from '../ChainBrowser';
+import { CustomDropdown } from '../Dropdown';
 import { useChainStore } from '../../stores/chainStore';
 import { usePresetStore } from '../../stores/presetStore';
+import type { PresetInfo } from '../../api/types';
+import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
+import { juceBridge } from '../../api/juce-bridge';
+import prochainLogo from '../../assets/prochain-logo.png';
 
-type ActiveDropdown = 'save' | 'load' | 'browse' | 'share' | 'settings' | 'avatar' | null;
+type ActiveDropdown = 'save' | 'browse' | 'share' | 'settings' | 'avatar' | null;
 
 export function HeaderMenu() {
   const [active, setActive] = useState<ActiveDropdown>(null);
@@ -17,8 +21,22 @@ export function HeaderMenu() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
-  const { chainName, setChainName, targetInputLufs } = useChainStore();
-  const { loadPreset } = usePresetStore();
+  const { chainName, setChainName, targetInputPeakMin, targetInputPeakMax } = useChainStore();
+  const { presets, currentPreset, loadPreset } = usePresetStore();
+
+  const navigatePreset = useCallback((direction: -1 | 1) => {
+    if (presets.length === 0) return;
+    const currentIdx = currentPreset
+      ? presets.findIndex((p: PresetInfo) => p.path === currentPreset.path)
+      : -1;
+    let nextIdx: number;
+    if (currentIdx === -1) {
+      nextIdx = direction === 1 ? 0 : presets.length - 1;
+    } else {
+      nextIdx = (currentIdx + direction + presets.length) % presets.length;
+    }
+    loadPreset(presets[nextIdx].path);
+  }, [presets, currentPreset, loadPreset]);
 
   const toggle = useCallback((dropdown: ActiveDropdown) => {
     setActive((prev) => (prev === dropdown ? null : dropdown));
@@ -28,7 +46,7 @@ export function HeaderMenu() {
     setActive(null);
   }, []);
 
-  // Handle sharePreset event from LoadDropdown
+  // Handle sharePreset event from LocalTab
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -45,20 +63,25 @@ export function HeaderMenu() {
     return () => window.removeEventListener('sharePreset', handler);
   }, [loadPreset, setChainName]);
 
-  // Close on Escape
+  // Close on Escape (component priority)
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const registerShortcut = useKeyboardStore.getState().registerShortcut;
+    return registerShortcut({
+      id: 'header-menu-escape',
+      key: 'Escape',
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: true, // Allow Escape when editing name
+      handler: (e) => {
         if (isEditingName) {
+          e.preventDefault();
           setIsEditingName(false);
-        } else {
+        } else if (active) {
+          e.preventDefault();
           close();
         }
       }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [close, isEditingName]);
+    });
+  }, [close, isEditingName, active]);
 
   // Close dropdowns on outside click (but not for browse modal)
   useEffect(() => {
@@ -100,52 +123,50 @@ export function HeaderMenu() {
     setIsEditingName(false);
   };
 
+  const commitNameAndSave = () => {
+    const trimmed = editName.trim();
+    if (trimmed) {
+      setChainName(trimmed);
+    }
+    setIsEditingName(false);
+    setActive('save');
+  };
+
   const cancelEditName = () => {
     setIsEditingName(false);
   };
 
   const btnBase =
-    'flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase font-medium rounded transition-all relative';
+    'flex items-center justify-center w-7 h-7 rounded transition-all duration-150 relative';
   const btnInactive =
-    'text-plugin-muted hover:text-plugin-text hover:bg-white/5';
-  const btnActive = 'text-plugin-text bg-white/8 shadow-sm';
+    'text-[var(--color-text-secondary)] hover:text-[var(--color-accent-cyan)] hover:bg-[rgba(0,240,255,0.08)]';
+  const btnActive = 'text-[var(--color-accent-cyan)] bg-[rgba(0,240,255,0.12)] shadow-[0_0_8px_rgba(0,240,255,0.2)]';
 
   return (
     <div ref={headerRef} className="relative">
-      {/* Header bar */}
-      <div className="flex items-center gap-0.5 px-2 py-1 bg-plugin-surface border-b border-plugin-border">
+      {/* Header bar — cyber command bar */}
+      <div
+        className="flex items-center gap-1 px-3 py-1.5"
+        style={{
+          background: 'var(--color-bg-primary)',
+          borderBottom: '1px solid var(--color-border-default)',
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        {/* Logo */}
+        <img src={prochainLogo} alt="ProChain" className="h-5 mr-2 opacity-80" />
+
         {/* Avatar / Profile */}
         <AvatarDropdown isOpen={active === 'avatar'} onToggle={() => toggle('avatar')} onClose={close} />
-        <div className="w-px h-5 bg-plugin-border mr-1" />
+        <div className="w-px h-5 mx-1" style={{ background: 'var(--color-border-default)' }} />
 
-        {/* Save */}
-        <button
-          onClick={() => toggle('save')}
-          className={`${btnBase} ${active === 'save' ? btnActive : btnInactive}`}
-          title="Save chain"
-        >
-          <Save className="w-3.5 h-3.5" />
-          <span>Save</span>
-        </button>
-
-        {/* Load */}
-        <button
-          onClick={() => toggle('load')}
-          className={`${btnBase} ${active === 'load' ? btnActive : btnInactive}`}
-          title="Load chain"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-          <span>Load</span>
-        </button>
-
-        {/* Browse */}
+        {/* Browse (includes local chains) */}
         <button
           onClick={() => toggle('browse')}
           className={`${btnBase} ${active === 'browse' ? btnActive : btnInactive}`}
-          title="Browse community chains"
+          title="Browse chains"
         >
-          <Globe className="w-3.5 h-3.5" />
-          <span>Browse</span>
+          <FolderOpen className="w-3.5 h-3.5" />
         </button>
 
         {/* Share */}
@@ -154,12 +175,11 @@ export function HeaderMenu() {
           className={`${btnBase} ${active === 'share' ? btnActive : btnInactive}`}
           title="Share chain"
         >
-          <Share2 className="w-3.5 h-3.5" />
-          <span>Share</span>
+          <Send className="w-3.5 h-3.5" />
         </button>
 
         {/* Divider */}
-        <div className="w-px h-5 bg-plugin-border mx-1" />
+        <div className="w-px h-5 mx-1" style={{ background: 'var(--color-border-default)' }} />
 
         {/* Chain Name */}
         {isEditingName ? (
@@ -170,23 +190,36 @@ export function HeaderMenu() {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') commitName();
+                if (e.key === 'Enter') commitNameAndSave();
                 if (e.key === 'Escape') cancelEditName();
               }}
-              onBlur={commitName}
-              className="flex-1 min-w-0 px-2 py-0.5 bg-black/40 border border-plugin-accent/50 rounded font-mono text-xs text-plugin-text font-medium focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              onBlur={commitName} /* blur just saves name, doesn't open modal */
+              className="flex-1 min-w-0 px-2 py-0.5 rounded text-xs font-medium focus:outline-none"
+              style={{
+                background: 'var(--color-bg-input)',
+                border: '1px solid var(--color-accent-cyan)',
+                color: 'var(--color-text-primary)',
+                fontFamily: 'var(--font-mono)',
+                boxShadow: '0 0 8px rgba(222, 255, 10, 0.2)',
+              }}
               maxLength={64}
             />
             <button
-              onClick={commitName}
-              className="p-0.5 text-green-400 hover:text-green-300"
-              title="Confirm"
+              onClick={commitNameAndSave}
+              className="p-0.5 transition-colors duration-150"
+              style={{ color: 'var(--color-accent-cyan)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
+              title="Save chain"
             >
-              <Check className="w-3.5 h-3.5" />
+              <Save className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={cancelEditName}
-              className="p-0.5 text-red-400 hover:text-red-300"
+              className="p-0.5 transition-colors duration-150"
+              style={{ color: 'var(--color-text-tertiary)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-status-error)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
               title="Cancel"
             >
               <X className="w-3.5 h-3.5" />
@@ -195,19 +228,62 @@ export function HeaderMenu() {
         ) : (
           <button
             onClick={startEditingName}
-            className="flex-1 min-w-0 px-2 py-0.5 text-left text-xs font-medium text-plugin-text hover:text-plugin-accent truncate transition-colors group"
+            className="flex-1 min-w-0 px-2 py-0.5 text-left truncate transition-colors duration-150 group"
+            style={{
+              fontSize: 'var(--text-sm)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              letterSpacing: 'var(--tracking-wide)',
+              color: 'var(--color-text-primary)',
+            }}
             title="Click to rename chain"
           >
-            <span className="group-hover:underline decoration-dotted underline-offset-2">
+            <span className="group-hover:underline decoration-dotted underline-offset-2" style={{ textDecorationColor: 'var(--color-accent-cyan)' }}>
               {chainName}
             </span>
-            {targetInputLufs !== null && (
-              <span className="ml-2 text-[10px] text-plugin-muted font-normal">
-                🎚️ {targetInputLufs} LUFS
+            {targetInputPeakMin !== null && targetInputPeakMax !== null && (
+              <span
+                className="ml-2"
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-tertiary)',
+                  fontWeight: 400,
+                }}
+              >
+                {targetInputPeakMin} to {targetInputPeakMax} dBpk
               </span>
             )}
           </button>
         )}
+
+        {/* Preset prev/next */}
+        {presets.length > 0 && (
+          <div className="flex items-center -space-x-0.5">
+            <button
+              onClick={() => navigatePreset(-1)}
+              className={`${btnBase} ${btnInactive}`}
+              title="Previous preset"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => navigatePreset(1)}
+              className={`${btnBase} ${btnInactive}`}
+              title="Next preset"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Keyboard Shortcuts Help */}
+        <button
+          onClick={() => window.dispatchEvent(new Event('showKeyboardShortcuts'))}
+          className={`${btnBase} ${btnInactive}`}
+          title="Keyboard shortcuts (?)"
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+        </button>
 
         {/* Settings */}
         <button
@@ -223,12 +299,6 @@ export function HeaderMenu() {
       {active === 'save' && (
         <div className="absolute left-0 top-full z-50 mt-0.5">
           <SaveDropdown onClose={close} />
-        </div>
-      )}
-
-      {active === 'load' && (
-        <div className="absolute left-0 top-full z-50 mt-0.5">
-          <LoadDropdown onClose={close} />
         </div>
       )}
 
@@ -253,77 +323,240 @@ export function HeaderMenu() {
 
 /** Quick settings dropdown for chain-level metadata */
 function SettingsDropdown({ onClose }: { onClose: () => void }) {
-  const { targetInputLufs, setTargetInputLufs } = useChainStore();
-  const [lufsValue, setLufsValue] = useState(targetInputLufs ?? -12);
+  const { targetInputPeakMin, targetInputPeakMax, setTargetInputPeakRange } = useChainStore();
+  const [peakMin, setPeakMin] = useState(targetInputPeakMin ?? -12);
+  const [peakMax, setPeakMax] = useState(targetInputPeakMax ?? -6);
+  const [oversamplingFactor, setOversamplingFactor] = useState(0);
+  const [oversamplingLatencyMs, setOversamplingLatencyMs] = useState(0);
+  const [isChangingOS, setIsChangingOS] = useState(false);
 
-  const LUFS_PRESETS = [
-    { value: -24, label: '-24 (Quiet)' },
-    { value: -18, label: '-18 (Conservative)' },
-    { value: -14, label: '-14 (Moderate)' },
-    { value: -12, label: '-12 (Standard)' },
-    { value: -8, label: '-8 (Hot)' },
+  // Fetch current oversampling state on mount
+  useEffect(() => {
+    juceBridge.getOversamplingFactor().then(setOversamplingFactor).catch(() => {});
+    juceBridge.getOversamplingLatencyMs().then(setOversamplingLatencyMs).catch(() => {});
+  }, []);
+
+  const handleOversamplingChange = async (factor: number) => {
+    if (isChangingOS || factor === oversamplingFactor) return;
+    setIsChangingOS(true);
+    try {
+      const result = await juceBridge.setOversamplingFactor(factor);
+      if (result.success) {
+        setOversamplingFactor(result.factor ?? factor);
+        setOversamplingLatencyMs(result.latencyMs ?? 0);
+      }
+    } catch {
+      // Silently handle — plugin may not support it yet
+    } finally {
+      setIsChangingOS(false);
+    }
+  };
+
+  const PEAK_PRESETS = [
+    { min: -24, max: -18, label: 'Quiet' },
+    { min: -18, max: -12, label: 'Conservative' },
+    { min: -12, max: -6, label: 'Standard' },
+    { min: -6, max: -3, label: 'Hot' },
   ];
 
-  const applyLufs = () => {
-    setTargetInputLufs(lufsValue);
+  const OS_OPTIONS = [
+    { value: 0, label: 'Off' },
+    { value: 1, label: '2x' },
+    { value: 2, label: '4x' },
+  ];
+
+  const applyPeakRange = () => {
+    setTargetInputPeakRange(peakMin, peakMax);
     onClose();
   };
 
-  const clearLufs = () => {
-    setTargetInputLufs(null);
+  const clearPeakRange = () => {
+    setTargetInputPeakRange(null, null);
     onClose();
   };
 
   return (
-    <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl p-4 animate-slide-up">
-      <h3 className="text-xs font-mono font-semibold text-plugin-text mb-3 uppercase tracking-wider">
+    <div
+      className="w-80 rounded-md shadow-xl p-4 scale-in"
+      style={{
+        background: 'rgba(15, 15, 15, 0.9)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid var(--color-border-default)',
+        boxShadow: 'var(--shadow-elevated)',
+      }}
+    >
+      <h3
+        className="mb-3"
+        style={{
+          fontSize: 'var(--text-sm)',
+          fontFamily: 'var(--font-extended)',
+          fontWeight: 900,
+          color: 'var(--color-text-primary)',
+          textTransform: 'uppercase',
+          letterSpacing: 'var(--tracking-wider)',
+        }}
+      >
         Chain Settings
       </h3>
 
-      {/* Target LUFS */}
+      {/* Target Input Peak Range */}
       <div className="mb-3">
-        <label className="block text-[11px] font-mono text-plugin-muted mb-1.5">
-          🎚️ Target Input LUFS
+        <label
+          className="block mb-1.5"
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--color-text-secondary)',
+            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-wide)',
+          }}
+        >
+          Target Input Peak (dBpk)
         </label>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-1.5">
           <input
             type="number"
-            value={lufsValue}
-            onChange={(e) => setLufsValue(Number(e.target.value))}
-            min={-40}
+            value={peakMin}
+            onChange={(e) => setPeakMin(Number(e.target.value))}
+            min={-60}
             max={0}
             step={1}
-            className="w-16 bg-black/40 border border-plugin-border rounded px-2 py-1 text-xs text-plugin-text font-mono text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent"
-
+            className="w-16 rounded px-2 py-1 text-center focus:outline-none"
+            style={{
+              background: 'var(--color-bg-input)',
+              border: '1px solid var(--color-border-default)',
+              color: 'var(--color-text-primary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-sm)',
+            }}
           />
-          <span className="text-[10px] text-plugin-dim">dB</span>
-          <select
-            value={lufsValue}
-            onChange={(e) => setLufsValue(Number(e.target.value))}
-            className="flex-1 bg-black/40 border border-plugin-border rounded px-2 py-1 text-[11px] font-mono text-plugin-muted focus:outline-none"
-          >
-            {LUFS_PRESETS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>to</span>
+          <input
+            type="number"
+            value={peakMax}
+            onChange={(e) => setPeakMax(Number(e.target.value))}
+            min={-60}
+            max={0}
+            step={1}
+            className="w-16 rounded px-2 py-1 text-center focus:outline-none"
+            style={{
+              background: 'var(--color-bg-input)',
+              border: '1px solid var(--color-border-default)',
+              color: 'var(--color-text-primary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-sm)',
+            }}
+          />
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>dBpk</span>
         </div>
-        <p className="text-[10px] text-plugin-dim mt-1">
-          Recommended input level for this chain
+        <div className="flex gap-1 flex-wrap">
+          {PEAK_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => { setPeakMin(p.min); setPeakMax(p.max); }}
+              className="rounded px-2 py-0.5 transition-all duration-150"
+              style={{
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono)',
+                color: peakMin === p.min && peakMax === p.max ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                background: peakMin === p.min && peakMax === p.max ? 'rgba(255,255,255,0.08)' : 'transparent',
+                border: `1px solid ${peakMin === p.min && peakMax === p.max ? 'var(--color-border-default)' : 'transparent'}`,
+                cursor: 'pointer',
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+          Recommended input peak level for this chain
+        </p>
+      </div>
+
+      {/* Oversampling */}
+      <div className="mb-3">
+        <label
+          className="block mb-1.5"
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--color-text-secondary)',
+            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-wide)',
+          }}
+        >
+          Oversampling
+        </label>
+        <div
+          className="flex rounded overflow-hidden"
+          style={{
+            border: '1px solid var(--color-border-default)',
+          }}
+        >
+          {OS_OPTIONS.map((opt) => {
+            const isActive = oversamplingFactor === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => handleOversamplingChange(opt.value)}
+                disabled={isChangingOS}
+                className="flex-1 py-1.5 text-center transition-all duration-150"
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: isActive ? 700 : 400,
+                  color: isActive ? 'var(--color-accent-cyan)' : 'var(--color-text-secondary)',
+                  background: isActive ? 'rgba(0, 240, 255, 0.1)' : 'transparent',
+                  borderRight: opt.value < 2 ? '1px solid var(--color-border-default)' : 'none',
+                  boxShadow: isActive ? '0 0 12px rgba(0, 240, 255, 0.2) inset' : 'none',
+                  textTransform: 'uppercase',
+                  letterSpacing: 'var(--tracking-wide)',
+                  opacity: isChangingOS ? 0.5 : 1,
+                  cursor: isChangingOS ? 'wait' : 'pointer',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {oversamplingFactor > 0 && (
+          <p className="mt-1" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+            +{oversamplingLatencyMs.toFixed(1)}ms latency
+          </p>
+        )}
+        <p className="mt-0.5" style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', opacity: 0.7 }}>
+          Reduces aliasing from non-linear plugins
         </p>
       </div>
 
       <div className="flex gap-2">
         <button
-          onClick={clearLufs}
-          className="flex-1 text-[11px] text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2 py-1.5 transition-colors"
+          onClick={clearPeakRange}
+          className="flex-1 rounded px-2 py-1.5 transition-all duration-150"
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border-default)',
+            background: 'transparent',
+            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-wide)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-border-focus)';
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-border-default)';
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+          }}
         >
-          Clear Target
+          Clear
         </button>
         <button
-          onClick={applyLufs}
-          className="flex-1 text-[11px] text-white bg-plugin-accent hover:bg-plugin-accent/80 rounded px-2 py-1.5 font-medium transition-colors"
+          onClick={applyPeakRange}
+          className="btn btn-primary flex-1"
         >
           Apply
         </button>

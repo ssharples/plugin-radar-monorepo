@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Rules — Read These First
 
-### Always Verify Builds
+### Always Verify Builds — And Auto-Rebuild the AU Plugin
 After making code changes, **always run the relevant build** before reporting completion. Never assume changes compile cleanly.
 - **TypeScript (web):** `cd apps/web && npx next build` or `pnpm build:web`
 - **TypeScript (desktop UI):** `cd apps/desktop/ui && npx vite build`
 - **C++ (JUCE):** `cd apps/desktop/build && cmake --build . --target PluginChainManager_AU`
 - If the build fails, fix the errors before reporting the task as done.
+
+After any C++ or desktop UI code changes, **always rebuild the full AU pipeline** (UI build → zip → C++ build → install) without waiting for the user to ask. The user expects changes to be testable in the DAW immediately.
 
 ### Field Name Consistency Across Layers
 When adding or modifying data fields (Convex schema, mutations, queries, frontend calls, C++ bridge), **verify that ALL consumers use the exact same field names**. Use Grep to search for the old field name across the entire repo before finishing. Past bugs: `pluginName` vs `name`, `fileOrIdentifier` mismatches, nested response parsing errors.
@@ -30,6 +32,15 @@ When making UI changes (colors, fonts, spacing, component patterns), use Grep to
 ### Keep Changes Minimal and Targeted
 During iterative UI refinement sessions, make only the requested change. Do not refactor surrounding code, add docstrings to unchanged code, or make "improvements" beyond what was asked. Surgical edits only.
 
+### UI: Simplest Approach First
+When implementing UI components, use the **simplest possible approach**. Do not add glow effects, filters, scaling, glassmorphism, drop shadows, or other visual embellishments unless explicitly requested. For image-based components (knobs, buttons), render assets flat with basic transforms (rotate, translate) only. If the user provides PNGs, just render them — don't add post-processing.
+
+### Verify API/Target Names From Source
+Before using any function name, build target, or API identifier in code, **read the actual source file** to verify the correct name. Do not guess. Past bugs: `getPluginParameters` vs `readPluginParameters`, wrong CMake target names, calling APIs that don't exist with the assumed JUCE configuration flags.
+
+### Always Implement, Don't Just Plan
+When a feature or fix requires both a plan and implementation, **always proceed to implementation** within the same session unless the user explicitly asks for plan-only. Do not end a session at the planning stage if implementation is feasible.
+
 ### Research Before Implementing Non-Trivial Features
 For features involving unfamiliar frameworks or complex interactions (dnd-kit, JUCE WebBrowserComponent bridge, Next.js Image, etc.), **research known gotchas first** and propose an approach before writing code. Past bugs: dnd-kit's `active.data.current` emptying on unmount, glass CSS effects being too complex for the context, JS-based animations being janky vs CSS.
 
@@ -39,7 +50,7 @@ When modifying Convex schema or function signatures:
 2. Update the mutation/query in the relevant `convex/*.ts` file
 3. Grep for all callers in `apps/web/`, `apps/desktop/ui/src/api/convex-client.ts`, and `scripts/`
 4. Verify field names match exactly at every call site
-5. Desktop UI uses `anyApi` (untyped) — field mismatches won't be caught by TypeScript there
+5. Desktop UI uses typed `api` — but always verify field names match the Convex schema
 
 ### C++ / WebView Bridge Changes Checklist
 When modifying the JUCE ↔ JS bridge:
@@ -48,6 +59,22 @@ When modifying the JUCE ↔ JS bridge:
 3. Update the types in `ui/src/api/types.ts`
 4. Group operations pass args as `JSON.stringify({...})` — make sure both sides agree on the JSON shape
 5. Build both the UI (`npx vite build`) and C++ (`cmake --build`) to verify
+
+## Debugging Guidelines
+
+When debugging crashes or bugs:
+1. **Start with the simplest hypothesis.** Do not cycle through multiple speculative fixes without evidence.
+2. **Add targeted logging first** to confirm the root cause before implementing any fix.
+3. **Show log output** and explain the evidence before proposing a code change.
+4. Do not speculatively change code (null checks, constructor reordering, flag toggling) without confirming the hypothesis.
+5. Past bugs caused by skipping this: Pro-L 2 crash was a 4-channel vs 2-channel sidechain mismatch, but multiple wrong hypotheses were tried first (null pointers, constructor timing, ObjC flags).
+
+## Development Environment
+
+Before starting dev servers, **kill zombie processes** on common ports first:
+```bash
+lsof -ti:3000 | xargs kill -9 2>/dev/null; lsof -ti:3001 | xargs kill -9 2>/dev/null; lsof -ti:5173 | xargs kill -9 2>/dev/null
+```
 
 ## Build & Development Commands
 
@@ -161,14 +188,14 @@ Both apps use opaque session tokens (not JWT). `auth:login` → `sessionToken` �
 
 ### Desktop App Bridge Pattern
 
-The desktop plugin uses `anyApi` from `convex/server` (not generated types) because its `ui/` workspace has a different `convex/` directory than the monorepo root. This allows calling deployed functions by name without type generation conflicts.
+The desktop plugin uses typed `api` from `@convex/_generated/api` for Convex calls. This provides full type safety for mutations and queries.
 
 ```typescript
 // apps/desktop/ui/src/api/convex-client.ts
-import { anyApi } from "convex/server";
-const result = await convex.mutation(anyApi.social.rateChain, {
+import { api } from "@convex/_generated/api";
+const result = await convex.mutation(api.social.rateChain, {
   sessionToken: token,
-  chainId: chainId as any,
+  chainId: chainId,
   rating: 5,
 });
 ```
@@ -226,7 +253,7 @@ Vite + React 18 + TypeScript + Zustand + Tailwind + @dnd-kit
 
 | File | Purpose |
 |------|---------|
-| `api/convex-client.ts` | Full Convex integration via `anyApi`: auth, sync, chains, social, friends |
+| `api/convex-client.ts` | Full Convex integration via typed `api`: auth, sync, chains, social, friends |
 | `api/juce-bridge.ts` | TypeScript wrapper for all native C++ functions |
 | `api/types.ts` | TS types mirroring C++ data model |
 | `stores/chainStore.ts` | Tree + flat chain state, node selection, DnD |
@@ -243,7 +270,7 @@ Vite builds as IIFE (not ES modules) via `vite-plugin-singlefile` — required f
 
 ## Web App (`apps/web/`)
 
-Next.js 16 with App Router, React 19, Tailwind CSS 4, shadcn/ui. Dark theme: stone-950/amber-400.
+Next.js 16 with App Router, React 19, Tailwind CSS 4, shadcn/ui. Dark theme: neutral-950 with #deff0a neon lime accents. Brand identity: "ProChain by Plugin Radar" — ProChain is the product, Plugin Radar is the web platform.
 
 ### Key Routes
 
@@ -304,7 +331,7 @@ Chain slots include base64-encoded `presetData` with `presetSizeBytes`. JUCE `ge
 - `BranchGainProcessor`: Stereo gain with `SmoothedValue` (Multiplicative smoothing)
 - Vite builds as IIFE — required for JUCE WebBrowserComponent. Custom plugin strips `type="module"` and `crossorigin`
 - Desktop UI zip must be regenerated and C++ rebuilt after frontend changes
-- Desktop `convex-client.ts` uses `anyApi` (not generated types) because the desktop workspace has a separate `convex/` directory from the monorepo root
+- Desktop `convex-client.ts` uses typed `api` from `@convex/_generated/api` for full type safety
 - `ChainNodeId = int` typedef — can't overload methods with both `int` and `ChainNodeId` params
 - `std::variant` requires complete types — `GroupData` before `ChainNode` in header
 
@@ -323,10 +350,12 @@ No formal test suite. Manual testing:
 - Plugin chains use slugs for public URLs, share codes for private sharing
 - Effect categories defined in `packages/shared/src/categories.ts`
 - Web app uses `@phosphor-icons/react` for icons
-- Web app styling: shadcn/ui + Tailwind 4 + stone-950/amber-400 dark theme
+- Web app styling: shadcn/ui + Tailwind 4 + neutral-950/#deff0a neon lime dark theme
 - Rate-limited mutations use `checkRateLimit()` from `convex/lib/rateLimit.ts`
 
 ### Desktop UI Design System ("Propane")
+> Note: "Propane" is the desktop UI design system / brand name. "ProChain" is the product name.
+
 - Color tokens in `apps/desktop/ui/tailwind.config.js` — accent `#89572a`, serial `#c9944a`, parallel `#5a7842`
 - Fonts: Cutive Mono (mono), Nosifer (brand) — self-hosted WOFF2 in `ui/src/fonts/`
 - CRT text effect: `.crt-text` class in `index.css`

@@ -24,7 +24,7 @@ export default function ManufacturerDetailPage() {
         <MagnifyingGlass className="w-12 h-12 text-stone-600 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-stone-100 mb-2">Manufacturer Not Found</h1>
         <p className="text-stone-400 mb-4">We couldn't find a manufacturer with this name</p>
-        <Link href="/manufacturers" className="text-amber-400 hover:text-amber-300 transition">
+        <Link href="/manufacturers" className="text-white hover:text-[#deff0a] transition">
           &larr; Back to manufacturers
         </Link>
       </div>
@@ -54,7 +54,7 @@ export default function ManufacturerDetailPage() {
   return (
     <div className="relative">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-6 py-8 relative">
         {/* Breadcrumb */}
@@ -102,7 +102,7 @@ export default function ManufacturerDetailPage() {
                   href={manufacturer.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-amber-400 hover:text-amber-300 transition"
+                  className="flex items-center gap-2 text-white hover:text-[#deff0a] transition"
                 >
                   <Globe className="w-4 h-4" />
                   Visit Website
@@ -118,7 +118,7 @@ export default function ManufacturerDetailPage() {
 
             {/* Stats */}
             <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 text-center">
-              <div className="text-3xl font-bold text-amber-400">
+              <div className="text-3xl font-bold text-white">
                 {manufacturer.pluginCount}
               </div>
               <div className="text-stone-400 text-sm">

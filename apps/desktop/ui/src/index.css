@@ -1,6 +1,25 @@
+/* Design System: Digital Underground */
+@import './styles/design-system.css';
+
+/* Custom Dropdown Styles */
+@import './components/Dropdown/dropdown.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* OtherInstancesList button hover effects (CSS :hover, not JS onMouseEnter —
+   JUCE WebView fires mouseenter on page load for elements under cursor) */
+.inst-btn:hover:not(:disabled) {
+  color: var(--color-accent-cyan) !important;
+  border-color: rgba(222, 255, 10, 0.3) !important;
+  background: rgba(222, 255, 10, 0.08) !important;
+}
+.inst-btn-send:hover:not(:disabled) {
+  color: var(--color-accent-lime) !important;
+  border-color: rgba(204, 255, 0, 0.3) !important;
+  background: rgba(204, 255, 0, 0.08) !important;
+}
 
 /* Self-hosted fonts for JUCE WebView (no network access) */
 @font-face {
@@ -38,61 +57,101 @@ body {
   overflow: hidden;
 }
 
+/* Global grain texture overlay — z-index must stay below modals/context menus */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Vignette edge darkening */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(0, 0, 0, 0.25) 100%
+  );
+}
+
 html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-/* Default scrollbar — Propane amber */
+/* Default scrollbar — Cyber */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #121212;
+  background: var(--color-bg-primary, #0a0a0a);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(137, 87, 42, 0.24);
+  background: var(--color-border-strong, #303030);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #89572a;
+  background: var(--color-border-focus, #404040);
 }
 
-/* Custom PNG-backed scrollbar for chain area */
+/* Glassmorphism scrollbar for chain area */
 .chain-scrollbar::-webkit-scrollbar {
-  width: 16px;
+  width: 8px;
 }
 
 .chain-scrollbar::-webkit-scrollbar-track {
-  background: url('./assets/scrollbar-bg.png') repeat-y;
-  background-size: 16px auto;
+  background: rgba(18, 18, 18, 0.8);
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 .chain-scrollbar::-webkit-scrollbar-thumb {
-  background: url('./assets/scrollbar-thumb.png') repeat-y;
-  background-size: 16px auto;
-  border-radius: 0;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
 .chain-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: url('./assets/scrollbar-thumb.png') repeat-y;
-  background-size: 16px auto;
-  filter: brightness(1.3);
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 4px 12px rgba(255, 255, 255, 0.2),
+    inset 0 1px 3px rgba(255, 255, 255, 0.2);
+}
+
+.chain-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 2px 6px rgba(255, 255, 255, 0.3),
+    inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* CRT text glow effect */
 .crt-text {
-  text-shadow: 0 0 0.95px rgba(255, 255, 255, 0.6);
+  text-shadow: 0 0 0.95px rgba(222, 255, 10, 0.4);
 }
 
-/* Propane label utility */
+/* Mono label utility */
 .propane-label {
-  font-family: 'Cutive Mono', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -119,14 +178,14 @@ html, body, #root {
   transition: opacity 200ms, transform 200ms;
 }
 
-/* Drop zone stripe patterns for group creation */
+/* Drop zone stripe patterns for group creation — thickened for visibility */
 .drop-zone-stripes-serial {
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
-    transparent 3px,
-    rgba(201, 148, 74, 0.12) 3px,
-    rgba(201, 148, 74, 0.12) 6px
+    transparent 8px,
+    rgba(255, 255, 255, 0.2) 8px,
+    rgba(255, 255, 255, 0.2) 16px
   );
 }
 
@@ -134,8 +193,375 @@ html, body, #root {
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
-    transparent 3px,
-    rgba(90, 120, 66, 0.12) 3px,
-    rgba(90, 120, 66, 0.12) 6px
+    transparent 8px,
+    rgba(90, 120, 66, 0.3) 8px,
+    rgba(90, 120, 66, 0.3) 16px
   );
+}
+
+/* Soft pulse animation for drop zones */
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1.0;
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* Strong glow pulse for hovered drop zones */
+@keyframes glow-pulse-strong {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.7);
+  }
+}
+
+.animate-glow-pulse-strong {
+  animation: glow-pulse-strong 1.2s ease-in-out infinite;
+}
+
+/* Breathing glow animation for drag preview */
+@keyframes drag-preview-glow {
+  0%, 100% {
+    filter: drop-shadow(0 4px 16px rgba(255, 255, 255, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 4px 24px rgba(255, 255, 255, 0.5));
+  }
+}
+
+.drag-preview-active {
+  animation: drag-preview-glow 2s ease-in-out infinite;
+}
+
+/* Drop zone pulse for valid targets — smooth breathing effect */
+@keyframes drop-zone-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.2);
+  }
+}
+
+.animate-drop-zone-pulse {
+  animation: drop-zone-pulse 1.5s ease-in-out infinite;
+}
+
+/* Magnetic snap animation — subtle bounce when hovering near drop zone */
+@keyframes magnetic-snap {
+  0% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.4);
+  }
+  100% {
+    transform: scaleY(1.2);
+  }
+}
+
+.animate-magnetic-snap {
+  animation: magnetic-snap 0.3s ease-out;
+}
+
+/* Ghost preview fade-in — appears at drop location */
+@keyframes ghost-fade-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+}
+
+.animate-ghost-preview {
+  animation: ghost-fade-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Dim non-dragged items during drag — 3-tier spotlight system:
+   Tier 1: Active drop target (isOver) → full opacity + glow (handled in components)
+   Tier 2: Valid drop zones (not hovered) → 0.7 opacity (drop-target-valid overrides)
+   Tier 3: Non-target items → 0.45 opacity (is-dimmed) */
+.dim-during-drag {
+  transition: opacity 0.2s ease-out;
+  will-change: opacity;
+}
+
+.dim-during-drag.is-dimmed {
+  opacity: 0.45;
+}
+
+/* Valid drop targets stay brighter during drag — overrides is-dimmed */
+.dim-during-drag.drop-target-valid {
+  opacity: 0.7;
+}
+
+/* Active drop target — full brightness */
+.dim-during-drag.drop-target-active {
+  opacity: 1;
+}
+
+/* Group dissolve collapse animation */
+@keyframes group-collapse {
+  0% {
+    opacity: 1;
+    max-height: 200px;
+    transform: scaleY(1);
+    margin-bottom: 0;
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    transform: scaleY(0.8);
+    margin-bottom: -8px;
+  }
+}
+
+.animate-group-collapse {
+  animation: group-collapse 200ms var(--ease-snap, cubic-bezier(0.4, 0, 0.2, 1)) forwards;
+  overflow: hidden;
+  transform-origin: top center;
+  pointer-events: none;
+}
+
+/* =============================================
+   State-Aware Visual Feedback System
+   ============================================= */
+
+/* Bypassed state: 40% opacity + subtle red glow */
+.plugin-slot-bypassed {
+  opacity: 0.4;
+  filter: drop-shadow(0 0 4px rgba(255, 0, 51, 0.3));
+  transition: opacity 150ms ease, filter 150ms ease;
+}
+
+/* Solo state: Cyan neon border */
+.plugin-slot-solo {
+  box-shadow: 0 0 0 2px var(--color-accent-cyan, #deff0a), 0 0 12px rgba(222, 255, 10, 0.4);
+  transition: box-shadow 150ms ease;
+}
+
+/* Solo active: dim other plugins (applied to parent container) */
+.plugins-soloed .plugin-slot:not(.plugin-slot-solo) {
+  opacity: 0.35;
+  transition: opacity 150ms ease;
+}
+
+/* Selected state: Cyan accent border + scale */
+.plugin-slot-selected {
+  box-shadow: 0 0 0 2px var(--color-accent-cyan, #deff0a), 0 0 16px rgba(222, 255, 10, 0.5);
+  transform: scale(1.02);
+  transition: box-shadow 150ms ease, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Hover state: smooth elevation effect */
+.plugin-slot-hover {
+  transform: translateY(-1px);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+  transition: transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 150ms ease;
+}
+
+/* Processing indicator: subtle pulse on meter */
+@keyframes meter-processing-pulse {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1.0;
+  }
+}
+
+.meter-processing {
+  animation: meter-processing-pulse 1.5s ease-in-out infinite;
+}
+
+/* State stacking: bypassed + selected */
+.plugin-slot-bypassed.plugin-slot-selected {
+  opacity: 0.4;
+  box-shadow: 0 0 0 2px var(--color-accent-cyan, #deff0a), 0 0 16px rgba(222, 255, 10, 0.5), 0 0 8px rgba(255, 0, 51, 0.3);
+  transform: scale(1.02);
+}
+
+/* State stacking: solo + selected */
+.plugin-slot-solo.plugin-slot-selected {
+  box-shadow: 0 0 0 3px var(--color-accent-cyan, #deff0a), 0 0 20px rgba(222, 255, 10, 0.6);
+  transform: scale(1.02);
+}
+
+/* Smooth transitions for all state changes */
+.plugin-slot-wrapper {
+  transition: opacity 150ms ease, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 150ms ease, box-shadow 150ms ease;
+}
+
+/* Toast notification fade-in animation */
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: rgba(222, 255, 10, 0.25);
+    box-shadow: none;
+  }
+  50% {
+    border-color: rgba(222, 255, 10, 0.45);
+    box-shadow: 0 0 8px rgba(222, 255, 10, 0.15);
+  }
+}
+
+/* =============================================
+   Micro Animations — UI Polish
+   ============================================= */
+
+/* Scale-in for modals & dropdown panels */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.scale-in {
+  animation: scale-in var(--duration-base, 200ms) var(--ease-snap, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+/* Stagger-fade for list items — apply to parent, children auto-stagger */
+@keyframes stagger-item {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-children > * {
+  animation: stagger-item var(--duration-base, 200ms) var(--ease-snap, cubic-bezier(0.4, 0, 0.2, 1)) both;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 30ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 90ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 210ms; }
+.stagger-children > *:nth-child(n+9) { animation-delay: 240ms; }
+
+/* Subtle success pulse — used after save/send confirmations */
+@keyframes success-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(0, 255, 136, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0);
+  }
+}
+
+.animate-success-pulse {
+  animation: success-pulse 0.6s ease-out;
+}
+
+/* Badge pop-in */
+@keyframes badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.badge-pop {
+  animation: badge-pop var(--duration-base, 200ms) var(--ease-bounce, cubic-bezier(0.34, 1.56, 0.64, 1));
+}
+
+/* Smooth content reveal — for expanding sections */
+@keyframes content-reveal {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.content-reveal {
+  animation: content-reveal var(--duration-slow, 300ms) var(--ease-smooth, cubic-bezier(0.4, 0, 0.6, 1));
+  overflow: hidden;
+}
+
+/* Input focus glow pulse (one-shot) */
+@keyframes input-focus-glow {
+  0% {
+    box-shadow: 0 0 0 1px var(--color-accent-cyan), 0 0 12px rgba(222, 255, 10, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 1px var(--color-accent-cyan), 0 0 0 rgba(222, 255, 10, 0);
+  }
+}
+
+.input:focus {
+  animation: input-focus-glow 0.4s ease-out;
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-input) 25%,
+    var(--color-bg-hover) 50%,
+    var(--color-bg-input) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }

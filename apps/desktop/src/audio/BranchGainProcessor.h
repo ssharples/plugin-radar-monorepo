@@ -41,7 +41,7 @@ public:
     void setStateInformation(const void*, int) override {}
 
 private:
-    static float dbToLinear(float dB);
+    static float dbToLinear(float dB) noexcept;
 
     std::atomic<float> gainDb{0.0f};
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedGain;

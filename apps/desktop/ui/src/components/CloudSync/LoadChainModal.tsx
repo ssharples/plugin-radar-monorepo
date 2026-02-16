@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCloudChainStore } from '../../stores/cloudChainStore';
+import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
 import { ChainDetailModal } from './ChainDetailModal';
 import { StarRating } from './StarRating';
+import { CustomDropdown } from '../Dropdown';
 
 interface LoadChainModalProps {
   onClose: () => void;
@@ -23,15 +25,20 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
   const [view, setView] = useState<'browse' | 'detail'>('browse');
   const [chainRatings, setChainRatings] = useState<Record<string, { average: number; count: number }>>({});
 
-  // Escape key to close
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
-
+  // Escape key to close (modal priority)
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    const registerShortcut = useKeyboardStore.getState().registerShortcut;
+    return registerShortcut({
+      id: 'load-chain-modal-escape',
+      key: 'Escape',
+      priority: ShortcutPriority.MODAL,
+      allowInInputs: true,
+      handler: (e) => {
+        e.preventDefault();
+        onClose();
+      }
+    });
+  }, [onClose]);
 
   useEffect(() => {
     browseChains({ category, sortBy });
@@ -43,7 +50,6 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
     if (chains.length === 0) return;
     const fetchRatings = async () => {
       const ratings: Record<string, { average: number; count: number }> = {};
-      // Fetch in parallel, limit to first 20
       const subset = chains.slice(0, 20);
       await Promise.all(
         subset.map(async (chain) => {
@@ -82,16 +88,69 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-      <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-lg w-full mx-4 border border-plugin-accent max-h-[80vh] overflow-y-auto animate-slide-up" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 fade-in"
+      style={{ background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="glass scale-in"
+        style={{
+          maxWidth: '32rem',
+          width: '100%',
+          margin: '0 1rem',
+          borderRadius: 'var(--radius-xl)',
+          padding: 'var(--space-6)',
+          border: '1px solid rgba(222, 255, 10, 0.15)',
+          maxHeight: '85vh',
+          overflowY: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-mono font-bold text-white">Load Chain</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">&#x2715;</button>
+          <h2
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-3xl)',
+              fontWeight: 700,
+              color: 'var(--color-text-primary)',
+              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-wider)',
+            }}
+          >
+            Load Chain
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              color: 'var(--color-text-tertiary)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '18px',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
+          >
+            &#x2715;
+          </button>
         </div>
 
         {/* Share code input */}
         <div className="mb-6">
-          <label className="block text-sm text-gray-400 mb-2">Have a share code?</label>
+          <label
+            style={{
+              display: 'block',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-text-tertiary)',
+              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-wide)',
+              marginBottom: 'var(--space-2)',
+            }}
+          >
+            Have a share code?
+          </label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -99,73 +158,120 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
               onChange={(e) => setShareCode(e.target.value.toUpperCase())}
               placeholder="ABC123"
               maxLength={6}
-              className="flex-1 bg-black/30 border border-plugin-border rounded px-3 py-2 text-white font-mono text-center tracking-widest"
+              className="input flex-1"
+              style={{ textAlign: 'center', letterSpacing: 'var(--tracking-widest)' }}
             />
             <button
               onClick={handleLoadByCode}
               disabled={shareCode.length < 6}
-              className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded px-4 py-2 font-mono"
+              className="btn btn-primary"
             >
               Load
             </button>
           </div>
         </div>
 
-        <div className="border-t border-plugin-border pt-4">
+        <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: 'var(--space-4)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-medium">Browse Public Chains</h3>
+            <h3
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 700,
+                color: 'var(--color-text-primary)',
+                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-wide)',
+              }}
+            >
+              Browse Public Chains
+            </h3>
             <div className="flex gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-black/30 border border-plugin-border rounded px-2 py-1 text-xs text-white"
-              >
-                <option value="popular">Popular</option>
-                <option value="recent">Recent</option>
-                <option value="downloads">Downloads</option>
-                <option value="rating">Top Rated</option>
-              </select>
-              <select
-                value={category || ''}
-                onChange={(e) => setCategory(e.target.value || undefined)}
-                className="bg-black/30 border border-plugin-border rounded px-2 py-1 text-xs text-white"
-              >
-                <option value="">All</option>
-                <option value="vocal">Vocal</option>
-                <option value="drums">Drums</option>
-                <option value="bass">Bass</option>
-                <option value="mixing">Mixing</option>
-                <option value="mastering">Mastering</option>
-                <option value="creative">Creative</option>
-              </select>
+              <div style={{ width: '110px' }}>
+                <CustomDropdown
+                  value={sortBy}
+                  options={[
+                    { value: 'popular', label: 'Popular' },
+                    { value: 'recent', label: 'Recent' },
+                    { value: 'downloads', label: 'Downloads' },
+                    { value: 'rating', label: 'Top Rated' },
+                  ]}
+                  onChange={(val) => setSortBy(val as any)}
+                  size="sm"
+                />
+              </div>
+              <div style={{ width: '100px' }}>
+                <CustomDropdown
+                  value={category || ''}
+                  options={[
+                    { value: '', label: 'All' },
+                    { value: 'vocals', label: 'Vocals' },
+                    { value: 'drums', label: 'Drums' },
+                    { value: 'bass', label: 'Bass' },
+                    { value: 'keys-synths', label: 'Keys & Synths' },
+                    { value: 'guitar', label: 'Guitar' },
+                    { value: 'fx-creative', label: 'FX & Creative' },
+                    { value: 'mixing-mastering', label: 'Mixing & Mastering' },
+                  ]}
+                  onChange={(val) => setCategory(val || undefined)}
+                  size="sm"
+                />
+              </div>
             </div>
           </div>
 
           {loading ? (
-            <div className="text-center py-8 text-gray-400">Loading...</div>
+            <div style={{ textAlign: 'center', padding: 'var(--space-8) 0', color: 'var(--color-text-tertiary)' }}>
+              Loading...
+            </div>
           ) : chains.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">No chains found</div>
+            <div style={{ textAlign: 'center', padding: 'var(--space-8) 0', color: 'var(--color-text-tertiary)' }}>
+              No chains found
+            </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 stagger-children">
               {chains.map((chain) => {
                 const ratingData = chainRatings[chain._id];
                 return (
                   <button
                     key={chain._id}
                     onClick={() => handleSelectChain(chain.slug)}
-                    className="w-full text-left p-3 bg-black/30 hover:bg-black/50 rounded-lg transition-colors"
+                    className="w-full text-left fast-snap"
+                    style={{
+                      padding: 'var(--space-3)',
+                      background: 'var(--color-bg-input)',
+                      border: '1px solid var(--color-border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      transition: 'all var(--duration-fast) var(--ease-snap)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.3)';
+                      e.currentTarget.style.background = 'var(--color-bg-hover)';
+                      e.currentTarget.style.boxShadow = '0 0 8px rgba(222, 255, 10, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-border-subtle)';
+                      e.currentTarget.style.background = 'var(--color-bg-input)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-white font-medium text-sm">{chain.name}</div>
-                      <div className="text-xxs text-gray-400">
+                      <div
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)' }}
+                      >
+                        {chain.name}
+                      </div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
                         {chain.pluginCount} plugins
                       </div>
                     </div>
                     {chain.author?.name && (
-                      <div className="text-xs text-gray-400">by {chain.author.name}</div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                        by {chain.author.name}
+                      </div>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
-                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <div className="flex items-center gap-3" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-disabled)' }}>
                         <span>Likes: {chain.likes}</span>
                         <span>DL: {chain.downloads}</span>
                       </div>

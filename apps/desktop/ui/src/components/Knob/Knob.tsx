@@ -1,15 +1,22 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import knobSvg from '../../assets/volume-knob.svg';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import knobImg from '../../assets/button-simple.png';
 
 interface KnobProps {
-  value: number;           // Value in dB
-  min?: number;            // Min dB (default -60)
-  max?: number;            // Max dB (default +24)
-  defaultValue?: number;   // Default value for double-click reset
-  size?: number;           // Size in pixels (default 48)
-  label?: string;          // Label below knob
+  value: number;
+  min?: number;
+  max?: number;
+  defaultValue?: number;
+  size?: number;
+  label?: string;
+  formatValue?: (value: number) => string;
   onChange: (value: number) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
+
+const TICK_COUNT = 31;
+const ARC_SWEEP = 270;
+const START_ANGLE = -135;
 
 export function Knob({
   value,
@@ -18,35 +25,30 @@ export function Knob({
   defaultValue = 0,
   size = 48,
   label,
+  formatValue: formatValueProp,
   onChange,
+  onDragStart,
+  onDragEnd,
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ y: 0, value: 0 });
-  const shiftHeldRef = useRef(false);
   const knobRef = useRef<HTMLDivElement>(null);
-
-  // Convert dB value to rotation angle (0-270 degrees)
-  const valueToAngle = (dB: number): number => {
-    const normalized = (dB - min) / (max - min);
-    return normalized * 270 - 135; // -135 to +135 degrees
-  };
-
   const safeValue = value ?? defaultValue;
-  const angle = valueToAngle(safeValue);
-  const zeroAngle = valueToAngle(0);
+  const normalized = Math.max(0, Math.min(1, (safeValue - min) / (max - min)));
+  const litTicks = Math.round(normalized * (TICK_COUNT - 1));
+  const knobRotation = START_ANGLE + normalized * ARC_SWEEP;
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
+    onDragStart?.();
     dragStartRef.current = { y: e.clientY, value };
-    shiftHeldRef.current = e.shiftKey;
-  }, [value]);
+  }, [value, onDragStart]);
 
   const handleDoubleClick = useCallback(() => {
     onChange(defaultValue);
   }, [defaultValue, onChange]);
 
-  // Scroll-to-change
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const fine = e.shiftKey;
@@ -65,140 +67,136 @@ export function Knob({
 
   useEffect(() => {
     if (!isDragging) return;
-
     const handleMouseMove = (e: MouseEvent) => {
-      shiftHeldRef.current = e.shiftKey;
       const deltaY = dragStartRef.current.y - e.clientY;
       const sensitivity = e.shiftKey ? (max - min) / 1000 : (max - min) / 200;
       const newValue = dragStartRef.current.value + deltaY * sensitivity;
       const clampedValue = Math.max(min, Math.min(max, newValue));
       onChange(Math.round(clampedValue * 10) / 10);
     };
-
     const handleMouseUp = () => {
       setIsDragging(false);
+      onDragEnd?.();
     };
-
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, min, max, onChange]);
+  }, [isDragging, min, max, onChange, onDragEnd]);
 
-  // Format display value
-  const formatValue = (dB: number): string => {
-    if (dB == null) return '0.0';
-    if (dB <= min) return '-inf';
-    if (dB >= 0) return `+${dB.toFixed(1)}`;
-    return dB.toFixed(1);
+  const formatValue = (val: number): string => {
+    if (formatValueProp) return formatValueProp(val);
+    if (val == null) return '0.0';
+    if (val <= min) return '-inf';
+    if (val >= 0) return `+${val.toFixed(1)}`;
+    return val.toFixed(1);
   };
 
-  const center = size / 2;
-  const radius = size * 0.38;
+  // SVG metering ticks sit in a slightly larger canvas around the knob
+  const outerSize = size * 1.4;
+  const center = outerSize / 2;
+  const tickOuterR = outerSize * 0.47;
+  const NEON = '#deff0a';
 
-  // Arc path for track
-  const createArc = (startAngle: number, endAngle: number, r: number): string => {
-    const start = (startAngle - 90) * (Math.PI / 180);
-    const end = (endAngle - 90) * (Math.PI / 180);
-    const startX = center + Math.cos(start) * r;
-    const startY = center + Math.sin(start) * r;
-    const endX = center + Math.cos(end) * r;
-    const endY = center + Math.sin(end) * r;
-    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-    return `M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`;
-  };
+  const ticks = useMemo(() => {
+    const result: Array<{
+      x1: number; y1: number;
+      x2: number; y2: number;
+      isMajor: boolean;
+    }> = [];
+    for (let i = 0; i < TICK_COUNT; i++) {
+      const angleDeg = START_ANGLE + (i / (TICK_COUNT - 1)) * ARC_SWEEP;
+      const rad = (angleDeg - 90) * (Math.PI / 180);
+      const isMajor = i % 5 === 0;
+      const tickLen = isMajor ? outerSize * 0.07 : outerSize * 0.04;
+      const innerR = tickOuterR - tickLen;
+      result.push({
+        x1: center + Math.cos(rad) * innerR,
+        y1: center + Math.sin(rad) * innerR,
+        x2: center + Math.cos(rad) * tickOuterR,
+        y2: center + Math.sin(rad) * tickOuterR,
+        isMajor,
+      });
+    }
+    return result;
+  }, [outerSize, center, tickOuterR]);
 
-  // 0 dB tick mark position
-  const zeroTickAngle = (zeroAngle - 90) * (Math.PI / 180);
-  const tickInner = radius * 0.95;
-  const tickOuter = radius * 1.15;
-  const tickX1 = center + Math.cos(zeroTickAngle) * tickInner;
-  const tickY1 = center + Math.sin(zeroTickAngle) * tickInner;
-  const tickX2 = center + Math.cos(zeroTickAngle) * tickOuter;
-  const tickY2 = center + Math.sin(zeroTickAngle) * tickOuter;
-
-  const isAtZero = Math.abs(safeValue) < 0.05;
-
-  // Knob image size — slightly smaller than the container to leave room for the arc track
-  const knobImgSize = size * 0.82;
 
   return (
     <div className="flex flex-col items-center gap-0.5 relative">
       <div
         ref={knobRef}
         className={`relative select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        style={{ width: size, height: size }}
+        style={{ width: outerSize, height: outerSize }}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
       >
-        {/* Track arc + tick behind the knob */}
+        {/* SVG metering ticks */}
         <svg
-          width={size}
-          height={size}
-          className="absolute inset-0 pointer-events-none"
+          width={outerSize}
+          height={outerSize}
+          className="absolute inset-0"
+          viewBox={`0 0 ${outerSize} ${outerSize}`}
+          style={{ pointerEvents: 'none' }}
         >
-          {/* Track arc (background) */}
-          <path
-            d={createArc(-135, 135, radius * 0.95)}
-            fill="none"
-            stroke="#222"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-          />
-
-          {/* Value arc (filled portion) */}
-          {safeValue > min && (
-            <path
-              d={createArc(-135, angle, radius * 0.95)}
-              fill="none"
-              stroke={isDragging ? '#a06830' : '#89572a'}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-            />
-          )}
-
-          {/* 0 dB tick mark */}
-          <line
-            x1={tickX1}
-            y1={tickY1}
-            x2={tickX2}
-            y2={tickY2}
-            stroke={isAtZero ? '#89572a' : '#444'}
-            strokeWidth={1}
-            strokeLinecap="round"
-          />
+          {ticks.map((tick, i) => {
+            const isLit = i <= litTicks;
+            return (
+              <line
+                key={i}
+                x1={tick.x1} y1={tick.y1}
+                x2={tick.x2} y2={tick.y2}
+                stroke={isLit ? NEON : '#2a2a2a'}
+                strokeWidth={tick.isMajor ? 1.5 : 0.8}
+                strokeLinecap="butt"
+                opacity={isLit ? 1 : 0.5}
+              />
+            );
+          })}
         </svg>
 
-        {/* Rotatable knob image */}
+        {/* Combined knob + glow PNG (square, no shadow) */}
         <img
-          src={knobSvg}
+          src={knobImg}
           alt=""
           draggable={false}
-          className="absolute pointer-events-none"
           style={{
-            width: knobImgSize,
-            height: knobImgSize,
-            top: (size - knobImgSize) / 2,
-            left: (size - knobImgSize) / 2,
-            transform: `rotate(${angle}deg)`,
-            transition: isDragging ? 'none' : 'transform 50ms ease-out',
+            position: 'absolute',
+            width: size,
+            height: size,
+            left: (outerSize - size) / 2,
+            top: (outerSize - size) / 2,
+            transform: `rotate(${knobRotation}deg)`,
+            pointerEvents: 'none',
           }}
         />
       </div>
 
-      {/* Value display */}
-      <div className={`text-[10px] font-mono tabular-nums transition-colors ${
-        isDragging ? 'text-plugin-accent' : 'text-plugin-text'
-      }`}>
+      {/* Value */}
+      <div
+        className="tabular-nums leading-tight transition-colors"
+        style={{
+          fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+          fontSize: 'var(--text-xs, 10px)',
+          color: isDragging ? NEON : 'var(--color-text-secondary, #a0a0a0)',
+          textShadow: isDragging ? `0 0 8px rgba(222, 255, 10, 0.5)` : 'none',
+        }}
+      >
         {formatValue(safeValue)}
       </div>
 
-      {/* Label */}
       {label && (
-        <div className="text-[9px] font-mono text-plugin-muted uppercase tracking-widest font-medium">
+        <div
+          className="uppercase tracking-widest font-medium"
+          style={{
+            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+            fontSize: 'var(--text-xs, 10px)',
+            letterSpacing: 'var(--tracking-wider, 0.1em)',
+            color: 'var(--color-text-tertiary, #606060)',
+          }}
+        >
           {label}
         </div>
       )}

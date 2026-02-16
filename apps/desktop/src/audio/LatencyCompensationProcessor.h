@@ -20,11 +20,13 @@ public:
     ~LatencyCompensationProcessor() override = default;
 
     int getDelaySamples() const { return delaySamples; }
+    void setDelaySamples(int newDelay);
 
     // AudioProcessor overrides
     const juce::String getName() const override { return "LatencyCompensation"; }
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
+    void reset() override;
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override;
 
     double getTailLengthSeconds() const override { return 0.0; }
@@ -45,7 +47,9 @@ public:
 
 private:
     int delaySamples = 0;
+    int storedBlockSize = 512;
     juce::dsp::DelayLine<float> delayLine;
+    juce::dsp::ProcessSpec currentSpec;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LatencyCompensationProcessor)
 };

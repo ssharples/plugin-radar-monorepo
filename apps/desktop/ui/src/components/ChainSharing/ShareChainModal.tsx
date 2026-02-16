@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Send, Users, CheckCircle, AlertCircle } from 'lucide-react';
-import * as convexClient from '../../api/convex-client';
+import { convex, getStoredSession } from '../../api/convex-client';
 import { api } from '@convex/_generated/api';
+import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
 
 interface ShareChainModalProps {
   chainId: string;
@@ -14,6 +15,20 @@ interface Friend {
   username: string;
 }
 
+const modalOverlayStyle: React.CSSProperties = {
+  background: 'rgba(0, 0, 0, 0.75)',
+  backdropFilter: 'blur(4px)',
+};
+
+const modalPanelStyle: React.CSSProperties = {
+  maxWidth: '28rem',
+  width: '100%',
+  margin: '0 1rem',
+  borderRadius: 'var(--radius-xl)',
+  padding: 'var(--space-6)',
+  border: '1px solid rgba(222, 255, 10, 0.15)',
+};
+
 export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModalProps) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<string | null>(null);
@@ -22,34 +37,39 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Escape key to close
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
-
+  // Escape key to close (modal priority)
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    const registerShortcut = useKeyboardStore.getState().registerShortcut;
+    return registerShortcut({
+      id: 'share-chain-modal-escape',
+      key: 'Escape',
+      priority: ShortcutPriority.MODAL,
+      allowInInputs: true,
+      handler: (e) => {
+        e.preventDefault();
+        onClose();
+      }
+    });
+  }, [onClose]);
 
   useEffect(() => {
     loadFriends();
   }, []);
 
   const loadFriends = async () => {
-    const token = localStorage.getItem('pluginradar_session');
+    const token = getStoredSession();
     if (!token) {
       setLoading(false);
       return;
     }
 
     try {
-      const res = await convexClient.convex.query(api.friends.getFriends, {
+      const res = await convex.query(api.friends.getFriends, {
         sessionToken: token,
       });
       setFriends(res.map((f: any) => ({ userId: f.userId, username: f.username })));
-    } catch (err) {
-      console.error('Failed to load friends:', err);
+    } catch {
+      // Failed to load friends
     }
     setLoading(false);
   };
@@ -61,7 +81,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
     setError('');
     setSuccess('');
 
-    const token = localStorage.getItem('pluginradar_session');
+    const token = getStoredSession();
     if (!token) {
       setError('Not logged in');
       setSending(false);
@@ -71,7 +91,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
     const friend = friends.find((f) => f.userId === selectedFriend);
 
     try {
-      await convexClient.convex.mutation(api.privateChains.sendChain, {
+      await convex.mutation(api.privateChains.sendChain, {
         sessionToken: token,
         recipientIdentifier: friend?.username ?? selectedFriend,
         chainId: chainId as any,
@@ -85,82 +105,76 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-      <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 flex items-center justify-center z-50 fade-in" style={modalOverlayStyle} onClick={onClose}>
+      <div className="glass scale-in" style={modalPanelStyle} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-4">
-          <Send size={18} className="text-plugin-accent" />
-          <h2 className="text-xl font-mono font-bold text-white">Share Chain</h2>
+          <Send size={18} style={{ color: 'var(--color-accent-cyan)' }} />
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+            Share Chain
+          </h2>
         </div>
 
-        <div className="bg-black/20 rounded p-3 mb-4">
-          <div className="text-sm text-gray-400">Sharing</div>
-          <div className="text-white font-medium">{chainName}</div>
+        <div style={{ background: 'var(--color-bg-input)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-4)', border: '1px solid var(--color-border-subtle)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>Sharing</div>
+          <div style={{ color: 'var(--color-text-primary)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{chainName}</div>
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded p-3 mb-4 text-red-400 text-sm">
+          <div className="flex items-center gap-2" style={{ background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.3)', borderRadius: 'var(--radius-base)', padding: 'var(--space-3)', marginBottom: 'var(--space-4)', color: 'var(--color-status-error)', fontSize: 'var(--text-sm)' }}>
             <AlertCircle size={14} />
             {error}
           </div>
         )}
 
         {success ? (
-          <div className="text-center py-4">
-            <CheckCircle size={40} className="text-green-400 mx-auto mb-3" />
-            <div className="text-green-400 font-medium mb-4">{success}</div>
-            <button
-              onClick={onClose}
-              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-2"
-            >
-              Done
-            </button>
+          <div className="text-center" style={{ padding: 'var(--space-4) 0' }}>
+            <CheckCircle size={40} style={{ color: 'var(--color-status-active)', margin: '0 auto var(--space-3)' }} />
+            <div style={{ color: 'var(--color-status-active)', fontWeight: 600, marginBottom: 'var(--space-4)', fontFamily: 'var(--font-mono)' }}>{success}</div>
+            <button onClick={onClose} className="btn btn-primary w-full">Done</button>
           </div>
         ) : (
           <>
             {loading ? (
-              <div className="text-gray-400 text-sm py-4 text-center">Loading friends...</div>
+              <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', padding: 'var(--space-4) 0', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>Loading friends...</div>
             ) : friends.length === 0 ? (
-              <div className="text-gray-500 text-sm py-4 text-center">
-                <Users size={24} className="mx-auto mb-2 opacity-50" />
+              <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-sm)', padding: 'var(--space-4) 0', textAlign: 'center' }}>
+                <Users size={24} style={{ margin: '0 auto 8px', opacity: 0.5, color: 'var(--color-text-disabled)' }} />
                 No friends yet. Add friends to share chains!
               </div>
             ) : (
-              <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
-                <label className="block text-sm text-gray-400 mb-2">Select a friend</label>
+              <div className="space-y-2 mb-4 max-h-60 overflow-y-auto scrollbar-cyber">
+                <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: '8px' }}>Select a friend</label>
                 {friends.map((friend) => (
                   <button
                     key={friend.userId}
                     onClick={() => setSelectedFriend(friend.userId)}
-                    className={`w-full flex items-center gap-3 p-3 rounded text-left transition-colors ${
-                      selectedFriend === friend.userId
-                        ? 'bg-plugin-accent/20 border border-plugin-accent/50'
-                        : 'bg-black/20 border border-transparent hover:border-plugin-border'
-                    }`}
+                    className="w-full flex items-center gap-3 fast-snap"
+                    style={{
+                      padding: 'var(--space-3)',
+                      borderRadius: 'var(--radius-md)',
+                      textAlign: 'left',
+                      background: selectedFriend === friend.userId ? 'rgba(222, 255, 10, 0.1)' : 'var(--color-bg-input)',
+                      border: selectedFriend === friend.userId ? '1px solid rgba(222, 255, 10, 0.4)' : '1px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all var(--duration-fast)',
+                    }}
                   >
-                    <div className="w-8 h-8 rounded-full bg-plugin-accent/30 flex items-center justify-center text-plugin-accent text-sm font-bold">
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(222, 255, 10, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent-cyan)', fontSize: 'var(--text-sm)', fontWeight: 700 }}>
                       {friend.username.charAt(0).toUpperCase()}
                     </div>
-                    <div className="text-white text-sm">{friend.username}</div>
+                    <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>{friend.username}</div>
                   </button>
                 ))}
               </div>
             )}
 
             <div className="flex gap-3 pt-2">
-              <button
-                onClick={onClose}
-                className="flex-1 border border-plugin-border text-gray-400 hover:text-white rounded px-4 py-2 text-sm"
-              >
-                Cancel
-              </button>
+              <button onClick={onClose} className="btn flex-1">Cancel</button>
               <button
                 onClick={handleSend}
                 disabled={sending || !selectedFriend}
-                className={`flex-1 flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium ${
-                  sending || !selectedFriend
-                    ? 'bg-plugin-accent/50 text-plugin-accent cursor-not-allowed'
-                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
-                }`}
+                className={`btn flex-1 flex items-center justify-center gap-2 ${sending || !selectedFriend ? '' : 'btn-primary'}`}
+                style={sending || !selectedFriend ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               >
                 <Send size={14} />
                 {sending ? 'Sending...' : 'Send Chain'}

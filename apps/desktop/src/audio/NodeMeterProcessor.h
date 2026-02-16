@@ -46,6 +46,9 @@ public:
     void setAssociatedNodeId(ChainNodeId id) { associatedNodeId = id; }
     ChainNodeId getAssociatedNodeId() const { return associatedNodeId; }
 
+    // PHASE 2: Conditional metering - enable/disable LUFS calculation
+    void setEnableLUFS(bool enabled) { meter.setEnableLUFS(enabled); }
+
 private:
     AudioMeter meter;
     ChainNodeId associatedNodeId = -1;

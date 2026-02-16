@@ -1,20 +1,26 @@
 import { useOnboardingStore } from '../../stores/onboardingStore'
 import type { BlacklistedPlugin, ScanFailureReason } from '../../stores/onboardingTypes'
 
-const reasonConfig: Record<ScanFailureReason, { label: string; color: string; description: string }> = {
+const reasonConfig: Record<ScanFailureReason, { label: string; bg: string; border: string; color: string; description: string }> = {
   crash: {
     label: 'Crashed',
-    color: 'text-red-400 bg-red-500/10 border-red-500/20',
+    bg: 'rgba(255, 0, 51, 0.1)',
+    border: 'rgba(255, 0, 51, 0.2)',
+    color: 'var(--color-status-error)',
     description: 'Crashed during scanning and was blacklisted',
   },
   'scan-failure': {
     label: 'Authorization Required',
-    color: 'text-plugin-warning bg-plugin-warning/10 border-plugin-warning/20',
+    bg: 'rgba(255, 170, 0, 0.1)',
+    border: 'rgba(255, 170, 0, 0.2)',
+    color: 'var(--color-status-warning)',
     description: 'May need authorization (iLok) or a valid license',
   },
   timeout: {
     label: 'Timed Out',
-    color: 'text-plugin-dim bg-plugin-surface-alt border-plugin-border',
+    bg: 'var(--color-bg-input)',
+    border: 'var(--color-border-default)',
+    color: 'var(--color-text-disabled)',
     description: 'Took too long — may have been waiting for a license dialog',
   },
 }
@@ -40,17 +46,20 @@ export function ScanResults() {
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
       {/* Headline */}
-      <h2 className="font-mono text-lg text-plugin-text crt-text uppercase tracking-wider mb-1">
+      <h2
+        className="crt-text mb-1"
+        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
+      >
         Found {scanResult.totalDiscovered} Plugins
       </h2>
-      <p className="text-plugin-dim text-xxs font-mono mb-6">
+      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', marginBottom: '1.5rem' }}>
         Completed in {durationSec}s
       </p>
 
       {/* Issues section */}
       {hasIssues && (
         <div className="w-full mb-6">
-          <h3 className="text-plugin-muted text-xs font-mono uppercase tracking-wider mb-3">
+          <h3 style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
             {scanResult.totalBlacklisted} {scanResult.totalBlacklisted === 1 ? 'issue' : 'issues'} found
           </h3>
 
@@ -58,15 +67,16 @@ export function ScanResults() {
             const config = reasonConfig[reason]
             const plugins = grouped[reason]!
             return (
-              <div key={reason} className="mb-3">
-                <div className={`text-xxs font-mono px-3 py-2 rounded-propane border ${config.color} mb-1`}>
-                  <span className="uppercase font-bold">{config.label}</span>
-                  <span className="ml-2 opacity-70">{config.description}</span>
+              <div key={reason} style={{ marginBottom: '12px' }}>
+                <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', padding: '8px 12px', borderRadius: 'var(--radius-base)', border: `1px solid ${config.border}`, background: config.bg, color: config.color, marginBottom: '4px' }}>
+                  <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{config.label}</span>
+                  <span style={{ marginLeft: '8px', opacity: 0.7 }}>{config.description}</span>
                 </div>
                 {plugins.map((p, i) => (
                   <div
                     key={i}
-                    className="text-plugin-dim text-xxs font-mono pl-4 py-0.5 truncate"
+                    className="truncate"
+                    style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', paddingLeft: '16px', paddingTop: '2px', paddingBottom: '2px' }}
                   >
                     {p.name}
                   </div>
@@ -81,13 +91,13 @@ export function ScanResults() {
       <div className="flex flex-col w-full gap-2">
         <button
           onClick={continueFromResults}
-          className="w-full py-2.5 bg-plugin-accent hover:bg-plugin-accent-bright text-black font-mono text-sm uppercase tracking-wider rounded-propane transition-colors"
+          className="btn btn-primary w-full"
         >
           Continue to Propane
         </button>
         <button
           onClick={rescan}
-          className="w-full py-2 bg-transparent border border-plugin-border hover:border-plugin-accent text-plugin-muted hover:text-plugin-text font-mono text-xs uppercase tracking-wider rounded-propane transition-colors"
+          className="btn w-full"
         >
           Rescan All
         </button>

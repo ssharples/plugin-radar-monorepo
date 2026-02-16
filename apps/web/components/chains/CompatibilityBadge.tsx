@@ -9,9 +9,9 @@ export function CompatibilityBadge({ percentage }: { percentage: number }) {
 
   const color =
     percentage >= 80
-      ? "text-emerald-400"
+      ? "text-white"
       : percentage >= 60
-        ? "text-amber-400"
+        ? "text-white"
         : percentage >= 40
           ? "text-orange-400"
           : "text-red-400";

@@ -52,7 +52,7 @@ export default function ProfilePage() {
   if (profileUser === undefined) {
     return (
       <div className="container mx-auto px-4 lg:px-6 py-16 text-center">
-        <div className="animate-spin w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full mx-auto" />
+        <div className="animate-spin w-8 h-8 border-2 border-[#deff0a] border-t-transparent rounded-full mx-auto" />
       </div>
     );
   }
@@ -61,7 +61,7 @@ export default function ProfilePage() {
   if (profileUser === null) {
     return (
       <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent pointer-events-none" />
         <div className="container mx-auto px-4 lg:px-6 py-16 text-center relative">
           <User className="w-12 h-12 text-stone-600 mx-auto mb-4" />
           <h1
@@ -88,7 +88,7 @@ export default function ProfilePage() {
 
   return (
     <div className="relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-6 py-10 relative">
         {/* Profile Header */}
@@ -110,7 +110,7 @@ export default function ProfilePage() {
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-medium ${
                     profileUser.tier === "premium"
-                      ? "bg-amber-500 text-stone-900"
+                      ? "bg-white text-black"
                       : "bg-stone-700 text-stone-300"
                   }`}
                 >
@@ -175,7 +175,7 @@ export default function ProfilePage() {
               onClick={() => setActiveTab(tab.key)}
               className={`pb-3 text-sm font-medium transition ${
                 activeTab === tab.key
-                  ? "text-amber-500 border-b-2 border-amber-500"
+                  ? "text-[#deff0a] border-b-2 border-[#deff0a]"
                   : "text-stone-400 hover:text-stone-200"
               }`}
             >
@@ -251,7 +251,7 @@ function ChainsTab({
         <Link
           key={chain._id}
           href={`/chains/${chain.slug}`}
-          className="block glass-card rounded-xl p-5 hover:border-amber-500/30 transition group"
+          className="block glass-card rounded-xl p-5 hover:border-[#deff0a]/30 transition group"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="px-2 py-1 bg-white/[0.04] border border-white/[0.06] rounded text-xs text-stone-400 capitalize">
@@ -262,7 +262,7 @@ function ChainsTab({
             </span>
           </div>
 
-          <h3 className="font-semibold text-stone-100 group-hover:text-amber-400 transition truncate mb-3">
+          <h3 className="font-semibold text-stone-100 group-hover:text-white transition truncate mb-3">
             {chain.name}
           </h3>
 
@@ -337,7 +337,7 @@ function FollowersTab({ userId }: { userId: Id<"users"> }) {
             size="sm"
           />
           <span className="text-stone-200 font-medium">
-            {follower!.name || follower!.email}
+            {follower!.name || "User"}
           </span>
         </Link>
       ))}
@@ -396,7 +396,7 @@ function FollowingTab({ userId }: { userId: Id<"users"> }) {
             size="sm"
           />
           <span className="text-stone-200 font-medium">
-            {user!.name || user!.email}
+            {user!.name || "User"}
           </span>
         </Link>
       ))}

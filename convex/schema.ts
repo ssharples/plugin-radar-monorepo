@@ -900,6 +900,24 @@ export default defineSchema({
     .index("by_plugin", ["plugin"])
     .index("by_requested", ["requestedAt"]),
 
+  // Auto-queued unmatched plugins for enrichment (no catalog entry yet)
+  enrichmentQueue: defineTable({
+    pluginName: v.string(),
+    manufacturer: v.string(),
+    format: v.string(),
+    userCount: v.number(),
+    firstSeenAt: v.number(),
+    lastSeenAt: v.number(),
+    status: v.string(),              // "pending" | "processing" | "completed" | "failed"
+    priority: v.string(),            // "low" | "normal" | "high"
+    createdPluginId: v.optional(v.id("plugins")),
+    processedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+  })
+    .index("by_status", ["status"])
+    .index("by_name_manufacturer", ["pluginName", "manufacturer"])
+    .index("by_priority_status", ["priority", "status"]),
+
   // ============================================
   // PLUGIN DIRECTORY INTEGRATION
   // ============================================
@@ -1000,8 +1018,12 @@ export default defineSchema({
     // Forking
     forkedFrom: v.optional(v.id("pluginChains")),
 
-    // LUFS target — recommended input level for this chain
+    // LUFS target — recommended input level for this chain (legacy, kept for backward compat)
     targetInputLufs: v.optional(v.number()),
+
+    // Peak dB target range — recommended input peak level for this chain
+    targetInputPeakMin: v.optional(v.number()),
+    targetInputPeakMax: v.optional(v.number()),
 
     // Timestamps
     createdAt: v.number(),
@@ -1213,9 +1235,34 @@ export default defineSchema({
     updatedAt: v.number(),
     confidence: v.number(),         // 0-100, how reliable is this mapping
     source: v.string(),             // "manual", "ai-analyzed", "juce-scanned"
+
+    // Crowdpool tracking
+    contributorCount: v.optional(v.number()),   // How many users have contributed to this map
+    lastContributorAt: v.optional(v.number()),  // Timestamp of last contribution
   })
     .index("by_plugin", ["plugin"])
     .index("by_category", ["category"]),
+
+  // Chain load result tracking — measures load success rate
+  chainLoadResults: defineTable({
+    chain: v.id("pluginChains"),
+    user: v.id("users"),
+    totalSlots: v.number(),
+    loadedSlots: v.number(),
+    failedSlots: v.number(),
+    substitutedSlots: v.number(),
+    successRate: v.number(), // loadedSlots / totalSlots (0.0–1.0)
+    failures: v.optional(v.array(v.object({
+      position: v.number(),
+      pluginName: v.string(),
+      reason: v.string(), // "not_found", "load_error", "preset_error"
+    }))),
+    loadTimeMs: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_chain", ["chain"])
+    .index("by_user", ["user"])
+    .index("by_created", ["createdAt"]),
 
   // Standard semantic parameter definitions
   parameterSemantics: defineTable({

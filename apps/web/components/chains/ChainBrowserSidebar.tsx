@@ -9,11 +9,28 @@ const SORT_OPTIONS = [
   { value: "downloads", label: "Most Downloaded" },
 ];
 
+const GENRE_OPTIONS = [
+  "Electronic",
+  "Hip-Hop",
+  "Rock",
+  "Pop",
+  "R&B",
+  "Metal",
+  "Jazz",
+  "Ambient",
+  "Country",
+  "Classical",
+  "Lo-Fi",
+  "Reggaeton",
+];
+
 export function ChainBrowserSidebar({
   searchQuery,
   onSearchChange,
   category,
   onCategoryChange,
+  genre,
+  onGenreChange,
   sortBy,
   onSortChange,
   showCompatible,
@@ -23,6 +40,8 @@ export function ChainBrowserSidebar({
   onSearchChange: (value: string) => void;
   category: string;
   onCategoryChange: (value: string) => void;
+  genre: string;
+  onGenreChange: (value: string) => void;
   sortBy: string;
   onSortChange: (value: string) => void;
   showCompatible: boolean;
@@ -39,7 +58,7 @@ export function ChainBrowserSidebar({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search chains..."
-            className="w-full pl-9 pr-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/20 transition-all text-sm"
+            className="w-full pl-9 pr-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-[#deff0a]/20 transition-all text-sm"
           />
         </div>
       </div>
@@ -55,6 +74,38 @@ export function ChainBrowserSidebar({
         />
       </div>
 
+      {/* Genre Filter */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">
+          Genre
+        </h3>
+        <div className="space-y-0.5">
+          <button
+            onClick={() => onGenreChange("")}
+            className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition ${
+              genre === ""
+                ? "bg-white/10 text-white font-medium"
+                : "text-stone-400 hover:text-stone-200 hover:bg-white/[0.04]"
+            }`}
+          >
+            All Genres
+          </button>
+          {GENRE_OPTIONS.map((g) => (
+            <button
+              key={g}
+              onClick={() => onGenreChange(genre === g ? "" : g)}
+              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition ${
+                genre === g
+                  ? "bg-white/10 text-white font-medium"
+                  : "text-stone-400 hover:text-stone-200 hover:bg-white/[0.04]"
+              }`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Compatibility filter */}
       <div>
         <label className="flex items-center gap-2 cursor-pointer group">
@@ -62,7 +113,7 @@ export function ChainBrowserSidebar({
             type="checkbox"
             checked={showCompatible}
             onChange={(e) => onCompatibleChange(e.target.checked)}
-            className="w-4 h-4 rounded border-stone-700 bg-white/[0.04] text-amber-500 focus:ring-amber-500/20 focus:ring-offset-0"
+            className="w-4 h-4 rounded border-stone-700 bg-white/[0.04] text-[#deff0a] focus:ring-[#deff0a]/20 focus:ring-offset-0"
           />
           <span className="text-sm text-stone-400 group-hover:text-stone-300 transition">
             Compatible only
@@ -80,7 +131,7 @@ export function ChainBrowserSidebar({
           <select
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value)}
-            className="flex-1 px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 text-sm focus:outline-none focus:border-amber-500/30 transition"
+            className="flex-1 px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 text-sm focus:outline-none focus:border-white/30 transition"
           >
             {SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>

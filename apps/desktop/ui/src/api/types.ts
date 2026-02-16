@@ -38,6 +38,16 @@ export interface PresetInfo {
   lastModified: string;
 }
 
+// Group template information
+export interface GroupTemplateInfo {
+  name: string;
+  category: string;
+  path: string;
+  lastModified: string;
+  mode: 'serial' | 'parallel';
+  pluginCount: number;
+}
+
 // Scan progress
 export interface ScanProgress {
   scanning: boolean;
@@ -67,6 +77,8 @@ export interface MeterData {
   inputRmsL: number;
   inputRmsR: number;
   inputLufs: number;
+  inputAvgPeakDbL: number;
+  inputAvgPeakDbR: number;
   outputPeakL: number;
   outputPeakR: number;
   outputPeakHoldL: number;
@@ -82,10 +94,15 @@ export interface NodeMeterReadings {
   peakR: number;
   peakHoldL: number;
   peakHoldR: number;
+  rmsL: number;
+  rmsR: number;
   inputPeakL: number;
   inputPeakR: number;
   inputPeakHoldL: number;
   inputPeakHoldR: number;
+  inputRmsL: number;
+  inputRmsR: number;
+  latencyMs?: number;
 }
 
 // Gain settings
@@ -112,6 +129,14 @@ export interface PluginNodeUI {
   branchGainDb: number;
   solo: boolean;
   mute: boolean;
+  // Per-plugin controls
+  inputGainDb: number;
+  outputGainDb: number;
+  pluginDryWet: number;
+  sidechainSource: number;
+  midSideMode: number;  // 0=off, 1=mid, 2=side, 3=midside
+  hasSidechain: boolean;
+  latency?: number;
 }
 
 export interface GroupNodeUI {
@@ -120,6 +145,8 @@ export interface GroupNodeUI {
   name: string;
   mode: 'serial' | 'parallel';
   dryWet: number;
+  duckAmount: number;
+  duckReleaseMs: number;
   collapsed: boolean;
   children: ChainNodeUI[];
 }
@@ -138,6 +165,8 @@ export interface ApiResponse<T = void> {
   chainState?: ChainStateV2;
   presetList?: PresetInfo[];
   preset?: PresetInfo;
+  templateList?: GroupTemplateInfo[];
+  groupId?: number;
   message?: string;
   data?: T;
 }
@@ -145,6 +174,34 @@ export interface ApiResponse<T = void> {
 // =============================================
 // Chain browser types
 // =============================================
+
+export interface BrowseChainSlot {
+  pluginName: string;
+  manufacturer: string;
+  format?: string;
+  uid?: number;
+  fileOrIdentifier?: string;
+  version?: string;
+  bypassed?: boolean;
+  presetData?: string;
+  presetSizeBytes?: number;
+  presetName?: string;
+  position?: number;
+  matchedPlugin?: string;
+  notes?: string;
+  parameters?: Array<{
+    name: string;
+    value: string;
+    normalizedValue?: number;
+    semantic?: string;
+    unit?: string;
+  }>;
+  pluginData?: {
+    name: string;
+    slug: string;
+    imageUrl?: string;
+  };
+}
 
 export interface BrowseChainResult {
   _id: string;
@@ -160,10 +217,17 @@ export interface BrowseChainResult {
   likes: number;
   isPublic: boolean;
   pluginIds?: string[];
-  slots: any[];
+  slots: BrowseChainSlot[];
   author?: { name?: string; avatarUrl?: string };
   targetInputLufs?: number;
+  targetInputPeakMin?: number;
+  targetInputPeakMax?: number;
   createdAt: number;
+  forks?: number;
+  views?: number;
+  genre?: string;
+  averageRating?: number;
+  updatedAt?: number;
 }
 
 export interface BrowseChainsPaginatedResult {
@@ -178,6 +242,17 @@ export interface CollectionItem {
   addedAt: number;
   source: string;
   notes?: string;
+}
+
+// Chain import result with slot-level detail
+export interface ChainImportResult {
+  success: boolean;
+  totalSlots: number;
+  loadedSlots: number;
+  failedSlots: number;
+  failures?: Array<{ position: number; pluginName: string; reason: string }>;
+  chainState?: ChainStateV2;
+  error?: string;
 }
 
 // Blacklisted plugin event (from scanner)
@@ -196,6 +271,9 @@ export interface OtherInstanceInfo {
   trackName: string;
   pluginCount: number;
   pluginNames: string[];
+  mirrorGroupId: number;   // -1 if not mirrored
+  isLeader: boolean;
+  isFollower: boolean;
 }
 
 export interface MirrorPartner {
@@ -205,9 +283,48 @@ export interface MirrorPartner {
 
 export interface MirrorState {
   isMirrored: boolean;
+  isLeader: boolean;
   mirrorGroupId: number | null;
   partners: MirrorPartner[];
 }
+
+// =============================================
+// Scanner management types
+// =============================================
+
+export interface CustomScanPath {
+  path: string;
+  format: string;
+  isDefault: boolean;
+}
+
+export interface DeactivatedPlugin {
+  identifier: string;
+  name: string;
+  manufacturer: string;
+  format: string;
+}
+
+export interface AutoScanState {
+  enabled: boolean;
+  intervalMs: number;
+  lastCheckTime: number;
+}
+
+export interface NewPluginsDetectedEvent {
+  count: number;
+  plugins: Array<{ path: string; format: string }>;
+}
+
+export interface PluginDescriptionWithStatus extends PluginDescription {
+  isDeactivated?: boolean;
+}
+
+// Unified chain item for merged local + cloud view
+export type UnifiedChainItem =
+  | { source: 'local'; data: PresetInfo }
+  | { source: 'cloud'; data: BrowseChainResult }
+  | { source: 'both'; localData: PresetInfo; cloudData: BrowseChainResult };
 
 // Native function types for JUCE bridge
 export type NativeFunction = (...args: unknown[]) => Promise<unknown>;

@@ -9,13 +9,36 @@ LatencyCompensationProcessor::LatencyCompensationProcessor(int delaySamples)
 
 void LatencyCompensationProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    juce::dsp::ProcessSpec spec;
-    spec.sampleRate = sampleRate;
-    spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
-    spec.numChannels = 2;
+    storedBlockSize = samplesPerBlock;
 
-    delayLine.prepare(spec);
+    currentSpec.sampleRate = sampleRate;
+    currentSpec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
+    currentSpec.numChannels = 2;
+
+    delayLine.prepare(currentSpec);
     delayLine.setDelay(static_cast<float>(delaySamples));
+}
+
+void LatencyCompensationProcessor::setDelaySamples(int newDelay)
+{
+    if (newDelay != delaySamples)
+    {
+        delaySamples = std::max(0, newDelay);
+
+        // Reallocate delay line — maximumBlockSize must be at least the audio
+        // processing block size, otherwise the internal buffer is undersized.
+        auto spec = currentSpec;
+        spec.maximumBlockSize = static_cast<juce::uint32>(std::max(storedBlockSize, delaySamples + 1));
+        delayLine.prepare(spec);
+        delayLine.setDelay(static_cast<float>(delaySamples));
+
+        setLatencySamples(delaySamples);
+    }
+}
+
+void LatencyCompensationProcessor::reset()
+{
+    delayLine.reset();
 }
 
 void LatencyCompensationProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)

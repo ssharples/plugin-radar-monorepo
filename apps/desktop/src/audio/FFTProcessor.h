@@ -35,11 +35,11 @@ public:
     void process(const juce::AudioBuffer<float>& buffer);
 
     /**
-     * Thread-safe getter for UI. Returns magnitude spectrum in dB (numBins values).
-     * Range is approximately -100 dB to 0 dB (relative to full scale).
+     * Thread-safe getter for UI. Returns magnitude spectrum reference (numBins values).
+     * Range is linear magnitudes (frontend converts to dB).
      * The caller receives the most recently completed FFT frame.
      */
-    std::vector<float> getMagnitudes() const;
+    const std::array<float, numBins>& getMagnitudes() const;
 
     /** Returns the number of output bins (numBins = fftSize/2). */
     int getNumBins() const { return numBins; }
@@ -47,13 +47,19 @@ public:
     /** Returns the sample rate used for frequency calculations. */
     double getSampleRate() const { return currentSampleRate; }
 
+    /** Enable/disable FFT processing. When disabled, process() returns immediately
+     *  and getMagnitudes() returns the last computed frame (frozen spectrum). */
+    void setEnabled(bool e) { enabled.store(e, std::memory_order_relaxed); }
+    bool isEnabled() const { return enabled.load(std::memory_order_relaxed); }
+
 private:
     juce::dsp::FFT forwardFFT;
     juce::dsp::WindowingFunction<float> windowFunction;
 
-    // FIFO for collecting samples on the audio thread
+    // FIFO for collecting samples on the audio thread (ring buffer)
     std::array<float, fftSize> fifo;
-    int fifoIndex = 0;
+    int writePos = 0;
+    int samplesInFifo = 0;
 
     // FFT working buffer (2x size for real-only forward transform)
     std::array<float, fftSize * 2> fftWorkBuffer;
@@ -71,6 +77,8 @@ private:
     std::atomic<bool> newDataReady{false};
 
     double currentSampleRate = 44100.0;
+
+    std::atomic<bool> enabled{true};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FFTProcessor)
 };

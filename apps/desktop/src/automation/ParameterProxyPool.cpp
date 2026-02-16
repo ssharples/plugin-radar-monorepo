@@ -1,6 +1,8 @@
 #include "ParameterProxyPool.h"
 #include "ProxyParameter.h"
 #include "../core/ChainProcessor.h"
+#include "../audio/PluginWithMeterWrapper.h"
+#include "../utils/ProChainLogger.h"
 
 void ParameterProxyPool::createAndRegister(juce::AudioProcessor& processor)
 {
@@ -10,9 +12,9 @@ void ParameterProxyPool::createAndRegister(juce::AudioProcessor& processor)
     {
         for (int param = 0; param < kMaxParamsPerSlot; ++param)
         {
-            auto* proxy = new ProxyParameter(slot, param);
-            proxies.push_back(proxy);
-            processor.addParameter(proxy); // processor takes ownership
+            auto proxy = std::make_unique<ProxyParameter>(slot, param);
+            proxies.push_back(proxy.get());
+            processor.addParameter(proxy.release()); // processor takes ownership
         }
     }
 }
@@ -45,6 +47,8 @@ void ParameterProxyPool::unbindSlot(int slotIndex)
 
 void ParameterProxyPool::rebindAll(ChainProcessor& chain)
 {
+    PCLOG("rebindAll — starting");
+
     // Use DFS-flattened plugin list from tree model
     auto plugins = chain.getFlatPluginList();
     int numPlugins = static_cast<int>(plugins.size());
@@ -55,13 +59,37 @@ void ParameterProxyPool::rebindAll(ChainProcessor& chain)
         {
             auto& leaf = *plugins[static_cast<size_t>(i)];
             if (auto node = chain.getNodeForId(leaf.graphNodeId))
-                bindSlot(i, node->getProcessor());
+            {
+                juce::AudioProcessor* processor = nullptr;
+                if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(node->getProcessor()))
+                {
+                    processor = wrapper->getWrappedPlugin();
+                }
+                else
+                {
+                    processor = node->getProcessor();
+                }
+
+                if (processor == nullptr)
+                {
+                    PCLOG("WARNING: rebindAll slot " + juce::String(i)
+                          + " — processor is null for " + leaf.description.name);
+                }
+
+                bindSlot(i, processor);
+            }
             else
+            {
+                PCLOG("WARNING: rebindAll slot " + juce::String(i)
+                      + " — graph node not found for nodeId=" + juce::String(leaf.graphNodeId.uid));
                 unbindSlot(i);
+            }
         }
         else
         {
             unbindSlot(i);
         }
     }
+
+    PCLOG("rebindAll — done (" + juce::String(numPlugins) + " plugins)");
 }

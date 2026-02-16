@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { getSessionUser } from "./lib/auth";
+import { checkRateLimit } from "./lib/rateLimit";
 
 // ============================================
 // Helper: Denormalize a 0-1 JUCE value to physical units
@@ -346,6 +348,134 @@ export const upsertParameterMap = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+// ============================================
+// 2b. contributeParameterDiscovery — crowdpooled parameter map contribution
+// ============================================
+export const contributeParameterDiscovery = mutation({
+  args: {
+    plugin: v.id("plugins"),
+    sessionToken: v.string(),
+    discoveredMap: v.object({
+      pluginName: v.string(),
+      category: v.string(),
+      confidence: v.number(),
+      matchedCount: v.number(),
+      totalCount: v.number(),
+      source: v.string(),
+      parameters: v.array(v.object({
+        juceParamId: v.string(),
+        juceParamIndex: v.optional(v.number()),
+        semantic: v.string(),
+        physicalUnit: v.string(),
+        mappingCurve: v.string(),
+        minValue: v.number(),
+        maxValue: v.number(),
+        defaultValue: v.optional(v.number()),
+        rangeStart: v.optional(v.number()),
+        rangeEnd: v.optional(v.number()),
+        skewFactor: v.optional(v.number()),
+        symmetricSkew: v.optional(v.boolean()),
+        interval: v.optional(v.number()),
+        hasNormalisableRange: v.optional(v.boolean()),
+        curveSamples: v.optional(v.array(v.object({
+          normalized: v.number(),
+          physical: v.number(),
+        }))),
+        qRepresentation: v.optional(v.string()),
+      })),
+      eqBandCount: v.optional(v.number()),
+      eqBandParameterPattern: v.optional(v.string()),
+      compHasAutoMakeup: v.optional(v.boolean()),
+      compHasParallelMix: v.optional(v.boolean()),
+      compHasLookahead: v.optional(v.boolean()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Rate limit: 1 contribution per user per plugin per hour
+    await checkRateLimit(ctx, `param-contrib:${userId}:${args.plugin}`, 1, 3600000);
+
+    const now = Date.now();
+    const { discoveredMap } = args;
+
+    // Lookup existing map
+    const existing = await ctx.db
+      .query("pluginParameterMaps")
+      .withIndex("by_plugin", (q) => q.eq("plugin", args.plugin))
+      .first();
+
+    if (existing) {
+      // Always increment contributor count
+      const newContributorCount = (existing.contributorCount ?? 0) + 1;
+      const updates: Record<string, any> = {
+        contributorCount: newContributorCount,
+        lastContributorAt: now,
+        updatedAt: now,
+      };
+
+      // If manual map, just count — don't overwrite data
+      if (existing.source === "manual") {
+        await ctx.db.patch(existing._id, updates);
+        return { action: "counted_only" as const, contributorCount: newContributorCount };
+      }
+
+      // For juce-scanned: only update data if new discovery has more matched params,
+      // or same count but higher confidence
+      const existingMatchedCount = existing.parameters.filter(
+        (p) => p.semantic !== "unknown"
+      ).length;
+
+      if (
+        discoveredMap.matchedCount > existingMatchedCount ||
+        (discoveredMap.matchedCount === existingMatchedCount &&
+          discoveredMap.confidence > existing.confidence)
+      ) {
+        // Update with better data
+        await ctx.db.patch(existing._id, {
+          ...updates,
+          pluginName: discoveredMap.pluginName,
+          category: discoveredMap.category,
+          parameters: discoveredMap.parameters,
+          eqBandCount: discoveredMap.eqBandCount,
+          eqBandParameterPattern: discoveredMap.eqBandParameterPattern,
+          compHasAutoMakeup: discoveredMap.compHasAutoMakeup,
+          compHasParallelMix: discoveredMap.compHasParallelMix,
+          compHasLookahead: discoveredMap.compHasLookahead,
+          confidence: discoveredMap.confidence,
+          source: discoveredMap.source,
+        });
+        return { action: "updated" as const, contributorCount: newContributorCount };
+      }
+
+      // Data not better — just count
+      await ctx.db.patch(existing._id, updates);
+      return { action: "counted_only" as const, contributorCount: newContributorCount };
+    }
+
+    // No existing map — insert new
+    await ctx.db.insert("pluginParameterMaps", {
+      plugin: args.plugin,
+      pluginName: discoveredMap.pluginName,
+      category: discoveredMap.category,
+      parameters: discoveredMap.parameters,
+      eqBandCount: discoveredMap.eqBandCount,
+      eqBandParameterPattern: discoveredMap.eqBandParameterPattern,
+      compHasAutoMakeup: discoveredMap.compHasAutoMakeup,
+      compHasParallelMix: discoveredMap.compHasParallelMix,
+      compHasLookahead: discoveredMap.compHasLookahead,
+      confidence: discoveredMap.confidence,
+      source: discoveredMap.source,
+      contributorCount: 1,
+      lastContributorAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { action: "inserted" as const, contributorCount: 1 };
   },
 });
 

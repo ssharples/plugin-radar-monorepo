@@ -1,10 +1,10 @@
 import { MetadataRoute } from 'next';
-import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
+import { convexServer } from '@/lib/convex-server';
+import { getAllArticles } from '@/lib/articles';
+import { CURATED_CATEGORIES } from './chains/best/curated-categories';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://pluginradar.com';
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Categories with dedicated pages
 const categories = [
@@ -26,10 +26,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Fetch dynamic data from Convex
   const [pluginSlugs, manufacturerSlugs, comparisonSlugs, chainSlugs] = await Promise.all([
-    convex.query(api.sitemap.allPluginSlugs, {}).catch(() => []),
-    convex.query(api.sitemap.allManufacturerSlugs, {}).catch(() => []),
-    convex.query(api.sitemap.allComparisonSlugs, {}).catch(() => []),
-    convex.query(api.sitemap.allChainSlugs, {}).catch(() => []),
+    convexServer.query(api.sitemap.allPluginSlugs, {}).catch(() => []),
+    convexServer.query(api.sitemap.allManufacturerSlugs, {}).catch(() => []),
+    convexServer.query(api.sitemap.allComparisonSlugs, {}).catch(() => []),
+    convexServer.query(api.sitemap.allChainSlugs, {}).catch(() => []),
   ]);
 
   // Static pages
@@ -44,12 +44,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${BASE_URL}/plugins`,
       lastModified: now,
       changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
-      url: `${BASE_URL}/sales`,
-      lastModified: now,
-      changeFrequency: 'hourly',
       priority: 0.9,
     },
     {
@@ -76,30 +70,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.7,
     },
-    {
-      url: `${BASE_URL}/wishlist`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/collection`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/alerts`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/account`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
+    // Note: /account is a private user page excluded from sitemap
+    // /sales, /wishlist, /collection, /alerts removed for open beta
   ];
 
   // Category pages
@@ -142,6 +114,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
+  // Learn articles
+  const learnArticles = getAllArticles();
+  const learnPages: MetadataRoute.Sitemap = [
+    {
+      url: `${BASE_URL}/learn`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    ...learnArticles.map(article => ({
+      url: `${BASE_URL}/learn/${article.slug}`,
+      lastModified: new Date(article.date),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    })),
+  ];
+
+  // Curated "best of" chain pages
+  const curatedChainPages: MetadataRoute.Sitemap = [
+    {
+      url: `${BASE_URL}/chains/best`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    ...CURATED_CATEGORIES.map(cat => ({
+      url: `${BASE_URL}/chains/best/${cat.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.8,
+    })),
+  ];
+
   return [
     ...staticPages,
     ...categoryPages,
@@ -149,5 +154,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...manufacturerPages,
     ...comparisonPages,
     ...chainPages,
+    ...learnPages,
+    ...curatedChainPages,
   ];
 }

@@ -46,7 +46,7 @@ function ResetPasswordForm() {
           </p>
           <Link
             href="/forgot-password"
-            className="inline-block px-6 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-medium rounded-lg transition-colors"
+            className="inline-block px-6 py-2 bg-white hover:bg-[#ccff00] text-stone-900 font-medium rounded-lg transition-colors"
           >
             Request New Link
           </Link>
@@ -83,7 +83,7 @@ function ResetPasswordForm() {
           </p>
           <Link
             href="/"
-            className="inline-block px-6 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-medium rounded-lg transition-colors"
+            className="inline-block px-6 py-2 bg-white hover:bg-[#ccff00] text-stone-900 font-medium rounded-lg transition-colors"
           >
             Sign In
           </Link>
@@ -140,7 +140,7 @@ function ResetPasswordForm() {
               required
               minLength={6}
               autoFocus
-              className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-[#deff0a] focus:outline-none"
               placeholder="••••••••"
             />
           </div>
@@ -155,7 +155,7 @@ function ResetPasswordForm() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-[#deff0a] focus:outline-none"
               placeholder="••••••••"
             />
           </div>
@@ -169,7 +169,7 @@ function ResetPasswordForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-medium rounded-lg transition-colors disabled:opacity-50"
+            className="w-full py-2 bg-white hover:bg-[#ccff00] text-stone-900 font-medium rounded-lg transition-colors disabled:opacity-50"
           >
             {isLoading ? "Resetting..." : "Reset Password"}
           </button>
@@ -178,7 +178,7 @@ function ResetPasswordForm() {
         <div className="mt-4 text-center text-sm text-stone-400">
           <Link
             href="/forgot-password"
-            className="text-amber-500 hover:underline"
+            className="text-[#deff0a] hover:underline"
           >
             Request a new reset link
           </Link>

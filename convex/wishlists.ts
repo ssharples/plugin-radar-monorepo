@@ -1,16 +1,19 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getSessionUser } from "./lib/auth";
 
 // ============================================
 // QUERIES
 // ============================================
 
 export const listByUser = query({
-  args: { user: v.id("users") },
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const wishlists = await ctx.db
       .query("wishlists")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
 
     // Enrich with plugin data
@@ -47,25 +50,29 @@ export const listByUser = query({
 
 export const getForPlugin = query({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     return await ctx.db
       .query("wishlists")
       .withIndex("by_user_plugin", (q) =>
-        q.eq("user", args.user).eq("plugin", args.plugin)
+        q.eq("user", userId).eq("plugin", args.plugin)
       )
       .first();
   },
 });
 
 export const count = query({
-  args: { user: v.id("users") },
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const wishlists = await ctx.db
       .query("wishlists")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
     return wishlists.length;
   },
@@ -77,17 +84,19 @@ export const count = query({
 
 export const add = mutation({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
     targetPrice: v.optional(v.number()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     // Check if already in wishlist
     const existing = await ctx.db
       .query("wishlists")
       .withIndex("by_user_plugin", (q) =>
-        q.eq("user", args.user).eq("plugin", args.plugin)
+        q.eq("user", userId).eq("plugin", args.plugin)
       )
       .first();
 
@@ -100,7 +109,7 @@ export const add = mutation({
     }
 
     return await ctx.db.insert("wishlists", {
-      user: args.user,
+      user: userId,
       plugin: args.plugin,
       targetPrice: args.targetPrice,
       notes: args.notes,
@@ -111,14 +120,16 @@ export const add = mutation({
 
 export const remove = mutation({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const existing = await ctx.db
       .query("wishlists")
       .withIndex("by_user_plugin", (q) =>
-        q.eq("user", args.user).eq("plugin", args.plugin)
+        q.eq("user", userId).eq("plugin", args.plugin)
       )
       .first();
 
@@ -130,10 +141,19 @@ export const remove = mutation({
 
 export const updateTargetPrice = mutation({
   args: {
+    sessionToken: v.string(),
     id: v.id("wishlists"),
     targetPrice: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Verify ownership
+    const wishlist = await ctx.db.get(args.id);
+    if (!wishlist || wishlist.user !== userId) {
+      throw new Error("Not authorized");
+    }
+
     await ctx.db.patch(args.id, {
       targetPrice: args.targetPrice,
     });
@@ -142,10 +162,19 @@ export const updateTargetPrice = mutation({
 
 export const updateNotes = mutation({
   args: {
+    sessionToken: v.string(),
     id: v.id("wishlists"),
     notes: v.string(),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Verify ownership
+    const wishlist = await ctx.db.get(args.id);
+    if (!wishlist || wishlist.user !== userId) {
+      throw new Error("Not authorized");
+    }
+
     await ctx.db.patch(args.id, {
       notes: args.notes,
     });

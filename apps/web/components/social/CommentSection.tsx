@@ -106,13 +106,13 @@ function CommentItem({
               onChange={(e) => setReplyText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleReply()}
               placeholder="Write a reply..."
-              className="flex-1 bg-stone-800 border border-stone-700 rounded-lg px-3 py-1.5 text-sm text-white focus:border-amber-500 focus:outline-none"
+              className="flex-1 bg-stone-800 border border-stone-700 rounded-lg px-3 py-1.5 text-sm text-white focus:border-white focus:outline-none"
               autoFocus
             />
             <button
               onClick={handleReply}
               disabled={submitting || !replyText.trim()}
-              className="px-3 py-1.5 text-xs bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-900 font-medium rounded-lg transition-colors"
+              className="px-3 py-1.5 text-xs bg-white text-black font-medium rounded-lg transition-colors"
             >
               {submitting ? "..." : "Reply"}
             </button>
@@ -188,12 +188,12 @@ export function CommentSection({
             onChange={(e) => setNewComment(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             placeholder="Add a comment..."
-            className="flex-1 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-white placeholder-stone-500 focus:border-amber-500 focus:outline-none"
+            className="flex-1 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-white placeholder-stone-500 focus:border-white focus:outline-none"
           />
           <button
             onClick={handleSubmit}
             disabled={submitting || !newComment.trim()}
-            className="px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-900 font-semibold rounded-lg transition-colors shadow-lg shadow-amber-500/20"
+            className="px-4 py-2 text-sm bg-white text-black font-semibold rounded-lg transition-colors shadow-lg shadow-white/20"
           >
             {submitting ? "..." : "Comment"}
           </button>

@@ -67,8 +67,8 @@ function saveCache(cache: Record<string, CachedChain>) {
       }
     }
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch (e) {
-    console.warn('[OfflineStore] Failed to save cache:', e);
+  } catch (_e) {
+    // Silently ignored — localStorage may be full or unavailable
   }
 }
 
@@ -84,8 +84,8 @@ function loadQueue(): QueuedWrite[] {
 function saveQueue(queue: QueuedWrite[]) {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-  } catch (e) {
-    console.warn('[OfflineStore] Failed to save queue:', e);
+  } catch (_e) {
+    // Silently ignored — localStorage may be full or unavailable
   }
 }
 
@@ -275,7 +275,6 @@ export const useOfflineStore = create<OfflineStoreState & OfflineStoreActions>((
             lastError: String(err),
           });
         } else {
-          console.error(`[OfflineStore] Dropping write after ${MAX_RETRIES} retries:`, item, err);
           set({ lastError: `Failed to sync: ${item.action} (dropped after ${MAX_RETRIES} retries)` });
         }
       }

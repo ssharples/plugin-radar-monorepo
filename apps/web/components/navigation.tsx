@@ -1,35 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import {
-  MagnifyingGlass,
-  User,
-  Heart,
-  DownloadSimple,
-  List,
-  X,
-} from "@phosphor-icons/react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { AvatarDropdown } from "./avatar-dropdown";
+
+const navLinks = [
+  { href: "/chains", label: "Chains" },
+  { href: "/plugins", label: "Plugins" },
+  { href: "/learn", label: "Learn" },
+  { href: "/download", label: "Download" },
+  { href: "/about", label: "About" },
+];
 
 export function Navigation() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const isActive = (path: string) => {
-    if (path === "/") return pathname === "/";
-    return pathname.startsWith(path);
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/plugins?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <header
@@ -41,159 +25,84 @@ export function Navigation() {
       }}
     >
       <div className="container mx-auto px-4 lg:px-6">
-        <div className="flex items-center justify-between h-16 gap-6">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
             <img
-              src="/propane-logo.png"
-              alt="Propane"
-              className="h-9 w-auto object-contain"
+              src="/prochain-logo.png"
+              alt="ProChain"
+              className="h-9 w-auto object-contain transition-all duration-300 group-hover:scale-105 group-hover:brightness-110"
             />
           </Link>
 
-          {/* Search Bar — desktop */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex">
-            <div className="relative w-full group">
-              <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 group-focus-within:text-amber-400/70 transition-colors" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search plugins & chains..."
-                className="w-full pl-10 pr-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/30 focus:bg-white/[0.06] focus:ring-1 focus:ring-amber-500/20 transition-all text-sm"
-              />
-            </div>
-          </form>
-
-          {/* Navigation Links — desktop */}
-          <nav className="hidden md:flex items-center gap-0.5">
-            <NavLink href="/chains" active={isActive("/chains")}>
-              Chains
-            </NavLink>
-            <NavLink href="/plugins" active={isActive("/plugins")}>
-              Explore
-            </NavLink>
-            <NavLink href="/sales" active={isActive("/sales")}>
-              <span className="flex items-center gap-1.5">
-                Deals
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              </span>
-            </NavLink>
-            <NavLink href="/manufacturers" active={isActive("/manufacturers")}>
-              Brands
-            </NavLink>
-            <div className="w-px h-5 bg-white/[0.06] mx-1.5" />
-            <NavLink href="/wishlist" active={isActive("/wishlist")} icon>
-              <Heart
-                className="w-[18px] h-[18px]"
-                weight={isActive("/wishlist") ? "fill" : "regular"}
-              />
-            </NavLink>
-            <NavLink href="/account" active={isActive("/account")} icon>
-              <User className="w-[18px] h-[18px]" />
-            </NavLink>
-            <div className="w-px h-5 bg-white/[0.06] mx-1.5" />
-            <Link
-              href="#download"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-white text-sm font-medium rounded-lg transition-all shadow-sm shadow-amber-500/20"
-            >
-              <DownloadSimple weight="bold" className="w-3.5 h-3.5" />
-              Download
-            </Link>
-          </nav>
-
-          {/* Mobile menu toggle */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-stone-400 hover:text-white transition"
-          >
-            {mobileMenuOpen ? (
-              <X className="w-5 h-5" />
-            ) : (
-              <List className="w-5 h-5" />
-            )}
-          </button>
-        </div>
-
-        {/* Mobile Search */}
-        <form onSubmit={handleSearch} className="pb-3 md:hidden">
-          <div className="relative w-full">
-            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search plugins & chains..."
-              className="w-full pl-10 pr-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/30 text-sm"
-            />
-          </div>
-        </form>
-
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <nav className="md:hidden pb-4 flex flex-wrap gap-2">
-            {[
-              { href: "/chains", label: "Chains" },
-              { href: "/plugins", label: "Explore" },
-              { href: "/sales", label: "Deals" },
-              { href: "/manufacturers", label: "Brands" },
-              { href: "/free", label: "Free" },
-              { href: "/wishlist", label: "Wishlist" },
-              { href: "/account", label: "Account" },
-            ].map(({ href, label }) => (
+          {/* Desktop nav links */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navLinks.map((link) => (
               <Link
-                key={href}
-                href={href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                  isActive(href)
-                    ? "bg-amber-500/10 text-amber-400"
-                    : "text-stone-400 hover:text-white hover:bg-white/[0.04]"
-                }`}
+                key={link.href}
+                href={link.href}
+                className="px-3 py-1.5 text-sm text-stone-400 hover:text-white transition-colors rounded-md hover:bg-white/[0.05]"
               >
-                {label}
+                {link.label}
               </Link>
             ))}
-            <Link
-              href="#download"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-sm bg-amber-500 text-white font-medium"
-            >
-              Download
-            </Link>
           </nav>
-        )}
-      </div>
-    </header>
-  );
-}
 
-function NavLink({
-  href,
-  active,
-  children,
-  icon = false,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-  icon?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`relative px-3 py-2 rounded-lg transition-all text-sm font-medium flex items-center gap-1.5 ${
-        icon ? "px-2" : ""
-      } ${
-        active
-          ? "text-amber-400"
-          : "text-stone-400 hover:text-stone-200 hover:bg-white/[0.04]"
-      }`}
-    >
-      {children}
-      {active && !icon && (
-        <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-gradient-to-r from-amber-500/0 via-amber-500 to-amber-500/0" />
+          <div className="flex items-center gap-3">
+            {/* CTA */}
+            <a
+              href="/download"
+              className="neon-button px-5 py-2 rounded-lg text-sm font-bold hidden sm:inline-flex"
+            >
+              Download Free
+            </a>
+
+            {/* Avatar / Auth */}
+            <AvatarDropdown />
+
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="md:hidden flex flex-col gap-1.5 p-2 -mr-2"
+              aria-label="Toggle menu"
+            >
+              <span
+                className={`block w-5 h-0.5 bg-stone-300 transition-all ${mobileOpen ? "rotate-45 translate-y-2" : ""}`}
+              />
+              <span
+                className={`block w-5 h-0.5 bg-stone-300 transition-all ${mobileOpen ? "opacity-0" : ""}`}
+              />
+              <span
+                className={`block w-5 h-0.5 bg-stone-300 transition-all ${mobileOpen ? "-rotate-45 -translate-y-2" : ""}`}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-white/[0.06] bg-black/95">
+          <nav className="container mx-auto px-4 py-3 flex flex-col gap-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className="px-3 py-2.5 text-sm text-stone-400 hover:text-white transition-colors rounded-md hover:bg-white/[0.05]"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <a
+              href="/download"
+              className="neon-button px-5 py-2.5 rounded-lg text-sm font-bold text-center mt-2"
+            >
+              Download Free
+            </a>
+          </nav>
+        </div>
       )}
-    </Link>
+    </header>
   );
 }

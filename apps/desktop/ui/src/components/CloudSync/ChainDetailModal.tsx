@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCloudChainStore } from '../../stores/cloudChainStore';
 import { useSyncStore } from '../../stores/syncStore';
+import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
+import { translateParameters, recordChainLoadResult } from '../../api/convex-client';
+import { juceBridge } from '../../api/juce-bridge';
+import type { ChainImportResult } from '../../api/types';
+import { autoDiscoverAllPlugins } from '../../stores/chainStore';
 import { StarRating } from './StarRating';
 import { CommentSection } from './CommentSection';
 import type { Comment } from './CommentSection';
@@ -11,14 +16,32 @@ interface ChainDetailModalProps {
   onBack: () => void;
 }
 
+const modalOverlayStyle: React.CSSProperties = {
+  background: 'rgba(0, 0, 0, 0.75)',
+  backdropFilter: 'blur(4px)',
+};
+
+const modalPanelStyle: React.CSSProperties = {
+  maxWidth: '32rem',
+  width: '100%',
+  margin: '0 1rem',
+  borderRadius: 'var(--radius-xl)',
+  padding: 'var(--space-6)',
+  border: '1px solid rgba(222, 255, 10, 0.15)',
+  maxHeight: '85vh',
+  overflowY: 'auto',
+};
+
 export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalProps) {
   const {
     currentChain,
     compatibility,
     detailedCompatibility,
+    substitutionPlan,
     toggleLike,
     downloadChain,
     fetchDetailedCompatibility,
+    fetchSubstitutionPlan,
     getChainRating,
     getComments,
     addComment,
@@ -51,7 +74,6 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
   const chainId = currentChain?._id;
 
-  // Load rating and comments
   useEffect(() => {
     if (!chainId) return;
 
@@ -67,24 +89,59 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
     if (isLoggedIn) {
       fetchDetailedCompatibility(chainId);
+      fetchSubstitutionPlan(chainId);
       if (currentChain?.author) {
         isFollowingAuthor(chainId).then(setFollowing);
       }
     }
   }, [chainId, isLoggedIn]);
 
-  // Escape key
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    },
-    [onClose]
-  );
-
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    const registerShortcut = useKeyboardStore.getState().registerShortcut;
+    return registerShortcut({
+      id: 'chain-detail-modal-escape',
+      key: 'Escape',
+      priority: ShortcutPriority.MODAL,
+      allowInInputs: true,
+      handler: (e) => {
+        e.preventDefault();
+        onClose();
+      }
+    });
+  }, [onClose]);
+
+  // Auto-populate substitutions from the substitution plan
+  useEffect(() => {
+    if (!substitutionPlan || !currentChain) return;
+
+    const newSubs = new Map<number, {
+      originalName: string;
+      altName: string;
+      altManufacturer: string;
+      matchedPluginId?: string;
+      originalMatchedPluginId?: string;
+    }>();
+
+    for (const slot of substitutionPlan.slots) {
+      if (
+        slot.status === "missing" &&
+        slot.bestSubstitute &&
+        slot.bestSubstitute.combinedScore >= 50
+      ) {
+        newSubs.set(slot.slotPosition, {
+          originalName: slot.pluginName,
+          altName: slot.bestSubstitute.pluginName,
+          altManufacturer: slot.bestSubstitute.manufacturer,
+          matchedPluginId: slot.bestSubstitute.pluginId,
+          originalMatchedPluginId: slot.matchedPluginId,
+        });
+      }
+    }
+
+    if (newSubs.size > 0) {
+      setSubstitutions(newSubs as any);
+    }
+  }, [substitutionPlan, currentChain]);
 
   if (!currentChain) return null;
 
@@ -142,8 +199,19 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
     });
   };
 
-  const handleLoadChain = () => {
+  const handleLoadChain = async () => {
     downloadChain(currentChain._id);
+
+    // Build substitution metadata for param translation
+    const subMeta = new Map<number, { originalMatchedPluginId?: string; matchedPluginId?: string }>();
+    substitutions.forEach((sub: any, pos: number) => {
+      if (sub.matchedPluginId && sub.originalMatchedPluginId) {
+        subMeta.set(pos, {
+          originalMatchedPluginId: sub.originalMatchedPluginId,
+          matchedPluginId: sub.matchedPluginId,
+        });
+      }
+    });
 
     const chainData = {
       version: 1,
@@ -163,11 +231,97 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
           bypassed: slot.bypassed ?? false,
           presetData: sub ? '' : (slot.presetData || ''),
           presetSizeBytes: sub ? 0 : (slot.presetSizeBytes || 0),
+          parameters: (!sub && slot.parameters) ? slot.parameters.map((p: any) => ({
+            name: p.name || '',
+            semantic: p.semantic || '',
+            unit: p.unit || '',
+            value: String(p.value ?? ''),
+            normalizedValue: p.normalizedValue ?? 0,
+          })) : [],
         };
       }),
     };
 
+    const loadStart = performance.now();
+    const importResult = await juceBridge.importChain(chainData) as ChainImportResult;
+    const loadTimeMs = Math.round(performance.now() - loadStart);
+
+    // Also call the parent onLoad for backward compat (e.g. setting chain name)
     onLoad(chainData);
+
+    // Report load result to Convex (best-effort)
+    recordChainLoadResult({
+      chainId: currentChain._id,
+      totalSlots: importResult.totalSlots ?? currentChain.slots.length,
+      loadedSlots: importResult.loadedSlots ?? currentChain.slots.length,
+      failedSlots: importResult.failedSlots ?? 0,
+      substitutedSlots: substitutions.size,
+      failures: importResult.failures,
+      loadTimeMs,
+    });
+
+    // After the chain is loaded, apply parameter translation for substituted slots
+    // and trigger crowdpool discovery. This is best-effort — don't block the close.
+    (async () => {
+      try {
+        // Wait a moment for the chain to load in JUCE
+        await new Promise((r) => setTimeout(r, 500));
+
+        // Get the current chain state to find node IDs
+        const state = await juceBridge.getChainState();
+        if (!state?.nodes) return;
+
+        // Apply param translation for substituted slots
+        for (const [position, meta] of subMeta.entries()) {
+          if (!meta.originalMatchedPluginId || !meta.matchedPluginId) continue;
+
+          // Find the node at this position in the loaded chain
+          const flatPlugins: Array<{ id: number; index: number }> = [];
+          function flatten(nodes: any[]) {
+            for (const n of nodes) {
+              if (n.type === 'plugin') flatPlugins.push({ id: n.id, index: flatPlugins.length });
+              if (n.children) flatten(n.children);
+            }
+          }
+          flatten(state.nodes);
+
+          const targetNode = flatPlugins.find((p) => p.index === position);
+          if (!targetNode) continue;
+
+          // Get source plugin's current parameters
+          const paramResult = await juceBridge.readPluginParameters(targetNode.id);
+          if (!paramResult?.success || !paramResult.parameters?.length) continue;
+          const sourceParams = paramResult.parameters;
+
+          // Translate parameters
+          const translation = await translateParameters(
+            meta.originalMatchedPluginId,
+            meta.matchedPluginId,
+            sourceParams.map((p: any) => ({
+              paramId: p.name,
+              paramIndex: p.index,
+              normalizedValue: p.normalizedValue,
+            }))
+          );
+
+          if (translation?.targetParams?.length) {
+            await juceBridge.applyPluginParameters(
+              targetNode.id,
+              translation.targetParams.map((tp) => ({
+                paramIndex: tp.paramIndex ?? 0,
+                value: tp.value,
+              }))
+            );
+          }
+        }
+
+        // Fire-and-forget: crowdpool discovery for all plugins
+        autoDiscoverAllPlugins(state.nodes).catch(() => {});
+      } catch {
+        // Best-effort — silently ignored
+      }
+    })();
+
     onClose();
   };
 
@@ -176,46 +330,48 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in"
-      onClick={onClose}
-    >
-      <div
-        className="bg-plugin-surface rounded-propane-lg p-6 max-w-lg w-full mx-4 border border-plugin-accent max-h-[85vh] overflow-y-auto animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 flex items-center justify-center z-50 fade-in" style={modalOverlayStyle} onClick={onClose}>
+      <div className="glass scale-in scrollbar-cyber" style={modalPanelStyle} onClick={(e) => e.stopPropagation()}>
         {/* Back button */}
         <button
           onClick={onBack}
-          className="text-gray-400 hover:text-white text-sm mb-4 flex items-center gap-1"
+          className="mb-4 flex items-center gap-1"
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', background: 'none', border: 'none', cursor: 'pointer' }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-accent-cyan)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
         >
           &larr; Back to Browse
         </button>
 
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
-          <h2 className="text-xl font-bold text-white">{currentChain.name}</h2>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+            {currentChain.name}
+          </h2>
           {currentChain.forkedFrom && (
-            <span className="text-xxs bg-plugin-accent/20 text-plugin-accent px-1.5 py-0.5 rounded">
-              fork
-            </span>
+            <span className="badge badge-cyan" style={{ fontSize: 'var(--text-xs)' }}>fork</span>
           )}
         </div>
 
         {/* Author + follow */}
         {currentChain.author?.name && (
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm text-gray-400">
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
               by {currentChain.author.name}
             </span>
             {isLoggedIn && currentChain.authorId !== userId && (
               <button
                 onClick={handleFollow}
-                className={`text-xxs px-2 py-0.5 rounded border transition-colors ${
-                  following
-                    ? 'border-plugin-accent/50 text-plugin-accent bg-plugin-accent/10'
-                    : 'border-plugin-border text-plugin-muted hover:text-white hover:border-plugin-accent/50'
-                }`}
+                className="btn"
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  padding: '2px var(--space-2)',
+                  ...(following ? {
+                    borderColor: 'rgba(222, 255, 10, 0.4)',
+                    color: 'var(--color-accent-cyan)',
+                    background: 'rgba(222, 255, 10, 0.08)',
+                  } : {}),
+                }}
               >
                 {following ? 'Following' : 'Follow'}
               </button>
@@ -225,19 +381,14 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
         {/* Description */}
         {currentChain.description && (
-          <p className="text-gray-300 text-sm mb-3">{currentChain.description}</p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{currentChain.description}</p>
         )}
 
         {/* Tags */}
         {currentChain.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4">
             {currentChain.tags.map((tag: string) => (
-              <span
-                key={tag}
-                className="px-2 py-0.5 bg-plugin-accent/20 text-plugin-accent rounded text-xxs"
-              >
-                {tag}
-              </span>
+              <span key={tag} className="badge badge-cyan">{tag}</span>
             ))}
           </div>
         )}
@@ -251,7 +402,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
             onRate={handleRate}
           />
           {rating.userRating && (
-            <div className="text-xxs text-plugin-muted mt-1">
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-1)' }}>
               Your rating: {rating.userRating}/5
             </div>
           )}
@@ -259,42 +410,32 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
         {/* Compatibility */}
         {compatibility && (
-          <div
-            className={`rounded-lg p-3 mb-4 ${
-              compatibility.canFullyLoad
-                ? 'bg-green-500/10 border border-green-500/30'
-                : 'bg-yellow-500/10 border border-yellow-500/30'
-            }`}
-          >
+          <div style={{
+            borderRadius: 'var(--radius-lg)',
+            padding: 'var(--space-3)',
+            marginBottom: 'var(--space-4)',
+            background: compatibility.canFullyLoad ? 'rgba(0, 255, 136, 0.06)' : 'rgba(255, 170, 0, 0.06)',
+            border: `1px solid ${compatibility.canFullyLoad ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 170, 0, 0.2)'}`,
+          }}>
             <div className="flex items-center justify-between mb-2">
-              <span
-                className={`text-sm font-medium ${
-                  compatibility.canFullyLoad ? 'text-green-400' : 'text-yellow-400'
-                }`}
-              >
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)' }}>
                 {compatibility.canFullyLoad
                   ? 'All plugins available'
-                  : `Missing ${compatibility.missingCount} of ${
-                      compatibility.ownedCount + compatibility.missingCount
-                    } plugins`}
+                  : `Missing ${compatibility.missingCount} of ${compatibility.ownedCount + compatibility.missingCount} plugins`}
               </span>
-              <span
-                className={`text-sm font-mono font-bold ${
-                  compatibility.canFullyLoad ? 'text-green-400' : 'text-yellow-400'
-                }`}
-              >
+              <span style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', fontWeight: 700, color: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)' }}>
                 {compatibility.percentage}%
               </span>
             </div>
-            <div className="w-full bg-black/30 rounded-full h-1.5">
+            <div className="meter">
               <div
-                className={`h-1.5 rounded-full transition-all ${
-                  compatibility.canFullyLoad ? 'bg-green-500' : 'bg-yellow-500'
-                }`}
-                style={{ width: `${compatibility.percentage}%` }}
+                className="meter-fill"
+                style={{
+                  width: `${compatibility.percentage}%`,
+                  background: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)',
+                }}
               />
             </div>
-            {/* Missing plugin suggestions with actionable swap buttons */}
             {detailedCompatibility && detailedCompatibility.missing.length > 0 && (
               <div className="mt-2 space-y-1.5">
                 {detailedCompatibility.missing.map((m, i) => {
@@ -303,17 +444,17 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                   );
                   const sub = substitutions.get(slot?.position ?? -1);
                   return (
-                    <div key={i} className="text-xxs">
-                      <span className="text-yellow-400">{m.pluginName}</span>
-                      <span className="text-plugin-muted"> by {m.manufacturer}</span>
+                    <div key={i} style={{ fontSize: 'var(--text-xs)' }}>
+                      <span style={{ color: 'var(--color-status-warning)' }}>{m.pluginName}</span>
+                      <span style={{ color: 'var(--color-text-tertiary)' }}> by {m.manufacturer}</span>
                       {sub ? (
                         <span className="ml-1.5 inline-flex items-center gap-1">
-                          <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded text-[10px]">
+                          <span style={{ padding: '2px 6px', background: 'rgba(0, 255, 136, 0.15)', color: 'var(--color-status-active)', borderRadius: 'var(--radius-sm)', fontSize: '10px' }}>
                             Using {sub.altName}
                           </span>
                           <button
                             onClick={() => handleUndoSubstitute(slot?.position ?? -1)}
-                            className="text-plugin-muted hover:text-white text-[10px] underline"
+                            style={{ color: 'var(--color-text-tertiary)', fontSize: '10px', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
                           >
                             undo
                           </button>
@@ -323,13 +464,20 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                           <span key={j} className="inline-flex flex-col ml-1">
                             <button
                               onClick={() => handleSubstitute(slot.position, m.pluginName, alt)}
-                              className="px-1.5 py-0.5 bg-plugin-accent/20 text-plugin-accent
-                                         hover:bg-plugin-accent/30 rounded text-[10px] transition-colors"
+                              style={{
+                                padding: '2px 6px',
+                                background: 'rgba(222, 255, 10, 0.1)',
+                                color: 'var(--color-accent-cyan)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '10px',
+                                border: 'none',
+                                cursor: 'pointer',
+                              }}
                             >
                               Use {alt.name}
                             </button>
                             {alt.similarityReasons && (
-                              <span className="text-[9px] text-plugin-dim ml-0.5 mt-0.5 truncate max-w-[180px]">
+                              <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)', marginLeft: '2px', marginTop: '2px' }} className="truncate max-w-[180px]">
                                 {alt.similarityReasons}
                               </span>
                             )}
@@ -346,7 +494,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
         {/* Plugin list */}
         <div className="mb-4">
-          <div className="text-xs text-plugin-muted mb-2">
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: 'var(--space-2)', fontFamily: 'var(--font-mono)' }}>
             Plugins ({currentChain.slots.length})
           </div>
           <div className="space-y-1">
@@ -360,18 +508,23 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
               return (
                 <div
                   key={idx}
-                  className={`flex items-center justify-between p-2 rounded text-sm ${
-                    isOwned ? 'bg-green-500/5' : 'bg-black/20'
-                  }`}
+                  className="flex items-center justify-between"
+                  style={{
+                    padding: 'var(--space-2)',
+                    borderRadius: 'var(--radius-base)',
+                    fontSize: 'var(--text-sm)',
+                    background: isOwned ? 'rgba(0, 255, 136, 0.04)' : 'var(--color-bg-input)',
+                    border: `1px solid ${isOwned ? 'rgba(0, 255, 136, 0.1)' : 'var(--color-border-subtle)'}`,
+                  }}
                 >
                   <div className="min-w-0">
-                    <div className="text-white text-sm truncate">{slot.pluginName}</div>
-                    <div className="text-plugin-muted text-xxs">{slot.manufacturer}</div>
+                    <div style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }} className="truncate">{slot.pluginName}</div>
+                    <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-xs)' }}>{slot.manufacturer}</div>
                   </div>
                   {isOwned ? (
-                    <span className="text-green-400 text-xxs shrink-0 ml-2">Owned</span>
+                    <span style={{ color: 'var(--color-status-active)', fontSize: 'var(--text-xs)' }} className="shrink-0 ml-2">Owned</span>
                   ) : (
-                    <span className="text-plugin-dim text-xxs shrink-0 ml-2">Missing</span>
+                    <span style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)' }} className="shrink-0 ml-2">Missing</span>
                   )}
                 </div>
               );
@@ -380,34 +533,23 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
         </div>
 
         {/* Stats row */}
-        <div className="flex items-center gap-4 text-xs text-plugin-muted mb-4">
+        <div className="flex items-center gap-4 mb-4" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
           <span>Likes: {currentChain.likes}</span>
           <span>Downloads: {currentChain.downloads}</span>
         </div>
 
         {/* Action buttons */}
         <div className="flex gap-2 mb-6">
-          <button
-            onClick={handleLike}
-            className="px-3 py-1.5 border border-plugin-border rounded text-sm text-gray-400 hover:text-white hover:border-pink-500/50 transition-colors"
-          >
-            Like
-          </button>
+          <button onClick={handleLike} className="btn">Like</button>
           {isLoggedIn && (
             <button
-              onClick={() => {
-                setForkName(`${currentChain.name} (fork)`);
-                setShowForkDialog(true);
-              }}
-              className="px-3 py-1.5 border border-plugin-border rounded text-sm text-gray-400 hover:text-white hover:border-plugin-accent/50 transition-colors"
+              onClick={() => { setForkName(`${currentChain.name} (fork)`); setShowForkDialog(true); }}
+              className="btn"
             >
               Fork
             </button>
           )}
-          <button
-            onClick={handleLoadChain}
-            className="flex-1 bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-1.5 text-sm font-medium"
-          >
+          <button onClick={handleLoadChain} className="btn btn-primary flex-1">
             {compatibility?.canFullyLoad
               ? 'Load Chain'
               : substitutions.size > 0
@@ -418,36 +560,27 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
         {/* Fork dialog */}
         {showForkDialog && (
-          <div className="mb-4 p-3 bg-black/20 border border-plugin-border rounded-lg">
-            <div className="text-sm text-white mb-2">Fork this chain</div>
+          <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--color-bg-input)', border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Fork this chain</div>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={forkName}
                 onChange={(e) => setForkName(e.target.value)}
                 placeholder="New chain name"
-                className="flex-1 bg-black/30 border border-plugin-border rounded px-2 py-1.5 text-sm text-white"
+                className="input flex-1"
                 autoFocus
               />
-              <button
-                onClick={handleFork}
-                disabled={forking || !forkName.trim()}
-                className="px-3 py-1.5 text-xs bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded font-medium"
-              >
+              <button onClick={handleFork} disabled={forking || !forkName.trim()} className="btn btn-primary">
                 {forking ? '...' : 'Fork'}
               </button>
-              <button
-                onClick={() => setShowForkDialog(false)}
-                className="px-2 py-1.5 text-xs text-gray-400 hover:text-white"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setShowForkDialog(false)} className="btn">Cancel</button>
             </div>
           </div>
         )}
 
-        {/* Divider */}
-        <div className="border-t border-plugin-border pt-4">
+        {/* Divider + Comments */}
+        <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: 'var(--space-4)' }}>
           <CommentSection
             comments={comments}
             currentUserId={userId}

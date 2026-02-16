@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
-import { useState, useEffect, useRef } from 'react';
-import { GitBranch, ChevronDown } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { InlinePluginSearch } from './InlinePluginSearch';
 
 interface DropZoneProps {
   /** Unique droppable ID encoding: `{parentId}:{insertIndex}` */
@@ -9,130 +10,253 @@ interface DropZoneProps {
   isParallelContext: boolean;
   /** Whether a drag is currently active anywhere */
   isDragActive: boolean;
-  /** ID of the node above this drop zone (for group creation) */
-  nodeAboveId?: number;
-  /** ID of the node below this drop zone (for group creation) */
-  nodeBelowId?: number;
-  /** Whether shift key is held (for group creation hint) */
-  shiftHeld?: boolean;
   /** Whether this drop zone is disabled (self-drop prevention) */
   disabled?: boolean;
+  /** Parent node ID for inline search */
+  parentId?: number;
+  /** Insert index for inline search */
+  insertIndex?: number;
+  /** Slot number to display (1-based) */
+  slotNumber?: number;
 }
 
 /**
- * Reusable drop zone component that renders between plugins/nodes.
- * Shows a thin line when dragging, expands on hover.
- * Supports "Create Parallel Group" hint when hovering with Shift.
+ * Enhanced drop zone component with pulse animation and ghost preview.
+ * Shows subtle line when dragging, pulses on valid targets, snaps on hover.
+ * On 500ms hover dwell, plugins push apart smoothly to reveal a + icon.
  */
 export function DropZone({
   droppableId,
   isParallelContext,
   isDragActive,
-  nodeAboveId,
-  nodeBelowId,
-  shiftHeld = false,
   disabled = false,
+  parentId,
+  insertIndex,
+  slotNumber,
 }: DropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: droppableId,
     disabled,
   });
 
-  const [showGroupHint, setShowGroupHint] = useState(false);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [expanded, setExpanded] = useState(false);
+  const [showInlineSearch, setShowInlineSearch] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoneRef = useRef<HTMLDivElement | null>(null);
 
-  // Track hover duration for group creation hint
-  useEffect(() => {
-    if (isOver && isDragActive) {
-      hoverTimerRef.current = setTimeout(() => {
-        if (nodeAboveId != null && nodeBelowId != null) {
-          setShowGroupHint(true);
-        }
-      }, 500);
-    } else {
-      setShowGroupHint(false);
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-      }
+  // Combined ref for both dnd-kit and our local ref
+  const setRefs = useCallback((el: HTMLElement | null) => {
+    setNodeRef(el);
+    zoneRef.current = el as HTMLDivElement | null;
+  }, [setNodeRef]);
+
+  const handleMouseEnter = useCallback(() => {
+    if (showInlineSearch) return;
+    // Start 500ms dwell timer
+    hoverTimerRef.current = setTimeout(() => {
+      setExpanded(true);
+    }, 500);
+  }, [showInlineSearch]);
+
+  const handleMouseLeave = useCallback((e: React.MouseEvent) => {
+    // Don't collapse if the mouse is moving to another element
+    // inside this DropZone (e.g. the + button or guide line)
+    const related = e.relatedTarget as Node | null;
+    if (related && zoneRef.current?.contains(related)) return;
+
+    // Cancel pending timer
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
     }
+    // Collapse if not showing inline search
+    if (!showInlineSearch) {
+      setExpanded(false);
+    }
+  }, [showInlineSearch]);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
     return () => {
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-      }
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     };
-  }, [isOver, isDragActive, nodeAboveId, nodeBelowId]);
+  }, []);
 
-  // Don't render at all when no drag is happening
+  // Use neon yellow (#deff0a) for all contexts
+  const lineColor = '#deff0a';
+
+  // When not dragging, show dwell-to-expand + icon
   if (!isDragActive) {
-    return <div ref={setNodeRef} className="h-0.5" />;
+    return (
+      <div
+        ref={setRefs}
+        className="relative"
+        style={{ zIndex: expanded || showInlineSearch ? 10 : 1 }}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Invisible hover hitbox — extends ±10px above/below the seam
+            so the user can trigger it even when plugins are flush.
+            The hitbox grows when expanded so the + button stays reachable.
+            Disabled (pointerEvents:none) when inline search is open so the search UI receives clicks. */}
+        <div
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: '-10px',
+            bottom: '-10px',
+            minHeight: expanded ? '52px' : '20px',
+            zIndex: 2,
+            cursor: expanded ? 'default' : 'pointer',
+            pointerEvents: showInlineSearch ? 'none' : 'auto',
+          }}
+        />
+
+        {/* Expanding gap — pushes plugins apart on 500ms dwell */}
+        <div
+          style={{
+            height: showInlineSearch ? 'auto' : expanded ? '32px' : '0px',
+            transition: expanded
+              ? 'height 350ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+              : 'height 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+            overflow: showInlineSearch ? 'visible' : 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+          }}
+        >
+          {/* Subtle guide line */}
+          {expanded && !showInlineSearch && (
+            <div
+              style={{
+                position: 'absolute',
+                left: '16px',
+                right: '16px',
+                height: '1px',
+                background: 'rgba(222, 255, 10, 0.2)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          {/* Plus button — scales in when expanded */}
+          {!showInlineSearch && parentId !== undefined && insertIndex !== undefined && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowInlineSearch(true);
+              }}
+              className="relative z-10 flex items-center justify-center w-5 h-5 rounded-full"
+              style={{
+                background: 'rgba(222, 255, 10, 0.15)',
+                border: '1px solid rgba(222, 255, 10, 0.4)',
+                color: 'var(--color-accent-cyan)',
+                opacity: expanded ? 1 : 0,
+                transform: expanded ? 'scale(1)' : 'scale(0)',
+                transition: 'opacity 200ms ease-out 80ms, transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms',
+                pointerEvents: expanded ? 'auto' : 'none',
+                cursor: 'pointer',
+              }}
+              title="Insert plugin here"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Inline Plugin Search */}
+        {showInlineSearch && parentId !== undefined && insertIndex !== undefined && (
+          <div className="px-4 py-2">
+            <InlinePluginSearch
+              parentId={parentId}
+              insertIndex={insertIndex}
+              onPluginAdded={() => {
+                setShowInlineSearch(false);
+                setExpanded(false);
+              }}
+              onClose={() => {
+                setShowInlineSearch(false);
+                setExpanded(false);
+              }}
+              onOpenFullBrowser={() => window.dispatchEvent(new Event('openPluginBrowser'))}
+            />
+          </div>
+        )}
+      </div>
+    );
   }
-
-  const lineColor = isParallelContext ? 'bg-plugin-parallel' : 'bg-plugin-serial';
-  const glowColor = isParallelContext ? 'shadow-[0_0_8px_rgba(90,120,66,0.3)]' : 'shadow-[0_0_8px_rgba(201,148,74,0.3)]';
-  const borderColor = isParallelContext ? 'border-plugin-parallel/50' : 'border-plugin-serial/50';
-  const bgColor = isParallelContext ? 'bg-plugin-parallel/10' : 'bg-plugin-serial/10';
-
-  const isShowingGroupHint = showGroupHint && shiftHeld && nodeAboveId != null && nodeBelowId != null;
 
   return (
     <div
       ref={setNodeRef}
-      className={`
-        relative transition-all duration-200
-        ${isOver ? 'py-2' : 'py-1'}
-      `}
-      style={{ transitionTimingFunction: isOver ? 'cubic-bezier(0.34, 1.56, 0.64, 1)' : 'ease-out' }}
+      className="relative"
+      style={{
+        paddingTop: isOver ? '24px' : '3px',
+        paddingBottom: isOver ? '24px' : '3px',
+        transition: isOver
+          ? 'padding 300ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+          : 'padding 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
     >
-      {/* Main drop indicator line */}
-      <div
-        className={`
-          mx-3 rounded-full transition-all duration-200 ease-out
-          ${isOver
-            ? `h-1 ${lineColor} shadow-md ${glowColor}`
-            : `h-0.5 ${lineColor}/40 animate-pulse-soft`
-          }
-        `}
-      />
-
-      {/* Arrow indicator when hovered */}
-      {isOver && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-0 animate-fade-in">
-          <ChevronDown className={`w-3 h-3 ${isParallelContext ? 'text-plugin-parallel' : 'text-plugin-serial'}`} />
-        </div>
-      )}
-
-      {/* Group creation hint (appears after 500ms hover + shift) */}
-      {isShowingGroupHint && (
+      {/* Drop indicator line with pulse animation, magnetic snap, and directional caret */}
+      <div className="relative mx-3">
         <div
-          className={`
-            absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50
-            flex items-center gap-1.5 px-2.5 py-1 rounded-md
-            border ${borderColor} ${bgColor}
-            text-xs whitespace-nowrap
-            animate-fade-in
-          `}
-        >
-          <GitBranch className={`w-3 h-3 ${isParallelContext ? 'text-plugin-parallel' : 'text-plugin-serial'}`} />
-          <span className="text-plugin-text">
-            Drop to create parallel group
-          </span>
-        </div>
-      )}
-
-      {/* Standard group hint tooltip (after 500ms without shift) */}
-      {showGroupHint && !shiftHeld && nodeAboveId != null && nodeBelowId != null && (
+          className={`rounded-full ${isOver ? 'animate-magnetic-snap' : disabled ? '' : 'animate-drop-zone-pulse'}`}
+          style={{
+            height: isOver ? '6px' : '2px',
+            background: isOver
+              ? lineColor
+              : disabled
+                ? 'var(--color-border-subtle)'
+                : lineColor,
+            opacity: isOver ? 0.9 : disabled ? 0.3 : 0.4,
+            boxShadow: isOver ? `0 0 12px ${lineColor}` : 'none',
+            transition: 'all var(--duration-fast) var(--ease-snap)',
+          }}
+        />
+        {/* Directional caret — indicates "insert here, push down" */}
+        {isOver && !disabled && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: '-2px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: `6px solid ${lineColor}`,
+              borderTop: '5px solid transparent',
+              borderBottom: '5px solid transparent',
+              filter: `drop-shadow(0 0 4px ${lineColor})`,
+              opacity: 0.9,
+            }}
+          />
+        )}
+      </div>
+      {/* Ghost preview bar when hovering with slot number */}
+      {isOver && !disabled && (
         <div
-          className={`
-            absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50
-            flex items-center gap-1.5 px-2.5 py-1 rounded-md
-            bg-plugin-surface/95 border border-plugin-border
-            text-xs text-plugin-muted whitespace-nowrap
-            animate-fade-in
-            backdrop-blur-sm shadow-lg
-          `}
+          className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-12 mx-2 rounded-lg animate-ghost-preview pointer-events-none flex items-center justify-center"
+          style={{
+            border: `2px dashed rgba(222, 255, 10, 0.35)`,
+            background: 'rgba(222, 255, 10, 0.04)',
+          }}
         >
-          <span>Hold <kbd className="px-1 py-0.5 rounded bg-plugin-border text-plugin-text text-xxs font-mono">Shift</kbd> + drop to create parallel group</span>
+          {slotNumber !== undefined && (
+            <div
+              className="font-mono font-bold"
+              style={{
+                fontSize: '20px',
+                color: 'rgba(222, 255, 10, 0.6)',
+                textShadow: '0 0 8px rgba(222, 255, 10, 0.4)',
+              }}
+            >
+              {slotNumber}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -159,9 +283,9 @@ export function GroupDropZone({
     id: droppableId,
   });
 
-  const borderColor = isParallelContext ? 'border-plugin-parallel' : 'border-plugin-serial';
-  const bgColor = isParallelContext ? 'bg-plugin-parallel/10' : 'bg-plugin-serial/10';
-  const textColor = isParallelContext ? 'text-plugin-parallel' : 'text-plugin-serial';
+  // Use neon yellow for all contexts
+  const accentColor = '#deff0a';
+  const accentBg = 'rgba(222, 255, 10, 0.08)';
 
   // Empty group placeholder
   if (isEmpty) {
@@ -169,17 +293,25 @@ export function GroupDropZone({
       <div
         ref={setNodeRef}
         onDoubleClick={onBrowsePlugins}
-        className={`
-          mx-2 rounded-lg border-2 border-dashed transition-all duration-200
-          ${isOver && isDragActive
-            ? `${borderColor} ${bgColor} py-4`
-            : 'border-plugin-border/50 py-3'
-          }
-          flex items-center justify-center gap-2 cursor-pointer
-          hover:border-plugin-border
-        `}
+        className="mx-2 rounded-lg flex items-center justify-center gap-2 cursor-pointer"
+        style={{
+          border: isOver && isDragActive
+            ? `2px dashed ${accentColor}`
+            : '2px dashed var(--color-border-default)',
+          background: isOver && isDragActive ? accentBg : 'transparent',
+          padding: isOver && isDragActive ? '16px 0' : '12px 0',
+          transition: 'all var(--duration-fast) var(--ease-snap)',
+        }}
       >
-        <span className={`text-xs ${isOver ? textColor : 'text-plugin-muted'}`}>
+        <span
+          className="text-xs"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: 'var(--tracking-wide)',
+            textTransform: 'uppercase' as const,
+            color: isOver ? accentColor : 'var(--color-text-tertiary)',
+          }}
+        >
           {isOver && isDragActive
             ? 'Drop plugin here'
             : 'Drop a plugin here or click to browse'
@@ -198,11 +330,12 @@ export function GroupDropZone({
   return (
     <div
       ref={setNodeRef}
-      className={`
-        absolute inset-0 rounded-lg border-2 pointer-events-none z-10
-        transition-all duration-150
-        ${borderColor} ${bgColor}
-      `}
+      className="absolute inset-0 rounded-lg pointer-events-none z-10"
+      style={{
+        border: `2px solid ${accentColor}`,
+        background: accentBg,
+        transition: 'all var(--duration-fast) var(--ease-snap)',
+      }}
     />
   );
 }

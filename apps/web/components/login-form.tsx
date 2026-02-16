@@ -42,7 +42,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-[#deff0a] focus:outline-none"
               placeholder="Your name"
             />
           </div>
@@ -55,7 +55,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-amber-500 focus:outline-none"
+            className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-[#deff0a] focus:outline-none"
             placeholder="you@example.com"
           />
         </div>
@@ -68,7 +68,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-amber-500 focus:outline-none"
+            className="w-full px-3 py-2 bg-stone-800 rounded-lg text-white border border-stone-700 focus:border-[#deff0a] focus:outline-none"
             placeholder="••••••••"
           />
         </div>
@@ -83,7 +83,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
           <div className="text-right">
             <Link
               href="/forgot-password"
-              className="text-sm text-stone-400 hover:text-amber-500 transition-colors"
+              className="text-sm text-stone-400 hover:text-[#deff0a] transition-colors"
             >
               Forgot password?
             </Link>
@@ -93,7 +93,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-medium rounded-lg transition-colors disabled:opacity-50"
+          className="w-full py-2 bg-[#deff0a] hover:bg-[#ccff00] text-stone-900 font-medium rounded-lg transition-colors disabled:opacity-50"
         >
           {isLoading
             ? "Loading..."
@@ -109,7 +109,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             Don&apos;t have an account?{" "}
             <button
               onClick={() => setMode("register")}
-              className="text-amber-500 hover:underline"
+              className="text-[#deff0a] hover:underline"
             >
               Sign up
             </button>
@@ -119,7 +119,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             Already have an account?{" "}
             <button
               onClick={() => setMode("login")}
-              className="text-amber-500 hover:underline"
+              className="text-[#deff0a] hover:underline"
             >
               Sign in
             </button>

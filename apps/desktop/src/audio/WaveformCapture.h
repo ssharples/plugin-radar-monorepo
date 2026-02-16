@@ -23,6 +23,13 @@ public:
     static constexpr int SAMPLES_PER_PEAK = 512;  // Samples averaged per peak
     static constexpr int MAX_DELAY_SAMPLES = 48000;  // Max 1 second at 48kHz
 
+    // PHASE 3: Zero-allocation snapshot struct (returned by value, no heap allocation)
+    struct PeakSnapshot
+    {
+        std::array<float, NUM_PEAKS> prePeaks;
+        std::array<float, NUM_PEAKS> postPeaks;
+    };
+
     WaveformCapture();
     ~WaveformCapture() = default;
 
@@ -35,10 +42,13 @@ public:
     /** Call from audio thread AFTER processing */
     void pushPostSamples(const juce::AudioBuffer<float>& buffer);
 
-    /** Get current pre-processing peak data (UI thread safe) */
+    /** PHASE 3: Get snapshot of both pre/post peaks (UI thread safe, no allocation) */
+    PeakSnapshot getSnapshot() const;
+
+    /** Get current pre-processing peak data (UI thread safe) - DEPRECATED: use getSnapshot() */
     std::vector<float> getPrePeaks() const;
 
-    /** Get current post-processing peak data (UI thread safe) */
+    /** Get current post-processing peak data (UI thread safe) - DEPRECATED: use getSnapshot() */
     std::vector<float> getPostPeaks() const;
 
     /** Reset capture state */

@@ -39,7 +39,7 @@ export function UserAvatar({ name, avatarUrl, size = "md" }: UserAvatarProps) {
 
   return (
     <div
-      className={`rounded-full bg-amber-500/20 text-amber-400 font-semibold flex items-center justify-center shrink-0 ${className}`}
+      className={`rounded-full bg-white/20 text-white font-semibold flex items-center justify-center shrink-0 ${className}`}
     >
       {initials}
     </div>

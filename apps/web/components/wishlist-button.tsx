@@ -15,11 +15,11 @@ interface WishlistButtonProps {
 
 export function WishlistButton({ pluginId, size = "md", showLabel = true }: WishlistButtonProps) {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, sessionToken } = useAuth();
 
   const wishlistItem = useQuery(
     api.wishlists.getForPlugin,
-    user ? { user: user._id, plugin: pluginId } : "skip"
+    sessionToken ? { sessionToken, plugin: pluginId } : "skip"
   );
 
   const addToWishlist = useMutation(api.wishlists.add);
@@ -34,9 +34,9 @@ export function WishlistButton({ pluginId, size = "md", showLabel = true }: Wish
     }
 
     if (isInWishlist) {
-      await removeFromWishlist({ user: user._id, plugin: pluginId });
+      await removeFromWishlist({ sessionToken: sessionToken!, plugin: pluginId });
     } else {
-      await addToWishlist({ user: user._id, plugin: pluginId });
+      await addToWishlist({ sessionToken: sessionToken!, plugin: pluginId });
     }
   };
 

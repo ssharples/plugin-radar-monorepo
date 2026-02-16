@@ -19,7 +19,7 @@ class PluginManager : public juce::ChangeListener, public juce::Timer
 {
 public:
     PluginManager();
-    ~PluginManager() override;
+    ~PluginManager() noexcept override;
 
     // Scanning
     void startScan(bool rescanAll = false);
@@ -52,10 +52,38 @@ public:
     void clearBlacklist();
     juce::var getBlacklistAsJson() const;
 
+    // ============================================
+    // Custom Scan Paths
+    // ============================================
+    juce::var getCustomScanPathsAsJson() const;
+    bool addCustomScanPath(const juce::String& path, const juce::String& format);
+    bool removeCustomScanPath(const juce::String& path, const juce::String& format);
+
+    // ============================================
+    // Plugin Deactivation
+    // ============================================
+    bool deactivatePlugin(const juce::String& identifier);
+    bool reactivatePlugin(const juce::String& identifier);
+    juce::var getDeactivatedPluginsAsJson() const;
+    bool removeKnownPlugin(const juce::String& identifier);
+    juce::var getPluginListIncludingDeactivatedAsJson() const;
+    bool isDeactivated(const juce::String& identifier) const;
+
+    // ============================================
+    // Auto-Scan Detection
+    // ============================================
+    bool enableAutoScan(int intervalMs);
+    bool disableAutoScan();
+    juce::var getAutoScanStateAsJson() const;
+    juce::var checkForNewPlugins();
+
     // Callbacks
     std::function<void()> onScanComplete;
     std::function<void(float, const juce::String&)> onScanProgress;
-    std::function<void(const juce::String&, ScanFailureReason)> onPluginBlacklisted;  // Called when a plugin is auto-blacklisted
+    std::function<void(const juce::String&, ScanFailureReason)> onPluginBlacklisted;
+    std::function<void()> onDeactivationChanged;
+    std::function<void(int, const juce::var&)> onNewPluginsDetected;  // count, plugins array
+    std::function<void()> onAutoScanStateChanged;
 
     // Persistence
     void savePluginList();
@@ -70,7 +98,19 @@ private:
     // Blacklist persistence
     void saveBlacklist();
     void loadBlacklist();
-    void checkForCrashedPlugin();  // Check if previous scan crashed and blacklist the culprit
+    void checkForCrashedPlugin();
+
+    // Custom scan paths persistence
+    void saveCustomScanPaths();
+    void loadCustomScanPaths();
+
+    // Deactivation persistence
+    void saveDeactivatedList();
+    void loadDeactivatedList();
+
+    // Auto-scan persistence
+    void saveAutoScanSettings();
+    void loadAutoScanSettings();
 
     juce::KnownPluginList knownPlugins;
     juce::AudioPluginFormatManager formatManager;
@@ -79,13 +119,13 @@ private:
     std::atomic<bool> shouldStopScan { false };
     std::atomic<float> scanProgress { 0.0f };
     juce::String currentlyScanning;
-    std::mutex scanMutex;
+    mutable std::mutex scanMutex;
 
     // Main-thread scanner state
     std::unique_ptr<juce::PluginDirectoryScanner> currentScanner;
     int currentFormatIndex = 0;
     int currentPathIndex = 0;
-    juce::FileSearchPath currentSearchPaths;  // Cached search paths for current format
+    juce::FileSearchPath currentSearchPaths;
 
     // Out-of-process scanning
     juce::StringArray pluginsToScan;
@@ -97,6 +137,9 @@ private:
     juce::File getBlacklistFile() const;
     juce::File getDeadMansPedalFile() const;
     juce::File getScannerHelperPath() const;
+    juce::File getCustomScanPathsFile() const;
+    juce::File getDeactivatedPluginsFile() const;
+    juce::File getAutoScanSettingsFile() const;
     juce::FileSearchPath getSearchPathsForFormat(juce::AudioPluginFormat* format) const;
 
     // Out-of-process scanning methods
@@ -104,7 +147,6 @@ private:
     void scanNextPluginOutOfProcess();
     void processPendingScanResult();
 
-    // Result from a background scan — includes parsed plugins for thread-safe handoff
     struct BackgroundScanResult
     {
         ScanPluginResult scanResult;
@@ -112,7 +154,6 @@ private:
         juce::String pluginPath;
     };
 
-    // Runs in background thread — must NOT mutate shared state (knownPlugins, etc.)
     BackgroundScanResult scanPluginWithHelper(const juce::String& formatName, const juce::String& pluginPath);
 
     // Background scanning state
@@ -120,6 +161,31 @@ private:
     std::atomic<bool> backgroundScanInProgress { false };
     std::atomic<bool> hasPendingScanResult { false };
     BackgroundScanResult pendingScanResult;
+
+    // Custom scan paths: vector of {path, format} pairs
+    struct CustomScanPath
+    {
+        juce::String path;
+        juce::String format;  // "VST3", "AudioUnit", or "All"
+    };
+    std::vector<CustomScanPath> customScanPaths;
+
+    // Deactivated plugins (identifiers)
+    juce::StringArray deactivatedPlugins;
+
+    // Auto-scan timer (separate from the scan timer used during scanning)
+    class AutoScanTimer : public juce::Timer
+    {
+    public:
+        AutoScanTimer(PluginManager& pm) : pluginMgr(pm) {}
+        void timerCallback() override;
+    private:
+        PluginManager& pluginMgr;
+    };
+    AutoScanTimer autoScanTimer { *this };
+    bool autoScanEnabled = false;
+    int autoScanIntervalMs = 300000;  // default 5 minutes
+    juce::int64 lastAutoScanCheckTime = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };

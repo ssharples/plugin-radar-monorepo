@@ -1,12 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background:#000;height:100%">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plugin Chain Manager</title>
+    <style>
+      /* Instant black background + skeleton before React mounts */
+      body { margin:0; padding:0; background:#000; height:100%; overflow:hidden; }
+      #root { height:100%; }
+      .sk { background:#0a0a0a; height:100%; display:flex; flex-direction:column; font-family:monospace; }
+      .sk-header { height:48px; display:flex; align-items:center; padding:0 16px; gap:12px; border-bottom:1px solid #1a1a1a; }
+      .sk-pill { height:10px; border-radius:4px; background:#1a1a1a; }
+      .sk-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
+      .sk-slot { width:90%; max-width:420px; height:52px; border-radius:8px; background:#111; border:1px solid #1a1a1a; }
+      .sk-footer { height:66px; border-top:1px solid #1a1a1a; background:#0a0a0a; }
+      @keyframes sk-pulse { 0%,100%{opacity:.3} 50%{opacity:.6} }
+      .sk-slot { animation: sk-pulse 1.5s ease-in-out infinite; }
+      .sk-slot:nth-child(2) { animation-delay:.15s; }
+      .sk-slot:nth-child(3) { animation-delay:.3s; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Skeleton shown instantly, replaced when React mounts -->
+      <div class="sk">
+        <div class="sk-header">
+          <div class="sk-pill" style="width:80px"></div>
+          <div class="sk-pill" style="width:60px"></div>
+          <div style="flex:1"></div>
+          <div class="sk-pill" style="width:40px"></div>
+        </div>
+        <div class="sk-body">
+          <div class="sk-slot"></div>
+          <div class="sk-slot"></div>
+          <div class="sk-slot"></div>
+        </div>
+        <div class="sk-footer"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,22 +1,19 @@
-import { Component, ErrorInfo, ReactNode, useState, useEffect, useCallback } from 'react';
+import { Component, ErrorInfo, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
 import { PluginBrowser } from './components/PluginBrowser';
 import { ChainEditor } from './components/ChainEditor';
-import { WaveformDisplay } from './components/WaveformDisplay';
-import { SpectrumAnalyzer } from './components/SpectrumAnalyzer';
 import { PresetModal } from './components/PresetBrowser';
 import { Footer } from './components/Footer';
 import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
+import { KeyboardShortcutOverlay } from './components/KeyboardShortcutOverlay';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { usePresetStore } from './stores/presetStore';
 import { useSyncStore } from './stores/syncStore';
 import { useOfflineStore, startRetryLoop } from './stores/offlineStore';
+import { usePluginStore } from './stores/pluginStore';
+import { useKeyboardStore, ShortcutPriority } from './stores/keyboardStore';
 import { executeQueuedWrite } from './api/convex-client';
 import { juceBridge } from './api/juce-bridge';
-import uiBg from './assets/ui-bg.png';
-import headerBg from './assets/header.png';
-import analyzerContainer from './assets/analyzer-container.png';
-import analyzerDisplay from './assets/analyzer-display.png';
-import inputButtonBg from './assets/input-button-bg.png';
+import { GrainientBackground } from './components/GrainientBackground';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -30,8 +27,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('React Error:', error, errorInfo);
+  componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {
+    // Error already captured in state via getDerivedStateFromError
   }
 
   render() {
@@ -51,30 +48,91 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
-type AnalyzerView = 'waveform' | 'spectrum';
-
 function App() {
   const [showPresetModal, setShowPresetModal] = useState(false);
-  const [analyzerView, setAnalyzerView] = useState<AnalyzerView>('waveform');
   const [browserOpen, setBrowserOpen] = useState(false);
 
-  // Waveform sub-controls
-  const [showInput, setShowInput] = useState(true);
-  const [showOutput, setShowOutput] = useState(true);
 
-  // Spectrum sub-controls
-  const [specMode, setSpecMode] = useState<'bars' | 'line' | 'octave'>('bars');
-  const [octaveMode, setOctaveMode] = useState<'third' | 'full'>('third');
-
-  const { isOnboardingComplete, initialize: initOnboarding } = useOnboardingStore();
+  const { isOnboardingComplete, isInitializing, initialize: initOnboarding } = useOnboardingStore();
   const { currentPreset, fetchPresets } = usePresetStore();
-  const { initialize: initSync } = useSyncStore();
+  const { initialize: initSync, isLoggedIn, autoSync } = useSyncStore();
   const { initialize: initOffline } = useOfflineStore();
+  const { fetchPlugins, plugins } = usePluginStore();
+  const autoSyncFired = useRef(false);
 
   // Initialize onboarding check
   useEffect(() => {
-    initOnboarding().catch(console.error);
+    initOnboarding().catch(() => {});
   }, [initOnboarding]);
+
+  // All hooks must be called unconditionally (React Rules of Hooks)
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    fetchPresets();
+    fetchPlugins();
+  }, [fetchPresets, fetchPlugins, isOnboardingComplete]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    initSync().catch(() => {});
+  }, [initSync, isOnboardingComplete]);
+
+  // Auto-sync plugins to Convex once per session
+  useEffect(() => {
+    if (!isOnboardingComplete || !isLoggedIn || plugins.length === 0) return;
+    if (autoSyncFired.current) return;
+    autoSyncFired.current = true;
+    autoSync().catch(() => {});
+  }, [isOnboardingComplete, isLoggedIn, plugins.length, autoSync]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    initOffline();
+    startRetryLoop(executeQueuedWrite);
+  }, [initOffline, isOnboardingComplete]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    juceBridge.startWaveformStream();
+    return () => {
+      juceBridge.stopWaveformStream();
+    };
+  }, [isOnboardingComplete]);
+
+  // Cmd+B to toggle browser
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+
+    const registerShortcut = useKeyboardStore.getState().registerShortcut;
+    return registerShortcut({
+      id: 'toggle-plugin-browser',
+      key: 'b',
+      priority: ShortcutPriority.GLOBAL,
+      allowInInputs: false,
+      handler: (e) => {
+        if (!e.metaKey && !e.ctrlKey) return;
+        e.preventDefault();
+        setBrowserOpen(prev => !prev);
+      }
+    });
+  }, [isOnboardingComplete]);
+
+  // Listen for openPluginBrowser events from child components
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    const handler = () => setBrowserOpen(true);
+    window.addEventListener('openPluginBrowser', handler);
+    return () => window.removeEventListener('openPluginBrowser', handler);
+  }, [isOnboardingComplete]);
+
+  const toggleBrowser = useCallback(() => {
+    setBrowserOpen(prev => !prev);
+  }, []);
+
+  // Wait for initialization to complete before rendering anything
+  if (isInitializing) {
+    return <div style={{ width: '100%', height: '100%', backgroundColor: '#000000' }} />;
+  }
 
   // Show onboarding flow if not complete
   if (!isOnboardingComplete) {
@@ -85,249 +143,49 @@ function App() {
     );
   }
 
-  useEffect(() => {
-    fetchPresets();
-  }, [fetchPresets]);
-
-  useEffect(() => {
-    initSync().catch(console.error);
-  }, [initSync]);
-
-  useEffect(() => {
-    initOffline();
-    startRetryLoop(executeQueuedWrite);
-  }, [initOffline]);
-
-  useEffect(() => {
-    juceBridge.startWaveformStream();
-    return () => {
-      juceBridge.stopWaveformStream();
-    };
-  }, []);
-
-  // Cmd+B to toggle browser
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
-        e.preventDefault();
-        setBrowserOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
-
-  // Listen for openPluginBrowser events from child components
-  useEffect(() => {
-    const handler = () => setBrowserOpen(true);
-    window.addEventListener('openPluginBrowser', handler);
-    return () => window.removeEventListener('openPluginBrowser', handler);
-  }, []);
-
-  const toggleBrowser = useCallback(() => {
-    setBrowserOpen(prev => !prev);
-  }, []);
-
-  const ANALYZER_HEIGHT = 134;
   const FOOTER_HEIGHT = 66;
 
   return (
     <ErrorBoundary>
-      {/* Full-page background */}
       <div
         className="relative flex flex-col w-full h-full select-none overflow-hidden"
-        style={{
-          backgroundImage: `url(${uiBg})`,
-          backgroundSize: '100% 100%',
-          backgroundRepeat: 'no-repeat',
-        }}
+        style={{ background: '#0a0a0a' }}
       >
-        {/* Header — 33px, PNG background */}
-        <div
-          className="relative flex-shrink-0"
-          style={{
-            height: 33,
-            backgroundImage: `url(${headerBg})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-          }}
+        {/* Animated gradient background */}
+        <GrainientBackground
+          color1="#383838"
+          color2="#000000"
+          color3="#787878"
         />
 
-        {/* Chain area — fills remaining space, scrollable */}
-        <div
-          className="flex-1 min-h-0 overflow-hidden"
-          style={{ padding: '0 23px' }}
-        >
+        {/* Chain area — fills remaining space */}
+        <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
           <ErrorBoundary>
             <ChainEditor />
           </ErrorBoundary>
         </div>
 
-        {/* Analyzer — two-layer: container frame + display background */}
-        <div
-          className="flex-shrink-0 relative mx-3"
-          style={{
-            height: ANALYZER_HEIGHT,
-            backgroundImage: `url(${analyzerContainer})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        >
-          {/* Controls bar — in the container bezel above the display */}
-          <div className="absolute top-2 left-3 right-3 flex items-center gap-1.5 z-10">
-            {/* View toggle */}
-            <button
-              onClick={() => setAnalyzerView('waveform')}
-              className="relative"
-              style={{
-                width: 62, height: 18,
-                backgroundImage: `url(${inputButtonBg})`,
-                backgroundSize: '100% 100%',
-              }}
-            >
-              <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                analyzerView === 'waveform' ? 'text-white' : 'text-white/40'
-              }`}>
-                Waveform
-              </span>
-            </button>
-            <button
-              onClick={() => setAnalyzerView('spectrum')}
-              className="relative"
-              style={{
-                width: 62, height: 18,
-                backgroundImage: `url(${inputButtonBg})`,
-                backgroundSize: '100% 100%',
-              }}
-            >
-              <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                analyzerView === 'spectrum' ? 'text-white' : 'text-white/40'
-              }`}>
-                Spectrum
-              </span>
-            </button>
-
-            {/* Sub-controls — right-aligned */}
-            <div className="ml-auto flex items-center gap-1">
-              {analyzerView === 'waveform' ? (
-                <>
-                  <button
-                    onClick={() => setShowInput(v => !v)}
-                    className="relative"
-                    style={{
-                      width: 50, height: 18,
-                      backgroundImage: `url(${inputButtonBg})`,
-                      backgroundSize: '100% 100%',
-                    }}
-                  >
-                    <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                      showInput ? 'text-white' : 'text-white/30'
-                    }`}>
-                      Input
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => setShowOutput(v => !v)}
-                    className="relative"
-                    style={{
-                      width: 50, height: 18,
-                      backgroundImage: `url(${inputButtonBg})`,
-                      backgroundSize: '100% 100%',
-                    }}
-                  >
-                    <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                      showOutput ? 'text-plugin-accent' : 'text-white/30'
-                    }`}>
-                      Output
-                    </span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  {(['bars', 'line', 'octave'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setSpecMode(m)}
-                      className="relative"
-                      style={{
-                        width: 46, height: 18,
-                        backgroundImage: `url(${inputButtonBg})`,
-                        backgroundSize: '100% 100%',
-                      }}
-                    >
-                      <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                        specMode === m ? 'text-plugin-accent' : 'text-white/30'
-                      }`}>
-                        {m}
-                      </span>
-                    </button>
-                  ))}
-                  {specMode === 'octave' && (
-                    <button
-                      onClick={() => setOctaveMode(v => v === 'third' ? 'full' : 'third')}
-                      className="relative"
-                      style={{
-                        width: 50, height: 18,
-                        backgroundImage: `url(${inputButtonBg})`,
-                        backgroundSize: '100% 100%',
-                      }}
-                    >
-                      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-white/60">
-                        {octaveMode === 'third' ? '1/3' : '1/1'}
-                      </span>
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Display area — inner screen with display PNG background */}
-          <div
-            className="absolute overflow-hidden"
-            style={{
-              top: 32,
-              left: 8,
-              right: 8,
-              height: 94,
-              backgroundImage: `url(${analyzerDisplay})`,
-              backgroundSize: '100% 100%',
-              backgroundRepeat: 'no-repeat',
-            }}
-          >
-            {analyzerView === 'waveform' ? (
-              <WaveformDisplay showInput={showInput} showOutput={showOutput} />
-            ) : (
-              <SpectrumAnalyzer mode={specMode} octaveMode={octaveMode} />
-            )}
-          </div>
-        </div>
-
         {/* Footer — fixed height */}
-        <div className="flex-shrink-0" style={{ height: FOOTER_HEIGHT }}>
+        <div className="flex-shrink-0 relative z-[1]" style={{ height: FOOTER_HEIGHT }}>
           <Footer
             currentPresetName={currentPreset?.name}
             onPresetClick={() => setShowPresetModal(true)}
           />
         </div>
 
-        {/* Plugin browser overlay */}
+        {/* Plugin browser overlay - full screen */}
         {browserOpen && (
-          <div className="fixed inset-0 z-50" style={{ top: 33 }}>
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/40" onClick={toggleBrowser} />
-            {/* Panel */}
-            <div className="absolute left-0 top-0 bottom-0 w-[300px] bg-plugin-surface border-r border-plugin-border shadow-2xl">
-              <ErrorBoundary>
-                <PluginBrowser onClose={toggleBrowser} />
-              </ErrorBoundary>
-            </div>
-          </div>
+          <ErrorBoundary>
+            <PluginBrowser onClose={toggleBrowser} />
+          </ErrorBoundary>
         )}
 
         {showPresetModal && (
           <PresetModal onClose={() => setShowPresetModal(false)} />
         )}
+
+        {/* Keyboard shortcut overlay */}
+        <KeyboardShortcutOverlay />
       </div>
     </ErrorBoundary>
   );

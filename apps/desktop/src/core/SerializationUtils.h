@@ -35,8 +35,8 @@ inline void nodeToXml(const ChainNode& node, juce::XmlElement& parent)
         nodeXml->setAttribute("type", "plugin");
         nodeXml->setAttribute("bypassed", node.getPlugin().bypassed);
         nodeXml->setAttribute("branchGainDb", static_cast<double>(node.branchGainDb));
-        nodeXml->setAttribute("solo", node.solo);
-        nodeXml->setAttribute("mute", node.mute);
+        nodeXml->setAttribute("solo", node.solo.load(std::memory_order_relaxed));
+        nodeXml->setAttribute("mute", node.mute.load(std::memory_order_relaxed));
 
         if (auto descXml = node.getPlugin().description.createXml())
             nodeXml->addChildElement(descXml.release());
@@ -89,8 +89,8 @@ inline std::unique_ptr<ChainNode> xmlToNode(const juce::XmlElement& xml, int& ne
     if (type == "plugin")
     {
         node->branchGainDb = static_cast<float>(xml.getDoubleAttribute("branchGainDb", 0.0));
-        node->solo = xml.getBoolAttribute("solo", false);
-        node->mute = xml.getBoolAttribute("mute", false);
+        node->solo.store(xml.getBoolAttribute("solo", false), std::memory_order_relaxed);
+        node->mute.store(xml.getBoolAttribute("mute", false), std::memory_order_relaxed);
 
         PluginLeaf leaf;
         leaf.bypassed = xml.getBoolAttribute("bypassed", false);
@@ -165,8 +165,8 @@ inline juce::var nodeToJson(const ChainNode& node)
         obj->setProperty("bypassed", node.getPlugin().bypassed);
         obj->setProperty("manufacturer", node.getPlugin().description.manufacturerName);
         obj->setProperty("branchGainDb", node.branchGainDb);
-        obj->setProperty("solo", node.solo);
-        obj->setProperty("mute", node.mute);
+        obj->setProperty("solo", node.solo.load(std::memory_order_relaxed));
+        obj->setProperty("mute", node.mute.load(std::memory_order_relaxed));
     }
     else if (node.isGroup())
     {
@@ -209,8 +209,8 @@ inline juce::var nodeToJsonWithPresets(const ChainNode& node)
         obj->setProperty("numInputChannels", leaf.description.numInputChannels);
         obj->setProperty("numOutputChannels", leaf.description.numOutputChannels);
         obj->setProperty("branchGainDb", node.branchGainDb);
-        obj->setProperty("solo", node.solo);
-        obj->setProperty("mute", node.mute);
+        obj->setProperty("solo", node.solo.load(std::memory_order_relaxed));
+        obj->setProperty("mute", node.mute.load(std::memory_order_relaxed));
         // Note: presetData and presetSizeBytes omitted (require live processor)
     }
     else if (node.isGroup())
@@ -254,8 +254,8 @@ inline std::unique_ptr<ChainNode> jsonToNode(const juce::var& json, int& nextNod
     {
         node->name = obj->getProperty("name").toString();
         node->branchGainDb = static_cast<float>(obj->getProperty("branchGainDb"));
-        node->solo = static_cast<bool>(obj->getProperty("solo"));
-        node->mute = static_cast<bool>(obj->getProperty("mute"));
+        node->solo.store(static_cast<bool>(obj->getProperty("solo")), std::memory_order_relaxed);
+        node->mute.store(static_cast<bool>(obj->getProperty("mute")), std::memory_order_relaxed);
 
         PluginLeaf leaf;
         leaf.bypassed = static_cast<bool>(obj->getProperty("bypassed"));

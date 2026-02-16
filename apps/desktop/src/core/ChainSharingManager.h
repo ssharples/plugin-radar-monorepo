@@ -4,6 +4,9 @@
 #include <juce_events/juce_events.h>
 #include <functional>
 #include <vector>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 /**
  * Represents a received chain share from another user.
@@ -63,12 +66,19 @@ public:
 private:
     void timerCallback() override;
 
+    // Thread-safe version that uses a pre-captured token copy
+    void checkForReceivedChainsWithToken(const juce::String& token);
+
     // HTTP helper for Convex queries/mutations
     juce::var httpPost(const juce::String& path, const juce::var& args);
 
     juce::String sessionToken;
     juce::String convexUrl { "https://next-frog-231.convex.cloud" };
     std::atomic<int> pendingCount { 0 };
+    std::atomic<bool> isShuttingDown { false };
+    std::atomic<int> activeThreadCount { 0 };
+    std::mutex shutdownMutex;
+    std::condition_variable shutdownCondition;
 
     static constexpr int POLL_INTERVAL_MS = 30000; // 30 seconds
 

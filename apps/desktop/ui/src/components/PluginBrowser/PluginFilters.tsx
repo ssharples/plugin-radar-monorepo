@@ -1,6 +1,7 @@
 import { X, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { usePluginStore } from '../../stores/pluginStore';
+import { CustomDropdown } from '../Dropdown';
 
 // Categories from shared package
 const CATEGORIES = [
@@ -93,6 +94,32 @@ const TONAL_CHARACTERS = [
   { value: 'crisp', label: 'Crisp' },
 ];
 
+/** Shared style for filter chip buttons */
+function chipStyle(isActive: boolean): React.CSSProperties {
+  return {
+    padding: '2px 6px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '9px',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 'var(--tracking-wide)',
+    borderRadius: 'var(--radius-base)',
+    border: '1px solid',
+    cursor: 'pointer',
+    transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+    ...(isActive ? {
+      background: 'var(--color-accent-cyan)',
+      color: 'var(--color-bg-primary)',
+      borderColor: 'var(--color-accent-cyan)',
+      boxShadow: '0 0 8px rgba(222, 255, 10, 0.3)',
+    } : {
+      background: 'var(--color-bg-input)',
+      color: 'var(--color-text-secondary)',
+      borderColor: 'var(--color-border-default)',
+    }),
+  };
+}
+
 export function PluginFilters() {
   const {
     typeFilter,
@@ -153,16 +180,33 @@ export function PluginFilters() {
     <div className="relative" ref={advancedRef}>
       <div className="flex items-center gap-2">
         {/* Type toggle */}
-        <div className="flex rounded overflow-hidden border border-plugin-border">
+        <div
+          className="flex overflow-hidden"
+          style={{
+            borderRadius: 'var(--radius-base)',
+            border: '1px solid var(--color-border-default)',
+          }}
+        >
           {typeOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setTypeFilter(opt.value)}
-              className={`px-1.5 py-0.5 text-xxs font-mono uppercase transition-all ${
-                typeFilter === opt.value
-                  ? 'bg-plugin-accent text-black font-semibold'
-                  : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text'
-              }`}
+              className="fast-snap"
+              style={{
+                padding: '2px 6px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-wide)',
+                ...(typeFilter === opt.value ? {
+                  background: 'var(--color-accent-cyan)',
+                  color: 'var(--color-bg-primary)',
+                } : {
+                  background: 'var(--color-bg-input)',
+                  color: 'var(--color-text-secondary)',
+                }),
+              }}
             >
               {opt.label}
             </button>
@@ -170,29 +214,44 @@ export function PluginFilters() {
         </div>
 
         {/* Sort dropdown */}
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="bg-plugin-bg text-xxs font-mono text-plugin-muted rounded px-1.5 py-0.5 border border-plugin-border focus:outline-none focus:border-plugin-accent/50 cursor-pointer"
-        >
-          {sortOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <div style={{ width: '100px' }}>
+          <CustomDropdown
+            value={sortBy}
+            options={sortOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+            onChange={(val) => setSortBy(val as typeof sortBy)}
+            size="sm"
+          />
+        </div>
 
-        {/* Advanced filters toggle (only show if enrichment data loaded) */}
+        {/* Advanced filters toggle */}
         {enrichmentLoaded && (
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xxs font-mono uppercase rounded border transition-all ${
-              activeFilterCount > 0
-                ? 'bg-plugin-accent/15 text-plugin-accent border-plugin-accent/40'
-                : 'bg-plugin-bg text-plugin-muted border-plugin-border hover:text-plugin-text'
-            }`}
+            className="flex items-center gap-0.5 fast-snap"
+            style={{
+              padding: '2px 6px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-wide)',
+              borderRadius: 'var(--radius-base)',
+              border: '1px solid',
+              ...(activeFilterCount > 0 ? {
+                background: 'rgba(222, 255, 10, 0.1)',
+                color: 'var(--color-accent-cyan)',
+                borderColor: 'rgba(222, 255, 10, 0.4)',
+              } : {
+                background: 'var(--color-bg-input)',
+                color: 'var(--color-text-secondary)',
+                borderColor: 'var(--color-border-default)',
+              }),
+            }}
           >
-            <ChevronDown className={`w-3 h-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`w-3 h-3 fast-snap ${showAdvanced ? 'rotate-180' : ''}`}
+              style={{ transition: 'transform 150ms' }}
+            />
             {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
           </button>
         )}
@@ -200,14 +259,38 @@ export function PluginFilters() {
 
       {/* Advanced filter panel */}
       {showAdvanced && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl p-2.5 space-y-2">
+        <div
+          className="absolute right-0 top-full mt-1 z-50 w-72 p-2.5 space-y-2 slide-in"
+          style={{
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border-strong)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-elevated), 0 0 20px rgba(0, 0, 0, 0.6)',
+          }}
+        >
           {/* Header */}
           <div className="flex items-center justify-between">
-            <span className="text-xxs font-mono font-semibold text-plugin-text uppercase tracking-wider">Filters</span>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-wider)',
+                color: 'var(--color-accent-cyan)',
+              }}
+            >
+              Filters
+            </span>
             {hasActiveFilters() && (
               <button
                 onClick={clearAllFilters}
-                className="flex items-center gap-0.5 text-[9px] text-plugin-accent hover:text-plugin-accent/80"
+                className="flex items-center gap-0.5 fast-snap"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '9px',
+                  color: 'var(--color-accent-magenta)',
+                }}
               >
                 <X className="w-2.5 h-2.5" />
                 Clear all
@@ -217,27 +300,28 @@ export function PluginFilters() {
 
           {/* Category filter */}
           <div>
-            <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Category</label>
+            <label
+              style={{
+                display: 'block',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-wider)',
+                color: 'var(--color-text-tertiary)',
+                marginBottom: '4px',
+              }}
+            >
+              Category
+            </label>
             <div className="flex flex-wrap gap-0.5">
-              <button
-                onClick={() => setCategoryFilter(null)}
-                className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
-                  categoryFilter === null
-                    ? 'bg-plugin-accent text-black font-semibold'
-                    : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
-                }`}
-              >
+              <button onClick={() => setCategoryFilter(null)} style={chipStyle(categoryFilter === null)}>
                 All
               </button>
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.value}
                   onClick={() => setCategoryFilter(categoryFilter === cat.value ? null : cat.value)}
-                  className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
-                    categoryFilter === cat.value
-                      ? 'bg-plugin-accent text-black font-semibold'
-                      : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
-                  }`}
+                  style={chipStyle(categoryFilter === cat.value)}
                 >
                   {cat.label}
                 </button>
@@ -248,27 +332,28 @@ export function PluginFilters() {
           {/* Effect type filter (contextual based on category) */}
           {availableEffectTypes.length > 0 && (
             <div>
-              <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Effect Type</label>
+              <label
+                style={{
+                  display: 'block',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '9px',
+                  textTransform: 'uppercase',
+                  letterSpacing: 'var(--tracking-wider)',
+                  color: 'var(--color-text-tertiary)',
+                  marginBottom: '4px',
+                }}
+              >
+                Effect Type
+              </label>
               <div className="flex flex-wrap gap-0.5">
-                <button
-                  onClick={() => setEffectTypeFilter(null)}
-                  className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
-                    effectTypeFilter === null
-                      ? 'bg-plugin-accent text-black font-semibold'
-                      : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
-                  }`}
-                >
+                <button onClick={() => setEffectTypeFilter(null)} style={chipStyle(effectTypeFilter === null)}>
                   All
                 </button>
                 {availableEffectTypes.map((et) => (
                   <button
                     key={et.value}
                     onClick={() => setEffectTypeFilter(effectTypeFilter === et.value ? null : et.value)}
-                    className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
-                      effectTypeFilter === et.value
-                        ? 'bg-plugin-accent text-black font-semibold'
-                        : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
-                    }`}
+                    style={chipStyle(effectTypeFilter === et.value)}
                   >
                     {et.label}
                   </button>
@@ -279,17 +364,25 @@ export function PluginFilters() {
 
           {/* Tonal character filter */}
           <div>
-            <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Tonal Character</label>
+            <label
+              style={{
+                display: 'block',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-wider)',
+                color: 'var(--color-text-tertiary)',
+                marginBottom: '4px',
+              }}
+            >
+              Tonal Character
+            </label>
             <div className="flex flex-wrap gap-0.5">
               {TONAL_CHARACTERS.map((tc) => (
                 <button
                   key={tc.value}
                   onClick={() => toggleTonalCharacter(tc.value)}
-                  className={`px-1.5 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
-                    tonalCharacterFilter.includes(tc.value)
-                      ? 'bg-plugin-accent text-black font-semibold'
-                      : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
-                  }`}
+                  style={chipStyle(tonalCharacterFilter.includes(tc.value))}
                 >
                   {tc.label}
                 </button>
@@ -299,7 +392,19 @@ export function PluginFilters() {
 
           {/* Price filter */}
           <div>
-            <label className="text-[9px] font-mono text-plugin-dim uppercase tracking-wider mb-1 block">Price</label>
+            <label
+              style={{
+                display: 'block',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-wider)',
+                color: 'var(--color-text-tertiary)',
+                marginBottom: '4px',
+              }}
+            >
+              Price
+            </label>
             <div className="flex gap-0.5">
               {[
                 { value: 'all' as const, label: 'All' },
@@ -309,11 +414,7 @@ export function PluginFilters() {
                 <button
                   key={opt.value}
                   onClick={() => setPriceFilter(opt.value)}
-                  className={`px-2 py-0.5 text-[9px] font-mono uppercase rounded transition-all ${
-                    priceFilter === opt.value
-                      ? 'bg-plugin-accent text-black font-semibold'
-                      : 'bg-plugin-bg text-plugin-muted border border-plugin-border hover:text-plugin-text'
-                  }`}
+                  style={chipStyle(priceFilter === opt.value)}
                 >
                   {opt.label}
                 </button>

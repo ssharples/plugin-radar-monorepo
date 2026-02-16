@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getSessionUser } from "./lib/auth";
 
 // ============================================
 // QUERIES
@@ -45,12 +46,28 @@ export const search = query({
   },
 });
 
+export const listByNames = query({
+  args: { names: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const manufacturers = await Promise.all(
+      args.names.map(async (name) => {
+        return await ctx.db
+          .query("manufacturers")
+          .withIndex("by_name", (q) => q.eq("name", name))
+          .first();
+      })
+    );
+    return manufacturers.filter((m): m is NonNullable<typeof m> => m !== null);
+  },
+});
+
 // ============================================
 // MUTATIONS
 // ============================================
 
 export const create = mutation({
   args: {
+    sessionToken: v.string(),
     name: v.string(),
     slug: v.string(),
     website: v.string(),
@@ -59,6 +76,9 @@ export const create = mutation({
     newsletterEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
     const now = Date.now();
     
     // Check for duplicate slug
@@ -88,6 +108,7 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    sessionToken: v.string(),
     id: v.id("manufacturers"),
     name: v.optional(v.string()),
     website: v.optional(v.string()),
@@ -98,7 +119,10 @@ export const update = mutation({
     newsletterSubscribed: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
+    const { sessionToken: _, id, ...updates } = args;
     
     const existing = await ctx.db.get(id);
     if (!existing) {

@@ -18,6 +18,20 @@ namespace PlatformPaths
 #endif
     }
 
+    inline juce::File getGroupTemplatesDirectory()
+    {
+#if JUCE_MAC
+        return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+            .getChildFile("Library/Audio/Presets/PluginChainManager/Group Templates");
+#elif JUCE_WINDOWS
+        return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+            .getChildFile("PluginChainManager/Group Templates");
+#else
+        return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+            .getChildFile("PluginChainManager/Group Templates");
+#endif
+    }
+
     inline juce::File getPluginCacheDirectory()
     {
 #if JUCE_MAC

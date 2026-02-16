@@ -97,6 +97,8 @@ export const sendChain = mutation({
       slots: chain.slots,
       pluginCount: chain.pluginCount,
       targetInputLufs: chain.targetInputLufs,
+      targetInputPeakMin: chain.targetInputPeakMin,
+      targetInputPeakMax: chain.targetInputPeakMax,
     });
 
     // Insert the private chain share

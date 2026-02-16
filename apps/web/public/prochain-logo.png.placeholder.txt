@@ -1,0 +1,8 @@
+# ProChain Logo Placeholder
+
+Your ProChain logo should be placed at:
+apps/web/public/prochain-logo.png
+
+Until you add the real logo, the site will show a broken image.
+
+Temporary SVG text logo has been created for testing purposes.

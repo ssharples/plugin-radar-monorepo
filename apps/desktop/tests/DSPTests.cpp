@@ -820,3 +820,156 @@ TEST_CASE("AudioMeter: mono input duplicated to both channels", "[dsp][meter]")
     // R channel uses L when only 1 channel
     REQUIRE_THAT(readings.peakR, WithinAbs(0.6f, 0.0001f));
 }
+
+// =============================================================================
+// Phase 5: Extended DSP Tests
+// =============================================================================
+
+TEST_CASE("DryWetMixProcessor: smoothing mid-transition is not instant", "[dsp][drywet][extended]")
+{
+    DryWetMixProcessor proc;
+    proc.setMix(1.0f);  // Start at full wet
+    proc.prepareToPlay(44100.0, 512);
+
+    const int blockSize = 512;
+    juce::MidiBuffer midi;
+
+    // Let it settle at mix=1.0
+    for (int block = 0; block < 20; ++block)
+    {
+        juce::AudioBuffer<float> buf(4, blockSize);
+        buf.clear();
+        for (int i = 0; i < blockSize; ++i)
+        {
+            buf.getWritePointer(0)[i] = 0.0f;  // dry
+            buf.getWritePointer(1)[i] = 0.0f;
+            buf.getWritePointer(2)[i] = 1.0f;  // wet
+            buf.getWritePointer(3)[i] = 1.0f;
+        }
+        proc.processBlock(buf, midi);
+    }
+
+    // Now change mix to 0.0 (abrupt jump)
+    proc.setMix(0.0f);
+
+    // The very first block after the change should NOT be pure dry yet
+    // (SmoothedValue should be transitioning)
+    juce::AudioBuffer<float> transitionBuf(4, blockSize);
+    for (int i = 0; i < blockSize; ++i)
+    {
+        transitionBuf.getWritePointer(0)[i] = 0.0f;  // dry
+        transitionBuf.getWritePointer(1)[i] = 0.0f;
+        transitionBuf.getWritePointer(2)[i] = 1.0f;  // wet
+        transitionBuf.getWritePointer(3)[i] = 1.0f;
+    }
+    proc.processBlock(transitionBuf, midi);
+
+    // At least the first sample should still have some wet component
+    // (it can't jump instantly from 1.0 to 0.0)
+    float firstSample = transitionBuf.getReadPointer(0)[0];
+    REQUIRE(firstSample > 0.01f);  // Still has some wet signal
+}
+
+TEST_CASE("AudioMeter: peak hold decays over silent blocks", "[dsp][meter][extended]")
+{
+    AudioMeter meter;
+    meter.prepareToPlay(44100.0, 512);
+    meter.setPeakHoldTime(0.5f);    // Short hold for faster test
+    meter.setPeakDecayRate(40.0f);  // Fast decay
+
+    // Push a loud signal
+    juce::AudioBuffer<float> loudBuf(2, 512);
+    fillBuffer(loudBuf, 0.9f);
+    meter.process(loudBuf);
+
+    auto afterLoud = meter.getReadings();
+    REQUIRE_THAT(afterLoud.peakL, WithinAbs(0.9f, 0.001f));
+    float initialHold = afterLoud.peakHoldL;
+    REQUIRE(initialHold > 0.0f);
+
+    // Now process many blocks of silence — peak hold should eventually decay
+    juce::AudioBuffer<float> silentBuf(2, 512);
+    silentBuf.clear();
+    for (int i = 0; i < 200; ++i)
+        meter.process(silentBuf);
+
+    auto afterSilence = meter.getReadings();
+    // Peak should have decayed close to zero
+    REQUIRE(afterSilence.peakL < 0.1f);
+    // Peak hold should have decayed (may not be fully zero depending on timing)
+    REQUIRE(afterSilence.peakHoldL < initialHold);
+}
+
+TEST_CASE("AudioMeter: LUFS with sustained signal produces reasonable value", "[dsp][meter][extended]")
+{
+    AudioMeter meter;
+    meter.prepareToPlay(44100.0, 512);
+
+    // Generate a 3+ second 1kHz sine signal (AC content passes K-weighting filter)
+    // 3 seconds at 44100 Hz / 512 samples = ~258 blocks
+    const float freq = 1000.0f;
+    const float amplitude = 0.5f;
+    const double sr = 44100.0;
+
+    for (int block = 0; block < 300; ++block)
+    {
+        juce::AudioBuffer<float> buf(2, 512);
+        for (int i = 0; i < 512; ++i)
+        {
+            float sample = amplitude * std::sin(2.0f * juce::MathConstants<float>::pi * freq * (block * 512 + i) / static_cast<float>(sr));
+            buf.getWritePointer(0)[i] = sample;
+            buf.getWritePointer(1)[i] = sample;
+        }
+        meter.process(buf);
+    }
+
+    auto readings = meter.getReadings();
+    // LUFS should be between -100 and 0 for a 0.5 amplitude 1kHz sine
+    REQUIRE(readings.lufsShort > -100.0f);
+    REQUIRE(readings.lufsShort < 0.0f);
+}
+
+TEST_CASE("LatencyCompensationProcessor: large delay across many block boundaries", "[dsp][latency][extended]")
+{
+    // Test with delay much larger than block size
+    const int delaySamples = 1000;
+    LatencyCompensationProcessor proc(delaySamples);
+    proc.prepareToPlay(44100.0, 128);
+
+    const int blockSize = 128;
+    juce::MidiBuffer midi;
+
+    // Block 1: impulse at sample 0
+    juce::AudioBuffer<float> buf(2, blockSize);
+    buf.clear();
+    buf.getWritePointer(0)[0] = 1.0f;
+    buf.getWritePointer(1)[0] = 1.0f;
+    proc.processBlock(buf, midi);
+
+    // Process enough blocks to let the impulse come through
+    // Need ceil(1000/128) = 8 blocks total
+    bool foundImpulse = false;
+    int totalSamplesProcessed = blockSize;  // Already processed block 1
+
+    for (int block = 0; block < 10; ++block)
+    {
+        juce::AudioBuffer<float> nextBuf(2, blockSize);
+        nextBuf.clear();
+        proc.processBlock(nextBuf, midi);
+
+        // Check if impulse appears in this block
+        for (int i = 0; i < blockSize; ++i)
+        {
+            int absoluteSample = totalSamplesProcessed + i;
+            if (absoluteSample == delaySamples)
+            {
+                REQUIRE_THAT(nextBuf.getReadPointer(0)[i], WithinAbs(1.0f, 0.0001f));
+                REQUIRE_THAT(nextBuf.getReadPointer(1)[i], WithinAbs(1.0f, 0.0001f));
+                foundImpulse = true;
+            }
+        }
+        totalSamplesProcessed += blockSize;
+    }
+
+    REQUIRE(foundImpulse);
+}

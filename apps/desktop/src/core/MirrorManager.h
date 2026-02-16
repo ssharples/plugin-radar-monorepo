@@ -4,6 +4,7 @@
 #include "InstanceRegistry.h"
 #include <vector>
 #include <atomic>
+#include <memory>
 
 class PluginChainManagerProcessor;
 class ChainProcessor;
@@ -20,7 +21,7 @@ class MirrorManager : private juce::Timer, private InstanceRegistry::Listener
 {
 public:
     MirrorManager(PluginChainManagerProcessor& processor, InstanceRegistry& registry);
-    ~MirrorManager() override;
+    ~MirrorManager() noexcept override;
 
     /** Create a new mirror group with another instance. Returns group ID, or -1 on failure. */
     int startMirror(InstanceId partnerId);
@@ -36,6 +37,9 @@ public:
 
     /** Get the mirror group ID, or -1 if not mirrored. */
     int getMirrorGroupId() const;
+
+    /** Check if this instance is the leader of its mirror group. */
+    bool isLeader() const;
 
     /** Get the IDs of mirror partners (excluding self). */
     std::vector<InstanceId> getPartnerIds() const;
@@ -79,6 +83,7 @@ private:
     void instanceRegistryChanged() override;
     void propagateChainToPartners();
     void propagateParameterDiffs();
+    juce::String computeStructuralFingerprint() const;
 
     /** Take a snapshot of all plugin parameter values for diff comparison. */
     struct ParamSnapshot
@@ -89,8 +94,15 @@ private:
     };
     std::vector<ParamSnapshot> captureParameterSnapshot() const;
 
+    /** Validate that incoming parameter snapshot matches local chain structure. */
+    bool validateMirrorStructure(const std::vector<ParamSnapshot>& incoming) const;
+
     PluginChainManagerProcessor& processor;
     InstanceRegistry& registry;
+
+    // Weak lifetime guard: shared_ptr is kept alive by this object,
+    // async callbacks capture a weak_ptr and bail out if expired.
+    std::shared_ptr<std::atomic<bool>> aliveFlag = std::make_shared<std::atomic<bool>>(true);
 
     // State
     std::atomic<bool> suppressLocalNotification { false };
@@ -98,6 +110,9 @@ private:
 
     // Parameter diff state
     std::vector<ParamSnapshot> previousParamSnapshot;
+
+    // Structural fingerprint — only propagate chain when structure changes
+    juce::String lastPropagatedFingerprint;
 
     juce::ListenerList<Listener> listeners;
 

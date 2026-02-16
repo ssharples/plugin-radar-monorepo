@@ -27,6 +27,8 @@ public:
         float rmsL = 0.0f;          // RMS (linear)
         float rmsR = 0.0f;
         float lufsShort = -100.0f;  // Short-term LUFS (dB)
+        float avgPeakDbL = -100.0f; // Averaged peak dB over 2.5s window
+        float avgPeakDbR = -100.0f;
     };
 
     AudioMeter();
@@ -42,6 +44,9 @@ public:
     // Configuration
     void setPeakHoldTime(float seconds);    // Default: 1.5s
     void setPeakDecayRate(float dbPerSec);  // Default: 20 dB/s
+
+    // PHASE 2: Conditional metering (enable/disable LUFS calculation)
+    void setEnableLUFS(bool enabled);
 
 private:
     // K-weighting filter for LUFS (simplified 2-stage)
@@ -59,8 +64,6 @@ private:
     // Peak hold/decay state
     float peakHoldTimeSeconds = 1.5f;
     float peakDecayDbPerSec = 20.0f;
-    int peakHoldSamplesL = 0;
-    int peakHoldSamplesR = 0;
     float peakHoldCounterL = 0.0f;
     float peakHoldCounterR = 0.0f;
 
@@ -75,6 +78,26 @@ private:
     std::vector<float> lufsBufferR;
     int lufsBufferSize = 0;
     int lufsWritePos = 0;
+
+    // PHASE 1: Incremental LUFS calculation (running sums for O(1) update)
+    float lufsRunningSumL = 0.0f;
+    float lufsRunningSumR = 0.0f;
+
+    // Peak averaging ring buffer (2.5s window of per-block peak dB values)
+    // O(1) running sum, same pattern as incremental LUFS
+    static constexpr int PeakAvgWindowMs = 2500;
+    std::vector<float> peakAvgBufferL;  // per-block peak dB values
+    std::vector<float> peakAvgBufferR;
+    int peakAvgBufferSize = 0;          // number of blocks in 2.5s window
+    int peakAvgWritePos = 0;
+    int peakAvgSamplesWritten = 0;      // tracks fill level before buffer is full
+    float peakAvgRunningSumL = 0.0f;
+    float peakAvgRunningSumR = 0.0f;
+    std::atomic<float> avgPeakDbL{-100.0f};
+    std::atomic<float> avgPeakDbR{-100.0f};
+
+    // PHASE 2: Conditional metering flag (default true for backward compat)
+    std::atomic<bool> lufsEnabled{true};
 
     // K-weighting filter state (biquad coefficients)
     // Stage 1: High shelf (+4dB at high frequencies)

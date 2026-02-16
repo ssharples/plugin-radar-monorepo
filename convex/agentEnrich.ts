@@ -12,6 +12,7 @@ import { mutation, query } from "./_generated/server";
  */
 export const upsertPluginEnrichment = mutation({
   args: {
+    apiKey: v.string(),
     slug: v.string(),
     name: v.string(),
     manufacturer: v.string(),
@@ -58,8 +59,14 @@ export const upsertPluginEnrichment = mutation({
     isIndustryStandard: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    // Verify API key
+    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    if (args.apiKey !== expectedKey) {
+      throw new Error("Invalid API key");
+    }
+
     const now = Date.now();
-    
+
     // 0. Validate: reject instruments/synths
     const rejectedCategories = ["synth", "sampler", "instrument", "bundle"];
     if (args.category && rejectedCategories.includes(args.category)) {
@@ -278,6 +285,7 @@ export const upsertPluginEnrichment = mutation({
  */
 export const upsertComparison = mutation({
   args: {
+    apiKey: v.string(),
     slug: v.string(),
     pluginASlug: v.string(),
     pluginBSlug: v.string(),
@@ -301,8 +309,14 @@ export const upsertComparison = mutation({
     }))),
   },
   handler: async (ctx, args) => {
+    // Verify API key
+    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    if (args.apiKey !== expectedKey) {
+      throw new Error("Invalid API key");
+    }
+
     const now = Date.now();
-    
+
     // Find plugins by slug
     const pluginA = await ctx.db
       .query("plugins")

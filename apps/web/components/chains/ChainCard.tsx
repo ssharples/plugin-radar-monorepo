@@ -43,11 +43,11 @@ export function ChainCard({ chain }: { chain: any }) {
   return (
     <Link
       href={`/chains/${chain.slug}`}
-      className="block bg-stone-900/50 border border-stone-800 rounded-xl p-5 hover:border-amber-500/25 transition group"
+      className="block bg-stone-900/50 border border-stone-800 rounded-xl p-5 hover:border-white/25 transition group"
     >
       {/* Top row: category + compatibility */}
       <div className="flex items-center justify-between mb-3">
-        <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-400 capitalize">
+        <span className="px-2 py-1 bg-white/10 border border-white/20 rounded text-xs text-white capitalize">
           {chain.category}
         </span>
         <div className="flex items-center gap-2">
@@ -59,8 +59,8 @@ export function ChainCard({ chain }: { chain: any }) {
             disabled={bookmarking || bookmarked}
             className={`p-1 transition ${
               bookmarked
-                ? "text-amber-400"
-                : "text-stone-600 hover:text-amber-400"
+                ? "text-white"
+                : "text-stone-600 hover:text-white"
             } disabled:cursor-default`}
             title={bookmarked ? "In collection" : isAuthenticated ? "Add to collection" : "Log in to bookmark"}
           >
@@ -70,7 +70,7 @@ export function ChainCard({ chain }: { chain: any }) {
       </div>
 
       {/* Name */}
-      <h3 className="font-semibold text-stone-100 group-hover:text-amber-400 transition truncate mb-1">
+      <h3 className="font-semibold text-stone-100 group-hover:text-white transition truncate mb-1">
         {chain.name}
       </h3>
 
@@ -90,7 +90,7 @@ export function ChainCard({ chain }: { chain: any }) {
           {chain.tags.slice(0, 4).map((tag: string) => (
             <span
               key={tag}
-              className="text-xs px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400/80"
+              className="text-xs px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-white/80"
             >
               {tag}
             </span>

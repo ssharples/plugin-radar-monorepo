@@ -76,8 +76,8 @@ export async function captureSlotParameters(
           paramsByPosition.set(i, keyParams);
         }
       }
-    } catch (err) {
-      console.warn(`Failed to capture params for slot ${i}:`, err);
+    } catch (_err) {
+      // Silently ignored — parameter capture is best-effort
     }
   }
 

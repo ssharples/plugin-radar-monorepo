@@ -55,6 +55,13 @@ public:
         bool compHasParallelMix = false;
         bool compHasAutoMakeup = false;
         bool compHasLookahead = false;
+        bool reverbHasPredelay = false;
+        bool reverbHasDiffusion = false;
+        bool delayHasSync = false;
+        bool delayHasModulation = false;
+        bool satHasTypeSelector = false;
+        bool limiterHasLookahead = false;
+        bool gateHasHold = false;
         int confidence = 0;              // 0-100
         int matchedCount = 0;
         int totalCount = 0;
