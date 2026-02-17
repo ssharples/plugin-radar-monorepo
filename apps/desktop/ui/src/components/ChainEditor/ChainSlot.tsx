@@ -6,6 +6,7 @@ import { useChainStore } from '../../stores/chainStore';
 import { PluginSwapMenu } from './PluginSwapMenu';
 import { findCompatibleSwaps, translateParameters } from '../../api/convex-client';
 import { juceBridge } from '../../api/juce-bridge';
+import { ContextMenu, buildPluginSlotMenu } from '../ContextMenu';
 import sidePanelBg from '../../assets/side-panel.png';
 import rackmountBg from '../../assets/rackmount-bg.png';
 import bypassIconSvg from '../../assets/bypass-icon.svg';
@@ -109,6 +110,12 @@ export const ChainSlot = memo(function ChainSlot({
   const duplicateNode = useChainStore((s) => s.duplicateNode);
   const createGroup = useChainStore((s) => s.createGroup);
   const setBranchSolo = useChainStore((s) => s.setBranchSolo);
+  const setBranchMute = useChainStore((s) => s.setBranchMute);
+  const togglePluginEditor = useChainStore((s) => s.togglePluginEditor);
+  const openInlineEditor = useChainStore((s) => s.openInlineEditor);
+  const pluginClipboard = useChainStore((s) => s.pluginClipboard);
+  const pastePluginSettings = useChainStore((s) => s.pastePluginSettings);
+  const moveNode = useChainStore((s) => s.moveNode);
   
   // Hover state for progressive disclosure
   const [isHovered, setIsHovered] = useState(false);
@@ -457,6 +464,11 @@ export const ChainSlot = memo(function ChainSlot({
     onToggleBypass();
   }, [onToggleBypass]);
 
+  const handleMute = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBranchMute(id, !isMuted);
+  }, [setBranchMute, id, isMuted]);
+
   const handleRemove = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onRemove();
@@ -641,7 +653,7 @@ export const ChainSlot = memo(function ChainSlot({
           {/* Latency display */}
           {meterData?.latencyMs !== undefined && meterData.latencyMs > 0.1 && (
             <div className="absolute" style={{ left: 305, top: 16 }}>
-              <span className={`font-sans text-[10px] text-plugin-dim ${bypassed ? 'opacity-40' : ''}`}>
+              <span className={`font-sans text-[10px] text-white ${bypassed ? 'opacity-40' : ''}`}>
                 {meterData.latencyMs.toFixed(1)}ms
               </span>
             </div>
@@ -699,12 +711,12 @@ export const ChainSlot = memo(function ChainSlot({
               <button
                 className="absolute transition-opacity duration-200 hover:opacity-100"
                 style={{ left: 380, top: 13.5, width: 15, height: 15 }}
-                onClick={handleBypass}
+                onClick={handleMute}
                 onPointerDown={(e) => e.stopPropagation()}
-                title={bypassed ? 'Unmute' : 'Mute'}
+                title={isMuted ? 'Unmute' : 'Mute'}
               >
                 <img
-                  src={bypassed ? muteButtonActive : muteButtonInactive}
+                  src={isMuted ? muteButtonActive : muteButtonInactive}
                   alt="M"
                   className="w-full h-full"
                   draggable={false}
@@ -755,7 +767,7 @@ export const ChainSlot = memo(function ChainSlot({
         >
           {/* Close X button to remove plugin */}
           <button
-            className="absolute inset-0 flex items-center justify-center text-white/40 hover:text-red-400 transition-colors"
+            className="absolute inset-0 flex items-center justify-center text-white hover:text-red-400 transition-colors"
             onClick={handleRemove}
             onPointerDown={(e) => e.stopPropagation()}
             title="Remove plugin"
@@ -767,42 +779,48 @@ export const ChainSlot = memo(function ChainSlot({
 
       {/* Context menu (right-click) */}
       {showContextMenu && (
-        <>
-          <div className="fixed inset-0 z-[100]" onClick={() => setShowContextMenu(null)} />
-          <div
-            className="fixed z-[101] rounded-lg shadow-xl py-1 min-w-[140px]"
-            style={{
-              left: showContextMenu.x,
-              top: showContextMenu.y,
-              background: 'rgba(20, 20, 20, 0.98)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-            }}
-          >
-            {matchedPluginId && (
-              <button
-                onClick={() => { setShowContextMenu(null); setShowSwapMenu(true); }}
-                className="w-full px-3 py-1.5 text-left text-xs text-plugin-text hover:bg-plugin-border/50 font-sans"
-              >
-                Swap Plugin
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setShowContextMenu(null);
-                showInlineSearchBelow(id, parentId, indexInParent + 1);
-              }}
-              className="w-full px-3 py-1.5 text-left text-xs text-plugin-text hover:bg-plugin-border/50 font-sans"
-            >
-              Insert Plugin Below
-            </button>
-            <button
-              onClick={() => { setShowContextMenu(null); onRemove(); }}
-              className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-red-500/10 font-sans"
-            >
-              Remove
-            </button>
-          </div>
-        </>
+        <ContextMenu
+          x={showContextMenu.x}
+          y={showContextMenu.y}
+          items={buildPluginSlotMenu(
+            {
+              node: node as any,
+              nodeId: id,
+              parentId,
+              indexInParent,
+              hasMatchedPlugin: !!matchedPluginId,
+              isEditorOpen: !!isEditorOpen,
+              hasClipboard: !!pluginClipboard,
+              canMoveUp: indexInParent > 0,
+              canMoveDown: indexInParent >= 0, // will be refined by parent
+            },
+            {
+              toggleBypass: () => onToggleBypass(),
+              toggleSolo: () => setBranchSolo(id, !(node?.solo ?? false)),
+              remove: () => onRemove(),
+              duplicate: () => duplicateNode(id),
+              replaceWithSimilar: () => setShowSwapMenu(true),
+              moveUp: () => moveNode(id, parentId, Math.max(0, indexInParent - 1)),
+              moveDown: () => moveNode(id, parentId, indexInParent + 1),
+              savePreset: () => juceBridge.savePreset(name, ''),
+              loadPreset: () => { /* open preset browser */ },
+              openPluginWindow: () => togglePluginEditor(id),
+              openInlineEditor: () => openInlineEditor(id),
+              copyPluginSettings: () => {
+                useChainStore.setState({
+                  pluginClipboard: { name, fileOrIdentifier: node?.fileOrIdentifier ?? '', nodeId: id },
+                });
+              },
+              pastePluginSettings: () => {
+                if (pluginClipboard) pastePluginSettings(pluginClipboard.nodeId, id);
+              },
+              createSerialGroup: () => createGroup([id], 'serial'),
+              createParallelGroup: () => createGroup([id], 'parallel'),
+              insertBelow: () => showInlineSearchBelow(id, parentId, indexInParent + 1),
+            },
+          )}
+          onClose={() => setShowContextMenu(null)}
+        />
       )}
 
       {/* Swap Menu Dropdown */}

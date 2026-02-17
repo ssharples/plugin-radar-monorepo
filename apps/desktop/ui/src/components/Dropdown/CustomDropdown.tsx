@@ -251,7 +251,7 @@ export function CustomDropdown<T extends string | number>({
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-plugin-muted transition-transform ${
+          className={`w-3.5 h-3.5 text-white transition-transform ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -277,7 +277,7 @@ export function CustomDropdown<T extends string | number>({
           {/* Options */}
           <div role="listbox" aria-label={label}>
             {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-plugin-dim font-mono">
+              <div className="px-3 py-2 text-xs text-white font-mono">
                 No options found
               </div>
             ) : (

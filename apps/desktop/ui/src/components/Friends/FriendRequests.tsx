@@ -18,7 +18,7 @@ const cardStyle: React.CSSProperties = {
 };
 
 const headingStyle: React.CSSProperties = {
-  color: 'var(--color-text-primary)',
+  color: '#deff0a',
   fontFamily: 'var(--font-mono)',
   fontWeight: 600,
   textTransform: 'uppercase',

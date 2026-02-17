@@ -4,6 +4,7 @@ import { usePluginStore } from '../stores/pluginStore';
 import { useUsageStore } from '../stores/usageStore';
 import { useChainStore, useChainActions } from '../stores/chainStore';
 import { useKeyboardStore, ShortcutPriority } from '../stores/keyboardStore';
+import { juceBridge } from '../api/juce-bridge';
 import type { PluginDescription } from '../api/types';
 
 /**
@@ -13,15 +14,14 @@ import type { PluginDescription } from '../api/types';
 export function InlineSearchOverlay() {
   const searchOverlayActive = useChainStore(s => s.searchOverlayActive);
   const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
-  const nodes = useChainStore(s => s.nodes);
-  const { hideSearchOverlay, showSearchOverlay } = useChainActions();
+  const { hideSearchOverlay } = useChainActions();
 
   const { plugins, getEnrichedDataForPlugin } = usePluginStore();
   const { getPluginUsageCount, getMostRecentPlugins } = useUsageStore();
 
   const [query, setQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [mode, setMode] = useState<'replace' | 'add'>('replace');
+  const [mode, setMode] = useState<'replace' | 'add'>('add');
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when overlay opens
@@ -33,33 +33,34 @@ export function InlineSearchOverlay() {
     }
   }, [searchOverlayActive]);
 
-  // Register Cmd+K / Cmd+Shift+K shortcuts
+  // Register Shift+Enter shortcut to toggle search overlay
   useEffect(() => {
     const register = useKeyboardStore.getState().registerShortcut;
-    const cleanups: (() => void)[] = [];
 
-    // Shift+Enter → open search overlay (replace mode), toggle if already open
-    cleanups.push(register({
+    const cleanup = register({
       id: 'inline-search-open',
       key: 'Enter',
+      modifiers: { shift: true, meta: false, ctrl: false, alt: false },
       priority: ShortcutPriority.GLOBAL,
       allowInInputs: false,
       handler: (e) => {
-        if (!e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
         const state = useChainStore.getState();
         if (!state.inlineEditorNodeId) return;
         e.preventDefault();
         if (state.searchOverlayActive) {
           hideSearchOverlay();
         } else {
-          setMode('replace');
-          showSearchOverlay();
+          setMode('add');
+          // Set state synchronously so overlay appears immediately,
+          // then fire bridge call in the background for C++ layout changes.
+          useChainStore.setState({ searchOverlayActive: true });
+          juceBridge.showSearchOverlay().catch(() => {});
         }
       },
-    }));
+    });
 
-    return () => cleanups.forEach(fn => fn());
-  }, [showSearchOverlay, hideSearchOverlay]);
+    return cleanup;
+  }, [hideSearchOverlay]);
 
   // Search results with relevance scoring
   const searchResults = useMemo(() => {
@@ -139,7 +140,7 @@ export function InlineSearchOverlay() {
       {/* Search input */}
       <div className="w-full max-w-lg px-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-plugin-muted" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white" size={18} />
           <input
             ref={inputRef}
             type="text"
@@ -158,7 +159,7 @@ export function InlineSearchOverlay() {
             </span>
             <button
               onClick={() => hideSearchOverlay()}
-              className="text-plugin-muted hover:text-white"
+              className="text-white hover:text-plugin-accent"
             >
               <X size={14} />
             </button>
@@ -172,7 +173,7 @@ export function InlineSearchOverlay() {
             className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
               mode === 'replace'
                 ? 'bg-plugin-accent/20 text-plugin-accent border border-plugin-accent/30'
-                : 'text-plugin-muted hover:text-white border border-transparent'
+                : 'text-white hover:text-plugin-accent border border-transparent'
             }`}
           >
             <Replace size={10} className="inline mr-1" />
@@ -183,7 +184,7 @@ export function InlineSearchOverlay() {
             className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
               mode === 'add'
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'text-plugin-muted hover:text-white border border-transparent'
+                : 'text-white hover:text-plugin-accent border border-transparent'
             }`}
           >
             <ArrowRight size={10} className="inline mr-1" />
@@ -195,7 +196,7 @@ export function InlineSearchOverlay() {
       {/* Results */}
       <div className="w-full max-w-lg px-4 mt-3 max-h-[50vh] overflow-y-auto">
         {searchResults.length === 0 && query.trim() && (
-          <div className="text-center text-plugin-muted text-sm py-8">
+          <div className="text-center text-white text-sm py-8">
             No plugins found for "{query}"
           </div>
         )}
@@ -215,12 +216,12 @@ export function InlineSearchOverlay() {
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white truncate">{plugin.name}</div>
-                <div className="text-[10px] text-plugin-muted truncate">
+                <div className="text-[10px] text-white truncate">
                   {plugin.manufacturer}
                   {category && <span className="ml-2 text-plugin-accent/60">{category}</span>}
                 </div>
               </div>
-              <span className="text-[9px] font-mono text-plugin-muted shrink-0">
+              <span className="text-[9px] font-mono text-white shrink-0">
                 {plugin.format}
               </span>
             </button>
@@ -229,7 +230,7 @@ export function InlineSearchOverlay() {
       </div>
 
       {/* Footer hints */}
-      <div className="mt-auto pb-4 text-[10px] text-plugin-muted font-mono flex items-center gap-4">
+      <div className="mt-auto pb-4 text-[10px] text-white font-mono flex items-center gap-4">
         <span>↑↓ Navigate</span>
         <span>↵ Select</span>
         <span>Esc Close</span>

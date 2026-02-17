@@ -46,7 +46,7 @@ export function PresetBrowser() {
       <div className="flex items-center justify-between p-3 border-b border-plugin-border">
         <div className="flex items-center gap-2">
           <Folder className="w-4 h-4 text-plugin-accent" />
-          <h2 className="text-sm font-semibold text-plugin-text">Presets</h2>
+          <h2 className="text-sm font-semibold text-[#deff0a]">Presets</h2>
         </div>
         <button
           onClick={() => setShowSaveModal(true)}
@@ -60,7 +60,7 @@ export function PresetBrowser() {
       {/* Current preset */}
       {currentPreset && (
         <div className="px-3 py-2 bg-plugin-accent/10 border-b border-plugin-border">
-          <p className="text-xs text-plugin-muted">Current preset:</p>
+          <p className="text-xs text-white">Current preset:</p>
           <p className="text-sm text-plugin-text font-medium truncate">
             {currentPreset.name}
           </p>
@@ -83,11 +83,11 @@ export function PresetBrowser() {
       {/* Preset list */}
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-plugin-muted">
+          <div className="flex items-center justify-center h-32 text-white">
             Loading...
           </div>
         ) : filteredPresets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-plugin-muted text-sm">
+          <div className="flex flex-col items-center justify-center h-32 text-white text-sm">
             <FileText className="w-8 h-8 mb-2 opacity-20" />
             <p>No presets found</p>
           </div>
@@ -103,18 +103,18 @@ export function PresetBrowser() {
                     : 'hover:bg-plugin-bg border border-transparent'
                 }`}
               >
-                <FileText className="flex-shrink-0 w-4 h-4 text-plugin-muted" />
+                <FileText className="flex-shrink-0 w-4 h-4 text-white" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-plugin-text truncate">
                     {preset.name}
                   </p>
-                  <p className="text-xs text-plugin-muted truncate">
+                  <p className="text-xs text-white truncate">
                     {preset.category}
                   </p>
                 </div>
                 <button
                   onClick={(e) => handleDeletePreset(preset.path, e)}
-                  className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-plugin-muted hover:text-red-500 transition-all"
+                  className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-white hover:text-red-500 transition-all"
                   title="Delete preset"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -126,7 +126,7 @@ export function PresetBrowser() {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-plugin-border text-xs text-plugin-muted">
+      <div className="px-3 py-2 border-t border-plugin-border text-xs text-white">
         {filteredPresets.length} preset{filteredPresets.length !== 1 ? 's' : ''}
       </div>
 

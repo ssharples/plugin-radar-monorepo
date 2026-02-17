@@ -649,6 +649,10 @@ class JuceBridge {
     return this.callNative<ApiResponse>('addPluginToGroup', JSON.stringify({ pluginId, parentId, insertIndex }));
   }
 
+  async addDryPath(parentId: number, insertIndex = -1): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('addDryPath', JSON.stringify({ parentId, insertIndex }));
+  }
+
   async setNodeBypassed(nodeId: number, bypassed: boolean): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('setNodeBypassed', JSON.stringify({ nodeId, bypassed }));
   }
@@ -1024,6 +1028,19 @@ class JuceBridge {
    */
   onInlineEditorChanged(handler: EventHandler<InlineEditorState>): () => void {
     return this.on('inlineEditorChanged', handler);
+  }
+
+  // ============================================
+  // Panel Layout — expand window for side/bottom panels
+  // ============================================
+
+  /**
+   * Tell C++ to resize the window to accommodate panels alongside the plugin editor.
+   * rightWidth: total width of right-side panels (0 = none)
+   * bottomHeight: total height of bottom panels (0 = none)
+   */
+  async setPanelLayout(rightWidth: number, bottomHeight: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setPanelLayout', rightWidth, bottomHeight);
   }
 
   // ============================================

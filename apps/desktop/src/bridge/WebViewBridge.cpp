@@ -556,6 +556,13 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             else
                 completion(juce::var());
         })
+        .withNativeFunction("addDryPath", [this](const juce::Array<juce::var>& args,
+                                                    juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+                completion(addDryPath(args[0]));
+            else
+                completion(juce::var());
+        })
         .withNativeFunction("setNodeBypassed", [this](const juce::Array<juce::var>& args,
                                                        juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             if (args.size() >= 1)
@@ -1149,7 +1156,26 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             }
             completion(juce::var(result));
         })
-        // (Dynamic sidebar width removed — sidebar is fixed at 44px)
+        // ============================================
+        // Panel Layout — expand window for side/bottom panels
+        // ============================================
+        .withNativeFunction("setPanelLayout", [this](const juce::Array<juce::var>& args,
+                                                      juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            auto* result = new juce::DynamicObject();
+            if (editor && args.size() >= 2)
+            {
+                int rightWidth = static_cast<int>(args[0]);
+                int bottomHeight = static_cast<int>(args[1]);
+                editor->setPanelLayout(rightWidth, bottomHeight);
+                result->setProperty("success", true);
+            }
+            else
+            {
+                result->setProperty("success", false);
+                result->setProperty("error", "Missing args (rightWidth, bottomHeight) or editor not available");
+            }
+            completion(juce::var(result));
+        })
         // ============================================
         // Search Overlay
         // ============================================
@@ -2406,6 +2432,40 @@ juce::var WebViewBridge::addPluginToGroup(const juce::var& args)
     {
         result->setProperty("success", false);
         result->setProperty("error", "Plugin not found: " + pluginId);
+    }
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::addDryPath(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+
+    juce::var parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+
+    if (!parsed.isObject())
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Invalid arguments");
+        return juce::var(result);
+    }
+
+    auto* obj = parsed.getDynamicObject();
+    int parentId = static_cast<int>(obj->getProperty("parentId"));
+    int insertIndex = obj->hasProperty("insertIndex")
+        ? static_cast<int>(obj->getProperty("insertIndex")) : -1;
+
+    auto newId = chainProcessor.addDryPath(parentId, insertIndex);
+    if (newId >= 0)
+    {
+        result->setProperty("success", true);
+        result->setProperty("nodeId", newId);
+        result->setProperty("chainState", getChainState());
+    }
+    else
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Failed to add dry path (parent must be a parallel group)");
     }
 
     return juce::var(result);

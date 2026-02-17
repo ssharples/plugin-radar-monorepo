@@ -118,6 +118,7 @@ private:
     juce::var moveNodeOp(const juce::var& args);
     juce::var removeNodeOp(const juce::var& args);
     juce::var addPluginToGroup(const juce::var& args);
+    juce::var addDryPath(const juce::var& args);
     juce::var setNodeBypassed(const juce::var& args);
 
     // Node mute

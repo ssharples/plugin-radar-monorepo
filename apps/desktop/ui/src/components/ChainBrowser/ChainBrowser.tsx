@@ -1,23 +1,25 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Globe, FolderOpen } from 'lucide-react';
+import { X, Globe, FolderOpen, Plug } from 'lucide-react';
 import { ChainBrowserSidebar } from './ChainBrowserSidebar';
 import { ChainBrowserGrid } from './ChainBrowserGrid';
 import { ChainBrowserDetail } from './ChainBrowserDetail';
 import { BrowseFilterBar } from './BrowseFilterBar';
 import { MyChainsList } from './MyChainsList';
+import { PluginListPanel } from './PluginListPanel';
 import { useCloudChainStore } from '../../stores/cloudChainStore';
 import { useSyncStore } from '../../stores/syncStore';
 import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
 import type { BrowseChainResult } from '../../api/types';
 
-type BrowserTab = 'my-chains' | 'browse';
+export type BrowserTab = 'plugins' | 'my-chains' | 'browse';
 const PAGE_SIZE = 20;
 
 interface ChainBrowserProps {
   onClose: () => void;
+  initialTab?: BrowserTab;
 }
 
-export function ChainBrowser({ onClose }: ChainBrowserProps) {
+export function ChainBrowser({ onClose, initialTab = 'plugins' }: ChainBrowserProps) {
   const {
     chains,
     browseTotal,
@@ -37,12 +39,13 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
 
   const { isLoggedIn } = useSyncStore();
 
-  const [tab, setTab] = useState<BrowserTab>('my-chains');
+  const [tab, setTab] = useState<BrowserTab>(initialTab);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedUseCase, setSelectedUseCase] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('popular');
   const [compatFilter, setCompatFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [previewChain, setPreviewChain] = useState<BrowseChainResult | null>(null);
 
@@ -66,13 +69,14 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
         useCaseGroup: selectedGroup ?? undefined,
         useCase: selectedUseCase ?? undefined,
         search: searchQuery || undefined,
+        authorName: authorFilter ?? undefined,
         sortBy: sortBy as any,
         compatibilityFilter: compatFilter as any,
         limit: PAGE_SIZE,
         offset: 0,
       });
     }
-  }, [tab, selectedGroup, selectedUseCase, sortBy, compatFilter, searchQuery, browseChainsPaginated]);
+  }, [tab, selectedGroup, selectedUseCase, sortBy, compatFilter, searchQuery, authorFilter, browseChainsPaginated]);
 
   // Fetch collection on browse tab
   useEffect(() => {
@@ -121,12 +125,13 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
       useCaseGroup: selectedGroup ?? undefined,
       useCase: selectedUseCase ?? undefined,
       search: searchQuery || undefined,
+      authorName: authorFilter ?? undefined,
       sortBy: sortBy as any,
       compatibilityFilter: compatFilter as any,
       limit: PAGE_SIZE,
       offset: newOffset,
     });
-  }, [offset, selectedGroup, selectedUseCase, searchQuery, sortBy, compatFilter, browseChainsPaginated]);
+  }, [offset, selectedGroup, selectedUseCase, searchQuery, authorFilter, sortBy, compatFilter, browseChainsPaginated]);
 
   const handlePrevPage = useCallback(() => {
     const newOffset = Math.max(0, offset - PAGE_SIZE);
@@ -135,12 +140,24 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
       useCaseGroup: selectedGroup ?? undefined,
       useCase: selectedUseCase ?? undefined,
       search: searchQuery || undefined,
+      authorName: authorFilter ?? undefined,
       sortBy: sortBy as any,
       compatibilityFilter: compatFilter as any,
       limit: PAGE_SIZE,
       offset: newOffset,
     });
-  }, [offset, selectedGroup, selectedUseCase, searchQuery, sortBy, compatFilter, browseChainsPaginated]);
+  }, [offset, selectedGroup, selectedUseCase, searchQuery, authorFilter, sortBy, compatFilter, browseChainsPaginated]);
+
+  const handleAuthorClick = useCallback((authorName: string) => {
+    setAuthorFilter(authorName);
+    setSearchQuery('');
+    setOffset(0);
+  }, []);
+
+  const handleClearAuthorFilter = useCallback(() => {
+    setAuthorFilter(null);
+    setOffset(0);
+  }, []);
 
   const handleToggleCollection = useCallback(
     async (chainId: string) => {
@@ -178,6 +195,9 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
       {/* Tab bar (also serves as header) */}
       <div className="flex items-center justify-between px-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)' }}>
         <div className="flex items-center gap-1">
+          <button onClick={() => setTab('plugins')} style={tabBtnStyle('plugins')}>
+            <Plug className="w-3 h-3" /> Plugins
+          </button>
           <button onClick={() => setTab('my-chains')} style={tabBtnStyle('my-chains')}>
             <FolderOpen className="w-3 h-3" /> My Chains
           </button>
@@ -229,6 +249,8 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
             isInCollection={collectionIds.has(previewChain._id)}
             onToggleCollection={() => handleToggleCollection(previewChain._id)}
           />
+        ) : tab === 'plugins' ? (
+          <PluginListPanel onClose={onClose} />
         ) : tab === 'my-chains' ? (
           <MyChainsList
             onClose={onClose}
@@ -245,11 +267,14 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
             ownedPluginIds={ownedPluginIds}
             collectionIds={collectionIds}
             isLoggedIn={isLoggedIn}
+            authorFilter={authorFilter}
             onPreview={handlePreview}
             onLoad={handlePreview}
             onToggleCollection={handleToggleCollection}
             onNextPage={handleNextPage}
             onPrevPage={handlePrevPage}
+            onAuthorClick={handleAuthorClick}
+            onClearAuthorFilter={handleClearAuthorFilter}
           />
         )}
       </div>

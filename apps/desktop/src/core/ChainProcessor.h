@@ -14,7 +14,6 @@
 struct WireResult
 {
     juce::AudioProcessorGraph::NodeID audioOut;
-    juce::AudioProcessorGraph::NodeID midiOut;
 };
 
 class ChainProcessor : public juce::AudioProcessorGraph
@@ -41,6 +40,9 @@ public:
 
     // Add a plugin to a specific parent group at a given index
     bool addPlugin(const juce::PluginDescription& desc, ChainNodeId parentId, int insertIndex);
+
+    // Add an empty dry path branch to a parallel group
+    ChainNodeId addDryPath(ChainNodeId parentId, int insertIndex = -1);
 
     // Remove any node by ID (plugin or group)
     bool removeNode(ChainNodeId nodeId);
@@ -243,9 +245,16 @@ private:
     bool tryRestoreCrashRecoveryState();
     void cleanupCrashRecoveryFile();
     void rebuildGraph();
-    WireResult wireNode(ChainNode& node, NodeID audioIn, NodeID midiIn);
-    WireResult wireSerialGroup(ChainNode& node, NodeID audioIn, NodeID midiIn);
-    WireResult wireParallelGroup(ChainNode& node, NodeID audioIn, NodeID midiIn);
+    WireResult wireNode(ChainNode& node, NodeID audioIn);
+    WireResult wireSerialGroup(ChainNode& node, NodeID audioIn);
+    WireResult wireParallelGroup(ChainNode& node, NodeID audioIn);
+
+    // Helper: wire a single-channel M/S plugin (MidOnly or SideOnly)
+    // processChannel = which encode output the plugin processes (0=mid, 1=side)
+    // bypassChannel  = which encode output bypasses the plugin (1=side, 0=mid)
+    void wireMidSidePlugin(PluginLeaf& leaf, NodeID encodeNodeId, NodeID pluginNodeId,
+                           NodeID decodeNodeId, int processChannel, int bypassChannel,
+                           int pluginLatency);
 
     void removeUtilityNodes(UpdateKind update = UpdateKind::sync);
     void notifyChainChanged();
@@ -312,8 +321,6 @@ private:
 
     NodeID audioInputNode;
     NodeID audioOutputNode;
-    NodeID midiInputNode;
-    NodeID midiOutputNode;
 
     // Sidechain buffer from host (set before processBlock, not owned)
     juce::AudioBuffer<float>* externalSidechainBuffer = nullptr;

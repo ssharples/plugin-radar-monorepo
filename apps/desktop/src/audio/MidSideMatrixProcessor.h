@@ -43,6 +43,7 @@ public:
 
 private:
     static constexpr float kInvSqrt2 = 0.7071067811865476f;
+    int diagSampleCounter = 0;  // Temporary diagnostic counter (remove after confirming M/S fix)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidSideMatrixProcessor)
 };

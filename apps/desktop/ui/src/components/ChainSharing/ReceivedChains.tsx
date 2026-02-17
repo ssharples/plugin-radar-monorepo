@@ -180,7 +180,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Inbox size={18} style={{ color: 'var(--color-accent-cyan)' }} />
-          <h3 style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Received Chains</h3>
+          <h3 style={{ color: '#deff0a', fontFamily: 'var(--font-mono)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Received Chains</h3>
           {chains.length > 0 && (
             <span className="badge badge-cyan" style={{ animation: 'neon-pulse 2s ease-in-out infinite' }}>
               {chains.length}

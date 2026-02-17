@@ -70,7 +70,7 @@ function MapSourceIndicator({
       );
     case 'none':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-plugin-muted">
+        <div className="flex items-center gap-1.5 text-[10px] text-white">
           <span className="w-2 h-2 rounded-full bg-neutral-600" />
           No map yet
           {onScan && (
@@ -296,7 +296,7 @@ export function PluginSwapMenu({
               <button
                 onClick={handleRandomize}
                 disabled={!!swapping}
-                className="p-1 rounded hover:bg-plugin-accent/20 text-plugin-muted hover:text-plugin-accent transition-colors"
+                className="p-1 rounded hover:bg-plugin-accent/20 text-white hover:text-plugin-accent transition-colors"
                 title="Random swap"
               >
                 <Dice5 className="w-4 h-4" />
@@ -304,7 +304,7 @@ export function PluginSwapMenu({
             )}
             <button
               onClick={onClose}
-              className="p-1 rounded hover:bg-plugin-border text-plugin-muted hover:text-plugin-text transition-colors"
+              className="p-1 rounded hover:bg-plugin-border text-white hover:text-plugin-text transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -319,7 +319,7 @@ export function PluginSwapMenu({
             scanning={scanning}
           />
           {mapContributorCount > 0 && (
-            <div className="flex items-center gap-1 text-[10px] text-plugin-muted">
+            <div className="flex items-center gap-1 text-[10px] text-white">
               <Users className="w-3 h-3" />
               {mapContributorCount} contributor{mapContributorCount > 1 ? 's' : ''}
             </div>
@@ -330,7 +330,7 @@ export function PluginSwapMenu({
       {/* Content */}
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-6 text-plugin-muted">
+          <div className="flex items-center justify-center py-6 text-white">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             <span className="text-sm">Finding compatible plugins...</span>
           </div>
@@ -340,8 +340,8 @@ export function PluginSwapMenu({
           </div>
         ) : swaps.length === 0 ? (
           <div className="px-3 py-4 text-center">
-            <p className="text-sm text-plugin-muted">No compatible plugins found.</p>
-            <p className="text-xs text-plugin-muted/60 mt-1">
+            <p className="text-sm text-white">No compatible plugins found.</p>
+            <p className="text-xs text-white mt-1">
               You need owned plugins in the same category with parameter maps.
             </p>
           </div>
@@ -357,7 +357,7 @@ export function PluginSwapMenu({
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-plugin-text truncate">{swap.pluginName}</p>
-                <p className="text-xs text-plugin-muted">
+                <p className="text-xs text-white">
                   {swap.parameterCount} params
                   {swap.eqBandCount ? ` • ${swap.eqBandCount} bands` : ''}
                 </p>
@@ -376,7 +376,7 @@ export function PluginSwapMenu({
       {/* Footer */}
       {swaps.length > 0 && (
         <div className="px-3 py-1.5 border-t border-plugin-border bg-plugin-bg/50">
-          <p className="text-[10px] text-plugin-muted/50 flex items-center gap-1.5">
+          <p className="text-[10px] text-white/70 flex items-center gap-1.5">
             <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />&gt;80%</span>
             <span className="opacity-30">|</span>
             <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block" />50-80%</span>

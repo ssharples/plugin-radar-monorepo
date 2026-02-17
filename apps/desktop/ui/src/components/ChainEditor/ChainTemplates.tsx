@@ -47,8 +47,8 @@ export function ChainTemplates() {
       <div className="w-12 h-12 rounded-xl bg-plugin-accent/10 border border-plugin-accent/20 flex items-center justify-center mb-3">
         <Plus className="w-6 h-6 text-plugin-accent" />
       </div>
-      <h2 className="text-sm font-semibold font-mono uppercase text-plugin-text mb-1">Build your chain</h2>
-      <p className="text-xs font-mono uppercase text-plugin-muted mb-5 text-center">
+      <h2 className="text-sm font-semibold font-mono uppercase text-[#deff0a] mb-1">Build your chain</h2>
+      <p className="text-xs font-mono uppercase text-white mb-5 text-center">
         Double-click a plugin from the browser, or get inspired
       </p>
 
@@ -70,7 +70,7 @@ export function ChainTemplates() {
                 <Icon className="w-3.5 h-3.5 text-plugin-text" />
                 <span className="text-[11px] font-medium font-mono uppercase text-plugin-text">{t.name}</span>
               </div>
-              <span className="text-[10px] font-mono uppercase text-plugin-muted leading-tight">
+              <span className="text-[10px] font-mono uppercase text-white leading-tight">
                 {t.description}
               </span>
             </button>

@@ -97,14 +97,19 @@ void PluginChainManagerEditor::resized()
     {
         auto bounds = getLocalBounds();
 
-        // WebView spans the FULL window (L-shape: sidebar left + toolbar bottom)
+        // WebView spans the FULL window (L-shape: sidebar left + toolbar bottom + panels)
         if (webBrowser)
             webBrowser->setBounds(bounds);
 
-        // Plugin editor overlaid: offset by sidebar on left, toolbar on bottom
+        // Plugin editor overlaid: offset by sidebar on left, toolbar on bottom,
+        // and any open panels on right/bottom
         auto editorArea = bounds;
         editorArea.removeFromLeft(sidebarWidth);
         editorArea.removeFromBottom(toolbarHeight);
+        if (bottomPanelHeight > 0)
+            editorArea.removeFromBottom(bottomPanelHeight);
+        if (rightPanelWidth > 0)
+            editorArea.removeFromRight(rightPanelWidth);
 
         if (editorViewport)
         {
@@ -201,9 +206,9 @@ bool PluginChainManagerEditor::showInlineEditor(ChainNodeId nodeId)
     // Disable manual resize in inline mode
     setResizable(false, false);
 
-    // Resize host window: sidebar + editor width, editor height + toolbar
-    int newW = edW + sidebarWidth;
-    int newH = edH + toolbarHeight;
+    // Resize host window: sidebar + editor width + right panel, editor height + toolbar + bottom panel
+    int newW = edW + sidebarWidth + rightPanelWidth;
+    int newH = edH + toolbarHeight + bottomPanelHeight;
     setSize(newW, newH);
 
     // Give keyboard focus to the plugin editor
@@ -243,6 +248,10 @@ void PluginChainManagerEditor::hideInlineEditor()
     }
 
     inlineEditorNodeId = -1;
+
+    // Reset panel dimensions when leaving inline mode
+    rightPanelWidth = 0;
+    bottomPanelHeight = 0;
 
     // Switch mode BEFORE setSize so resized() uses the correct layout
     currentMode = ViewMode::WebView;
@@ -336,9 +345,9 @@ bool PluginChainManagerEditor::switchInlineEditor(ChainNodeId nodeId)
 
     inlineEditor->addComponentListener(this);
 
-    // Resize to fit new editor (sidebar + editor width, editor + toolbar height)
-    int newW = edW + sidebarWidth;
-    int newH = edH + toolbarHeight;
+    // Resize to fit new editor (sidebar + editor width + right panel, editor + toolbar + bottom panel)
+    int newW = edW + sidebarWidth + rightPanelWidth;
+    int newH = edH + toolbarHeight + bottomPanelHeight;
     setSize(newW, newH);
 
     inlineEditor->grabKeyboardFocus();
@@ -386,9 +395,29 @@ void PluginChainManagerEditor::componentMovedOrResized(juce::Component& componen
             addAndMakeVisible(*inlineEditor);
         }
 
-        setSize(edW + sidebarWidth, edH + toolbarHeight);
+        setSize(edW + sidebarWidth + rightPanelWidth, edH + toolbarHeight + bottomPanelHeight);
 
         resizeGuard = false;
+    }
+}
+
+//==============================================================================
+// Panel Layout — expand/contract window for WebView panels
+//==============================================================================
+
+void PluginChainManagerEditor::setPanelLayout(int rightWidth, int bottomHeight)
+{
+    rightPanelWidth = juce::jmax(0, rightWidth);
+    bottomPanelHeight = juce::jmax(0, bottomHeight);
+
+    if (currentMode == ViewMode::PluginEditor && inlineEditor)
+    {
+        // Recalculate window size: plugin editor dimensions + sidebar + toolbar + panels
+        int edW = inlineEditor->getWidth();
+        int edH = inlineEditor->getHeight();
+        int newW = edW + sidebarWidth + rightPanelWidth;
+        int newH = edH + toolbarHeight + bottomPanelHeight;
+        setSize(newW, newH);
     }
 }
 

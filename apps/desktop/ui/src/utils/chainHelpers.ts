@@ -1,11 +1,11 @@
 import type { ChainNodeUI } from '../api/types';
 
-/** Collect all plugin nodes from the tree in DFS order */
+/** Collect all plugin nodes from the tree in DFS order (excludes dry path nodes) */
 export function collectPlugins(nodes: ChainNodeUI[]): { id: number; name: string }[] {
   const result: { id: number; name: string }[] = [];
   const walk = (list: ChainNodeUI[]) => {
     for (const node of list) {
-      if (node.type === 'plugin') {
+      if (node.type === 'plugin' && !node.isDryPath) {
         result.push({ id: node.id, name: node.name });
       } else if (node.type === 'group') {
         walk(node.children);

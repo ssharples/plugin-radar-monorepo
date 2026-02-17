@@ -1626,6 +1626,7 @@ export const browseChainsPaginated = query({
     useCaseGroup: v.optional(v.string()),
     useCase: v.optional(v.string()),
     search: v.optional(v.string()),
+    authorName: v.optional(v.string()),
     sortBy: v.optional(v.string()),       // "popular" | "recent" | "downloads" | "rating"
     genre: v.optional(v.string()),
     compatibilityFilter: v.optional(v.string()), // "all" | "full" | "close"
@@ -1692,6 +1693,21 @@ export const browseChainsPaginated = query({
         .query("pluginChains")
         .withIndex("by_public", (q) => q.eq("isPublic", true))
         .take(200);
+    }
+
+    // Apply author filter if requested
+    if (args.authorName) {
+      const authorNameLower = args.authorName.toLowerCase();
+      const matchingUsers = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("name"), args.authorName!))
+        .take(5);
+      if (matchingUsers.length > 0) {
+        const authorIds = new Set(matchingUsers.map((u) => u._id.toString()));
+        chains = chains.filter((chain) => authorIds.has(chain.user.toString()));
+      } else {
+        chains = [];
+      }
     }
 
     // Apply genre filter if requested

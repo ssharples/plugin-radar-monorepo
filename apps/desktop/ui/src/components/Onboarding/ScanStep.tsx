@@ -70,7 +70,7 @@ export function ScanStep() {
     <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
       <h2
         className="crt-text mb-2"
-        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
+        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
       >
         Scanning Your Plugins
       </h2>

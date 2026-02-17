@@ -147,7 +147,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
               fontFamily: 'var(--font-extended)',
               letterSpacing: 'var(--tracking-wider)',
               textTransform: 'uppercase' as const,
-              color: 'var(--color-text-primary)',
+              color: '#deff0a',
             }}
           >
             Build Your Chain
@@ -244,14 +244,14 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
         {recentChains.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4 px-1">
-              <Clock className="w-4 h-4" style={{ color: 'var(--color-text-tertiary)' }} />
+              <Clock className="w-4 h-4" style={{ color: '#deff0a' }} />
               <h2
                 className="text-xs"
                 style={{
                   fontFamily: 'var(--font-mono)',
                   letterSpacing: 'var(--tracking-widest)',
                   textTransform: 'uppercase' as const,
-                  color: 'var(--color-text-tertiary)',
+                  color: '#deff0a',
                 }}
               >
                 Recently Viewed
@@ -278,7 +278,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
                         className="text-sm font-bold truncate"
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          color: 'var(--color-text-primary)',
+                          color: '#deff0a',
                         }}
                       >
                         {chain.name || 'Untitled Chain'}

@@ -123,7 +123,7 @@ export function ChainBrowserDetail({
         <ChevronLeft className="w-3 h-3" /> Back
       </button>
 
-      <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
+      <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: '#deff0a', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
         {chain.name}
       </h3>
       {chain.author?.name && (
@@ -193,7 +193,7 @@ export function ChainBrowserDetail({
 
       {/* Plugin slots */}
       <div style={{ marginBottom: 'var(--space-4)' }}>
-        <h4 style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '8px' }}>
+        <h4 style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '8px' }}>
           Plugins ({chain.slots?.length ?? 0})
         </h4>
         <div className="space-y-1">

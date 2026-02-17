@@ -109,7 +109,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
       <div className="glass scale-in" style={modalPanelStyle} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-4">
           <Send size={18} style={{ color: 'var(--color-accent-cyan)' }} />
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
             Share Chain
           </h2>
         </div>

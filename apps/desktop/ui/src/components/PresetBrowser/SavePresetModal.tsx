@@ -85,7 +85,7 @@ export function SavePresetModal({ onClose }: SavePresetModalProps) {
       <div className="glass scale-in" style={modalPanelStyle}>
         {/* Header */}
         <div className="flex items-center justify-between" style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-default)' }}>
-          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Save Preset</h3>
+          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Save Preset</h3>
           <button
             onClick={onClose}
             style={{ padding: '4px', borderRadius: 'var(--radius-base)', color: 'var(--color-text-disabled)', background: 'none', border: 'none', cursor: 'pointer' }}

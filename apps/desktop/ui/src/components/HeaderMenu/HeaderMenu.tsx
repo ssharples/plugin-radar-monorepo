@@ -309,7 +309,7 @@ export function HeaderMenu() {
       )}
 
       {active === 'browse' && (
-        <ChainBrowser onClose={close} />
+        <ChainBrowser onClose={close} initialTab="browse" />
       )}
 
       {active === 'settings' && (
@@ -391,7 +391,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
           fontSize: 'var(--text-sm)',
           fontFamily: 'var(--font-extended)',
           fontWeight: 900,
-          color: 'var(--color-text-primary)',
+          color: '#deff0a',
           textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wider)',
         }}

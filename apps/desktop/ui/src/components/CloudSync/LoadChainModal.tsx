@@ -113,7 +113,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
               fontFamily: 'var(--font-mono)',
               fontSize: 'var(--text-3xl)',
               fontWeight: 700,
-              color: 'var(--color-text-primary)',
+              color: '#deff0a',
               textTransform: 'uppercase',
               letterSpacing: 'var(--tracking-wider)',
             }}
@@ -178,7 +178,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
                 fontFamily: 'var(--font-mono)',
                 fontSize: 'var(--text-sm)',
                 fontWeight: 700,
-                color: 'var(--color-text-primary)',
+                color: '#deff0a',
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wide)',
               }}

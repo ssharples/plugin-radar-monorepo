@@ -341,7 +341,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
               fontSize: 'var(--text-2xl)',
               fontFamily: 'var(--font-extended)',
               fontWeight: 900,
-              color: 'var(--color-text-primary)',
+              color: '#deff0a',
               marginBottom: '4px',
             }}>
               "{previewChain.name}"
@@ -424,7 +424,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
               <h4 className="mb-2" style={{
                 fontSize: 'var(--text-xs)',
                 fontFamily: 'var(--font-mono)',
-                color: 'var(--color-text-tertiary)',
+                color: '#deff0a',
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wider)',
               }}>

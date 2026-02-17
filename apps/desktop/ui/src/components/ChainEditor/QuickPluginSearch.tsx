@@ -226,7 +226,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
             fontWeight: 900,
             textTransform: 'uppercase',
             letterSpacing: '0.3em',
-            color: 'var(--color-text-secondary)',
+            color: '#deff0a',
           }}
         >
           Start Building

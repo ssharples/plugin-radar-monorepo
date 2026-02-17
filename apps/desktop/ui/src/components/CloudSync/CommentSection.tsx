@@ -191,7 +191,7 @@ export function CommentSection({
         className="text-sm font-medium mb-3"
         style={{
           fontFamily: 'var(--font-mono)',
-          color: 'var(--color-text-primary)',
+          color: '#deff0a',
           textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wide)',
         }}

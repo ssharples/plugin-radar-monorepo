@@ -2,6 +2,21 @@
 #include "PluginEditor.h"
 #include "core/MirrorManager.h"
 #include "utils/ProChainLogger.h"
+#include <cmath>
+
+// Replace any NaN/Inf samples with 0.0 to prevent downstream corruption
+static void sanitiseBuffer(juce::AudioBuffer<float>& buffer)
+{
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
+        auto* data = buffer.getWritePointer(ch);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            if (!std::isfinite(data[i]))
+                data[i] = 0.0f;
+        }
+    }
+}
 PluginChainManagerProcessor::PluginChainManagerProcessor()
     : AudioProcessor(BusesProperties()
                      .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -96,12 +111,12 @@ const juce::String PluginChainManagerProcessor::getName() const
 
 bool PluginChainManagerProcessor::acceptsMidi() const
 {
-    return true;
+    return false;
 }
 
 bool PluginChainManagerProcessor::producesMidi() const
 {
-    return true;
+    return false;
 }
 
 bool PluginChainManagerProcessor::isMidiEffect() const
@@ -279,6 +294,9 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // Apply input gain first (operates on stereo ch0-1 only)
     gainProcessor.processInputGain(buffer);
 
+    // Sanitise after input gain — extreme gain can push plugins into NaN/Inf
+    sanitiseBuffer(buffer);
+
     // Meter input AFTER gain (showing what actually enters the chain)
     inputMeter.process(buffer);
 
@@ -342,6 +360,9 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         buffer.copyFrom(0, 0, chainStereoBuffer, 0, 0, buffer.getNumSamples());
         buffer.copyFrom(1, 0, chainStereoBuffer, 1, 0, buffer.getNumSamples());
     }
+
+    // Sanitise after chain — catch any NaN/Inf produced by plugins
+    sanitiseBuffer(buffer);
 
     // Capture post-processing waveform and analyze via FFT (before output gain)
     waveformCapture.pushPostSamples(buffer);

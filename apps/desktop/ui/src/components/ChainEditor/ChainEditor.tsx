@@ -14,7 +14,7 @@ import {
   rectIntersection,
   type CollisionDetection,
 } from '@dnd-kit/core';
-import { Layers, GitBranch, Undo2, Redo2, Power, AppWindow, Plus, Radio, Copy, Link2, Send } from 'lucide-react';
+import { Layers, GitBranch, Undo2, Redo2, Power, AppWindow, Plus, Radio, Copy, Link2, Send, Star } from 'lucide-react';
 import { useChainStore, useChainActions } from '../../stores/chainStore';
 import { useChainEditorShortcuts } from '../../hooks/useChainEditorShortcuts';
 import { juceBridge } from '../../api/juce-bridge';
@@ -26,6 +26,7 @@ import { InlinePluginSearch } from './InlinePluginSearch';
 import { MirrorIndicator } from './MirrorIndicator';
 import { HeaderMenu } from '../HeaderMenu';
 import { EmptyStateKit } from './EmptyStateKit';
+import { ContextMenu, buildEmptySpaceMenu } from '../ContextMenu';
 
 /** Compact output waveform for the toolbar — neon yellow line */
 function ToolbarWaveform() {
@@ -196,15 +197,17 @@ export function ChainEditor() {
   const snapshots = useChainStore(s => s.snapshots);
   const activeSnapshot = useChainStore(s => s.activeSnapshot);
   const toastMessage = useChainStore(s => s.toastMessage);
+  const pluginClipboard = useChainStore(s => s.pluginClipboard);
 
   const {
     fetchChainState, moveNode, createGroup, dissolveGroupSilent,
     selectNode, undo, redo, canUndo, canRedo, saveSnapshot, recallSnapshot,
-    openInlineEditor,
+    openInlineEditor, openGalaxy,
   } = useChainActions();
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuType, setContextMenuType] = useState<'multiselect' | 'empty'>('multiselect');
   const [activeDragNode, setActiveDragNode] = useState<ChainNodeUI | null>(null);
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
   const [groupSelectMode, setGroupSelectMode] = useState(false);
@@ -501,8 +504,13 @@ export function ChainEditor() {
   }, [nodes, moveNode, createGroup, dissolveGroupSilent]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     if (selectedIds.size >= 2) {
-      e.preventDefault();
+      setContextMenuType('multiselect');
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    } else {
+      // Empty space context menu
+      setContextMenuType('empty');
       setContextMenu({ x: e.clientX, y: e.clientY });
     }
   }, [selectedIds]);
@@ -721,8 +729,21 @@ export function ChainEditor() {
           <ToolbarWaveform />
         </div>
 
-        {/* Right side: latency, instances, mirror */}
+        {/* Right side: galaxy, latency, instances, mirror */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => openGalaxy()}
+            className="p-1 rounded"
+            style={{
+              color: 'var(--color-text-secondary)',
+              transition: 'all var(--duration-fast) var(--ease-snap)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#deff0a'; e.currentTarget.style.background = 'rgba(222, 255, 10, 0.1)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'transparent'; }}
+            title="Galaxy Visualizer"
+          >
+            <Star className="w-3.5 h-3.5" />
+          </button>
           <LatencyDisplay />
           <InstancesBadge />
           <MirrorIndicator />
@@ -907,52 +928,50 @@ export function ChainEditor() {
         </div>
       )}
 
-      {/* Context menu for creating groups */}
-      {contextMenu && selectedIds.size >= 2 && (
-        <div
-          className="fixed z-50 rounded-lg py-1 min-w-[180px]"
-          style={{
-            left: contextMenu.x,
-            top: contextMenu.y,
-            background: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border-strong)',
-            boxShadow: 'var(--shadow-elevated)',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => handleCreateGroup('serial')}
-            className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-sm)',
-              color: 'var(--color-text-primary)',
-              transition: 'all var(--duration-fast) var(--ease-snap)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <Layers className="w-4 h-4" style={{ color: 'var(--color-status-warning)' }} />
-            Create Serial Group
-            <span className="ml-auto text-xxs" style={{ color: 'var(--color-text-tertiary)' }}>⌘G</span>
-          </button>
-          <button
-            onClick={() => handleCreateGroup('parallel')}
-            className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-sm)',
-              color: 'var(--color-text-primary)',
-              transition: 'all var(--duration-fast) var(--ease-snap)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <GitBranch className="w-4 h-4" style={{ color: 'var(--color-accent-cyan)' }} />
-            Create Parallel Group
-            <span className="ml-auto text-xxs" style={{ color: 'var(--color-text-tertiary)' }}>⌘⇧G</span>
-          </button>
-        </div>
+      {/* Context menu — multi-select group creation OR empty space actions */}
+      {contextMenu && contextMenuType === 'multiselect' && selectedIds.size >= 2 && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={[
+            {
+              id: 'create-serial',
+              label: 'Create Serial Group',
+              shortcut: '\u2318G',
+              action: () => handleCreateGroup('serial'),
+            },
+            {
+              id: 'create-parallel',
+              label: 'Create Parallel Group',
+              shortcut: '\u2318\u21E7G',
+              action: () => handleCreateGroup('parallel'),
+            },
+          ]}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {contextMenu && contextMenuType === 'empty' && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={buildEmptySpaceMenu(
+            {
+              hasClipboard: !!pluginClipboard,
+              hasNodes: nodes.length > 0,
+            },
+            {
+              addPlugin: () => window.dispatchEvent(new Event('openPluginBrowser')),
+              pastePlugin: () => {
+                // Paste not applicable to empty space in current model
+              },
+              importChain: () => juceBridge.importChain({}),
+              createSerialGroup: () => createGroup([], 'serial'),
+              createParallelGroup: () => createGroup([], 'parallel'),
+            },
+          )}
+          onClose={() => setContextMenu(null)}
+        />
       )}
 
       {/* Snapshot toast notification */}

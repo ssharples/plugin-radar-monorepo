@@ -1,11 +1,10 @@
-import { Component, ErrorInfo, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
-import { PluginBrowser } from './components/PluginBrowser';
+import { Component, ErrorInfo, ReactNode, useEffect, useCallback, useRef, useState } from 'react';
+import { ChainBrowser } from './components/ChainBrowser';
 import { ChainEditor } from './components/ChainEditor';
 import { PresetModal } from './components/PresetBrowser';
 import { Footer } from './components/Footer';
 import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
 import { KeyboardShortcutOverlay } from './components/KeyboardShortcutOverlay';
-import { LeftToolbar } from './components/LeftToolbar';
 import { GalaxyVisualizer } from './components/GalaxyVisualizer/GalaxyVisualizer';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { usePresetStore } from './stores/presetStore';
@@ -17,9 +16,10 @@ import { executeQueuedWrite } from './api/convex-client';
 import { juceBridge } from './api/juce-bridge';
 import { GrainientBackground } from './components/GrainientBackground';
 import { InlineEditorSidebar } from './components/InlineEditorSidebar';
-import { InlineEditorToolbar } from './components/InlineEditorToolbar';
+import { InlineToolbar } from './components/InlineToolbar';
 import { InlineSearchOverlay } from './components/InlineSearchOverlay';
-import { useChainStore } from './stores/chainStore';
+import { PanelContainer } from './components/Panels';
+import { useChainStore, useChainActions } from './stores/chainStore';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -54,10 +54,46 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
+function InlineEditorLayout() {
+  const galaxyActive = useChainStore(s => s.galaxyActive);
+  const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
+  const { closeGalaxy, openGalaxy } = useChainActions();
+
+  // Galaxy-only mode: no plugin is open, just galaxy
+  const galaxyOnly = galaxyActive && inlineEditorNodeId === null;
+
+  return (
+    <div
+      className="flex flex-col w-full h-full select-none overflow-hidden"
+      style={{ background: '#0a0a0a' }}
+    >
+      {/* Top area: sidebar (left) + plugin overlay or galaxy (right) */}
+      <div className="flex flex-1 min-h-0">
+        <InlineEditorSidebar
+          galaxyActive={galaxyActive}
+          onToggleGalaxy={() => galaxyActive ? closeGalaxy() : openGalaxy()}
+        />
+        <PanelContainer>
+          {galaxyActive ? (
+            <div className="flex-1 min-h-0 overflow-hidden h-full">
+              <GalaxyVisualizer />
+            </div>
+          ) : (
+            /* Plugin editor is rendered natively by C++ in this space — leave transparent */
+            <div className="flex-1 h-full" />
+          )}
+        </PanelContainer>
+      </div>
+      {/* Bottom toolbar — full width (hide when galaxy-only, no plugin open) */}
+      {!galaxyOnly && <InlineToolbar />}
+      <InlineSearchOverlay />
+    </div>
+  );
+}
+
 function App() {
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
-  const [galaxyActive, setGalaxyActive] = useState(false);
 
   const { isOnboardingComplete, isInitializing, initialize: initOnboarding } = useOnboardingStore();
   const { currentPreset, fetchPresets } = usePresetStore();
@@ -65,6 +101,7 @@ function App() {
   const { initialize: initOffline } = useOfflineStore();
   const { fetchPlugins, plugins } = usePluginStore();
   const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
+  const galaxyActive = useChainStore(s => s.galaxyActive);
   const autoSyncFired = useRef(false);
 
   // Initialize onboarding check
@@ -151,27 +188,14 @@ function App() {
   }
 
   const FOOTER_HEIGHT = 66;
-  const isInlineMode = inlineEditorNodeId !== null;
+  const isInlineMode = inlineEditorNodeId !== null || galaxyActive;
 
   // In inline editor mode: L-shaped layout — sidebar on left (full height), toolbar on bottom
   // The WebView spans the full window, plugin editor overlaid on top with offsets
   if (isInlineMode) {
     return (
       <ErrorBoundary>
-        <div
-          className="flex flex-col w-full h-full select-none overflow-hidden"
-          style={{ background: '#0a0a0a' }}
-        >
-          {/* Top area: sidebar (left) + transparent plugin overlay space (right) */}
-          <div className="flex flex-1 min-h-0">
-            <InlineEditorSidebar />
-            {/* Plugin editor is rendered natively by C++ in this space — leave transparent */}
-            <div className="flex-1" />
-          </div>
-          {/* Bottom toolbar — full width */}
-          <InlineEditorToolbar />
-          <InlineSearchOverlay />
-        </div>
+        <InlineEditorLayout />
       </ErrorBoundary>
     );
   }
@@ -189,23 +213,11 @@ function App() {
           color3="#787878"
         />
 
-        {/* Main content area: left toolbar + chain/galaxy */}
-        <div className="flex-1 min-h-0 overflow-hidden relative z-[1] flex">
-          <LeftToolbar
-            galaxyActive={galaxyActive}
-            onToggleGalaxy={() => setGalaxyActive(prev => !prev)}
-          />
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {galaxyActive ? (
-              <ErrorBoundary>
-                <GalaxyVisualizer />
-              </ErrorBoundary>
-            ) : (
-              <ErrorBoundary>
-                <ChainEditor />
-              </ErrorBoundary>
-            )}
-          </div>
+        {/* Chain area — fills remaining space */}
+        <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
+          <ErrorBoundary>
+            <ChainEditor />
+          </ErrorBoundary>
         </div>
 
         {/* Footer — fixed height */}
@@ -219,7 +231,7 @@ function App() {
         {/* Plugin browser overlay - full screen */}
         {browserOpen && (
           <ErrorBoundary>
-            <PluginBrowser onClose={toggleBrowser} />
+            <ChainBrowser onClose={toggleBrowser} initialTab="plugins" />
           </ErrorBoundary>
         )}
 

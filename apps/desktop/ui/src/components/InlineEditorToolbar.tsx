@@ -126,13 +126,13 @@ export function InlineEditorToolbar() {
       {/* Peak I/O values */}
       <div className="flex gap-3 shrink-0">
         <div className="flex items-baseline gap-1">
-          <span className="text-[8px] font-mono text-plugin-muted tracking-wider">IN</span>
+          <span className="text-[8px] font-mono text-white tracking-wider">IN</span>
           <span className={`text-[10px] font-mono tabular-nums ${inputPeakDb > -3 ? 'text-red-400' : inputPeakDb > -12 ? 'text-yellow-400' : 'text-green-400'}`}>
             {formatDb(inputPeakDb)}
           </span>
         </div>
         <div className="flex items-baseline gap-1">
-          <span className="text-[8px] font-mono text-plugin-muted tracking-wider">OUT</span>
+          <span className="text-[8px] font-mono text-white tracking-wider">OUT</span>
           <span className={`text-[10px] font-mono tabular-nums ${outputPeakDb > -3 ? 'text-red-400' : outputPeakDb > -12 ? 'text-yellow-400' : 'text-green-400'}`}>
             {formatDb(outputPeakDb)}
           </span>
@@ -158,7 +158,7 @@ export function InlineEditorToolbar() {
             onDragEnd={_endContinuousGesture}
           />
           <div className="flex flex-col leading-none">
-            <span className="text-[7px] font-mono text-plugin-muted tracking-wider">IN</span>
+            <span className="text-[7px] font-mono text-white tracking-wider">IN</span>
             <span className="text-[9px] font-mono tabular-nums text-plugin-foreground/70">
               {formatGain(node.inputGainDb)}
             </span>
@@ -179,7 +179,7 @@ export function InlineEditorToolbar() {
             onDragEnd={_endContinuousGesture}
           />
           <div className="flex flex-col leading-none">
-            <span className="text-[7px] font-mono text-plugin-muted tracking-wider">OUT</span>
+            <span className="text-[7px] font-mono text-white tracking-wider">OUT</span>
             <span className="text-[9px] font-mono tabular-nums text-plugin-foreground/70">
               {formatGain(node.outputGainDb)}
             </span>
@@ -200,7 +200,7 @@ export function InlineEditorToolbar() {
             onDragEnd={_endContinuousGesture}
           />
           <div className="flex flex-col leading-none">
-            <span className="text-[7px] font-mono text-plugin-muted tracking-wider">D/W</span>
+            <span className="text-[7px] font-mono text-white tracking-wider">D/W</span>
             <span className="text-[9px] font-mono tabular-nums text-plugin-foreground/70">
               {Math.round(node.pluginDryWet * 100)}%
             </span>
@@ -213,7 +213,7 @@ export function InlineEditorToolbar() {
 
       {/* M/S Mode — neon yellow branding */}
       <div className="flex items-center gap-1 shrink-0">
-        <span className="text-[8px] font-mono text-plugin-muted tracking-wider">M/S</span>
+        <span className="text-[8px] font-mono text-white tracking-wider">M/S</span>
         <div
           className="flex rounded overflow-hidden"
           style={{

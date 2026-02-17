@@ -61,7 +61,8 @@ void collectPlugins(const ChainNode& node, std::vector<const PluginLeaf*>& resul
 {
     if (node.isPlugin())
     {
-        result.push_back(&node.getPlugin());
+        if (!node.getPlugin().isDryPath)
+            result.push_back(&node.getPlugin());
     }
     else if (node.isGroup())
     {
@@ -74,7 +75,8 @@ void collectPluginsMut(ChainNode& node, std::vector<PluginLeaf*>& result)
 {
     if (node.isPlugin())
     {
-        result.push_back(&node.getPlugin());
+        if (!node.getPlugin().isDryPath)
+            result.push_back(&node.getPlugin());
     }
     else if (node.isGroup())
     {
@@ -86,7 +88,7 @@ void collectPluginsMut(ChainNode& node, std::vector<PluginLeaf*>& result)
 int countPlugins(const ChainNode& node)
 {
     if (node.isPlugin())
-        return 1;
+        return node.getPlugin().isDryPath ? 0 : 1;
 
     int count = 0;
     if (node.isGroup())

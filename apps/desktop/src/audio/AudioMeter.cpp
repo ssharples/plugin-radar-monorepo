@@ -181,16 +181,25 @@ void AudioMeter::process(const juce::AudioBuffer<float>& buffer)
         {
             const size_t writeIdx = static_cast<size_t>(peakAvgWritePos);
 
-            // Subtract old value, add new (O(1) running sum update)
-            peakAvgRunningSumL += blockPeakDbL - peakAvgBufferL[writeIdx];
-            peakAvgRunningSumR += blockPeakDbR - peakAvgBufferR[writeIdx];
+            if (peakAvgSamplesWritten >= peakAvgBufferSize)
+            {
+                // Buffer full — subtract the value we're about to overwrite (O(1))
+                peakAvgRunningSumL -= peakAvgBufferL[writeIdx];
+                peakAvgRunningSumR -= peakAvgBufferR[writeIdx];
+            }
+            else
+            {
+                // Still filling — just count, don't subtract (old slots are uninitialised)
+                peakAvgSamplesWritten++;
+            }
+
+            // Add new value
+            peakAvgRunningSumL += blockPeakDbL;
+            peakAvgRunningSumR += blockPeakDbR;
 
             peakAvgBufferL[writeIdx] = blockPeakDbL;
             peakAvgBufferR[writeIdx] = blockPeakDbR;
             peakAvgWritePos = (peakAvgWritePos + 1) % peakAvgBufferSize;
-
-            if (peakAvgSamplesWritten < peakAvgBufferSize)
-                peakAvgSamplesWritten++;
 
             // Compute average over filled portion
             float divisor = static_cast<float>(peakAvgSamplesWritten);

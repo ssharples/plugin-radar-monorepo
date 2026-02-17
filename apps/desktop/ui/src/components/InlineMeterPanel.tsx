@@ -43,7 +43,7 @@ export function InlineMeterPanel({ expanded, onToggle }: InlineMeterPanelProps) 
     return (
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-center py-2 text-plugin-muted hover:text-plugin-foreground hover:bg-white/5 transition-colors border-t border-white/5"
+        className="w-full flex items-center justify-center py-2 text-white hover:text-plugin-accent hover:bg-white/5 transition-colors border-t border-white/5"
         title="Show metering panel"
       >
         <BarChart3 size={14} />
@@ -55,10 +55,10 @@ export function InlineMeterPanel({ expanded, onToggle }: InlineMeterPanelProps) 
     <div className="flex flex-col h-full bg-[#0a0a0a] overflow-hidden" style={{ width: 196 }}>
       {/* Header with collapse button */}
       <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/5 shrink-0">
-        <span className="text-[9px] font-mono text-plugin-muted uppercase tracking-wider">Meters</span>
+        <span className="text-[9px] font-mono text-[#deff0a] uppercase tracking-wider">Meters</span>
         <button
           onClick={onToggle}
-          className="text-plugin-muted hover:text-plugin-foreground"
+          className="text-white hover:text-plugin-accent"
           title="Collapse metering panel"
         >
           <BarChart3 size={12} />
@@ -77,8 +77,8 @@ export function InlineMeterPanel({ expanded, onToggle }: InlineMeterPanelProps) 
           return (
             <div key={plugin.id} className="mb-1.5">
               <div className="flex items-center gap-1 mb-0.5">
-                <span className="font-mono text-[8px] text-plugin-muted w-3 text-right">{i + 1}</span>
-                <span className="text-[8px] text-plugin-muted truncate flex-1" title={plugin.name}>
+                <span className="font-mono text-[8px] text-white w-3 text-right">{i + 1}</span>
+                <span className="text-[8px] text-white truncate flex-1" title={plugin.name}>
                   {plugin.name.length > 18 ? plugin.name.slice(0, 18) + '…' : plugin.name}
                 </span>
               </div>

@@ -122,7 +122,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
     return (
       <div className="fixed inset-0 flex items-center justify-center z-50 fade-in" style={modalOverlayStyle} onClick={onClose}>
         <div className="glass scale-in" style={modalPanelStyle} onClick={(e) => e.stopPropagation()}>
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: 'var(--space-4)' }}>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: 'var(--space-4)' }}>
             Sign In Required
           </h2>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
@@ -139,7 +139,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
       <div className="fixed inset-0 flex items-center justify-center z-50 fade-in" style={modalOverlayStyle} onClick={onClose}>
         <div className="glass scale-in" style={modalPanelStyle} onClick={(e) => e.stopPropagation()}>
           <div className="text-center">
-            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: 'var(--space-2)' }}>
+            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: 'var(--space-2)' }}>
               Chain Saved
             </h2>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
@@ -171,7 +171,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 fade-in" style={modalOverlayStyle} onClick={onClose}>
       <div className="glass scale-in" style={{ ...modalPanelStyle, maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: 'var(--space-4)' }}>
+        <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: 'var(--space-4)' }}>
           Save Chain
         </h2>
 

@@ -48,7 +48,7 @@ export function ScanResults() {
       {/* Headline */}
       <h2
         className="crt-text mb-1"
-        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
+        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
       >
         Found {scanResult.totalDiscovered} Plugins
       </h2>
@@ -59,7 +59,7 @@ export function ScanResults() {
       {/* Issues section */}
       {hasIssues && (
         <div className="w-full mb-6">
-          <h3 style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
+          <h3 style={{ color: '#deff0a', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
             {scanResult.totalBlacklisted} {scanResult.totalBlacklisted === 1 ? 'issue' : 'issues'} found
           </h3>
 

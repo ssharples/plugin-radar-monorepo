@@ -38,7 +38,7 @@ export function DropdownOption({
           ? 'bg-plugin-accent/20 text-plugin-accent'
           : highlighted
           ? 'bg-plugin-accent/10 text-white'
-          : 'text-plugin-muted hover:bg-plugin-accent/5 hover:text-white'
+          : 'text-white hover:bg-plugin-accent/5 hover:text-plugin-accent'
         }
         ${highlighted || selected ? 'crt-text' : ''}
       `}

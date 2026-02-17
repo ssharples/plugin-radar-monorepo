@@ -127,6 +127,7 @@ export interface PluginNodeUI {
   uid: number;
   fileOrIdentifier: string;
   bypassed: boolean;
+  isDryPath?: boolean;
   manufacturer: string;
   branchGainDb: number;
   solo: boolean;

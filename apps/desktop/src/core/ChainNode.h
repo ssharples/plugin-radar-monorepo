@@ -41,6 +41,7 @@ struct PluginLeaf
     juce::AudioProcessorGraph::NodeID meterNodeId;       // Output meter (after plugin)
     juce::AudioProcessorGraph::NodeID inputMeterNodeId;  // Input meter (before plugin)
     bool bypassed = false;
+    bool isDryPath = false;          // True for empty/passthrough branches in parallel groups
     juce::String pendingPresetData;  // Preset data to apply after prepareToPlay (for safe import)
 
     // Per-plugin controls (serialized in presets)

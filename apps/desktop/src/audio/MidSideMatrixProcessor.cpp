@@ -28,4 +28,13 @@ void MidSideMatrixProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         left[i]  = (l + r) * kInvSqrt2;  // Mid (encode) or L (decode)
         right[i] = (l - r) * kInvSqrt2;  // Side (encode) or R (decode)
     }
+
+    // Temporary diagnostic: log peak levels every ~1 second (remove after confirming fix)
+    diagSampleCounter += numSamples;
+    if (diagSampleCounter >= 44100)
+    {
+        DBG("MidSideMatrix processBlock: ch0 peak=" << buffer.getMagnitude(0, 0, numSamples)
+            << " ch1 peak=" << buffer.getMagnitude(1, 0, numSamples));
+        diagSampleCounter = 0;
+    }
 }

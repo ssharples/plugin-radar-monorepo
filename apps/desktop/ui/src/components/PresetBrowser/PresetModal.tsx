@@ -92,7 +92,7 @@ export function PresetModal({ onClose }: PresetModalProps) {
         <div className="flex items-center justify-between" style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-default)' }}>
           <div className="flex items-center gap-2">
             <Folder className="w-5 h-5" style={{ color: 'var(--color-accent-cyan)' }} />
-            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Presets</h2>
+            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Presets</h2>
           </div>
           <div className="flex items-center gap-2">
             <button

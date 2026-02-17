@@ -131,6 +131,7 @@ interface CloudChainActions {
     useCaseGroup?: string;
     useCase?: string;
     search?: string;
+    authorName?: string;
     sortBy?: "popular" | "recent" | "downloads" | "rating";
     compatibilityFilter?: "all" | "full" | "close";
     limit?: number;

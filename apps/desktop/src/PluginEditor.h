@@ -43,6 +43,9 @@ public:
 
     bool isSearchOverlayActive() const { return searchOverlayActive; }
 
+    /** Update panel layout — expands the window to make room for panels alongside the plugin editor. */
+    void setPanelLayout(int rightWidth, int bottomHeight);
+
     static constexpr int sidebarWidth = 44;
     static constexpr int toolbarHeight = 44;
 
@@ -68,6 +71,10 @@ private:
     int savedWebViewHeight = 750;
     bool resizeGuard = false;
     bool searchOverlayActive = false;
+
+    // Panel layout — extra space for WebView panels alongside the plugin editor
+    int rightPanelWidth = 0;
+    int bottomPanelHeight = 0;
 
     // ComponentListener — track plugin editor self-resize
     void componentMovedOrResized(juce::Component& component, bool wasMoved, bool wasResized) override;

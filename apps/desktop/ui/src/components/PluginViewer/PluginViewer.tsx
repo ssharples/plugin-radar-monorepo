@@ -493,7 +493,7 @@ export function PluginViewer() {
       <div className="flex items-center justify-between" style={{ padding: '6px 12px', borderBottom: '1px solid var(--color-border-default)' }}>
         <div className="flex items-center gap-1.5">
           <Link2 className="w-3.5 h-3.5" style={{ color: 'var(--color-accent-cyan)' }} />
-          <h2 style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Chain</h2>
+          <h2 style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: '#deff0a', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Chain</h2>
         </div>
         <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)', background: 'var(--color-bg-input)', padding: '2px 6px', borderRadius: 'var(--radius-base)', border: '1px solid var(--color-border-default)' }}>
           {slots.length}

@@ -193,7 +193,7 @@ export function KeyboardShortcutOverlay() {
             <div className="flex items-center justify-between" style={{ padding: 'var(--space-4) var(--space-6)', borderBottom: '1px solid var(--color-border-default)' }}>
               <div className="flex items-center gap-3">
                 <Keyboard className="w-5 h-5" style={{ color: 'var(--color-accent-cyan)' }} />
-                <h2 className="crt-text" style={{ fontSize: 'var(--text-lg)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', fontWeight: 700 }}>
+                <h2 className="crt-text" style={{ fontSize: 'var(--text-lg)', fontFamily: 'var(--font-mono)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', fontWeight: 700 }}>
                   Keyboard Shortcuts
                 </h2>
               </div>
@@ -212,7 +212,7 @@ export function KeyboardShortcutOverlay() {
             <div className="overflow-y-auto scrollbar-cyber space-y-6" style={{ maxHeight: 'calc(80vh - 80px)', padding: 'var(--space-6)' }}>
               {Object.entries(shortcutsByCategory).map(([category, shortcuts]) => (
                 <div key={category}>
-                  <h3 style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
                     {CATEGORY_LABELS[category]}
                   </h3>
                   <div className="space-y-2">

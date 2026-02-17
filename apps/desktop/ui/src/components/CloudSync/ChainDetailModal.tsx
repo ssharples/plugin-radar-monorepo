@@ -345,7 +345,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
             {currentChain.name}
           </h2>
           {currentChain.forkedFrom && (

@@ -194,7 +194,7 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
               onClick={onClose}
               className="p-1 hover:bg-plugin-accent/20 rounded transition-colors"
             >
-              <X className="w-4 h-4 text-plugin-muted hover:text-plugin-accent" />
+              <X className="w-4 h-4 text-white hover:text-plugin-accent" />
             </button>
           </div>
 
@@ -227,7 +227,7 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
                   transition-all duration-200 border
                   ${selectedCategory === cat.id
                     ? 'bg-plugin-accent text-black border-plugin-accent shadow-[0_0_12px_rgba(255,255,255,0.4)]'
-                    : 'bg-plugin-surface/50 text-plugin-muted border-plugin-border hover:text-plugin-text hover:border-plugin-accent/50'
+                    : 'bg-plugin-surface/50 text-white border-plugin-border hover:text-plugin-text hover:border-plugin-accent/50'
                   }
                 `}
               >
@@ -240,13 +240,13 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
 
         {/* Sort bar with metric-inspired design */}
         <div className="px-4 py-2 bg-plugin-bg/80 backdrop-blur-sm border-t border-plugin-border/30 flex items-center justify-between">
-          <div className="text-[10px] text-plugin-dim uppercase tracking-widest font-sans">
+          <div className="text-[10px] text-white uppercase tracking-widest font-sans">
             {displayPlugins.length} plugin{displayPlugins.length !== 1 ? 's' : ''}
           </div>
           <div className="relative">
             <button
               onClick={() => setShowSortMenu(!showSortMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-plugin-border/30 hover:bg-plugin-accent/20 border border-plugin-border hover:border-plugin-accent/50 rounded text-[10px] uppercase tracking-wider font-sans text-plugin-muted hover:text-plugin-text transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-plugin-border/30 hover:bg-plugin-accent/20 border border-plugin-border hover:border-plugin-accent/50 rounded text-[10px] uppercase tracking-wider font-sans text-white hover:text-plugin-text transition-all"
             >
               {getSortIcon(sortMode)}
               <span>{getSortLabel(sortMode)}</span>
@@ -266,7 +266,7 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
                       transition-colors
                       ${sortMode === mode
                         ? 'bg-plugin-accent/20 text-plugin-accent border-l-2 border-plugin-accent'
-                        : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/30'
+                        : 'text-white hover:text-plugin-text hover:bg-plugin-border/30'
                       }
                     `}
                   >
@@ -297,8 +297,8 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
           {displayPlugins.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Diamond className="w-16 h-16 mb-4 opacity-10" />
-              <div className="text-sm text-plugin-muted font-sans">No plugins found</div>
-              <div className="text-xs text-plugin-dim mt-1">Try adjusting your filters</div>
+              <div className="text-sm text-white font-sans">No plugins found</div>
+              <div className="text-xs text-white mt-1">Try adjusting your filters</div>
             </div>
           )}
         </div>
@@ -306,12 +306,12 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
 
       {/* Footer with keyboard hints */}
       <div className="border-t border-plugin-border/30 bg-plugin-surface/50 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-4 text-[9px] text-plugin-dim uppercase tracking-widest font-sans">
+        <div className="flex items-center gap-4 text-[9px] text-white/70 uppercase tracking-widest font-sans">
           <span><kbd className="px-1.5 py-0.5 bg-plugin-border/50 rounded">↑↓</kbd> Navigate</span>
           <span><kbd className="px-1.5 py-0.5 bg-plugin-border/50 rounded">Enter</kbd> Add</span>
           <span><kbd className="px-1.5 py-0.5 bg-plugin-border/50 rounded">Esc</kbd> Close</span>
         </div>
-        <div className="text-[9px] text-plugin-dim uppercase tracking-widest font-sans">
+        <div className="text-[9px] text-white/70 uppercase tracking-widest font-sans">
           ProChain v1.0
         </div>
       </div>
@@ -384,7 +384,7 @@ function PluginCard({ plugin, isHighlighted, usageCount, enrichedData, onClick, 
             )}
           </div>
 
-          <div className="flex items-center gap-2 text-[10px] text-plugin-dim font-sans">
+          <div className="flex items-center gap-2 text-[10px] text-white font-sans">
             <span className="truncate">{plugin.manufacturer}</span>
             {category && (
               <>

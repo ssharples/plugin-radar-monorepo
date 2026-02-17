@@ -4,6 +4,7 @@ import { useChainStore, useChainActions } from '../../stores/chainStore';
 import { ChainSlotCyber } from './ChainSlotCyber';
 import { GroupContainer } from './GroupContainer';
 import { ParallelBranchControls } from './ParallelBranchControls';
+import { DryPathSlot } from './DryPathSlot';
 import { DropZone } from './DropZone';
 import { InlinePluginSearch } from './InlinePluginSearch';
 
@@ -132,6 +133,20 @@ export function ChainNodeList({
                   dissolvingGroupId={dissolvingGroupId}
                 />
               </div>
+            ) : node.type === 'plugin' && node.isDryPath ? (
+              <div
+                className={`
+                  flex items-center gap-1.5 dim-during-drag
+                  ${isDragActive && node.id !== draggedNodeId ? 'is-dimmed' : ''}
+                `}
+              >
+                {isParallelParent && (
+                  <ParallelBranchControls node={node} />
+                )}
+                <div className="flex-1 min-w-0">
+                  <DryPathSlot node={node} />
+                </div>
+              </div>
             ) : (
               <div
                 className={`
@@ -192,7 +207,7 @@ export function ChainNodeList({
 
       {/* Empty state when no visible nodes */}
       {visibleNodes.length === 0 && !isDragActive && (
-        <div className="px-3 py-2 text-xxs text-plugin-muted italic">
+        <div className="px-3 py-2 text-xxs text-white italic">
           Empty group
         </div>
       )}

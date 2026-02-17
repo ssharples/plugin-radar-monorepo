@@ -167,7 +167,7 @@ export function UnifiedChainCard({
                 style={{
                   fontSize: 'var(--text-xs)',
                   fontWeight: 600,
-                  color: 'var(--color-text-primary)',
+                  color: '#deff0a',
                   fontFamily: 'var(--font-mono)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',

@@ -6,100 +6,102 @@ import type { FFTData } from '../../api/types';
 // ============================================
 // Constants
 // ============================================
-const PARTICLE_COUNT = 6000;
+const PARTICLE_COUNT = 20000;
 const FFT_BINS = 1024;
 const NEON_YELLOW = new THREE.Color('#deff0a');
 const WHITE = new THREE.Color('#ffffff');
-const DIM_BLUE = new THREE.Color('#334466');
-const ROTATION_SPEED = 0.00015; // Very slow rotation
+const DIM_WHITE = new THREE.Color('#667788');
+const ROTATION_SPEED = 0.00015;
 
 // ============================================
 // Shaders
 // ============================================
+
 const vertexShader = /* glsl */ `
-  uniform sampler2D uFFTTexture;    // 1024x2 float texture (row0=L, row1=R)
+  uniform sampler2D uFFTTexture;  // 1024x1 RGBA: R=magL, G=magR
   uniform float uTime;
 
-  attribute float aFreqBin;         // Which FFT bin this particle maps to (0-1023)
-  attribute float aBaseRadius;      // Base radial distance from center
-  attribute float aBaseAngle;       // Base angle in the galaxy disc
-  attribute float aBaseY;           // Base Y position (frequency axis)
-  attribute float aSizeRandom;      // Random size variation
-
-  varying float vMagnitude;         // Pass magnitude to fragment
-  varying float vFreqNorm;          // Normalized frequency (0=bass, 1=highs)
-  varying float vAlpha;
-
-  void main() {
-    // Read L and R magnitudes from the DataTexture
-    float freqUV = aFreqBin / 1024.0;
-    float magL = texture2D(uFFTTexture, vec2(freqUV, 0.25)).r;
-    float magR = texture2D(uFFTTexture, vec2(freqUV, 0.75)).r;
-
-    float magAvg = (magL + magR) * 0.5;
-    float stereoSpread = (magR - magL);  // Negative = left, positive = right
-
-    // Frequency-based scaling: bass bins get more energy amplification
-    float freqNorm = aFreqBin / 1024.0;
-    float freqBoost = mix(3.0, 0.8, freqNorm);  // Bass gets 3x, highs get 0.8x
-    float boostedMag = magAvg * freqBoost;
-
-    // Position: galaxy disc layout
-    // X = radial position + stereo offset
-    // Y = frequency (bass at bottom, highs at top) + amplitude push
-    // Z = depth from amplitude
-    float radius = aBaseRadius + stereoSpread * 40.0;
-    float angle = aBaseAngle + uTime * ROTATION_SPEED_VAL;
-
-    float x = cos(angle) * radius;
-    float z = sin(angle) * radius;
-    float y = aBaseY + boostedMag * 15.0;  // Amplitude lifts particles
-
-    // Add subtle depth push from amplitude
-    z += boostedMag * 8.0;
-
-    vec3 pos = vec3(x, y, z);
-
-    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-
-    // Point size: base + amplitude boost
-    float baseSize = 1.5 + aSizeRandom * 1.5;
-    float ampSize = boostedMag * 12.0;
-    gl_PointSize = (baseSize + ampSize) * (200.0 / -mvPosition.z);
-
-    gl_Position = projectionMatrix * mvPosition;
-
-    vMagnitude = boostedMag;
-    vFreqNorm = freqNorm;
-    vAlpha = 0.15 + boostedMag * 2.5;  // Dim when silent, bright when active
-  }
-`.replace('ROTATION_SPEED_VAL', ROTATION_SPEED.toFixed(6));
-
-const fragmentShader = /* glsl */ `
-  uniform vec3 uColorLow;    // Neon yellow for bass
-  uniform vec3 uColorHigh;   // White for highs
-  uniform vec3 uColorDim;    // Dim blue for inactive
+  attribute float aFreqBin;
+  attribute float aBaseRadius;
+  attribute float aBaseAngle;
+  attribute float aBaseY;
+  attribute float aSizeRandom;
 
   varying float vMagnitude;
   varying float vFreqNorm;
   varying float vAlpha;
 
   void main() {
-    // Circular point shape with soft edge
+    float freqUV = (aFreqBin + 0.5) / 1024.0;
+    vec4 fftSample = texture2D(uFFTTexture, vec2(freqUV, 0.5));
+    float magL = fftSample.r;
+    float magR = fftSample.g;
+
+    float magAvg = (magL + magR) * 0.5;
+    float stereoSpread = (magR - magL);
+
+    float freqNorm = aFreqBin / 1024.0;
+
+    // Bass gets more visual boost
+    float freqBoost = mix(3.5, 1.0, freqNorm);
+    float boostedMag = magAvg * freqBoost;
+
+    // --- RADIUS: galaxy shape at rest, amplitude expands further ---
+    float ampRadius = boostedMag * 35.0;
+    float radius = aBaseRadius + ampRadius;
+
+    // Stereo offset
+    float side = sign(cos(aBaseAngle));
+    radius += side * stereoSpread * 15.0;
+    radius = max(radius, 0.5);
+
+    float angle = aBaseAngle + uTime * ROTATION_SPEED_VAL;
+
+    float x = cos(angle) * radius;
+    float z = sin(angle) * radius;
+    float y = aBaseY;
+
+    vec3 pos = vec3(x, y, z);
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+
+    // Small base size — stars are tiny, audio makes them grow
+    float baseSize = 0.4 + aSizeRandom * 0.6;
+    float ampSize = boostedMag * 8.0;
+    gl_PointSize = (baseSize + ampSize) * (200.0 / -mvPosition.z);
+
+    gl_Position = projectionMatrix * mvPosition;
+
+    vMagnitude = boostedMag;
+    vFreqNorm = freqNorm;
+    // Visible at rest (white stars), brighter with audio
+    vAlpha = 0.25 + aSizeRandom * 0.15 + boostedMag * 2.5;
+  }
+`.replace('ROTATION_SPEED_VAL', ROTATION_SPEED.toFixed(6));
+
+const fragmentShader = /* glsl */ `
+  uniform vec3 uColorActive;   // neon yellow — audio-reactive color
+  uniform vec3 uColorHigh;     // white — high freq active color
+  uniform vec3 uColorIdle;     // dim white/blue-grey — idle star color
+
+  varying float vMagnitude;
+  varying float vFreqNorm;
+  varying float vAlpha;
+
+  void main() {
     vec2 center = gl_PointCoord - vec2(0.5);
     float dist = length(center);
     if (dist > 0.5) discard;
 
-    float softEdge = 1.0 - smoothstep(0.3, 0.5, dist);
+    float softEdge = 1.0 - smoothstep(0.2, 0.5, dist);
 
-    // Color: blend from neon yellow (bass) to white (highs)
-    // When inactive, dim toward blue-gray
-    vec3 activeColor = mix(uColorLow, uColorHigh, vFreqNorm);
-    vec3 finalColor = mix(uColorDim, activeColor, clamp(vMagnitude * 4.0, 0.0, 1.0));
+    // Idle: dim white stars. Active: transition to neon yellow (low) / white (high)
+    vec3 activeColor = mix(uColorActive, uColorHigh, vFreqNorm);
+    float activation = clamp(vMagnitude * 6.0, 0.0, 1.0);
+    vec3 finalColor = mix(uColorIdle, activeColor, activation);
 
-    // Glow effect for active bass particles
+    // Extra warm glow on bass frequencies when active
     float glow = vMagnitude * (1.0 - vFreqNorm) * 2.0;
-    finalColor += uColorLow * glow * 0.3;
+    finalColor += uColorActive * glow * 0.3;
 
     float alpha = clamp(vAlpha, 0.05, 1.0) * softEdge;
     gl_FragColor = vec4(finalColor, alpha);
@@ -107,7 +109,7 @@ const fragmentShader = /* glsl */ `
 `;
 
 // ============================================
-// Galaxy Visualizer Component
+// Component
 // ============================================
 export function GalaxyVisualizer() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -119,13 +121,14 @@ export function GalaxyVisualizer() {
   const animFrameRef = useRef<number>(0);
   const timeRef = useRef(0);
 
-  // FFT data buffers with lerp interpolation
   const fftCurrentL = useRef(new Float32Array(FFT_BINS));
   const fftCurrentR = useRef(new Float32Array(FFT_BINS));
   const fftTargetL = useRef(new Float32Array(FFT_BINS));
   const fftTargetR = useRef(new Float32Array(FFT_BINS));
 
-  // Handle incoming FFT data at 30Hz
+  // RGBA float data: R=magL, G=magR, B=0, A=1 per texel
+  const fftTexData = useRef(new Float32Array(FFT_BINS * 4));
+
   const handleFFTData = useCallback((data: FFTData) => {
     const L = data.magnitudesL ?? data.magnitudes;
     const R = data.magnitudesR ?? data.magnitudes;
@@ -142,164 +145,175 @@ export function GalaxyVisualizer() {
     const container = containerRef.current;
     if (!container) return;
 
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    // Wait a frame for layout to settle
+    const initTimeout = requestAnimationFrame(() => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      if (width === 0 || height === 0) return;
 
-    // ---- Renderer ----
-    const renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      alpha: true,
-      powerPreference: 'high-performance',
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x000000, 0);
-    container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
+      // ---- Renderer ----
+      const renderer = new THREE.WebGLRenderer({
+        antialias: false,
+        alpha: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0);
+      container.appendChild(renderer.domElement);
+      rendererRef.current = renderer;
 
-    // ---- Scene ----
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
+      // ---- Scene ----
+      const scene = new THREE.Scene();
+      sceneRef.current = scene;
 
-    // ---- Camera ----
-    const camera = new THREE.PerspectiveCamera(60, width / height, 1, 1000);
-    camera.position.set(0, 30, 120);
-    camera.lookAt(0, 0, 0);
-    cameraRef.current = camera;
+      // ---- Camera ----
+      const camera = new THREE.PerspectiveCamera(60, width / height, 1, 1000);
+      camera.position.set(0, 0, 80);
+      camera.lookAt(0, 0, 0);
+      cameraRef.current = camera;
 
-    // ---- FFT DataTexture (1024 x 2, R32F) ----
-    const fftData = new Float32Array(FFT_BINS * 2); // Row 0 = L, Row 1 = R
-    const fftTexture = new THREE.DataTexture(
-      fftData,
-      FFT_BINS,
-      2,
-      THREE.RedFormat,
-      THREE.FloatType
-    );
-    fftTexture.minFilter = THREE.LinearFilter;
-    fftTexture.magFilter = THREE.LinearFilter;
-    fftTexture.needsUpdate = true;
-    fftTextureRef.current = fftTexture;
+      // ---- FFT DataTexture: 1024x1 RGBA float ----
+      const texData = fftTexData.current;
+      for (let i = 0; i < FFT_BINS; i++) texData[i * 4 + 3] = 1.0;
 
-    // ---- Generate particle attributes ----
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const freqBins = new Float32Array(PARTICLE_COUNT);
-    const baseRadii = new Float32Array(PARTICLE_COUNT);
-    const baseAngles = new Float32Array(PARTICLE_COUNT);
-    const baseYs = new Float32Array(PARTICLE_COUNT);
-    const sizeRandoms = new Float32Array(PARTICLE_COUNT);
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      // Map particle to frequency bin: weighted distribution
-      // More particles for bass (perceptually important)
-      const t = i / PARTICLE_COUNT;
-      const freqBin = Math.floor(Math.pow(t, 0.6) * FFT_BINS);
-      freqBins[i] = Math.min(freqBin, FFT_BINS - 1);
-
-      // Galaxy disc layout
-      const freqNorm = freqBins[i] / FFT_BINS;
-      const radius = 10 + freqNorm * 70 + (Math.random() - 0.5) * 15;
-      const angle = Math.random() * Math.PI * 2;
-
-      // Y position maps to frequency (bass at bottom, highs at top)
-      // With some spiral arm structure
-      const spiralOffset = Math.sin(angle * 2 + freqNorm * 4) * 5;
-      const y = -30 + freqNorm * 60 + spiralOffset + (Math.random() - 0.5) * 8;
-
-      baseRadii[i] = radius;
-      baseAngles[i] = angle;
-      baseYs[i] = y;
-      sizeRandoms[i] = Math.random();
-
-      // Initial position (will be overridden by shader)
-      positions[i * 3] = Math.cos(angle) * radius;
-      positions[i * 3 + 1] = y;
-      positions[i * 3 + 2] = Math.sin(angle) * radius;
-    }
-
-    // ---- Geometry ----
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('aFreqBin', new THREE.BufferAttribute(freqBins, 1));
-    geometry.setAttribute('aBaseRadius', new THREE.BufferAttribute(baseRadii, 1));
-    geometry.setAttribute('aBaseAngle', new THREE.BufferAttribute(baseAngles, 1));
-    geometry.setAttribute('aBaseY', new THREE.BufferAttribute(baseYs, 1));
-    geometry.setAttribute('aSizeRandom', new THREE.BufferAttribute(sizeRandoms, 1));
-
-    // ---- Material ----
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        uFFTTexture: { value: fftTexture },
-        uTime: { value: 0 },
-        uColorLow: { value: NEON_YELLOW },
-        uColorHigh: { value: WHITE },
-        uColorDim: { value: DIM_BLUE },
-      },
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    materialRef.current = material;
-
-    // ---- Points ----
-    const points = new THREE.Points(geometry, material);
-    scene.add(points);
-
-    // ---- FFT subscription ----
-    const unsubscribe = juceBridge.onFFTData(handleFFTData);
-
-    // ---- Animation loop ----
-    const animate = () => {
-      animFrameRef.current = requestAnimationFrame(animate);
-      timeRef.current += 1;
-
-      // Lerp FFT data (smooth 30Hz → 60fps)
-      const currentL = fftCurrentL.current;
-      const currentR = fftCurrentR.current;
-      const targetL = fftTargetL.current;
-      const targetR = fftTargetR.current;
-      const lerpFactor = 0.25;
-
-      for (let i = 0; i < FFT_BINS; i++) {
-        currentL[i] += (targetL[i] - currentL[i]) * lerpFactor;
-        currentR[i] += (targetR[i] - currentR[i]) * lerpFactor;
-      }
-
-      // Update DataTexture
-      const texData = fftTexture.image.data as Float32Array;
-      texData.set(currentL, 0);
-      texData.set(currentR, FFT_BINS);
+      const fftTexture = new THREE.DataTexture(
+        texData,
+        FFT_BINS,
+        1,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      );
+      fftTexture.minFilter = THREE.NearestFilter;
+      fftTexture.magFilter = THREE.NearestFilter;
       fftTexture.needsUpdate = true;
+      fftTextureRef.current = fftTexture;
 
-      // Update time uniform
-      material.uniforms.uTime.value = timeRef.current;
+      // ---- Generate particles ----
+      // Distributed in a galaxy disc shape — visible at rest as white star field
+      const positions = new Float32Array(PARTICLE_COUNT * 3);
+      const freqBins = new Float32Array(PARTICLE_COUNT);
+      const baseRadii = new Float32Array(PARTICLE_COUNT);
+      const baseAngles = new Float32Array(PARTICLE_COUNT);
+      const baseYs = new Float32Array(PARTICLE_COUNT);
+      const sizeRandoms = new Float32Array(PARTICLE_COUNT);
 
-      renderer.render(scene, camera);
-    };
+      const Y_MIN = -38;
+      const Y_RANGE = 76;
 
-    animate();
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const t = i / PARTICLE_COUNT;
+        // Steep curve: pack heavily into low frequencies
+        const freqBin = Math.floor(Math.pow(t, 0.3) * FFT_BINS);
+        freqBins[i] = Math.min(freqBin, FFT_BINS - 1);
 
-    // ---- Cleanup ----
-    return () => {
-      cancelAnimationFrame(animFrameRef.current);
-      unsubscribe();
+        const freqNorm = freqBins[i] / FFT_BINS;
 
-      geometry.dispose();
-      material.dispose();
-      fftTexture.dispose();
-      renderer.dispose();
+        // Y position: frequency axis with jitter
+        const y = Y_MIN + freqNorm * Y_RANGE + (Math.random() - 0.5) * 3.0;
 
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+        // Base radius: galaxy disc shape visible at rest
+        // Wider spread so stars are visible even with no audio
+        const baseR = 3.0 + Math.random() * 12.0 + (1.0 - freqNorm) * 5.0;
+        const angle = Math.random() * Math.PI * 2;
+
+        baseRadii[i] = baseR;
+        baseAngles[i] = angle;
+        baseYs[i] = y;
+        sizeRandoms[i] = Math.random();
+
+        positions[i * 3] = Math.cos(angle) * baseR;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = Math.sin(angle) * baseR;
       }
 
-      rendererRef.current = null;
-      sceneRef.current = null;
-      cameraRef.current = null;
-      materialRef.current = null;
-      fftTextureRef.current = null;
+      // ---- Geometry ----
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('aFreqBin', new THREE.BufferAttribute(freqBins, 1));
+      geometry.setAttribute('aBaseRadius', new THREE.BufferAttribute(baseRadii, 1));
+      geometry.setAttribute('aBaseAngle', new THREE.BufferAttribute(baseAngles, 1));
+      geometry.setAttribute('aBaseY', new THREE.BufferAttribute(baseYs, 1));
+      geometry.setAttribute('aSizeRandom', new THREE.BufferAttribute(sizeRandoms, 1));
+
+      // ---- Material ----
+      const material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        uniforms: {
+          uFFTTexture: { value: fftTexture },
+          uTime: { value: 0 },
+          uColorActive: { value: NEON_YELLOW },
+          uColorHigh: { value: WHITE },
+          uColorIdle: { value: DIM_WHITE },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      materialRef.current = material;
+
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+
+      const unsubscribe = juceBridge.onFFTData(handleFFTData);
+
+      // ---- Animation loop ----
+      const animate = () => {
+        animFrameRef.current = requestAnimationFrame(animate);
+        timeRef.current += 1;
+
+        const currentL = fftCurrentL.current;
+        const currentR = fftCurrentR.current;
+        const targetL = fftTargetL.current;
+        const targetR = fftTargetR.current;
+        const lerpFactor = 0.18;
+
+        for (let i = 0; i < FFT_BINS; i++) {
+          currentL[i] += (targetL[i] - currentL[i]) * lerpFactor;
+          currentR[i] += (targetR[i] - currentR[i]) * lerpFactor;
+        }
+
+        // Pack into RGBA: R=magL, G=magR
+        const td = fftTexData.current;
+        for (let i = 0; i < FFT_BINS; i++) {
+          td[i * 4]     = currentL[i];
+          td[i * 4 + 1] = currentR[i];
+        }
+        fftTexture.needsUpdate = true;
+
+        material.uniforms.uTime.value = timeRef.current;
+        renderer.render(scene, camera);
+      };
+
+      animate();
+
+      // Store cleanup refs
+      (container as any).__galaxyCleanup = () => {
+        cancelAnimationFrame(animFrameRef.current);
+        unsubscribe();
+        geometry.dispose();
+        material.dispose();
+        fftTexture.dispose();
+        renderer.dispose();
+        if (container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
+        rendererRef.current = null;
+        sceneRef.current = null;
+        cameraRef.current = null;
+        materialRef.current = null;
+        fftTextureRef.current = null;
+      };
+    });
+
+    return () => {
+      cancelAnimationFrame(initTimeout);
+      const cleanup = (container as any).__galaxyCleanup;
+      if (cleanup) {
+        cleanup();
+        delete (container as any).__galaxyCleanup;
+      }
     };
   }, [handleFFTData]);
 

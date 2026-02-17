@@ -17,7 +17,7 @@ const POP_OUT = KNOB_SIZE * 0.5; // 50% protrusion above footer
 const labelStyle: React.CSSProperties = {
   fontSize: '8px',
   fontFamily: 'var(--font-mono)',
-  color: 'var(--color-text-tertiary)',
+  color: '#ffffff',
   textTransform: 'uppercase',
   letterSpacing: 'var(--tracking-wider)',
 };

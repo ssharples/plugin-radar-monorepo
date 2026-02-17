@@ -1,11 +1,13 @@
-import { ChevronDown, ChevronRight, Layers, GitBranch, X, GripVertical, Save, SlidersHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronDown, ChevronRight, Layers, GitBranch, X, GripVertical, Save, SlidersHorizontal, Plus, AudioLines } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useChainActions } from '../../stores/chainStore';
 import type { GroupNodeUI, ChainNodeUI } from '../../api/types';
 import { ChainNodeList } from './ChainNodeList';
+import { GroupBreadcrumbs } from './GroupBreadcrumbs';
 import { Slider } from '../Slider/Slider';
 import { SaveGroupTemplateModal } from './SaveGroupTemplateModal';
+import { ContextMenu, buildGroupMenu } from '../ContextMenu';
 
 interface GroupContainerProps {
   node: GroupNodeUI;
@@ -53,11 +55,19 @@ export function GroupContainer({
     dissolveGroup,
     removeNode,
     toggleGroupCollapsed,
+    addDryPath,
     _endContinuousGesture,
   } = useChainActions();
 
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [groupContextMenu, setGroupContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleGroupContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setGroupContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
 
   // Make the group draggable
   const {
@@ -143,6 +153,7 @@ export function GroupContainer({
         {...dragAttributes}
         {...dragListeners}
         className="flex items-center gap-2 px-3 py-2 cursor-grab active:cursor-grabbing"
+        onContextMenu={handleGroupContextMenu}
       >
         {/* Drag handle indicator */}
         <div className="flex-shrink-0 p-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -292,6 +303,11 @@ export function GroupContainer({
           </button>
         </div>
       </div>
+
+      {/* Breadcrumb navigation for nested groups */}
+      {depth > 0 && !node.collapsed && (
+        <GroupBreadcrumbs groupId={node.id} />
+      )}
 
       {/* Collapsible Controls Panel */}
       {controlsOpen && (
@@ -446,6 +462,74 @@ export function GroupContainer({
               dissolvingGroupId={dissolvingGroupId}
             />
           )}
+
+          {/* Parallel group action buttons */}
+          {isParallel && (
+            <div
+              className="flex items-center gap-2 mt-1.5 px-1"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => window.dispatchEvent(new Event('openPluginBrowser'))}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xxs font-bold"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: 'var(--tracking-wide)',
+                  textTransform: 'uppercase' as const,
+                  color: 'var(--color-text-tertiary)',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                  transition: 'all var(--duration-fast) var(--ease-snap)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#deff0a';
+                  e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.3)';
+                  e.currentTarget.style.background = 'rgba(222, 255, 10, 0.06)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-text-tertiary)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                }}
+                title="Add a new plugin branch"
+              >
+                <Plus className="w-3 h-3" />
+                BRANCH
+              </button>
+
+              {/* Only show "Add Dry Path" if none exists yet */}
+              {!node.children.some(c => c.type === 'plugin' && c.isDryPath) && (
+                <button
+                  onClick={() => addDryPath(node.id)}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xxs font-bold"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    letterSpacing: 'var(--tracking-wide)',
+                    textTransform: 'uppercase' as const,
+                    color: 'var(--color-text-tertiary)',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px dashed rgba(255, 255, 255, 0.1)',
+                    transition: 'all var(--duration-fast) var(--ease-snap)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#5a7842';
+                    e.currentTarget.style.borderColor = 'rgba(90, 120, 66, 0.4)';
+                    e.currentTarget.style.background = 'rgba(90, 120, 66, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--color-text-tertiary)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                  }}
+                  title="Add dry signal passthrough (for parallel compression, saturation, etc.)"
+                >
+                  <AudioLines className="w-3 h-3" />
+                  DRY PATH
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -507,6 +591,34 @@ export function GroupContainer({
           groupId={node.id}
           groupName={node.name}
           onClose={() => setShowSaveTemplateModal(false)}
+        />
+      )}
+
+      {/* Group Context Menu */}
+      {groupContextMenu && (
+        <ContextMenu
+          x={groupContextMenu.x}
+          y={groupContextMenu.y}
+          items={buildGroupMenu(
+            {
+              node,
+              nodeId: node.id,
+              isSerial: node.mode === 'serial',
+              isCollapsed: !!node.collapsed,
+            },
+            {
+              addPlugin: () => window.dispatchEvent(new Event('openPluginBrowser')),
+              addDryPath: isParallel ? () => addDryPath(node.id) : undefined,
+              convertToSerial: () => setGroupMode(node.id, 'serial'),
+              convertToParallel: () => setGroupMode(node.id, 'parallel'),
+              dissolveGroup: () => dissolveGroup(node.id),
+              setDryWet: () => setControlsOpen(true),
+              toggleCollapsed: () => toggleGroupCollapsed(node.id),
+              saveAsTemplate: () => setShowSaveTemplateModal(true),
+              removeGroup: () => removeNode(node.id),
+            },
+          )}
+          onClose={() => setGroupContextMenu(null)}
         />
       )}
     </>

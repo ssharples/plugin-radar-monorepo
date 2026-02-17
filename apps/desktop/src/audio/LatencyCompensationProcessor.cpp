@@ -43,9 +43,10 @@ void LatencyCompensationProcessor::reset()
 
 void LatencyCompensationProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
-    if (delaySamples <= 0)
-        return;
-
+    // NOTE: Do NOT early-return when delaySamples == 0.
+    // When used as a bypass buffer node (e.g., M/S processing), the delay line
+    // must process every block to properly "own" its buffer in the graph.
+    // With delay=0, the delay line passes through immediately (no cost).
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
     delayLine.process(context);

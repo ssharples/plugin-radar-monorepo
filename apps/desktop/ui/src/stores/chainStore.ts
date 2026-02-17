@@ -78,6 +78,9 @@ interface ChainStoreState {
   // Inline editor mode (plugin editor embedded in host window, null = webview mode)
   inlineEditorNodeId: number | null;
   searchOverlayActive: boolean;
+
+  // Galaxy visualizer mode
+  galaxyActive: boolean;
 }
 
 interface ChainActions {
@@ -107,6 +110,7 @@ interface ChainActions {
   setBranchGain: (nodeId: number, gainDb: number) => Promise<void>;
   setBranchSolo: (nodeId: number, solo: boolean) => Promise<void>;
   setBranchMute: (nodeId: number, mute: boolean) => Promise<void>;
+  addDryPath: (parentId: number, insertIndex?: number) => Promise<void>;
 
   // Per-plugin controls
   setNodeInputGain: (nodeId: number, gainDb: number) => Promise<void>;
@@ -166,6 +170,10 @@ interface ChainActions {
   closeInlineEditor: () => Promise<void>;
   showSearchOverlay: () => Promise<void>;
   hideSearchOverlay: () => Promise<void>;
+
+  // Galaxy visualizer
+  openGalaxy: () => void;
+  closeGalaxy: () => void;
 }
 
 function applyState(state: ChainStateV2) {
@@ -332,6 +340,7 @@ const initialState: ChainStoreState = {
   expandedNodeIds: new Set<number>(),
   inlineEditorNodeId: null,
   searchOverlayActive: false,
+  galaxyActive: false,
 };
 
 export const useChainStore = create<ChainStoreState & ChainActions>((set, get) => ({
@@ -884,6 +893,19 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
+  addDryPath: async (parentId: number, insertIndex = -1) => {
+    await get()._pushHistory();
+    try {
+      const result = await juceBridge.addDryPath(parentId, insertIndex);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
   // =============================================
   // Per-plugin controls
   // =============================================
@@ -1145,6 +1167,23 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   // =============================================
+  // Galaxy Visualizer
+  // =============================================
+
+  openGalaxy: () => {
+    // Close any open inline plugin editor first
+    const current = get().inlineEditorNodeId;
+    if (current !== null) {
+      juceBridge.closePluginInline().catch(() => {});
+    }
+    set({ galaxyActive: true, inlineEditorNodeId: null, searchOverlayActive: false });
+  },
+
+  closeGalaxy: () => {
+    set({ galaxyActive: false });
+  },
+
+  // =============================================
   // Continuous gesture helpers (debounce sliders/knobs)
   // =============================================
 
@@ -1213,6 +1252,7 @@ export const useChainActions = () => useChainStore(useShallow(state => ({
   setBranchGain: state.setBranchGain,
   setBranchSolo: state.setBranchSolo,
   setBranchMute: state.setBranchMute,
+  addDryPath: state.addDryPath,
   setNodeInputGain: state.setNodeInputGain,
   setNodeOutputGain: state.setNodeOutputGain,
   setNodeDryWet: state.setNodeDryWet,
@@ -1246,6 +1286,8 @@ export const useChainActions = () => useChainStore(useShallow(state => ({
   closeInlineEditor: state.closeInlineEditor,
   showSearchOverlay: state.showSearchOverlay,
   hideSearchOverlay: state.hideSearchOverlay,
+  openGalaxy: state.openGalaxy,
+  closeGalaxy: state.closeGalaxy,
 })));
 
 // Set up event listener - handles both V1 and V2 chain state

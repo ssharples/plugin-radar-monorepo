@@ -84,7 +84,7 @@ export function CloudSync() {
                 fontFamily: 'var(--font-mono)',
                 fontSize: 'var(--text-lg)',
                 fontWeight: 700,
-                color: 'var(--color-text-primary)',
+                color: '#deff0a',
                 marginBottom: 'var(--space-2)',
               }}
             >
@@ -136,7 +136,7 @@ export function CloudSync() {
                 fontFamily: 'var(--font-mono)',
                 fontSize: 'var(--text-lg)',
                 fontWeight: 700,
-                color: 'var(--color-text-primary)',
+                color: '#deff0a',
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wide)',
               }}
