@@ -20,6 +20,7 @@ import { InlineToolbar } from './components/InlineToolbar';
 import { InlineSearchOverlay } from './components/InlineSearchOverlay';
 import { PanelContainer } from './components/Panels';
 import { useChainStore, useChainActions } from './stores/chainStore';
+import { UndoToast } from './components/UndoToast';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -190,57 +191,79 @@ function App() {
   const FOOTER_HEIGHT = 66;
   const isInlineMode = inlineEditorNodeId !== null || galaxyActive;
 
-  // In inline editor mode: L-shaped layout — sidebar on left (full height), toolbar on bottom
-  // The WebView spans the full window, plugin editor overlaid on top with offsets
-  if (isInlineMode) {
-    return (
-      <ErrorBoundary>
-        <InlineEditorLayout />
-      </ErrorBoundary>
-    );
-  }
+  const viewTransition = 'opacity 180ms ease, transform 180ms ease';
 
   return (
     <ErrorBoundary>
-      <div
-        className="relative flex flex-col w-full h-full select-none overflow-hidden"
-        style={{ background: '#0a0a0a' }}
-      >
-        {/* Animated gradient background */}
-        <GrainientBackground
-          color1="#383838"
-          color2="#000000"
-          color3="#787878"
-        />
-
-        {/* Chain area — fills remaining space */}
-        <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
-          <ErrorBoundary>
-            <ChainEditor />
-          </ErrorBoundary>
+      <div className="relative w-full h-full" style={{ background: '#0a0a0a' }}>
+        {/* Inline editor view */}
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: isInlineMode ? 1 : 0,
+            transform: isInlineMode ? 'translateY(0)' : 'translateY(4px)',
+            transition: viewTransition,
+            pointerEvents: isInlineMode ? 'auto' : 'none',
+            zIndex: isInlineMode ? 1 : 0,
+          }}
+        >
+          <InlineEditorLayout />
         </div>
 
-        {/* Footer — fixed height */}
-        <div className="flex-shrink-0 relative z-[1]" style={{ height: FOOTER_HEIGHT }}>
-          <Footer
-            currentPresetName={currentPreset?.name}
-            onPresetClick={() => setShowPresetModal(true)}
-          />
+        {/* Chain editor view */}
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: isInlineMode ? 0 : 1,
+            transform: isInlineMode ? 'translateY(4px)' : 'translateY(0)',
+            transition: viewTransition,
+            pointerEvents: isInlineMode ? 'none' : 'auto',
+            zIndex: isInlineMode ? 0 : 1,
+          }}
+        >
+          <div
+            className="relative flex flex-col w-full h-full select-none overflow-hidden"
+          >
+            {/* Animated gradient background */}
+            <GrainientBackground
+              color1="#383838"
+              color2="#000000"
+              color3="#787878"
+            />
+
+            {/* Chain area — fills remaining space */}
+            <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
+              <ErrorBoundary>
+                <ChainEditor />
+              </ErrorBoundary>
+            </div>
+
+            {/* Footer — fixed height */}
+            <div className="flex-shrink-0 relative z-[1]" style={{ height: FOOTER_HEIGHT }}>
+              <Footer
+                currentPresetName={currentPreset?.name}
+                onPresetClick={() => setShowPresetModal(true)}
+              />
+            </div>
+
+            {/* Plugin browser overlay - full screen */}
+            {browserOpen && (
+              <ErrorBoundary>
+                <ChainBrowser onClose={toggleBrowser} initialTab="plugins" />
+              </ErrorBoundary>
+            )}
+
+            {showPresetModal && (
+              <PresetModal onClose={() => setShowPresetModal(false)} />
+            )}
+
+            {/* Keyboard shortcut overlay */}
+            <KeyboardShortcutOverlay />
+          </div>
         </div>
 
-        {/* Plugin browser overlay - full screen */}
-        {browserOpen && (
-          <ErrorBoundary>
-            <ChainBrowser onClose={toggleBrowser} initialTab="plugins" />
-          </ErrorBoundary>
-        )}
-
-        {showPresetModal && (
-          <PresetModal onClose={() => setShowPresetModal(false)} />
-        )}
-
-        {/* Keyboard shortcut overlay */}
-        <KeyboardShortcutOverlay />
+        {/* Undo toast — visible in both modes */}
+        <UndoToast />
       </div>
     </ErrorBoundary>
   );

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useShallow } from 'zustand/react/shallow';
 import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
@@ -353,14 +352,15 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   _pushHistory: async () => {
     if (get()._undoRedoInProgress) return;
     try {
-      // Capture full binary snapshot (includes all plugin preset data)
+      // Capture full binary snapshot (includes all plugin preset data).
+      // We store only binaryData — nodes/slots are reconstructed from C++ on restore.
+      // This avoids structuredClone overhead on 50 history entries.
       const binaryData = await juceBridge.captureSnapshot();
-      // Re-read state after await — it may have changed
-      const { nodes, slots, history } = get();
+      const { history } = get();
       const snapshot: ChainSnapshot = {
         binaryData,
-        nodes: structuredClone(nodes),
-        slots: structuredClone(slots),
+        nodes: [],
+        slots: [],
       };
       const newHistory = [...history, snapshot];
       if (newHistory.length > MAX_HISTORY) {
@@ -376,7 +376,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   canRedo: () => get().future.length > 0,
 
   undo: async () => {
-    const { history, future } = get();
+    const { history } = get();
     if (history.length === 0) return;
 
     set({ _undoRedoInProgress: true });
@@ -384,7 +384,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     try {
       // Capture current state as binary for the redo stack
       const currentBinary = await juceBridge.captureSnapshot();
-      const { nodes: curNodes, slots: curSlots, history: freshHistory, future: freshFuture } = get();
+      const { history: freshHistory, future: freshFuture } = get();
       if (freshHistory.length === 0) {
         set({ _undoRedoInProgress: false });
         return;
@@ -392,19 +392,16 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
       const currentSnapshot: ChainSnapshot = {
         binaryData: currentBinary,
-        nodes: structuredClone(curNodes),
-        slots: structuredClone(curSlots),
+        nodes: [],
+        slots: [],
       };
 
       const newHistory = [...freshHistory];
       const previousState = newHistory.pop()!;
 
-      // Set UI immediately from cached state (responsive feel)
       set({
         history: newHistory,
         future: [...freshFuture, currentSnapshot],
-        nodes: previousState.nodes.length > 0 ? previousState.nodes : curNodes,
-        slots: previousState.slots.length > 0 ? previousState.slots : curSlots,
         lastCloudChainId: null,
       });
 
@@ -431,7 +428,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     try {
       // Capture current state as binary for the undo stack
       const currentBinary = await juceBridge.captureSnapshot();
-      const { nodes: curNodes, slots: curSlots, history: freshHistory, future: freshFuture } = get();
+      const { history: freshHistory, future: freshFuture } = get();
       if (freshFuture.length === 0) {
         set({ _undoRedoInProgress: false });
         return;
@@ -439,19 +436,16 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
       const currentSnapshot: ChainSnapshot = {
         binaryData: currentBinary,
-        nodes: structuredClone(curNodes),
-        slots: structuredClone(curSlots),
+        nodes: [],
+        slots: [],
       };
 
       const newFuture = [...freshFuture];
       const nextState = newFuture.pop()!;
 
-      // Set UI immediately from cached state (responsive feel)
       set({
         history: [...freshHistory, currentSnapshot],
         future: newFuture,
-        nodes: nextState.nodes.length > 0 ? nextState.nodes : curNodes,
-        slots: nextState.slots.length > 0 ? nextState.slots : curSlots,
         lastCloudChainId: null,
       });
 
@@ -765,7 +759,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
       if (result.success && result.chainState) {
         const chainState = result.chainState as ChainStateV2;
         set({ ...applyState(chainState), loading: false });
-        return (result as any).groupId ?? null;
+        return result.groupId ?? null;
       } else {
         set({ error: result.error || 'Failed to create group', loading: false });
         return null;
@@ -1198,11 +1192,10 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
     try {
       const binaryData = await juceBridge.captureSnapshot();
-      const { nodes, slots } = get();
       const snapshot: ChainSnapshot = {
         binaryData,
-        nodes: structuredClone(nodes),
-        slots: structuredClone(slots),
+        nodes: [],
+        slots: [],
       };
       set({
         _continuousDragSnapshot: snapshot,
@@ -1230,9 +1223,10 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 }));
 
-// Stable actions hook — returns only action functions (referentially stable in Zustand).
-// Components use this to avoid re-rendering when unrelated state (e.g. nodeMeterData) changes.
-export const useChainActions = () => useChainStore(useShallow(state => ({
+// Stable actions selector — defined outside components so it's referentially stable.
+// Zustand action functions never change identity (created once in create()), so this
+// selector always returns the same object reference, avoiding unnecessary re-renders.
+const actionsSelector = (state: ChainStoreState & ChainActions) => ({
   fetchChainState: state.fetchChainState,
   addPlugin: state.addPlugin,
   addPluginToGroup: state.addPluginToGroup,
@@ -1288,7 +1282,10 @@ export const useChainActions = () => useChainStore(useShallow(state => ({
   hideSearchOverlay: state.hideSearchOverlay,
   openGalaxy: state.openGalaxy,
   closeGalaxy: state.closeGalaxy,
-})));
+});
+
+// Hook for components to access chain actions without re-rendering on state changes.
+export const useChainActions = () => useChainStore(actionsSelector);
 
 // Set up event listener - handles both V1 and V2 chain state
 juceBridge.onChainChanged((state: ChainStateV2) => {

@@ -1371,7 +1371,7 @@ void WebViewBridge::timerCallback()
     {
         auto snapshot = waveformCapture->getSnapshot();
 
-        auto* obj = new juce::DynamicObject();
+        cachedWaveformObj->clear();
 
         juce::Array<juce::var> preArr;
         preArr.ensureStorageAllocated(static_cast<int>(snapshot.prePeaks.size()));
@@ -1383,10 +1383,10 @@ void WebViewBridge::timerCallback()
         for (float v : snapshot.postPeaks)
             postArr.add(v);
 
-        obj->setProperty("pre", preArr);
-        obj->setProperty("post", postArr);
+        cachedWaveformObj->setProperty("pre", preArr);
+        cachedWaveformObj->setProperty("post", postArr);
 
-        emitEvent("waveformData", juce::var(obj));
+        emitEvent("waveformData", juce::var(cachedWaveformObj.get()));
     }
 
     // Emit meter data if meters are available
@@ -1395,31 +1395,31 @@ void WebViewBridge::timerCallback()
         auto inputReadings = inputMeter->getReadings();
         auto outputReadings = outputMeter->getReadings();
 
-        auto* meterObj = new juce::DynamicObject();
+        cachedMeterObj->clear();
 
         // Input meter values
-        meterObj->setProperty("inputPeakL", inputReadings.peakL);
-        meterObj->setProperty("inputPeakR", inputReadings.peakR);
-        meterObj->setProperty("inputPeakHoldL", inputReadings.peakHoldL);
-        meterObj->setProperty("inputPeakHoldR", inputReadings.peakHoldR);
-        meterObj->setProperty("inputRmsL", inputReadings.rmsL);
-        meterObj->setProperty("inputRmsR", inputReadings.rmsR);
-        meterObj->setProperty("inputLufs", inputReadings.lufsShort);
+        cachedMeterObj->setProperty("inputPeakL", inputReadings.peakL);
+        cachedMeterObj->setProperty("inputPeakR", inputReadings.peakR);
+        cachedMeterObj->setProperty("inputPeakHoldL", inputReadings.peakHoldL);
+        cachedMeterObj->setProperty("inputPeakHoldR", inputReadings.peakHoldR);
+        cachedMeterObj->setProperty("inputRmsL", inputReadings.rmsL);
+        cachedMeterObj->setProperty("inputRmsR", inputReadings.rmsR);
+        cachedMeterObj->setProperty("inputLufs", inputReadings.lufsShort);
 
         // Output meter values
-        meterObj->setProperty("outputPeakL", outputReadings.peakL);
-        meterObj->setProperty("outputPeakR", outputReadings.peakR);
-        meterObj->setProperty("outputPeakHoldL", outputReadings.peakHoldL);
-        meterObj->setProperty("outputPeakHoldR", outputReadings.peakHoldR);
-        meterObj->setProperty("outputRmsL", outputReadings.rmsL);
-        meterObj->setProperty("outputRmsR", outputReadings.rmsR);
-        meterObj->setProperty("outputLufs", outputReadings.lufsShort);
+        cachedMeterObj->setProperty("outputPeakL", outputReadings.peakL);
+        cachedMeterObj->setProperty("outputPeakR", outputReadings.peakR);
+        cachedMeterObj->setProperty("outputPeakHoldL", outputReadings.peakHoldL);
+        cachedMeterObj->setProperty("outputPeakHoldR", outputReadings.peakHoldR);
+        cachedMeterObj->setProperty("outputRmsL", outputReadings.rmsL);
+        cachedMeterObj->setProperty("outputRmsR", outputReadings.rmsR);
+        cachedMeterObj->setProperty("outputLufs", outputReadings.lufsShort);
 
         // Averaged peak dB (2.5s window) for calibration
-        meterObj->setProperty("inputAvgPeakDbL", inputReadings.avgPeakDbL);
-        meterObj->setProperty("inputAvgPeakDbR", inputReadings.avgPeakDbR);
+        cachedMeterObj->setProperty("inputAvgPeakDbL", inputReadings.avgPeakDbL);
+        cachedMeterObj->setProperty("inputAvgPeakDbR", inputReadings.avgPeakDbR);
 
-        emitEvent("meterData", juce::var(meterObj));
+        emitEvent("meterData", juce::var(cachedMeterObj.get()));
     }
 
     // Emit stereo FFT spectrum data if processor is available and enabled
@@ -1440,20 +1440,20 @@ void WebViewBridge::timerCallback()
             fftMagnitudeCacheR.add(v);
 
         // Build mono average for backward compat (SpectrumAnalyzer uses this)
-        juce::Array<juce::var> monoCache;
-        monoCache.ensureStorageAllocated(static_cast<int>(magnitudesL.size()));
+        fftMagnitudeCacheMono.clearQuick();
+        fftMagnitudeCacheMono.ensureStorageAllocated(static_cast<int>(magnitudesL.size()));
         for (size_t i = 0; i < magnitudesL.size(); ++i)
-            monoCache.add((magnitudesL[i] + magnitudesR[i]) * 0.5f);
+            fftMagnitudeCacheMono.add((magnitudesL[i] + magnitudesR[i]) * 0.5f);
 
-        auto* fftObj = new juce::DynamicObject();
-        fftObj->setProperty("magnitudes", monoCache);
-        fftObj->setProperty("magnitudesL", fftMagnitudeCacheL);
-        fftObj->setProperty("magnitudesR", fftMagnitudeCacheR);
-        fftObj->setProperty("numBins", fftProcessor->getNumBins());
-        fftObj->setProperty("fftSize", fftProcessor->getNumBins() * 2);
-        fftObj->setProperty("sampleRate", fftProcessor->getSampleRate());
+        cachedFftObj->clear();
+        cachedFftObj->setProperty("magnitudes", fftMagnitudeCacheMono);
+        cachedFftObj->setProperty("magnitudesL", fftMagnitudeCacheL);
+        cachedFftObj->setProperty("magnitudesR", fftMagnitudeCacheR);
+        cachedFftObj->setProperty("numBins", fftProcessor->getNumBins());
+        cachedFftObj->setProperty("fftSize", fftProcessor->getNumBins() * 2);
+        cachedFftObj->setProperty("sampleRate", fftProcessor->getSampleRate());
 
-        emitEvent("fftData", juce::var(fftObj));
+        emitEvent("fftData", juce::var(cachedFftObj.get()));
     }
 
     // Emit per-node meter data for inline plugin meters
@@ -1462,7 +1462,7 @@ void WebViewBridge::timerCallback()
         const auto& nodeMeterReadings = chainProcessor.getNodeMeterReadings();
         if (!nodeMeterReadings.empty())
         {
-            auto* nodeMetersObj = new juce::DynamicObject();
+            cachedNodeMetersObj->clear();
             for (const auto& nm : nodeMeterReadings)
             {
                 auto* entry = new juce::DynamicObject();
@@ -1479,9 +1479,9 @@ void WebViewBridge::timerCallback()
                 entry->setProperty("inputRmsL", nm.inputRmsL);
                 entry->setProperty("inputRmsR", nm.inputRmsR);
                 entry->setProperty("latencyMs", nm.latencyMs);
-                nodeMetersObj->setProperty(juce::String(nm.nodeId), juce::var(entry));
+                cachedNodeMetersObj->setProperty(juce::String(nm.nodeId), juce::var(entry));
             }
-            emitEvent("nodeMeterData", juce::var(nodeMetersObj));
+            emitEvent("nodeMeterData", juce::var(cachedNodeMetersObj.get()));
         }
     }
 

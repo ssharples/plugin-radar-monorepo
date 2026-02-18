@@ -7,7 +7,8 @@ interface ToolbarPresetNavProps {
 export function ToolbarPresetNav({ onSave }: ToolbarPresetNavProps) {
   const currentPreset = usePresetStore(s => s.currentPreset);
   const presets = usePresetStore(s => s.presets);
-  const { loadPreset, savePreset } = usePresetStore.getState();
+  const loadPreset = usePresetStore(s => s.loadPreset);
+  const savePreset = usePresetStore(s => s.savePreset);
 
   const currentIndex = currentPreset
     ? presets.findIndex(p => p.path === currentPreset.path)

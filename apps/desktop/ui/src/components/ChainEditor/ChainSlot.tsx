@@ -503,6 +503,7 @@ export const ChainSlot = memo(function ChainSlot({
         ref={setDragRef}
         {...attributes}
         {...wrappedListeners}
+        title="Click to edit inline · Shift+Click for external window"
         onClick={(e) => {
           e.stopPropagation();
           setShowContextMenu(null);
@@ -571,24 +572,61 @@ export const ChainSlot = memo(function ChainSlot({
           }}
         >
 
-          {/* Plugin name */}
+          {/* Plugin name with swap navigation arrows */}
           <div
-            className="absolute flex items-center justify-center text-white capitalize px-3"
+            className="absolute flex items-center text-white capitalize"
             style={{
               left: 20,
               top: 9,
-              width: Math.max(114, Math.min(280, name.length * 8 + 40)),
               height: 24,
-              fontFamily: 'Eurostile, "Arial Black", "Helvetica Bold", sans-serif',
-              fontWeight: 700,
-              fontSize: name.length > 20 ? 10 : name.length > 15 ? 11 : name.length > 12 ? 12 : name.length > 10 ? 13 : 14,
-              lineHeight: name.length > 20 ? '11px' : name.length > 15 ? '12px' : name.length > 12 ? '13px' : name.length > 10 ? '14px' : '15px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
             }}
           >
-            {name.toLowerCase()}
+            {/* Prev plugin swap arrow */}
+            {isHovered && similarPlugins.length > 0 && (
+              <button
+                className="flex items-center justify-center transition-opacity duration-150 opacity-50 hover:opacity-100"
+                style={{ width: 14, height: 24, flexShrink: 0 }}
+                onClick={handlePrevPlugin}
+                onPointerDown={(e) => e.stopPropagation()}
+                title={`Previous alternative${isSwapping ? ' (swapping...)' : ''}`}
+              >
+                <svg width="8" height="10" viewBox="0 0 8 10" fill="none">
+                  <path d="M6 1L2 5L6 9" stroke={isSwapping ? '#666' : '#c9944a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+
+            <div
+              className="flex items-center justify-center px-1"
+              style={{
+                width: Math.max(114, Math.min(280, name.length * 8 + 40)),
+                height: 24,
+                fontFamily: 'Eurostile, "Arial Black", "Helvetica Bold", sans-serif',
+                fontWeight: 700,
+                fontSize: name.length > 20 ? 10 : name.length > 15 ? 11 : name.length > 12 ? 12 : name.length > 10 ? 13 : 14,
+                lineHeight: name.length > 20 ? '11px' : name.length > 15 ? '12px' : name.length > 12 ? '13px' : name.length > 10 ? '14px' : '15px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {name.toLowerCase()}
+            </div>
+
+            {/* Next plugin swap arrow */}
+            {isHovered && similarPlugins.length > 0 && (
+              <button
+                className="flex items-center justify-center transition-opacity duration-150 opacity-50 hover:opacity-100"
+                style={{ width: 14, height: 24, flexShrink: 0 }}
+                onClick={handleNextPlugin}
+                onPointerDown={(e) => e.stopPropagation()}
+                title={`Next alternative${isSwapping ? ' (swapping...)' : ''}`}
+              >
+                <svg width="8" height="10" viewBox="0 0 8 10" fill="none">
+                  <path d="M2 1L6 5L2 9" stroke={isSwapping ? '#666' : '#c9944a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Visual meter bar with dB value */}

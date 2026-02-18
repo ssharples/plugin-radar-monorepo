@@ -5,15 +5,20 @@
 #include <cmath>
 
 // Replace any NaN/Inf samples with 0.0 to prevent downstream corruption.
-// Uses SIMD-friendly findMinAndMax instead of per-sample isfinite() branches.
+// Uses SIMD-friendly findMinAndMax as a fast path; only iterates per-sample
+// when the fast check detects a problem (preserves good samples).
 static void sanitiseBuffer(juce::AudioBuffer<float>& buffer)
 {
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
         auto range = juce::FloatVectorOperations::findMinAndMax(
             buffer.getReadPointer(ch), buffer.getNumSamples());
-        if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()))
-            buffer.clear(ch, 0, buffer.getNumSamples());
+        if (std::isfinite(range.getStart()) && std::isfinite(range.getEnd()))
+            continue;  // fast path: buffer is clean
+        // slow path: replace only bad samples
+        auto* data = buffer.getWritePointer(ch);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            if (!std::isfinite(data[i])) data[i] = 0.0f;
     }
 }
 PluginChainManagerProcessor::PluginChainManagerProcessor()

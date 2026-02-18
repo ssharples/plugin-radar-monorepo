@@ -218,6 +218,13 @@ private:
     // PHASE 3: Preallocated FFT magnitude caches (eliminates 30Hz allocation)
     mutable juce::Array<juce::var> fftMagnitudeCacheL;
     mutable juce::Array<juce::var> fftMagnitudeCacheR;
+    mutable juce::Array<juce::var> fftMagnitudeCacheMono;
+
+    // Pre-allocated DynamicObject instances for timer callback (W4 fix)
+    juce::DynamicObject::Ptr cachedWaveformObj   { new juce::DynamicObject() };
+    juce::DynamicObject::Ptr cachedMeterObj      { new juce::DynamicObject() };
+    juce::DynamicObject::Ptr cachedFftObj        { new juce::DynamicObject() };
+    juce::DynamicObject::Ptr cachedNodeMetersObj { new juce::DynamicObject() };
 
     // Alive flag for safe async operations (weak_ptr captured in lambdas)
     std::shared_ptr<std::atomic<bool>> aliveFlag = std::make_shared<std::atomic<bool>>(true);

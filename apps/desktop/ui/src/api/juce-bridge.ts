@@ -121,6 +121,8 @@ class JuceBridge {
       'newPluginsDetected',
       'autoScanStateChanged',
       'inlineEditorChanged',
+      'searchOverlayOpened',
+      'searchOverlayClosed',
     ];
 
     events.forEach((eventName) => {

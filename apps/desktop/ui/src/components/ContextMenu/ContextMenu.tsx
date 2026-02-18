@@ -88,15 +88,20 @@ function MenuItemRow({
   onClose,
   isActive = false,
   onHover,
+  forceSubOpen = false,
+  onSubClose,
 }: {
   item: MenuItemDef;
   onAction: (item: MenuItemDef) => void;
   onClose: () => void;
   isActive?: boolean;
   onHover?: () => void;
+  forceSubOpen?: boolean;
+  onSubClose?: () => void;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
   const [subOpen, setSubOpen] = useState(false);
+  const effectiveSubOpen = subOpen || forceSubOpen;
   const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   const hasChildren = item.children && item.children.length > 0;
@@ -112,7 +117,10 @@ function MenuItemRow({
   const handleMouseLeave = () => {
     if (hasChildren) {
       clearTimeout(hoverTimeout.current);
-      hoverTimeout.current = setTimeout(() => setSubOpen(false), 300);
+      hoverTimeout.current = setTimeout(() => {
+        setSubOpen(false);
+        onSubClose?.();
+      }, 300);
     }
   };
 
@@ -168,7 +176,7 @@ function MenuItemRow({
       {item.dividerAfter && <div className="context-menu-divider" />}
 
       {/* Sub-menu */}
-      {subOpen && hasChildren && rowRef.current && (
+      {effectiveSubOpen && hasChildren && rowRef.current && (
         <SubMenu
           items={item.children!}
           parentRect={rowRef.current.getBoundingClientRect()}
@@ -186,6 +194,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x, y });
   const [focusIndex, setFocusIndex] = useState(-1);
+  const [openSubmenuId, setOpenSubmenuId] = useState<string | null>(null);
 
   // Position clamping once DOM is measured
   useEffect(() => {
@@ -210,6 +219,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
           break;
         case 'ArrowDown': {
           e.preventDefault();
+          setOpenSubmenuId(null);
           const curPosInActionable = actionableIndices.indexOf(focusIndex);
           const next = curPosInActionable < actionableIndices.length - 1 ? curPosInActionable + 1 : 0;
           setFocusIndex(actionableIndices[next]);
@@ -217,25 +227,47 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         }
         case 'ArrowUp': {
           e.preventDefault();
+          setOpenSubmenuId(null);
           const curPosInActionable = actionableIndices.indexOf(focusIndex);
           const prev = curPosInActionable > 0 ? curPosInActionable - 1 : actionableIndices.length - 1;
           setFocusIndex(actionableIndices[prev]);
+          break;
+        }
+        case 'ArrowRight': {
+          e.preventDefault();
+          if (focusIndex >= 0 && focusIndex < items.length) {
+            const item = items[focusIndex];
+            if (item.children && item.children.length > 0) {
+              setOpenSubmenuId(item.id);
+            }
+          }
+          break;
+        }
+        case 'ArrowLeft': {
+          e.preventDefault();
+          if (openSubmenuId) {
+            setOpenSubmenuId(null);
+          }
           break;
         }
         case 'Enter': {
           e.preventDefault();
           if (focusIndex >= 0 && focusIndex < items.length) {
             const item = items[focusIndex];
-            if (!item.disabled && item.action) {
-              item.action();
-              onClose();
+            if (!item.disabled) {
+              if (item.children && item.children.length > 0) {
+                setOpenSubmenuId(item.id);
+              } else if (item.action) {
+                item.action();
+                onClose();
+              }
             }
           }
           break;
         }
       }
     },
-    [focusIndex, actionableIndices, items, onClose],
+    [focusIndex, actionableIndices, items, onClose, openSubmenuId],
   );
 
   useEffect(() => {
@@ -285,6 +317,8 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
           onClose={onClose}
           isActive={index === focusIndex}
           onHover={() => setFocusIndex(index)}
+          forceSubOpen={openSubmenuId === item.id}
+          onSubClose={() => setOpenSubmenuId(null)}
         />
       ))}
     </div>,

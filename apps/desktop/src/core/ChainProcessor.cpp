@@ -1517,41 +1517,41 @@ ChainProcessor::WindowState ChainProcessor::getWindowState() const
 
 void ChainProcessor::setGlobalMeterMode(MeterMode mode)
 {
+    // Only called from the message thread (via WebViewBridge), so no lock needed.
+    // Tree mutations also only happen on the message thread — no concurrent access.
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+
     const bool enableLufs = (mode == MeterMode::FullLUFS);
 
-    // Recursively walk the tree and update all meter nodes
-    std::function<void(ChainNode&)> updateMeters = [&](ChainNode& node) {
+    // Collect meter node IDs from the tree (lightweight — just reading IDs)
+    std::vector<juce::AudioProcessorGraph::NodeID> meterNodeIds;
+    std::function<void(const ChainNode&)> collectMeterIds = [&](const ChainNode& node) {
         if (node.isPlugin())
         {
-            auto& leaf = node.getPlugin();
-
-            // Update output meter
-            if (auto* meterNode = getNodeForId(leaf.meterNodeId))
-            {
-                if (auto* meterProc = dynamic_cast<NodeMeterProcessor*>(meterNode->getProcessor()))
-                {
-                    meterProc->setEnableLUFS(enableLufs);
-                }
-            }
-
-            // Update input meter
-            if (auto* inputMeterNode = getNodeForId(leaf.inputMeterNodeId))
-            {
-                if (auto* inputMeterProc = dynamic_cast<NodeMeterProcessor*>(inputMeterNode->getProcessor()))
-                {
-                    inputMeterProc->setEnableLUFS(enableLufs);
-                }
-            }
+            const auto& leaf = node.getPlugin();
+            if (leaf.meterNodeId != juce::AudioProcessorGraph::NodeID())
+                meterNodeIds.push_back(leaf.meterNodeId);
+            if (leaf.inputMeterNodeId != juce::AudioProcessorGraph::NodeID())
+                meterNodeIds.push_back(leaf.inputMeterNodeId);
         }
         else if (node.isGroup())
         {
-            for (auto& child : node.getGroup().children)
-                updateMeters(*child);
+            for (const auto& child : node.getGroup().children)
+                collectMeterIds(*child);
         }
     };
 
-    juce::SpinLock::ScopedLockType lock(treeLock);
-    updateMeters(rootNode);
+    collectMeterIds(rootNode);
+
+    // Now do the heavyweight getNodeForId + dynamic_cast without any lock
+    for (auto nodeId : meterNodeIds)
+    {
+        if (auto* meterNode = getNodeForId(nodeId))
+        {
+            if (auto* meterProc = dynamic_cast<NodeMeterProcessor*>(meterNode->getProcessor()))
+                meterProc->setEnableLUFS(enableLufs);
+        }
+    }
 }
 
 int ChainProcessor::getNumSlots() const
@@ -1872,7 +1872,7 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
 
         // Dry path nodes are empty passthrough branches (used in parallel groups)
         if (leaf.isDryPath)
-            return { audioIn };
+            return { audioIn, 0 };
 
         // Bypassed plugins: in parallel groups, disconnect entirely (mute).
         // In serial groups, pass through (bypass).
@@ -1880,11 +1880,11 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
         {
             if (isInParallelGroup(node.id))
             {
-                return { {} };  // Disconnect entirely (mute)
+                return { {}, 0 };  // Disconnect entirely (mute)
             }
             else
             {
-                return { audioIn };  // Passthrough in serial
+                return { audioIn, 0 };  // Passthrough in serial
             }
         }
 
@@ -1892,7 +1892,7 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
 
         // If plugin failed to instantiate, pass through like a bypassed plugin
         if (pluginNodeId == juce::AudioProcessorGraph::NodeID())
-            return { audioIn };
+            return { audioIn, 0 };
 
         // Reset utility node IDs (they are recreated each rebuild)
         leaf.inputGainNodeId = {};
@@ -1913,6 +1913,12 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
         bool useOutputGain = true;  // Always wire to avoid rebuild when gain changes from 0
         bool useDryWet = true;      // Always wire DryWetMixProcessor to avoid audio dropout on first knob move
         bool useMidSide = leaf.midSideMode != MidSideMode::Off;
+
+        // Query plugin latency once — used for dry/wet delay compensation and returned in WireResult
+        int pluginLatencySamples = 0;
+        if (auto gNode = getNodeForId(pluginNodeId))
+            if (auto* proc = gNode->getProcessor())
+                pluginLatencySamples = proc->getLatencySamples();
 
         NodeID currentAudioIn = audioIn;
 
@@ -1950,11 +1956,8 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
                 addConnection({{currentAudioIn, 0}, {encodeNode->nodeID, 0}}, UpdateKind::none);
                 addConnection({{currentAudioIn, 1}, {encodeNode->nodeID, 1}}, UpdateKind::none);
 
-                // Get plugin latency for bypass delay
-                int pluginLatency = 0;
-                if (auto gNode = getNodeForId(pluginNodeId))
-                    if (auto* proc = gNode->getProcessor())
-                        pluginLatency = proc->getLatencySamples();
+                // Use pre-computed plugin latency for bypass delay
+                int pluginLatency = pluginLatencySamples;
 
                 // Create M/S decode node (Mid/Side → L/R)
                 auto decodeProc = std::make_unique<MidSideMatrixProcessor>();
@@ -2044,7 +2047,7 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
                         }
                     }
 
-                    return { currentAudioOut };
+                    return { currentAudioOut, pluginLatencySamples };
                 }
             }
             // If M/S node creation failed, fall through to normal wiring
@@ -2068,16 +2071,11 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
                 leaf.pluginDryWetNodeId = mixNode->nodeID;
                 utilityNodes.insert(mixNode->nodeID);
 
-                // Compute plugin latency for dry path delay
-                int pluginLatency = 0;
-                if (auto gNode = getNodeForId(pluginNodeId))
-                    if (auto* proc = gNode->getProcessor())
-                        pluginLatency = proc->getLatencySamples();
-
+                // Use pre-computed plugin latency for dry path delay
                 NodeID dryDelayOut = drySource;
-                if (pluginLatency > 0)
+                if (pluginLatencySamples > 0)
                 {
-                    auto delayProc = std::make_unique<LatencyCompensationProcessor>(pluginLatency);
+                    auto delayProc = std::make_unique<LatencyCompensationProcessor>(pluginLatencySamples);
                     if (auto delayNode = addNode(std::move(delayProc), {}, UpdateKind::none))
                     {
                         utilityNodes.insert(delayNode->nodeID);
@@ -2113,7 +2111,7 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
             }
         }
 
-        return { currentAudioOut };
+        return { currentAudioOut, pluginLatencySamples };
     }
     else if (node.isGroup())
     {
@@ -2125,7 +2123,7 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
     }
 
     // Shouldn't reach here, but passthrough
-    return { audioIn };
+    return { audioIn, 0 };
 }
 
 WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
@@ -2135,7 +2133,7 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
 
     // Empty group = passthrough
     if (children.empty())
-        return { audioIn };
+        return { audioIn, 0 };
 
     bool useDryWet = (node.id != 0); // Always wire DryWetMixProcessor for non-root groups to avoid dropout/silent failure on first knob move
 
@@ -2143,11 +2141,13 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
     {
         // Root node: simple serial chain, no dry/wet
         NodeID prevAudio = audioIn;
+        int totalLatency = 0;
 
         for (auto& child : children)
         {
             auto result = wireNode(*child, prevAudio);
             prevAudio = result.audioOut;
+            totalLatency += result.latency;
         }
 
         // Insert DuckingProcessor after last child if duck amount > 0
@@ -2172,11 +2172,11 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
                 addConnection({{audioIn, 0}, {duckNode->nodeID, 2}}, UpdateKind::none);
                 addConnection({{audioIn, 1}, {duckNode->nodeID, 3}}, UpdateKind::none);
 
-                return { duckNode->nodeID };
+                return { duckNode->nodeID, totalLatency };
             }
         }
 
-        return { prevAudio };
+        return { prevAudio, totalLatency };
     }
 
     // Dry/wet mode: create a DryWetMixProcessor
@@ -2185,15 +2185,21 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
 
     auto mixNode = addNode(std::move(mixProc), {}, UpdateKind::none);
     if (!mixNode)
-        return { audioIn };
+        return { audioIn, 0 };
 
     group.dryWetMixNodeId = mixNode->nodeID;
     utilityNodes.insert(mixNode->nodeID);
 
-    // Compute wet path latency
+    // Wet path: wire children in series, accumulate latency from wireNode results
+    NodeID prevAudio = audioIn;
     int wetLatency = 0;
-    for (const auto& child : children)
-        wetLatency += computeNodeLatency(*child);
+
+    for (auto& child : children)
+    {
+        auto result = wireNode(*child, prevAudio);
+        prevAudio = result.audioOut;
+        wetLatency += result.latency;
+    }
 
     // Dry path: insert delay if wet path has latency
     NodeID drySource = audioIn;
@@ -2214,15 +2220,7 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
     addConnection({{drySource, 0}, {mixNode->nodeID, 0}}, UpdateKind::none);
     addConnection({{drySource, 1}, {mixNode->nodeID, 1}}, UpdateKind::none);
 
-    // Wet path: wire children in series, then connect to mix node channels 2-3
-    NodeID prevAudio = audioIn;
-
-    for (auto& child : children)
-    {
-        auto result = wireNode(*child, prevAudio);
-        prevAudio = result.audioOut;
-    }
-
+    // Connect wet path to mix node channels 2-3
     addConnection({{prevAudio, 0}, {mixNode->nodeID, 2}}, UpdateKind::none);
     addConnection({{prevAudio, 1}, {mixNode->nodeID, 3}}, UpdateKind::none);
 
@@ -2248,11 +2246,11 @@ WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
             addConnection({{audioIn, 0}, {duckNode->nodeID, 2}}, UpdateKind::none);
             addConnection({{audioIn, 1}, {duckNode->nodeID, 3}}, UpdateKind::none);
 
-            return { duckNode->nodeID };
+            return { duckNode->nodeID, wetLatency };
         }
     }
 
-    return { mixNode->nodeID };
+    return { mixNode->nodeID, wetLatency };
 }
 
 WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
@@ -2262,7 +2260,7 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
 
     // Empty group = passthrough
     if (children.empty())
-        return { audioIn };
+        return { audioIn, 0 };
 
     // Determine solo state: if any child is soloed, only soloed children play
     bool anySoloed = false;
@@ -2299,9 +2297,9 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
             utilityNodes.insert(silenceNode->nodeID);
             addConnection({{audioIn, 0}, {silenceNode->nodeID, 0}}, UpdateKind::none);
             addConnection({{audioIn, 1}, {silenceNode->nodeID, 1}}, UpdateKind::none);
-            return { silenceNode->nodeID };
+            return { silenceNode->nodeID, 0 };
         }
-        return { audioIn };
+        return { audioIn, 0 };
     }
 
     // Create sum compensation gain node at the output
@@ -2311,7 +2309,7 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
 
     auto sumGainNode = addNode(std::move(sumGainProc), {}, UpdateKind::none);
     if (!sumGainNode)
-        return { audioIn };
+        return { audioIn, 0 };
 
     group.sumGainNodeId = sumGainNode->nodeID;
     utilityNodes.insert(sumGainNode->nodeID);
@@ -2325,12 +2323,11 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
 
     struct BranchInfo {
         WireResult result;
-        int latency;
         bool active;
     };
     std::vector<BranchInfo> branchInfos;
 
-    // Pass 1: Wire all branches, collect per-branch results and latency
+    // Pass 1: Wire all branches, collect per-branch results (latency is in WireResult)
     for (size_t i = 0; i < children.size(); ++i)
     {
         auto& child = children[i];
@@ -2344,7 +2341,7 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
         if (!isActive)
         {
             group.branchGainNodeIds.push_back({});
-            branchInfos.push_back({{}, 0, false});
+            branchInfos.push_back({{}, false});
             continue;
         }
 
@@ -2356,7 +2353,7 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
         if (!branchGainNode)
         {
             group.branchGainNodeIds.push_back({});
-            branchInfos.push_back({{}, 0, false});
+            branchInfos.push_back({{}, false});
             continue;
         }
 
@@ -2367,17 +2364,16 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
         addConnection({{audioIn, 0}, {branchGainNode->nodeID, 0}}, UpdateKind::none);
         addConnection({{audioIn, 1}, {branchGainNode->nodeID, 1}}, UpdateKind::none);
 
-        // Wire child after branch gain
+        // Wire child after branch gain — latency is returned in result
         auto result = wireNode(*child, branchGainNode->nodeID);
-        int branchLatency = computeNodeLatency(*child);
-        branchInfos.push_back({result, branchLatency, true});
+        branchInfos.push_back({result, true});
     }
 
     // Pass 2: Find max latency, insert compensation delays, connect to sumGain
     int maxBranchLatency = 0;
     for (const auto& bi : branchInfos)
         if (bi.active)
-            maxBranchLatency = std::max(maxBranchLatency, bi.latency);
+            maxBranchLatency = std::max(maxBranchLatency, bi.result.latency);
 
     for (const auto& bi : branchInfos)
     {
@@ -2385,7 +2381,7 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
             continue;
 
         NodeID connectFrom = bi.result.audioOut;
-        int delayNeeded = maxBranchLatency - bi.latency;
+        int delayNeeded = maxBranchLatency - bi.result.latency;
 
         if (delayNeeded > 0)
         {
@@ -2429,11 +2425,11 @@ WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
             addConnection({{audioIn, 0}, {duckNode->nodeID, 2}}, UpdateKind::none);
             addConnection({{audioIn, 1}, {duckNode->nodeID, 3}}, UpdateKind::none);
 
-            return { duckNode->nodeID };
+            return { duckNode->nodeID, maxBranchLatency };
         }
     }
 
-    return { sumGainNode->nodeID };
+    return { sumGainNode->nodeID, maxBranchLatency };
 }
 
 //==============================================================================
@@ -2456,35 +2452,40 @@ bool ChainProcessor::isInParallelGroup(ChainNodeId id) const
 
 bool ChainProcessor::detectCycles() const
 {
-    // Use DFS with color marking (white=unvisited, gray=visiting, black=done)
-    std::map<juce::AudioProcessorGraph::NodeID, int> colors;
+    // Build adjacency list once — O(E) — then DFS in O(V+E)
+    std::map<juce::AudioProcessorGraph::NodeID, std::vector<juce::AudioProcessorGraph::NodeID>> adj;
 
     for (auto* node : getNodes())
-        colors[node->nodeID] = 0;  // white
+        adj[node->nodeID];  // ensure every node has an entry
+
+    for (const auto& conn : getConnections())
+        adj[conn.source.nodeID].push_back(conn.destination.nodeID);
+
+    // DFS with color marking (0=white/unvisited, 1=gray/visiting, 2=black/done)
+    std::map<juce::AudioProcessorGraph::NodeID, int> colors;
+    for (const auto& [id, _] : adj)
+        colors[id] = 0;
 
     std::function<bool(juce::AudioProcessorGraph::NodeID)> dfs;
     dfs = [&](juce::AudioProcessorGraph::NodeID id) -> bool
     {
         colors[id] = 1;  // gray (visiting)
 
-        for (auto& conn : getConnections())
+        for (auto dest : adj[id])
         {
-            if (conn.source.nodeID == id)
-            {
-                auto destColor = colors[conn.destination.nodeID];
-                if (destColor == 1)  // Back edge = cycle
-                    return true;
-                if (destColor == 0 && dfs(conn.destination.nodeID))
-                    return true;
-            }
+            auto destColor = colors[dest];
+            if (destColor == 1)  // Back edge = cycle
+                return true;
+            if (destColor == 0 && dfs(dest))
+                return true;
         }
 
         colors[id] = 2;  // black (done)
         return false;
     };
 
-    for (auto* node : getNodes())
-        if (colors[node->nodeID] == 0 && dfs(node->nodeID))
+    for (const auto& [id, _] : adj)
+        if (colors[id] == 0 && dfs(id))
             return true;
 
     return false;

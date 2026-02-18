@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import { PANEL_CONFIGS } from '../../stores/panelStore';
 import { usePanel } from './usePanel';
 import { Panel } from './Panel';
 import { ParameterPanel } from './ParameterPanel';
@@ -26,7 +25,7 @@ interface PanelContainerProps {
  * Only one panel is open at a time.
  */
 export function PanelContainer({ children }: PanelContainerProps) {
-  const { getVisiblePanels } = usePanel();
+  const { getVisiblePanels, getPanelSize } = usePanel();
 
   const rightPanels = getVisiblePanels('right');
   const bottomPanels = getVisiblePanels('bottom');
@@ -46,7 +45,7 @@ export function PanelContainer({ children }: PanelContainerProps) {
             key={id}
             className="shrink-0"
             style={{
-              width: PANEL_CONFIGS[id].defaultWidth,
+              width: getPanelSize(id).width,
             }}
           >
             <Panel id={id}>

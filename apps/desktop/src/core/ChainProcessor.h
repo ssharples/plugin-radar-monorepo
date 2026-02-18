@@ -13,6 +13,7 @@
 struct WireResult
 {
     juce::AudioProcessorGraph::NodeID audioOut;
+    int latency = 0;  // Total latency (samples) of the wired subtree
 };
 
 class ChainProcessor : public juce::AudioProcessorGraph

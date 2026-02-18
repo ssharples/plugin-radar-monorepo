@@ -189,24 +189,44 @@ export function UnifiedBrowser({ onClose }: UnifiedBrowserProps) {
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [highlightedIndex]);
 
-  // ── Keyboard navigation ─────────────────────────────────
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightedIndex(prev => Math.min(prev + 1, items.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIndex(prev => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && items[highlightedIndex]) {
-      e.preventDefault();
-      handleItemAction(items[highlightedIndex]);
-    }
-  }, [items, highlightedIndex]);
-
+  // ── Keyboard navigation (via keyboard store) ────────────
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    const registerShortcut = useKeyboardStore.getState().registerShortcut;
+    const unsubs = [
+      registerShortcut({
+        id: 'unified-browser-arrow-down',
+        key: 'ArrowDown',
+        priority: ShortcutPriority.MODAL,
+        allowInInputs: true,
+        handler: (e) => {
+          e.preventDefault();
+          setHighlightedIndex(prev => Math.min(prev + 1, items.length - 1));
+        },
+      }),
+      registerShortcut({
+        id: 'unified-browser-arrow-up',
+        key: 'ArrowUp',
+        priority: ShortcutPriority.MODAL,
+        allowInInputs: true,
+        handler: (e) => {
+          e.preventDefault();
+          setHighlightedIndex(prev => Math.max(prev - 1, 0));
+        },
+      }),
+      registerShortcut({
+        id: 'unified-browser-enter',
+        key: 'Enter',
+        priority: ShortcutPriority.MODAL,
+        allowInInputs: true,
+        handler: (e) => {
+          e.preventDefault();
+          const item = items[highlightedIndex];
+          if (item) handleItemAction(item);
+        },
+      }),
+    ];
+    return () => unsubs.forEach(unsub => unsub());
+  }, [items, highlightedIndex, handleItemAction]);
 
   // ── Actions ─────────────────────────────────────────────
   const handleItemAction = useCallback(async (item: UnifiedItem) => {

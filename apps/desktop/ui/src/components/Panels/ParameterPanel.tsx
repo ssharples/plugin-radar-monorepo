@@ -18,9 +18,12 @@ export function ParameterPanel() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isFetching = useRef(false);
 
   const fetchParams = useCallback(async () => {
     if (inlineEditorNodeId == null) return;
+    if (isFetching.current) return;
+    isFetching.current = true;
     try {
       const result = await juceBridge.readPluginParameters(inlineEditorNodeId);
       if (result.success && result.parameters) {
@@ -28,6 +31,8 @@ export function ParameterPanel() {
       }
     } catch {
       // Silently ignore — will retry on next poll
+    } finally {
+      isFetching.current = false;
     }
   }, [inlineEditorNodeId]);
 
