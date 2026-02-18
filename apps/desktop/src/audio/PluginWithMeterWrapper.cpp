@@ -115,14 +115,16 @@ void PluginWithMeterWrapper::processBlock(juce::AudioBuffer<float>& buffer, juce
             for (int ch = 0; ch < juce::jmin(2, numChannels); ++ch)
                 expandedBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
 
-            // Fill sidechain channels (ch 2+) from host SC bus, or zero
+            // Fill sidechain channels (ch 2+) from host SC bus, or mirror main audio.
+            // Mirroring main audio (instead of zeroing) is standard DAW behavior —
+            // plugins like Pro-L 2 interpret zero sidechain as "no signal → mute output".
             for (int ch = 2; ch < reqCh; ++ch)
             {
                 int scCh = ch - 2;
                 if (sidechainBuffer != nullptr && scCh < sidechainBuffer->getNumChannels())
                     expandedBuffer.copyFrom(ch, 0, *sidechainBuffer, scCh, 0, numSamples);
                 else
-                    expandedBuffer.clear(ch, 0, numSamples);
+                    expandedBuffer.copyFrom(ch, 0, expandedBuffer, ch % 2, 0, numSamples);
             }
 
             wrappedPlugin->processBlock(expandedBuffer, midiMessages);
