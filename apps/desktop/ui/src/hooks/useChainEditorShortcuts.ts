@@ -14,6 +14,8 @@ interface ChainEditorShortcutsOptions {
   saveSnapshot: (index: number) => void;
   recallSnapshot: (index: number) => void;
   openInlineEditor: (nodeId: number) => void;
+  isContextMenuOpen?: boolean;
+  closeContextMenu?: () => void;
 }
 
 /**
@@ -38,7 +40,9 @@ export function useChainEditorShortcuts({
   clearSelection,
   saveSnapshot,
   recallSnapshot,
-  openInlineEditor
+  openInlineEditor,
+  isContextMenuOpen,
+  closeContextMenu,
 }: ChainEditorShortcutsOptions) {
   const registerShortcut = useKeyboardStore((state) => state.registerShortcut);
 
@@ -278,4 +282,182 @@ export function useChainEditorShortcuts({
       }
     });
   }, [registerShortcut, saveSnapshot]);
+
+  // =============================================
+  // Arrow-key chain navigation
+  // =============================================
+
+  // ArrowUp → Select previous plugin
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-arrow-up',
+      key: 'ArrowUp',
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        // Don't interfere with modifier combos
+        if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+
+        const { selectedNodeId, nodes, selectNode } = useChainStore.getState();
+        const plugins = collectPlugins(nodes);
+        if (plugins.length === 0) return;
+
+        e.preventDefault();
+
+        if (selectedNodeId === null) {
+          // Nothing selected — select the last plugin
+          selectNode(plugins[plugins.length - 1].id);
+          return;
+        }
+
+        const currentIndex = plugins.findIndex(p => p.id === selectedNodeId);
+        if (currentIndex <= 0) {
+          // Already at top or not found — wrap to last
+          selectNode(plugins[plugins.length - 1].id);
+        } else {
+          selectNode(plugins[currentIndex - 1].id);
+        }
+      }
+    });
+  }, [registerShortcut]);
+
+  // ArrowDown → Select next plugin
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-arrow-down',
+      key: 'ArrowDown',
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        // Don't interfere with modifier combos
+        if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+
+        const { selectedNodeId, nodes, selectNode } = useChainStore.getState();
+        const plugins = collectPlugins(nodes);
+        if (plugins.length === 0) return;
+
+        e.preventDefault();
+
+        if (selectedNodeId === null) {
+          // Nothing selected — select the first plugin
+          selectNode(plugins[0].id);
+          return;
+        }
+
+        const currentIndex = plugins.findIndex(p => p.id === selectedNodeId);
+        if (currentIndex === -1 || currentIndex >= plugins.length - 1) {
+          // At bottom or not found — wrap to first
+          selectNode(plugins[0].id);
+        } else {
+          selectNode(plugins[currentIndex + 1].id);
+        }
+      }
+    });
+  }, [registerShortcut]);
+
+  // =============================================
+  // Quick actions on selected plugin
+  // =============================================
+
+  // B → Toggle bypass on selected plugin
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-bypass',
+      key: 'b',
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+
+        const { selectedNodeId, toggleNodeBypass } = useChainStore.getState();
+        if (selectedNodeId === null) return;
+
+        e.preventDefault();
+        toggleNodeBypass(selectedNodeId);
+      }
+    });
+  }, [registerShortcut]);
+
+  // D → Duplicate selected plugin
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-duplicate',
+      key: 'd',
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+
+        const { selectedNodeId, duplicateNode } = useChainStore.getState();
+        if (selectedNodeId === null) return;
+
+        e.preventDefault();
+        duplicateNode(selectedNodeId);
+      }
+    });
+  }, [registerShortcut]);
+
+  // =============================================
+  // Cmd+S → Save chain (dispatch event for HeaderMenu)
+  // =============================================
+
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-save',
+      key: 's',
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: false,
+      handler: (e) => {
+        if ((!e.metaKey && !e.ctrlKey) || e.shiftKey || e.altKey) return;
+
+        e.preventDefault();
+        window.dispatchEvent(new Event('showSaveDropdown'));
+      }
+    });
+  }, [registerShortcut]);
+
+  // =============================================
+  // Escape key hierarchy
+  // =============================================
+
+  useEffect(() => {
+    return registerShortcut({
+      id: 'chain-editor-escape',
+      key: 'Escape',
+      priority: ShortcutPriority.COMPONENT,
+      allowInInputs: true, // Escape should work even in inputs
+      handler: (e) => {
+        // 1. Context menu open → close it
+        if (isContextMenuOpen && closeContextMenu) {
+          e.preventDefault();
+          closeContextMenu();
+          return;
+        }
+
+        // 2. Search overlay open → close it
+        const { searchOverlayActive, hideSearchOverlay } = useChainStore.getState();
+        if (searchOverlayActive) {
+          e.preventDefault();
+          hideSearchOverlay();
+          return;
+        }
+
+        // 3. Nodes selected → deselect all
+        const { selectedNodeId, selectNode } = useChainStore.getState();
+        if (selectedNodeId !== null) {
+          e.preventDefault();
+          selectNode(null);
+          return;
+        }
+
+        // 4. Inline editor mode → exit
+        const { inlineEditorNodeId, closeInlineEditor } = useChainStore.getState();
+        if (inlineEditorNodeId !== null) {
+          e.preventDefault();
+          closeInlineEditor();
+          return;
+        }
+      }
+    });
+  }, [registerShortcut, isContextMenuOpen, closeContextMenu]);
 }

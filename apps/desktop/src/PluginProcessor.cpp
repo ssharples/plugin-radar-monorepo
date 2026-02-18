@@ -4,17 +4,16 @@
 #include "utils/ProChainLogger.h"
 #include <cmath>
 
-// Replace any NaN/Inf samples with 0.0 to prevent downstream corruption
+// Replace any NaN/Inf samples with 0.0 to prevent downstream corruption.
+// Uses SIMD-friendly findMinAndMax instead of per-sample isfinite() branches.
 static void sanitiseBuffer(juce::AudioBuffer<float>& buffer)
 {
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
-        auto* data = buffer.getWritePointer(ch);
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            if (!std::isfinite(data[i]))
-                data[i] = 0.0f;
-        }
+        auto range = juce::FloatVectorOperations::findMinAndMax(
+            buffer.getReadPointer(ch), buffer.getNumSamples());
+        if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()))
+            buffer.clear(ch, 0, buffer.getNumSamples());
     }
 }
 PluginChainManagerProcessor::PluginChainManagerProcessor()
@@ -285,7 +284,8 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     bool hasSC = buffer.getNumChannels() > 2;
     if (hasSC)
     {
-        sidechainBuffer.setSize(2, buffer.getNumSamples(), false, false, true);
+        if (sidechainBuffer.getNumSamples() < buffer.getNumSamples())
+            sidechainBuffer.setSize(2, buffer.getNumSamples() * 2, false, false, true);
         sidechainBuffer.copyFrom(0, 0, buffer, 2, 0, buffer.getNumSamples());
         sidechainBuffer.copyFrom(1, 0, buffer, 3, 0, buffer.getNumSamples());
     }
@@ -303,7 +303,8 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // Store dry signal (stereo only) for master dry/wet mixing (after input gain).
     // CRITICAL: Only copy 2 channels — dryDelayLine is prepared for 2 channels.
     // Copying the full 4-ch DAW buffer causes out-of-bounds writes in the delay line.
-    dryBufferForMaster.setSize(2, buffer.getNumSamples(), false, false, true);
+    if (dryBufferForMaster.getNumSamples() < buffer.getNumSamples())
+        dryBufferForMaster.setSize(2, buffer.getNumSamples() * 2, false, false, true);
     dryBufferForMaster.copyFrom(0, 0, buffer, 0, 0, buffer.getNumSamples());
     dryBufferForMaster.copyFrom(1, 0, buffer, 1, 0, buffer.getNumSamples());
 
@@ -328,7 +329,8 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     if (needsStereoIsolation)
     {
-        chainStereoBuffer.setSize(2, buffer.getNumSamples(), false, false, true);
+        if (chainStereoBuffer.getNumSamples() < buffer.getNumSamples())
+            chainStereoBuffer.setSize(2, buffer.getNumSamples() * 2, false, false, true);
         chainStereoBuffer.copyFrom(0, 0, buffer, 0, 0, buffer.getNumSamples());
         chainStereoBuffer.copyFrom(1, 0, buffer, 1, 0, buffer.getNumSamples());
     }
@@ -371,7 +373,8 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // Master dry/wet mixing (before output gain)
     {
         // Use pre-allocated 4-channel buffer: ch0-1 = dry (latency-compensated), ch2-3 = wet
-        dryWetMixBuffer.setSize(4, buffer.getNumSamples(), false, false, true);
+        if (dryWetMixBuffer.getNumSamples() < buffer.getNumSamples())
+            dryWetMixBuffer.setSize(4, buffer.getNumSamples() * 2, false, false, true);
 
         // Copy latency-compensated dry signal to ch0-1
         dryWetMixBuffer.copyFrom(0, 0, dryBufferForMaster, 0, 0, buffer.getNumSamples());

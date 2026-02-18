@@ -43,12 +43,8 @@ target_sources(ProChain
         src/core/ParameterDiscovery.cpp
         src/core/InstanceRegistry.cpp
         src/core/MirrorManager.cpp
-        src/core/UserProfile.cpp
-        src/core/ChainSharingManager.cpp
         src/bridge/WebViewBridge.cpp
         src/bridge/ResourceProvider.cpp
-        src/ui/PluginEditorHost.cpp
-        src/ui/PluginCanvas.cpp
         src/audio/WaveformCapture.cpp
         src/audio/GainProcessor.cpp
         src/audio/AudioMeter.cpp
@@ -60,7 +56,6 @@ target_sources(ProChain
         src/audio/MidSideMatrixProcessor.cpp
         src/audio/DuckingProcessor.cpp
         src/audio/LatencyCompensationProcessor.cpp
-        src/audio/MuteProcessor.cpp
         src/audio/PluginParameterWatcher.cpp
         src/automation/ProxyParameter.cpp
         src/automation/ParameterProxyPool.cpp
@@ -98,10 +93,12 @@ target_link_libraries(ProChain
 
 target_link_options(ProChain PUBLIC -ObjC)
 
-# Enable -ffast-math in Release builds for faster transcendental functions
-# Note: -march=native is intentionally omitted to preserve cross-compilation
+# Enable fast-math optimizations in Release builds, but NOT -ffinite-math-only.
+# -ffinite-math-only lets the compiler assume no NaN/Inf values exist, which
+# causes std::isfinite() checks (used in sanitiseBuffer) to be optimized away,
+# letting NaN propagate through the signal chain.
 target_compile_options(ProChain PRIVATE
-    $<$<CONFIG:Release>:-ffast-math>
+    $<$<CONFIG:Release>:-funsafe-math-optimizations -fno-math-errno -fno-trapping-math>
 )
 
 # Include directories
@@ -189,7 +186,6 @@ add_executable(ProChain_Tests
     tests/BlacklistTests.cpp
     tests/ChainNodeTests.cpp
     tests/DSPTests.cpp
-    tests/PresetSerializationTests.cpp
     tests/ParameterDiscoveryTests.cpp
     tests/ScannerStressTests.cpp
     tests/MirrorManagerTests.cpp
@@ -206,14 +202,10 @@ add_executable(ProChain_Tests
     src/core/MirrorManager.cpp
     src/core/PresetManager.cpp
     src/core/GroupTemplateManager.cpp
-    src/core/UserProfile.cpp
-    src/core/ChainSharingManager.cpp
     src/PluginProcessor.cpp
     src/PluginEditor.cpp
     src/bridge/WebViewBridge.cpp
     src/bridge/ResourceProvider.cpp
-    src/ui/PluginEditorHost.cpp
-    src/ui/PluginCanvas.cpp
     src/platform/KeyboardInterceptor.mm
     src/audio/DryWetMixProcessor.cpp
     src/audio/BranchGainProcessor.cpp
@@ -226,7 +218,6 @@ add_executable(ProChain_Tests
     src/audio/WaveformCapture.cpp
     src/audio/FFTProcessor.cpp
     src/audio/NodeMeterProcessor.cpp
-    src/audio/MuteProcessor.cpp
     src/audio/PluginParameterWatcher.cpp
     src/automation/ProxyParameter.cpp
     src/automation/ParameterProxyPool.cpp

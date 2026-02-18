@@ -149,12 +149,12 @@ export function UnifiedBrowser({ onClose }: UnifiedBrowserProps) {
     }
 
     // Sort
+    const recentList = sortMode === 'recent' ? getMostRecentPlugins() : [];
     result.sort((a, b) => {
         switch (sortMode) {
           case 'recent': {
-            const recent = getMostRecentPlugins();
-            const aIdx = a.kind === 'plugin' ? recent.findIndex(r => r.uid === a.data.uid) : -1;
-            const bIdx = b.kind === 'plugin' ? recent.findIndex(r => r.uid === (b.data as PluginDescription).uid) : -1;
+            const aIdx = a.kind === 'plugin' ? recentList.findIndex(r => r.uid === a.data.uid) : -1;
+            const bIdx = b.kind === 'plugin' ? recentList.findIndex(r => r.uid === (b.data as PluginDescription).uid) : -1;
             if (aIdx === -1 && bIdx === -1) return 0;
             if (aIdx === -1) return 1;
             if (bIdx === -1) return -1;

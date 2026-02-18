@@ -22,6 +22,7 @@ public:
 
 private:
     std::vector<ProxyParameter*> proxies; // raw ptrs, owned by AudioProcessor
+    int maxBoundSlot = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ParameterProxyPool)
 };

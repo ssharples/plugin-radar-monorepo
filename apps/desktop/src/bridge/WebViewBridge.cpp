@@ -1103,6 +1103,12 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 fftProcessor->setEnabled(static_cast<bool>(args[0]));
             completion(juce::var());
         })
+        .withNativeFunction("setNodeMetersEnabled", [this](const juce::Array<juce::var>& args,
+                                                            juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() > 0)
+                nodeMetersEnabled.store(static_cast<bool>(args[0]), std::memory_order_relaxed);
+            completion(juce::var());
+        })
         // ============================================
         // Inline Editor Mode
         // ============================================
@@ -1363,17 +1369,18 @@ void WebViewBridge::timerCallback()
     // Emit waveform data if available
     if (waveformCapture)
     {
-        auto preData = waveformCapture->getPrePeaks();
-        auto postData = waveformCapture->getPostPeaks();
+        auto snapshot = waveformCapture->getSnapshot();
 
         auto* obj = new juce::DynamicObject();
 
         juce::Array<juce::var> preArr;
-        for (float v : preData)
+        preArr.ensureStorageAllocated(static_cast<int>(snapshot.prePeaks.size()));
+        for (float v : snapshot.prePeaks)
             preArr.add(v);
 
         juce::Array<juce::var> postArr;
-        for (float v : postData)
+        postArr.ensureStorageAllocated(static_cast<int>(snapshot.postPeaks.size()));
+        for (float v : snapshot.postPeaks)
             postArr.add(v);
 
         obj->setProperty("pre", preArr);
@@ -1415,8 +1422,8 @@ void WebViewBridge::timerCallback()
         emitEvent("meterData", juce::var(meterObj));
     }
 
-    // Emit stereo FFT spectrum data if processor is available
-    if (fftProcessor)
+    // Emit stereo FFT spectrum data if processor is available and enabled
+    if (fftProcessor && fftProcessor->isEnabled())
     {
         auto magnitudesL = fftProcessor->getMagnitudesL();
         auto magnitudesR = fftProcessor->getMagnitudesR();
@@ -1450,8 +1457,9 @@ void WebViewBridge::timerCallback()
     }
 
     // Emit per-node meter data for inline plugin meters
+    if (nodeMetersEnabled.load(std::memory_order_relaxed))
     {
-        auto nodeMeterReadings = chainProcessor.getNodeMeterReadings();
+        const auto& nodeMeterReadings = chainProcessor.getNodeMeterReadings();
         if (!nodeMeterReadings.empty())
         {
             auto* nodeMetersObj = new juce::DynamicObject();

@@ -42,6 +42,10 @@ private:
     static float dbToLinear(float dB);
     static float clampGain(float dB);
 
+    void applySmoothedGain(juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative>& smoother,
+                           std::atomic<float>& pendingGainLinear,
+                           juce::AudioBuffer<float>& buffer);
+
     // SmoothedValue - ONLY accessed from the audio thread
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> inputGainSmoothed;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> outputGainSmoothed;

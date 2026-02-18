@@ -38,8 +38,13 @@ bool ParameterDiscovery::matchesPattern(const juce::String& input, const std::st
 {
     try
     {
-        std::regex re(pattern, std::regex_constants::icase);
-        return std::regex_search(input.toStdString(), re);
+        // Cache compiled regex objects to avoid recompilation on every call.
+        // Patterns are static string literals, so the cache grows to a fixed size.
+        static std::unordered_map<std::string, std::regex> cache;
+        auto it = cache.find(pattern);
+        if (it == cache.end())
+            it = cache.emplace(pattern, std::regex(pattern, std::regex_constants::icase)).first;
+        return std::regex_search(input.toStdString(), it->second);
     }
     catch (...)
     {
@@ -512,7 +517,7 @@ juce::String ParameterDiscovery::inferPhysicalUnit(const juce::String& label,
         return "db";
     if (labelLower.contains("ms") || labelLower.contains("millisec"))
         return "ms";
-    if (labelLower.contains("s") && !labelLower.contains("step"))
+    if (labelLower == "s" || labelLower.contains(" s") || labelLower.startsWith("sec") || labelLower.contains("seconds"))
         return "ms"; // Could be seconds
     if (labelLower.contains("%") || labelLower.contains("percent"))
         return "percent";
@@ -864,10 +869,7 @@ juce::var ParameterDiscovery::toJson(const DiscoveredMap& map)
     root->setProperty("matchedCount", map.matchedCount);
     root->setProperty("totalCount", map.totalCount);
     root->setProperty("eqBandCount", map.eqBandCount);
-    root->setProperty("eqBandParameterPattern", map.eqBandParameterPattern);
     root->setProperty("compHasParallelMix", map.compHasParallelMix);
-    root->setProperty("compHasAutoMakeup", map.compHasAutoMakeup);
-    root->setProperty("compHasLookahead", map.compHasLookahead);
     root->setProperty("reverbHasPredelay", map.reverbHasPredelay);
     root->setProperty("reverbHasDiffusion", map.reverbHasDiffusion);
     root->setProperty("delayHasSync", map.delayHasSync);

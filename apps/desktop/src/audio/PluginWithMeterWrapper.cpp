@@ -54,15 +54,13 @@ void PluginWithMeterWrapper::prepareToPlay(double sampleRate, int maximumExpecte
         if (needsExpansion)
         {
             int reqCh = wrappedPlugin->getTotalNumInputChannels();
-            expandedBuffer.setSize(reqCh, maximumExpectedSamplesPerBlock, false, false, true);
+            expandedBuffer.setSize(reqCh, maximumExpectedSamplesPerBlock * 2, false, false, true);
         }
 
         PCLOG("prepareToPlay wrapper done: " + wrappedPlugin->getName()
               + " latency=" + juce::String(lastReportedLatency)
               + " needsExpansion=" + juce::String(needsExpansion ? 1 : 0));
 
-        // Reset processBlock counter so we log fresh after each prepareToPlay
-        processBlockCallCount = 0;
     }
 
     // Prepare meters with same sample rate/block size
@@ -86,17 +84,7 @@ void PluginWithMeterWrapper::processBlock(juce::AudioBuffer<float>& buffer, juce
     const int numSamples = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
 
-    // Log first few calls for debugging
-    bool shouldLog = wrappedPlugin && processBlockCallCount < 3;
-    if (shouldLog)
-    {
-        ++processBlockCallCount;
-        PCLOG("processBlock #" + juce::String(processBlockCallCount) + " ENTER: " + wrappedPlugin->getName()
-              + " bufCh=" + juce::String(numChannels)
-              + " samples=" + juce::String(numSamples)
-              + " expand=" + juce::String(needsExpansion ? 1 : 0)
-              + " hasSC=" + juce::String(sidechainBuffer != nullptr ? 1 : 0));
-    }
+
 
     if (numSamples <= 0 || numChannels <= 0)
         return;
@@ -121,7 +109,7 @@ void PluginWithMeterWrapper::processBlock(juce::AudioBuffer<float>& buffer, juce
             // Ensure expandedBuffer has correct size (should already from prepareToPlay,
             // but handle edge cases like block size changes)
             if (expandedBuffer.getNumChannels() < reqCh || expandedBuffer.getNumSamples() < numSamples)
-                expandedBuffer.setSize(reqCh, numSamples, false, false, true);
+                expandedBuffer.setSize(reqCh, numSamples * 2, false, false, true);
 
             // Copy main stereo audio to ch 0-1
             for (int ch = 0; ch < juce::jmin(2, numChannels); ++ch)
@@ -137,10 +125,7 @@ void PluginWithMeterWrapper::processBlock(juce::AudioBuffer<float>& buffer, juce
                     expandedBuffer.clear(ch, 0, numSamples);
             }
 
-            if (shouldLog) PCLOG("  [C] calling wrappedPlugin->processBlock (expanded " + juce::String(reqCh) + "ch)");
             wrappedPlugin->processBlock(expandedBuffer, midiMessages);
-            if (shouldLog) PCLOG("  [D] wrappedPlugin->processBlock returned");
-
             // Copy output (ch 0-1) back to graph buffer
             for (int ch = 0; ch < juce::jmin(2, numChannels); ++ch)
                 buffer.copyFrom(ch, 0, expandedBuffer, ch, 0, numSamples);
@@ -148,9 +133,7 @@ void PluginWithMeterWrapper::processBlock(juce::AudioBuffer<float>& buffer, juce
         else
         {
             // Standard stereo plugin: process directly on graph buffer
-            if (shouldLog) PCLOG("  [C] calling wrappedPlugin->processBlock (direct)");
             wrappedPlugin->processBlock(buffer, midiMessages);
-            if (shouldLog) PCLOG("  [D] wrappedPlugin->processBlock returned");
         }
 
         // Detect latency changes (e.g., Auto-Tune mode toggle)
@@ -171,7 +154,6 @@ void PluginWithMeterWrapper::processBlock(juce::AudioBuffer<float>& buffer, juce
                                             numSamples);
         outputMeter.process(stereoView);
     }
-    if (shouldLog) PCLOG("  [F] processBlock done");
 }
 
 const juce::String PluginWithMeterWrapper::getName() const

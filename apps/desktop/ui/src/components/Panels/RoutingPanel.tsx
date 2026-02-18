@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useChainStore, useChainActions } from '../../stores/chainStore';
+import { findNodeById } from '../../utils/chainHelpers';
 import { Knob } from '../Knob/Knob';
 
 const NEON = '#deff0a';
@@ -26,18 +27,8 @@ export function RoutingPanel() {
   } = useChainActions();
 
   const currentNode = useMemo(() => {
-    if (inlineEditorNodeId == null) return null;
-    const find = (list: typeof nodes): typeof nodes[number] | null => {
-      for (const n of list) {
-        if (n.id === inlineEditorNodeId) return n;
-        if (n.type === 'group') {
-          const found = find(n.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    return find(nodes);
+    if (inlineEditorNodeId == null) return undefined;
+    return findNodeById(nodes, inlineEditorNodeId);
   }, [nodes, inlineEditorNodeId]);
 
   if (!currentNode || currentNode.type !== 'plugin') {

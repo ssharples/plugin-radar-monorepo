@@ -10,8 +10,6 @@
 #include "../utils/ProChainLogger.h"
 #include <cmath>
 #include <set>
-#include <chrono>
-#include <thread>
 
 #if JUCE_MAC
  #include <objc/objc.h>
@@ -709,90 +707,105 @@ ChainNodeId ChainProcessor::createGroup(const std::vector<ChainNodeId>& childIds
     if (childIds.empty())
         return -1;
 
-    // All children must share the same parent
-    auto* firstParent = ChainNodeHelpers::findParent(rootNode, childIds[0]);
-    if (!firstParent || !firstParent->isGroup())
-        return -1;
+    suspendProcessing(true);
 
-    for (size_t i = 1; i < childIds.size(); ++i)
-    {
-        auto* parent = ChainNodeHelpers::findParent(rootNode, childIds[i]);
-        if (parent != firstParent)
-            return -1; // Children must share the same parent
-    }
+    ChainNodeId groupId = -1;
 
-    // Find the earliest position among the children
-    auto& parentChildren = firstParent->getGroup().children;
-    int earliestIndex = static_cast<int>(parentChildren.size());
-    for (auto id : childIds)
+    // Perform tree manipulation with lock held briefly
     {
-        int idx = ChainNodeHelpers::findChildIndex(*firstParent, id);
-        if (idx >= 0 && idx < earliestIndex)
-            earliestIndex = idx;
-    }
+        const juce::SpinLock::ScopedLockType lock(treeLock);
 
-    // Extract the children (preserve their original order)
-    std::vector<std::unique_ptr<ChainNode>> extracted;
-    for (auto it = parentChildren.begin(); it != parentChildren.end(); )
-    {
-        bool found = false;
-        for (auto id : childIds)
+        // All children must share the same parent
+        auto* firstParent = ChainNodeHelpers::findParent(rootNode, childIds[0]);
+        if (!firstParent || !firstParent->isGroup())
         {
-            if ((*it)->id == id)
+            suspendProcessing(false);
+            return -1;
+        }
+
+        for (size_t i = 1; i < childIds.size(); ++i)
+        {
+            auto* parent = ChainNodeHelpers::findParent(rootNode, childIds[i]);
+            if (parent != firstParent)
             {
-                extracted.push_back(std::move(*it));
-                it = parentChildren.erase(it);
-                found = true;
-                break;
+                suspendProcessing(false);
+                return -1; // Children must share the same parent
             }
         }
-        if (!found)
-            ++it;
-    }
 
-    // Create the group node
-    auto group = std::make_unique<ChainNode>();
-    group->id = nextNodeId++;
-    group->name = name.isEmpty() ? "Group" : name;
-
-    GroupData groupData;
-    groupData.mode = mode;
-    groupData.dryWetMix = 1.0f;
-    groupData.children = std::move(extracted);
-    group->data = std::move(groupData);
-
-    // Insert at the earliest position
-    if (earliestIndex >= static_cast<int>(parentChildren.size()))
-        parentChildren.push_back(std::move(group));
-    else
-        parentChildren.insert(parentChildren.begin() + earliestIndex, std::move(group));
-
-    ChainNodeId groupId = parentChildren[static_cast<size_t>(earliestIndex)]->id;
-
-    // Auto-insert a dry path as the first child for parallel groups
-    if (mode == GroupMode::Parallel)
-    {
-        auto* groupNode = ChainNodeHelpers::findById(rootNode, groupId);
-        if (groupNode && groupNode->isGroup())
+        // Find the earliest position among the children
+        auto& parentChildren = firstParent->getGroup().children;
+        int earliestIndex = static_cast<int>(parentChildren.size());
+        for (auto id : childIds)
         {
-            auto dryNode = std::make_unique<ChainNode>();
-            dryNode->id = nextNodeId++;
-            dryNode->name = "Dry Path";
-
-            PluginLeaf dryLeaf;
-            dryLeaf.isDryPath = true;
-            dryNode->data = std::move(dryLeaf);
-
-            groupNode->getGroup().children.insert(
-                groupNode->getGroup().children.begin(), std::move(dryNode));
+            int idx = ChainNodeHelpers::findChildIndex(*firstParent, id);
+            if (idx >= 0 && idx < earliestIndex)
+                earliestIndex = idx;
         }
-    }
 
-    cachedSlotsDirty = true;
+        // Extract the children (preserve their original order)
+        std::vector<std::unique_ptr<ChainNode>> extracted;
+        for (auto it = parentChildren.begin(); it != parentChildren.end(); )
+        {
+            bool found = false;
+            for (auto id : childIds)
+            {
+                if ((*it)->id == id)
+                {
+                    extracted.push_back(std::move(*it));
+                    it = parentChildren.erase(it);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                ++it;
+        }
 
-    // CRITICAL: Suspend audio processing before rebuilding graph to prevent crashes
-    suspendProcessing(true);
+        // Create the group node
+        auto group = std::make_unique<ChainNode>();
+        group->id = nextNodeId++;
+        group->name = name.isEmpty() ? "Group" : name;
+
+        GroupData groupData;
+        groupData.mode = mode;
+        groupData.dryWetMix = 1.0f;
+        groupData.children = std::move(extracted);
+        group->data = std::move(groupData);
+
+        // Insert at the earliest position
+        if (earliestIndex >= static_cast<int>(parentChildren.size()))
+            parentChildren.push_back(std::move(group));
+        else
+            parentChildren.insert(parentChildren.begin() + earliestIndex, std::move(group));
+
+        groupId = parentChildren[static_cast<size_t>(earliestIndex)]->id;
+
+        // Auto-insert a dry path as the first child for parallel groups
+        if (mode == GroupMode::Parallel)
+        {
+            auto* groupNode = ChainNodeHelpers::findById(rootNode, groupId);
+            if (groupNode && groupNode->isGroup())
+            {
+                auto dryNode = std::make_unique<ChainNode>();
+                dryNode->id = nextNodeId++;
+                dryNode->name = "Dry Path";
+
+                PluginLeaf dryLeaf;
+                dryLeaf.isDryPath = true;
+                dryNode->data = std::move(dryLeaf);
+
+                groupNode->getGroup().children.insert(
+                    groupNode->getGroup().children.begin(), std::move(dryNode));
+            }
+        }
+
+        cachedSlotsDirty = true;
+    }  // Release lock before rebuildGraph
+
+    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
     rebuildGraph();
+
     suspendProcessing(false);
 
     notifyChainChanged();
@@ -808,39 +821,55 @@ bool ChainProcessor::dissolveGroup(ChainNodeId groupId)
     if (groupId == 0)
         return false;
 
-    auto* parent = ChainNodeHelpers::findParent(rootNode, groupId);
-    if (!parent || !parent->isGroup())
-        return false;
-
-    auto* groupNode = ChainNodeHelpers::findById(rootNode, groupId);
-    if (!groupNode || !groupNode->isGroup())
-        return false;
-
-    auto& parentChildren = parent->getGroup().children;
-
-    // Find the group's position
-    int groupIndex = ChainNodeHelpers::findChildIndex(*parent, groupId);
-    if (groupIndex < 0)
-        return false;
-
-    // Extract group's children
-    auto groupChildren = std::move(groupNode->getGroup().children);
-
-    // Remove the group from parent
-    parentChildren.erase(parentChildren.begin() + groupIndex);
-
-    // Insert the group's children at the same position
-    for (size_t i = 0; i < groupChildren.size(); ++i)
-    {
-        parentChildren.insert(parentChildren.begin() + groupIndex + static_cast<int>(i),
-                              std::move(groupChildren[i]));
-    }
-
-    cachedSlotsDirty = true;
-
-    // CRITICAL: Suspend audio processing before rebuilding graph to prevent crashes
     suspendProcessing(true);
+
+    // Perform tree manipulation with lock held briefly
+    {
+        const juce::SpinLock::ScopedLockType lock(treeLock);
+
+        auto* parent = ChainNodeHelpers::findParent(rootNode, groupId);
+        if (!parent || !parent->isGroup())
+        {
+            suspendProcessing(false);
+            return false;
+        }
+
+        auto* groupNode = ChainNodeHelpers::findById(rootNode, groupId);
+        if (!groupNode || !groupNode->isGroup())
+        {
+            suspendProcessing(false);
+            return false;
+        }
+
+        auto& parentChildren = parent->getGroup().children;
+
+        // Find the group's position
+        int groupIndex = ChainNodeHelpers::findChildIndex(*parent, groupId);
+        if (groupIndex < 0)
+        {
+            suspendProcessing(false);
+            return false;
+        }
+
+        // Extract group's children
+        auto groupChildren = std::move(groupNode->getGroup().children);
+
+        // Remove the group from parent
+        parentChildren.erase(parentChildren.begin() + groupIndex);
+
+        // Insert the group's children at the same position
+        for (size_t i = 0; i < groupChildren.size(); ++i)
+        {
+            parentChildren.insert(parentChildren.begin() + groupIndex + static_cast<int>(i),
+                                  std::move(groupChildren[i]));
+        }
+
+        cachedSlotsDirty = true;
+    }  // Release lock before rebuildGraph
+
+    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
     rebuildGraph();
+
     suspendProcessing(false);
 
     notifyChainChanged();
@@ -913,11 +942,9 @@ bool ChainProcessor::setGroupDucking(ChainNodeId groupId, float amount, float re
     }
     else if (group.duckAmount > 0.001f)
     {
-        // Need to rebuild graph to insert the ducking processor
-        // CRITICAL: Suspend audio processing before rebuilding graph to prevent crashes
-        suspendProcessing(true);
-        rebuildGraph();
-        suspendProcessing(false);
+        // Need to rebuild graph to insert the ducking processor — use deferred rebuild
+        scheduleRebuild();
+        return true;
     }
 
     notifyChainChanged();
@@ -1091,18 +1118,11 @@ bool ChainProcessor::setNodeInputGain(ChainNodeId nodeId, float gainDb)
     auto& leaf = node->getPlugin();
     leaf.inputGainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
 
-    // Update existing gain processor if wired (no rebuild needed)
+    // Gain nodes are always wired — just update the processor value (no rebuild needed)
     if (auto gNode = getNodeForId(leaf.inputGainNodeId))
     {
         if (auto* proc = dynamic_cast<BranchGainProcessor*>(gNode->getProcessor()))
             proc->setGainDb(leaf.inputGainDb);
-    }
-    else if (std::abs(leaf.inputGainDb) > 0.01f)
-    {
-        // Need to create the gain node — requires rebuild
-        suspendProcessing(true);
-        rebuildGraph();
-        suspendProcessing(false);
     }
 
     notifyChainChanged();
@@ -1118,17 +1138,11 @@ bool ChainProcessor::setNodeOutputGain(ChainNodeId nodeId, float gainDb)
     auto& leaf = node->getPlugin();
     leaf.outputGainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
 
-    // Update existing gain processor if wired (no rebuild needed)
+    // Gain nodes are always wired — just update the processor value (no rebuild needed)
     if (auto gNode = getNodeForId(leaf.outputGainNodeId))
     {
         if (auto* proc = dynamic_cast<BranchGainProcessor*>(gNode->getProcessor()))
             proc->setGainDb(leaf.outputGainDb);
-    }
-    else if (std::abs(leaf.outputGainDb) > 0.01f)
-    {
-        suspendProcessing(true);
-        rebuildGraph();
-        suspendProcessing(false);
     }
 
     notifyChainChanged();
@@ -1203,21 +1217,19 @@ bool ChainProcessor::setNodeMidSideMode(ChainNodeId nodeId, int mode)
 
 void ChainProcessor::setNodeBypassed(ChainNodeId nodeId, bool bypassed)
 {
-    const juce::SpinLock::ScopedLockType lock(treeLock);
-    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
-    if (!node || !node->isPlugin())
-        return;
+    {
+        const juce::SpinLock::ScopedLockType lock(treeLock);
+        auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
+        if (!node || !node->isPlugin())
+            return;
 
-    node->getPlugin().bypassed = bypassed;
+        node->getPlugin().bypassed = bypassed;
+    }
 
-    // CRITICAL: Suspend audio processing before rebuilding graph to prevent crashes
-    // Rebuild the graph to fully disconnect/reconnect the plugin.
-    // Bypassed plugins are skipped in wireNode(), so they use zero CPU.
-    suspendProcessing(true);
-    rebuildGraph();
-    suspendProcessing(false);
-
-    notifyChainChanged();
+    // Deferred rebuild — coalesces rapid bypass toggles (e.g. setAllBypass).
+    // ~16ms delay is imperceptible. Full rebuild needed because bypassed plugins
+    // are disconnected in wireNode() for zero CPU and correct latency reporting.
+    scheduleRebuild();
 }
 
 std::vector<PluginLeaf*> ChainProcessor::getFlatPluginList()
@@ -1274,24 +1286,33 @@ bool ChainProcessor::removePlugin(int slotIndex)
 bool ChainProcessor::movePlugin(int fromIndex, int toIndex)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    const juce::SpinLock::ScopedLockType lock(treeLock);
 
-    // For flat API compat, move within the root group
-    auto& rootChildren = rootNode.getGroup().children;
-    if (fromIndex < 0 || fromIndex >= static_cast<int>(rootChildren.size()) ||
-        toIndex < 0 || toIndex >= static_cast<int>(rootChildren.size()) ||
-        fromIndex == toIndex)
-        return false;
-
-    auto node = std::move(rootChildren[static_cast<size_t>(fromIndex)]);
-    rootChildren.erase(rootChildren.begin() + fromIndex);
-    rootChildren.insert(rootChildren.begin() + toIndex, std::move(node));
-
-    cachedSlotsDirty = true;
-
-    // CRITICAL: Suspend audio processing before rebuilding graph to prevent crashes
     suspendProcessing(true);
+
+    // Perform tree manipulation with lock held briefly
+    {
+        const juce::SpinLock::ScopedLockType lock(treeLock);
+
+        // For flat API compat, move within the root group
+        auto& rootChildren = rootNode.getGroup().children;
+        if (fromIndex < 0 || fromIndex >= static_cast<int>(rootChildren.size()) ||
+            toIndex < 0 || toIndex >= static_cast<int>(rootChildren.size()) ||
+            fromIndex == toIndex)
+        {
+            suspendProcessing(false);
+            return false;
+        }
+
+        auto node = std::move(rootChildren[static_cast<size_t>(fromIndex)]);
+        rootChildren.erase(rootChildren.begin() + fromIndex);
+        rootChildren.insert(rootChildren.begin() + toIndex, std::move(node));
+
+        cachedSlotsDirty = true;
+    }  // Release lock before rebuildGraph
+
+    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
     rebuildGraph();
+
     suspendProcessing(false);
 
     notifyChainChanged();
@@ -1305,12 +1326,6 @@ void ChainProcessor::setSlotBypassed(int slotIndex, bool bypassed)
     auto nodeId = getNodeIdByFlatIndex(slotIndex);
     if (nodeId >= 0)
         setNodeBypassed(nodeId, bypassed);
-}
-
-bool ChainProcessor::isSlotBypassed(int slotIndex) const
-{
-    auto* leaf = getPluginByFlatIndex(slotIndex);
-    return leaf ? leaf->bypassed : false;
 }
 
 void ChainProcessor::showPluginWindow(ChainNodeId nodeId)
@@ -1424,12 +1439,8 @@ void ChainProcessor::setAllBypass(bool bypassed)
     for (auto* leaf : plugins)
         leaf->bypassed = bypassed;
 
-    // CRITICAL: Suspend audio processing before rebuilding graph to prevent crashes
-    suspendProcessing(true);
-    rebuildGraph();
-    suspendProcessing(false);
-
-    notifyChainChanged();
+    // Single deferred rebuild for all bypass changes
+    scheduleRebuild();
 }
 
 ChainProcessor::BypassState ChainProcessor::getBypassState() const
@@ -1619,22 +1630,10 @@ void ChainProcessor::rebuildGraph()
     PCLOG("rebuildGraph — start (nodes=" + juce::String(getNodes().size()) + ")");
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
-    // suspendProcessing(true) prevents the NEXT processBlock from doing work,
-    // but the CURRENT audio callback may still be mid-way through the render sequence.
-    // Timed spin-wait until it finishes before touching the graph.
-    // 200ms covers even the longest audio callbacks (e.g. 2048 samples @ 44.1kHz ≈ 46ms).
-    {
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
-        while (audioThreadBusy.load(std::memory_order_acquire))
-        {
-            if (std::chrono::steady_clock::now() >= deadline)
-            {
-                PCLOG("rebuildGraph — WARNING: audioThreadBusy spin-wait timed out (200ms)");
-                break;
-            }
-            std::this_thread::yield();
-        }
-    }
+    // JUCE's rebuild() uses RenderSequenceExchange which does a wait-free
+    // try-lock swap of the render sequence pointer. The audio thread finishes
+    // its current callback on the old sequence; the new one takes effect next call.
+    // No spin-wait needed — suspendProcessing(true) is sufficient.
 
     // NOTE: Do NOT call releaseResources() here. The old render sequence may still
     // be referenced by the audio thread until rebuild() atomically swaps it.
@@ -1729,6 +1728,79 @@ void ChainProcessor::rebuildGraph()
 
     // Update cached meter wrapper pointers (avoids DFS + dynamic_cast in processBlock)
     updateMeterWrapperCache();
+}
+
+// ---------------------------------------------------------------------------
+// Deferred rebuild — coalesces rapid graph mutations into a single rebuild.
+// Posts ONE callAsync callback. If multiple scheduleRebuild() calls happen
+// before the callback fires, only one rebuild occurs.
+// ---------------------------------------------------------------------------
+void ChainProcessor::scheduleRebuild()
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+
+    // If inside a batch, just flag and let endBatch() handle it
+    if (batchDepth > 0)
+    {
+        rebuildNeeded.store(true, std::memory_order_relaxed);
+        return;
+    }
+
+    rebuildNeeded.store(true, std::memory_order_relaxed);
+
+    // Only post one callback — guard with rebuildScheduled
+    bool expected = false;
+    if (rebuildScheduled.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
+    {
+        auto alive = aliveFlag;
+        juce::MessageManager::callAsync([this, alive]() {
+            if (!alive->load(std::memory_order_acquire))
+                return;
+
+            rebuildScheduled.store(false, std::memory_order_release);
+
+            if (rebuildNeeded.exchange(false, std::memory_order_acq_rel))
+            {
+                suspendProcessing(true);
+                rebuildGraph();
+                suspendProcessing(false);
+                notifyChainChanged();
+            }
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Batch API — suppresses individual rebuilds during multi-operation sequences.
+// Nests: beginBatch() can be called multiple times; only the final endBatch()
+// triggers the rebuild.
+// ---------------------------------------------------------------------------
+void ChainProcessor::beginBatch()
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+
+    if (batchDepth == 0)
+        suspendProcessing(true);
+
+    ++batchDepth;
+}
+
+void ChainProcessor::endBatch()
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    jassert(batchDepth > 0);
+
+    --batchDepth;
+
+    if (batchDepth == 0)
+    {
+        if (rebuildNeeded.exchange(false, std::memory_order_acq_rel))
+        {
+            rebuildGraph();
+        }
+        suspendProcessing(false);
+        notifyChainChanged();
+    }
 }
 
 void ChainProcessor::updateMeterWrapperCache()
@@ -1837,9 +1909,9 @@ WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
                 wrapper->setSidechainBuffer(leaf.sidechainSource == 1 ? externalSidechainBuffer : nullptr);
         }
 
-        bool useInputGain = std::abs(leaf.inputGainDb) > 0.01f;
-        bool useOutputGain = std::abs(leaf.outputGainDb) > 0.01f;
-        bool useDryWet = true;  // Always wire DryWetMixProcessor to avoid audio dropout on first knob move
+        bool useInputGain = true;   // Always wire to avoid rebuild when gain changes from 0
+        bool useOutputGain = true;  // Always wire to avoid rebuild when gain changes from 0
+        bool useDryWet = true;      // Always wire DryWetMixProcessor to avoid audio dropout on first knob move
         bool useMidSide = leaf.midSideMode != MidSideMode::Off;
 
         NodeID currentAudioIn = audioIn;
@@ -2450,16 +2522,18 @@ void ChainProcessor::refreshLatencyCompensation()
     // This rebuilds the graph to update internal delay compensation
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
-    suspendProcessing(true);
-    rebuildGraph();
-    suspendProcessing(false);
-
-    // Acknowledge all wrapper latency flags so they don't re-trigger
+    // CRITICAL: Acknowledge all wrapper latency flags BEFORE rebuild.
+    // Otherwise the audio thread re-sets latencyRefreshNeeded during the rebuild,
+    // causing an infinite rebuild loop on the next timer tick.
     for (auto* node : getNodes())
     {
         if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(node->getProcessor()))
             wrapper->acknowledgeLatencyChange();
     }
+
+    suspendProcessing(true);
+    rebuildGraph();
+    suspendProcessing(false);
 
     // Note: rebuildGraph() already calls setLatencySamples() at the end
 }
@@ -2531,7 +2605,7 @@ int ChainProcessor::computeNodeLatency(const ChainNode& node, int depth) const
 // Per-node meter readings
 //==============================================================================
 
-std::vector<ChainProcessor::NodeMeterData> ChainProcessor::getNodeMeterReadings() const
+const std::vector<ChainProcessor::NodeMeterData>& ChainProcessor::getNodeMeterReadings() const
 {
     // PHASE 3: Reuse preallocated cache instead of allocating new vector at 30Hz
     cachedMeterReadings.clear();  // Doesn't deallocate capacity, just resets size
@@ -2575,7 +2649,7 @@ std::vector<ChainProcessor::NodeMeterData> ChainProcessor::getNodeMeterReadings(
         cachedMeterReadings.push_back(entry);
     }
 
-    return cachedMeterReadings;  // Returns by copy, but NRVO will optimize this
+    return cachedMeterReadings;
 }
 
 void ChainProcessor::resetAllNodePeaks()

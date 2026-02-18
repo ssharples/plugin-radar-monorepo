@@ -10,7 +10,7 @@
  *
  * Captures peak values from audio buffers in a ring buffer pattern.
  * Safe to call from the audio thread (pushPreSamples/pushPostSamples).
- * Safe to call from the UI thread (getPrePeaks/getPostPeaks).
+ * Safe to call from the UI thread (getSnapshot).
  *
  * Uses a shared write index so pre (input) and post (output) peaks are
  * always time-aligned in the ring buffer. Supports latency compensation
@@ -44,12 +44,6 @@ public:
 
     /** PHASE 3: Get snapshot of both pre/post peaks (UI thread safe, no allocation) */
     PeakSnapshot getSnapshot() const;
-
-    /** Get current pre-processing peak data (UI thread safe) - DEPRECATED: use getSnapshot() */
-    std::vector<float> getPrePeaks() const;
-
-    /** Get current post-processing peak data (UI thread safe) - DEPRECATED: use getSnapshot() */
-    std::vector<float> getPostPeaks() const;
 
     /** Reset capture state */
     void reset();

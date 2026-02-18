@@ -38,7 +38,6 @@ public:
         int blockSize,
         juce::String& errorMessage);
 
-    std::optional<juce::PluginDescription> findPluginByUid(int uid) const;
     std::optional<juce::PluginDescription> findPluginByIdentifier(const juce::String& identifier) const;
 
     // JSON export for React UI

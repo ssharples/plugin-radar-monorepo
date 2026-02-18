@@ -1,5 +1,7 @@
+import { memo } from 'react';
 import { Zap } from 'lucide-react';
 import type { PluginDescription } from '../../api/types';
+import type { EnrichedPluginData } from '../../api/convex-client';
 
 const CATEGORY_COLORS: Record<string, string> = {
   eq: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -22,15 +24,15 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 interface PluginCardProps {
   plugin: PluginDescription;
-  enrichedData: any;
+  enrichedData: EnrichedPluginData | undefined;
   usageCount: number;
   isHighlighted: boolean;
   onAdd: () => void;
   onMouseEnter: () => void;
 }
 
-export function PluginCard({ plugin, enrichedData, usageCount, isHighlighted, onAdd, onMouseEnter }: PluginCardProps) {
-  const manufacturerLogo = enrichedData?.manufacturerLogoUrl;
+export const PluginCard = memo(function PluginCard({ plugin, enrichedData, usageCount, isHighlighted, onAdd, onMouseEnter }: PluginCardProps) {
+  const manufacturerLogo = enrichedData?.manufacturerData?.resolvedLogoUrl ?? enrichedData?.manufacturerData?.logoUrl;
   const category = enrichedData?.category || plugin.category || '';
   const categoryColor = category ? (CATEGORY_COLORS[category.toLowerCase()] ?? CATEGORY_COLORS.utility) : '';
 
@@ -102,4 +104,4 @@ export function PluginCard({ plugin, enrichedData, usageCount, isHighlighted, on
       </div>
     </button>
   );
-}
+});

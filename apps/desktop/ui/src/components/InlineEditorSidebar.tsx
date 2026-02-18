@@ -16,24 +16,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { ArrowLeft, GripVertical, Plus, Star, SlidersHorizontal, ListMusic, Route, LayoutList } from 'lucide-react';
 import { useChainStore, useChainActions } from '../stores/chainStore';
 import { useKeyboardStore, ShortcutPriority } from '../stores/keyboardStore';
-import { collectPlugins, findNodeParentInfo } from '../utils/chainHelpers';
+import { collectPlugins, findNodeParentInfo, findPluginNode } from '../utils/chainHelpers';
 import { usePanelStore, type PanelId } from '../stores/panelStore';
 import { ContextMenu, buildPluginSlotMenu } from './ContextMenu';
 import type { MenuItemDef } from './ContextMenu';
-import type { ChainNodeUI, PluginNodeUI } from '../api/types';
+import type { ChainNodeUI } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
-
-// Find a plugin node by ID in the tree
-function findPluginNode(nodes: ChainNodeUI[], id: number): PluginNodeUI | null {
-  for (const node of nodes) {
-    if (node.id === id && node.type === 'plugin') return node;
-    if (node.type === 'group') {
-      const found = findPluginNode(node.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
 
 interface InlineEditorSidebarProps {
   galaxyActive?: boolean;

@@ -1,7 +1,8 @@
 import { ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 import { useChainStore } from '../../stores/chainStore';
-import type { ChainNodeUI, GroupNodeUI } from '../../api/types';
+import { findNodePath } from '../../utils/chainHelpers';
+import type { GroupNodeUI } from '../../api/types';
 
 interface GroupBreadcrumbsProps {
   /** The current group node ID to show the path to */
@@ -18,30 +19,12 @@ interface GroupBreadcrumbsProps {
 export function GroupBreadcrumbs({ groupId, onNavigate }: GroupBreadcrumbsProps) {
   const nodes = useChainStore(s => s.nodes);
 
-  // Build path from root to the target group
+  // Build path from root to the target group (only group nodes)
   const path = useMemo(() => {
-    const result: { id: number; name: string; mode: string }[] = [];
-
-    function findPath(nodeList: ChainNodeUI[], targetId: number): boolean {
-      for (const node of nodeList) {
-        if (node.type === 'group') {
-          if (node.id === targetId) {
-            result.push({ id: node.id, name: node.name, mode: node.mode });
-            return true;
-          }
-          // Search in children
-          if (findPath(node.children, targetId)) {
-            // Prepend this group to the path
-            result.unshift({ id: node.id, name: node.name, mode: node.mode });
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    findPath(nodes, groupId);
-    return result;
+    const rawPath = findNodePath(nodes, groupId);
+    return rawPath
+      .filter((n): n is GroupNodeUI => n.type === 'group')
+      .map(n => ({ id: n.id, name: n.name, mode: n.mode }));
   }, [nodes, groupId]);
 
   if (path.length <= 1) return null; // Don't show breadcrumbs for top-level groups

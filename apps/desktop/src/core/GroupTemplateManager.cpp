@@ -1,6 +1,5 @@
 #include "GroupTemplateManager.h"
 #include "../utils/PlatformPaths.h"
-#include "SerializationUtils.h"
 
 GroupTemplateManager::GroupTemplateManager(ChainProcessor& chainProcessor)
     : chain(chainProcessor)

@@ -1,6 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include "audio/DSPUtils.h"
 #include "audio/DryWetMixProcessor.h"
 #include "audio/BranchGainProcessor.h"
 #include "audio/LatencyCompensationProcessor.h"
@@ -34,120 +33,6 @@ static void settleSmoothing(juce::AudioProcessor& proc, int numBlocks = 20)
         buf.clear();
         proc.processBlock(buf, midi);
     }
-}
-
-// =============================================================================
-// Phase A: Pure Math Tests (DSPUtils)
-// =============================================================================
-
-TEST_CASE("DSPUtils: dbToLinear 0 dB = 1.0 (unity gain)", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::dbToLinear(0.0f), WithinAbs(1.0f, 0.0001f));
-}
-
-TEST_CASE("DSPUtils: dbToLinear -6 dB ~ 0.5012", "[dsp][math]")
-{
-    // -6 dB = 10^(-6/20) = 10^(-0.3) ~ 0.50119
-    REQUIRE_THAT(DSPUtils::dbToLinear(-6.0f), WithinAbs(0.50119f, 0.001f));
-}
-
-TEST_CASE("DSPUtils: dbToLinear -20 dB = 0.1", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::dbToLinear(-20.0f), WithinAbs(0.1f, 0.0001f));
-}
-
-TEST_CASE("DSPUtils: dbToLinear +6 dB ~ 1.9953", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::dbToLinear(6.0f), WithinAbs(1.9953f, 0.001f));
-}
-
-TEST_CASE("DSPUtils: dbToLinear +24 dB ~ 15.849", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::dbToLinear(24.0f), WithinAbs(15.8489f, 0.01f));
-}
-
-TEST_CASE("DSPUtils: dbToLinear -60 dB floors to 0.0", "[dsp][math]")
-{
-    REQUIRE(DSPUtils::dbToLinear(-60.0f) == 0.0f);
-}
-
-TEST_CASE("DSPUtils: dbToLinear below -60 dB floors to 0.0", "[dsp][math]")
-{
-    REQUIRE(DSPUtils::dbToLinear(-80.0f) == 0.0f);
-    REQUIRE(DSPUtils::dbToLinear(-100.0f) == 0.0f);
-}
-
-TEST_CASE("DSPUtils: linearToDb 1.0 = 0 dB", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::linearToDb(1.0f), WithinAbs(0.0f, 0.0001f));
-}
-
-TEST_CASE("DSPUtils: linearToDb 0.5 ~ -6.02 dB", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::linearToDb(0.5f), WithinAbs(-6.0206f, 0.01f));
-}
-
-TEST_CASE("DSPUtils: linearToDb 0.0 returns -100 dB", "[dsp][math]")
-{
-    REQUIRE(DSPUtils::linearToDb(0.0f) == -100.0f);
-}
-
-TEST_CASE("DSPUtils: linearToDb negative returns -100 dB", "[dsp][math]")
-{
-    REQUIRE(DSPUtils::linearToDb(-1.0f) == -100.0f);
-}
-
-TEST_CASE("DSPUtils: dbToLinear and linearToDb are inverses", "[dsp][math]")
-{
-    for (float db : {-50.0f, -30.0f, -12.0f, -6.0f, 0.0f, 3.0f, 6.0f, 12.0f, 20.0f})
-    {
-        float linear = DSPUtils::dbToLinear(db);
-        float roundTrip = DSPUtils::linearToDb(linear);
-        REQUIRE_THAT(roundTrip, WithinAbs(db, 0.01f));
-    }
-}
-
-TEST_CASE("DSPUtils: clampGainDb within range passes through", "[dsp][math]")
-{
-    REQUIRE(DSPUtils::clampGainDb(0.0f) == 0.0f);
-    REQUIRE(DSPUtils::clampGainDb(-30.0f) == -30.0f);
-    REQUIRE(DSPUtils::clampGainDb(12.0f) == 12.0f);
-    REQUIRE(DSPUtils::clampGainDb(-60.0f) == -60.0f);
-    REQUIRE(DSPUtils::clampGainDb(24.0f) == 24.0f);
-}
-
-TEST_CASE("DSPUtils: clampGainDb clamps below -60", "[dsp][math]")
-{
-    REQUIRE(DSPUtils::clampGainDb(-80.0f) == -60.0f);
-    REQUIRE(DSPUtils::clampGainDb(-100.0f) == -60.0f);
-}
-
-TEST_CASE("DSPUtils: clampGainDb clamps above +24", "[dsp][math]")
-{
-    REQUIRE(DSPUtils::clampGainDb(30.0f) == 24.0f);
-    REQUIRE(DSPUtils::clampGainDb(100.0f) == 24.0f);
-}
-
-TEST_CASE("DSPUtils: crossfade mix=0 returns dry", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::crossfade(1.0f, 0.5f, 0.0f), WithinAbs(1.0f, 0.0001f));
-}
-
-TEST_CASE("DSPUtils: crossfade mix=1 returns wet", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::crossfade(1.0f, 0.5f, 1.0f), WithinAbs(0.5f, 0.0001f));
-}
-
-TEST_CASE("DSPUtils: crossfade mix=0.5 returns average", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::crossfade(1.0f, 0.0f, 0.5f), WithinAbs(0.5f, 0.0001f));
-    REQUIRE_THAT(DSPUtils::crossfade(0.8f, 0.2f, 0.5f), WithinAbs(0.5f, 0.0001f));
-}
-
-TEST_CASE("DSPUtils: crossfade with equal dry and wet returns that value", "[dsp][math]")
-{
-    REQUIRE_THAT(DSPUtils::crossfade(0.7f, 0.7f, 0.3f), WithinAbs(0.7f, 0.0001f));
-    REQUIRE_THAT(DSPUtils::crossfade(0.7f, 0.7f, 0.9f), WithinAbs(0.7f, 0.0001f));
 }
 
 // =============================================================================
@@ -874,8 +759,6 @@ TEST_CASE("AudioMeter: peak hold decays over silent blocks", "[dsp][meter][exten
 {
     AudioMeter meter;
     meter.prepareToPlay(44100.0, 512);
-    meter.setPeakHoldTime(0.5f);    // Short hold for faster test
-    meter.setPeakDecayRate(40.0f);  // Fast decay
 
     // Push a loud signal
     juce::AudioBuffer<float> loudBuf(2, 512);

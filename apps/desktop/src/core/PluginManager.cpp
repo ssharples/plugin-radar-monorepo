@@ -269,16 +269,6 @@ std::unique_ptr<juce::AudioPluginInstance> PluginManager::createPluginInstance(
     return formatManager.createPluginInstance(desc, sampleRate, blockSize, errorMessage);
 }
 
-std::optional<juce::PluginDescription> PluginManager::findPluginByUid(int uid) const
-{
-    for (const auto& desc : knownPlugins.getTypes())
-    {
-        if (desc.uniqueId == uid)
-            return desc;  // Return a copy, not a pointer
-    }
-    return std::nullopt;
-}
-
 std::optional<juce::PluginDescription> PluginManager::findPluginByIdentifier(const juce::String& identifier) const
 {
     for (const auto& desc : knownPlugins.getTypes())

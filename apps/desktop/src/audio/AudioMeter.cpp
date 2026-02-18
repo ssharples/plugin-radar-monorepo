@@ -434,16 +434,6 @@ AudioMeter::Readings AudioMeter::getReadings() const
     return r;
 }
 
-void AudioMeter::setPeakHoldTime(float seconds)
-{
-    peakHoldTimeSeconds = juce::jlimit(0.0f, 10.0f, seconds);
-}
-
-void AudioMeter::setPeakDecayRate(float dbPerSec)
-{
-    peakDecayDbPerSec = juce::jlimit(1.0f, 100.0f, dbPerSec);
-}
-
 void AudioMeter::setEnableLUFS(bool enabled)
 {
     lufsEnabled.store(enabled, std::memory_order_relaxed);

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 
 interface AuthorAvatarProps {
   name?: string;
@@ -7,7 +7,7 @@ interface AuthorAvatarProps {
   onClick?: () => void;
 }
 
-export function AuthorAvatar({ name, avatarUrl, size = 24, onClick }: AuthorAvatarProps) {
+export const AuthorAvatar = memo(function AuthorAvatar({ name, avatarUrl, size = 24, onClick }: AuthorAvatarProps) {
   const initials = useMemo(() => {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/);
@@ -56,4 +56,4 @@ export function AuthorAvatar({ name, avatarUrl, size = 24, onClick }: AuthorAvat
       {initials}
     </div>
   );
-}
+});

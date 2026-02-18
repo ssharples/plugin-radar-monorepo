@@ -54,67 +54,33 @@ void GainProcessor::setOutputGain(float dB)
 
 void GainProcessor::processInputGain(juce::AudioBuffer<float>& buffer)
 {
-    const int numSamples = buffer.getNumSamples();
-    const int numChannels = buffer.getNumChannels();
-
-    // Audio thread: read the atomic target and set SmoothedValue here
-    inputGainSmoothed.setTargetValue(pendingInputGainLinear.load(std::memory_order_acquire));
-
-    if (inputGainSmoothed.isSmoothing())
-    {
-        // Guard against hosts delivering blocks larger than prepareToPlay indicated
-        const int rampSamples = std::min(numSamples, static_cast<int>(gainRampBuffer.size()));
-
-        // Build the gain ramp once into the pre-allocated buffer
-        for (int i = 0; i < rampSamples; ++i)
-            gainRampBuffer[static_cast<size_t>(i)] = inputGainSmoothed.getNextValue();
-
-        // Apply the ramp to all channels using SIMD multiply
-        const float* rampData = gainRampBuffer.data();
-        for (int channel = 0; channel < numChannels; ++channel)
-        {
-            auto* data = buffer.getWritePointer(channel);
-            juce::FloatVectorOperations::multiply(data, rampData, rampSamples);
-        }
-
-        // Any remaining samples beyond the ramp buffer get the final ramp value
-        if (rampSamples < numSamples)
-        {
-            float tailGain = gainRampBuffer[static_cast<size_t>(rampSamples - 1)];
-            for (int channel = 0; channel < numChannels; ++channel)
-            {
-                auto* data = buffer.getWritePointer(channel);
-                juce::FloatVectorOperations::multiply(data + rampSamples, tailGain, numSamples - rampSamples);
-            }
-        }
-    }
-    else
-    {
-        // No smoothing needed - apply constant gain
-        float gain = inputGainSmoothed.getCurrentValue();
-        if (std::abs(gain - 1.0f) > 0.0001f)
-        {
-            buffer.applyGain(gain);
-        }
-    }
+    applySmoothedGain(inputGainSmoothed, pendingInputGainLinear, buffer);
 }
 
 void GainProcessor::processOutputGain(juce::AudioBuffer<float>& buffer)
+{
+    applySmoothedGain(outputGainSmoothed, pendingOutputGainLinear, buffer);
+}
+
+void GainProcessor::applySmoothedGain(
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative>& smoother,
+    std::atomic<float>& pendingGainLinear,
+    juce::AudioBuffer<float>& buffer)
 {
     const int numSamples = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
 
     // Audio thread: read the atomic target and set SmoothedValue here
-    outputGainSmoothed.setTargetValue(pendingOutputGainLinear.load(std::memory_order_acquire));
+    smoother.setTargetValue(pendingGainLinear.load(std::memory_order_acquire));
 
-    if (outputGainSmoothed.isSmoothing())
+    if (smoother.isSmoothing())
     {
         // Guard against hosts delivering blocks larger than prepareToPlay indicated
         const int rampSamples = std::min(numSamples, static_cast<int>(gainRampBuffer.size()));
 
         // Build the gain ramp once into the pre-allocated buffer
         for (int i = 0; i < rampSamples; ++i)
-            gainRampBuffer[static_cast<size_t>(i)] = outputGainSmoothed.getNextValue();
+            gainRampBuffer[static_cast<size_t>(i)] = smoother.getNextValue();
 
         // Apply the ramp to all channels using SIMD multiply
         const float* rampData = gainRampBuffer.data();
@@ -137,7 +103,7 @@ void GainProcessor::processOutputGain(juce::AudioBuffer<float>& buffer)
     }
     else
     {
-        float gain = outputGainSmoothed.getCurrentValue();
+        float gain = smoother.getCurrentValue();
         if (std::abs(gain - 1.0f) > 0.0001f)
         {
             buffer.applyGain(gain);

@@ -122,36 +122,6 @@ WaveformCapture::PeakSnapshot WaveformCapture::getSnapshot() const
     return snapshot;
 }
 
-std::vector<float> WaveformCapture::getPrePeaks() const
-{
-    std::vector<float> result(NUM_PEAKS);
-    size_t writeIdx = sharedWriteIndex.load(std::memory_order_acquire);
-
-    // Read from oldest to newest
-    for (size_t i = 0; i < NUM_PEAKS; ++i)
-    {
-        size_t readIdx = (writeIdx + i) % NUM_PEAKS;
-        result[i] = prePeaks[readIdx].load(std::memory_order_relaxed);
-    }
-
-    return result;
-}
-
-std::vector<float> WaveformCapture::getPostPeaks() const
-{
-    std::vector<float> result(NUM_PEAKS);
-    size_t writeIdx = sharedWriteIndex.load(std::memory_order_acquire);
-
-    // Read from oldest to newest — same index as pre
-    for (size_t i = 0; i < NUM_PEAKS; ++i)
-    {
-        size_t readIdx = (writeIdx + i) % NUM_PEAKS;
-        result[i] = postPeaks[readIdx].load(std::memory_order_relaxed);
-    }
-
-    return result;
-}
-
 void WaveformCapture::reset()
 {
     for (auto& p : prePeaks)

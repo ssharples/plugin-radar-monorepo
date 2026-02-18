@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Layers, GitBranch } from 'lucide-react';
 import type { GroupTemplateInfo } from '../../api/types';
 
@@ -8,7 +9,7 @@ interface GroupPresetCardProps {
   onMouseEnter: () => void;
 }
 
-export function GroupPresetCard({ template, isHighlighted, onInsert, onMouseEnter }: GroupPresetCardProps) {
+export const GroupPresetCard = memo(function GroupPresetCard({ template, isHighlighted, onInsert, onMouseEnter }: GroupPresetCardProps) {
   const isParallel = template.mode === 'parallel';
   const ModeIcon = isParallel ? GitBranch : Layers;
 
@@ -74,4 +75,4 @@ export function GroupPresetCard({ template, isHighlighted, onInsert, onMouseEnte
       </div>
     </button>
   );
-}
+});

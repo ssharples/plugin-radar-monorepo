@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Download, Star, GitFork, Eye } from 'lucide-react';
 import { AuthorAvatar } from './AuthorAvatar';
 import type { BrowseChainResult } from '../../api/types';
@@ -10,7 +11,7 @@ interface ChainCardProps {
   onAuthorClick?: (authorName: string) => void;
 }
 
-export function ChainCard({ chain, isHighlighted, onLoad, onMouseEnter, onAuthorClick }: ChainCardProps) {
+export const ChainCard = memo(function ChainCard({ chain, isHighlighted, onLoad, onMouseEnter, onAuthorClick }: ChainCardProps) {
   const rating = chain.averageRating ?? 0;
   const fullStars = Math.floor(rating);
   const hasHalf = rating - fullStars >= 0.5;
@@ -123,4 +124,4 @@ export function ChainCard({ chain, isHighlighted, onLoad, onMouseEnter, onAuthor
       )}
     </div>
   );
-}
+});

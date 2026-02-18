@@ -18,22 +18,30 @@ const ALL_SHORTCUTS: ShortcutHint[] = [
   { id: 'redo', keys: '\u2318\u21e7Z', description: 'Redo', category: 'editing' },
   { id: 'redo-alt', keys: '\u2318Y', description: 'Redo (alternate)', category: 'editing' },
   { id: 'delete', keys: '\u232b / Del', description: 'Remove selected plugin', category: 'editing' },
+  { id: 'bypass', keys: 'B', description: 'Toggle bypass on selected plugin', category: 'editing' },
+  { id: 'duplicate', keys: 'D', description: 'Duplicate selected plugin', category: 'editing' },
+  { id: 'save', keys: '\u2318S', description: 'Save chain', category: 'editing' },
 
   // Groups
   { id: 'serial-group', keys: '\u2318G', description: 'Create serial group', category: 'groups' },
   { id: 'parallel-group', keys: '\u2318\u21e7G', description: 'Create parallel group', category: 'groups' },
 
   // Snapshots
-  { id: 'snapshot-1', keys: '\u23181', description: 'Recall snapshot A', category: 'snapshots' },
-  { id: 'snapshot-2', keys: '\u23182', description: 'Recall snapshot B', category: 'snapshots' },
-  { id: 'snapshot-3', keys: '\u23183', description: 'Recall snapshot C', category: 'snapshots' },
-  { id: 'save-snapshot-1', keys: '\u2318\u21e71', description: 'Save snapshot A', category: 'snapshots' },
-  { id: 'save-snapshot-2', keys: '\u2318\u21e72', description: 'Save snapshot B', category: 'snapshots' },
-  { id: 'save-snapshot-3', keys: '\u2318\u21e73', description: 'Save snapshot C', category: 'snapshots' },
+  { id: 'snapshot-1', keys: '\u2318\u23251', description: 'Recall snapshot A', category: 'snapshots' },
+  { id: 'snapshot-2', keys: '\u2318\u23252', description: 'Recall snapshot B', category: 'snapshots' },
+  { id: 'snapshot-3', keys: '\u2318\u23253', description: 'Recall snapshot C', category: 'snapshots' },
+  { id: 'snapshot-4', keys: '\u2318\u23254', description: 'Recall snapshot D', category: 'snapshots' },
+  { id: 'save-snapshot-1', keys: '\u2318\u2325\u21e71', description: 'Save snapshot A', category: 'snapshots' },
+  { id: 'save-snapshot-2', keys: '\u2318\u2325\u21e72', description: 'Save snapshot B', category: 'snapshots' },
+  { id: 'save-snapshot-3', keys: '\u2318\u2325\u21e73', description: 'Save snapshot C', category: 'snapshots' },
+  { id: 'save-snapshot-4', keys: '\u2318\u2325\u21e74', description: 'Save snapshot D', category: 'snapshots' },
 
   // Navigation
   { id: 'focus-search', keys: '\u2318F', description: 'Focus plugin search', category: 'navigation' },
-  { id: 'plugin-browser', keys: '\u2318B', description: 'Open plugin browser', category: 'navigation' },
+  { id: 'plugin-jump', keys: '\u23181\u20139', description: 'Jump to plugin N (inline editor)', category: 'navigation' },
+  { id: 'arrow-up', keys: '\u2191', description: 'Select previous plugin', category: 'navigation' },
+  { id: 'arrow-down', keys: '\u2193', description: 'Select next plugin', category: 'navigation' },
+  { id: 'escape', keys: 'Esc', description: 'Close menu / deselect / exit editor', category: 'navigation' },
 
   // Global
   { id: 'shortcuts-help', keys: '?', description: 'Show keyboard shortcuts', category: 'global' },

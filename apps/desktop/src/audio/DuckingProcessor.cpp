@@ -99,13 +99,10 @@ void DuckingProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         else
             envelopeLevel = releaseCoeff * envelopeLevel + (1.0f - releaseCoeff) * scPeak;
 
-        // Calculate target gain: 1.0 - (envelope * duckAmount)
+        // Calculate gain: 1.0 - (envelope * duckAmount)
         float clampedEnv = juce::jlimit(0.0f, 1.0f, envelopeLevel);
-        float targetGain = 1.0f - (clampedEnv * amount);
-        targetGain = juce::jlimit(0.0f, 1.0f, targetGain);
-
-        smoothedGain.setTargetValue(targetGain);
-        float g = smoothedGain.getNextValue();
+        float g = 1.0f - (clampedEnv * amount);
+        g = juce::jlimit(0.0f, 1.0f, g);
 
         outL[i] = audioL[i] * g;
         outR[i] = audioR[i] * g;

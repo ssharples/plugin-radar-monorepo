@@ -41,10 +41,6 @@ public:
     // Thread-safe getters
     Readings getReadings() const;
 
-    // Configuration
-    void setPeakHoldTime(float seconds);    // Default: 1.5s
-    void setPeakDecayRate(float dbPerSec);  // Default: 20 dB/s
-
     // PHASE 2: Conditional metering (enable/disable LUFS calculation)
     void setEnableLUFS(bool enabled);
 

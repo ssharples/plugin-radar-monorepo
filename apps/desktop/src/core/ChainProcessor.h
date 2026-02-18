@@ -4,7 +4,6 @@
 #include "ChainNode.h"
 #include "PluginSlot.h"
 #include "PluginManager.h"
-#include "ParameterDiscovery.h"
 #include "../audio/PluginParameterWatcher.h"
 #include <vector>
 #include <memory>
@@ -98,7 +97,6 @@ public:
 
     // Slot control (flat API compat)
     void setSlotBypassed(int slotIndex, bool bypassed);
-    bool isSlotBypassed(int slotIndex) const;
 
     // Plugin UI (now keyed by node ID)
     void showPluginWindow(ChainNodeId nodeId);
@@ -148,7 +146,7 @@ public:
         float inputRmsL, inputRmsR;                                    // input RMS
         float latencyMs;                                               // latency in milliseconds
     };
-    std::vector<NodeMeterData> getNodeMeterReadings() const;
+    const std::vector<NodeMeterData>& getNodeMeterReadings() const;
     void resetAllNodePeaks();
 
     // Duplicate a plugin node (inserts copy right after the original)
@@ -245,6 +243,9 @@ private:
     bool tryRestoreCrashRecoveryState();
     void cleanupCrashRecoveryFile();
     void rebuildGraph();
+    void scheduleRebuild();  // Deferred rebuild — coalesces rapid changes into single rebuild
+    void beginBatch();       // Suspend processing and suppress rebuilds until endBatch()
+    void endBatch();         // Resume processing and perform single rebuild
     WireResult wireNode(ChainNode& node, NodeID audioIn);
     WireResult wireSerialGroup(ChainNode& node, NodeID audioIn);
     WireResult wireParallelGroup(ChainNode& node, NodeID audioIn);
@@ -340,9 +341,15 @@ private:
     // Thread safety: SpinLock protects the tree during mutations
     mutable juce::SpinLock treeLock;
 
-    // Audio-thread-busy flag — used by rebuildGraph() to spin-wait until
-    // the current audio callback finishes before modifying the graph.
+    // Audio-thread-busy flag — set by processBlock, cleared on exit.
     std::atomic<bool> audioThreadBusy{false};
+
+    // Deferred rebuild — coalesces rapid graph mutations into a single rebuild
+    std::atomic<bool> rebuildNeeded{false};
+    std::atomic<bool> rebuildScheduled{false};
+
+    // Batch API — suppresses individual rebuilds during multi-operation sequences
+    int batchDepth{0};  // Nesting counter (message thread only)
 
     // Set by the audio thread when any hosted plugin reports a latency change.
     // Polled by the message thread (WebViewBridge timer) to trigger graph rebuild.

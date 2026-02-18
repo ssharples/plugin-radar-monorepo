@@ -13,8 +13,8 @@ FFTProcessor::FFTProcessor()
     magnitudeLBufferB.fill(0.0f);
     magnitudeRBufferA.fill(0.0f);
     magnitudeRBufferB.fill(0.0f);
-    monoAverageBuffer.fill(0.0f);
 }
+
 
 void FFTProcessor::prepareToPlay(double sampleRate, int /*samplesPerBlock*/)
 {
@@ -34,7 +34,6 @@ void FFTProcessor::reset()
     magnitudeLBufferB.fill(0.0f);
     magnitudeRBufferA.fill(0.0f);
     magnitudeRBufferB.fill(0.0f);
-    monoAverageBuffer.fill(0.0f);
     activeReadBufferL.store(0, std::memory_order_relaxed);
     activeReadBufferR.store(0, std::memory_order_relaxed);
     newDataReady.store(false, std::memory_order_relaxed);
@@ -131,11 +130,4 @@ const std::array<float, FFTProcessor::numBins>& FFTProcessor::getMagnitudesR() c
     return (readBuf == 0) ? magnitudeRBufferA : magnitudeRBufferB;
 }
 
-const std::array<float, FFTProcessor::numBins>& FFTProcessor::getMagnitudes() const
-{
-    const auto& L = getMagnitudesL();
-    const auto& R = getMagnitudesR();
-    for (int i = 0; i < numBins; ++i)
-        monoAverageBuffer[i] = (L[i] + R[i]) * 0.5f;
-    return monoAverageBuffer;
-}
+

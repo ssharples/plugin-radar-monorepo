@@ -33,15 +33,13 @@ void DryWetMixProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     if (numChannels < 4)
     {
         // Fallback passthrough — don't silently produce silence
-        DBG("DryWetMixProcessor: expected 4 channels, got " + juce::String(numChannels));
-        jassert(false);
+        jassertfalse;
         return;
     }
 
     if (numSamples <= 0 || numSamples > 8192)
     {
-        DBG("DryWetMixProcessor: invalid buffer size " + juce::String(numSamples));
-        jassert(false);
+        jassertfalse;
         return;
     }
 

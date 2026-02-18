@@ -46,28 +46,4 @@ namespace PlatformPaths
 #endif
     }
 
-    inline juce::StringArray getDefaultVST3Paths()
-    {
-        juce::StringArray paths;
-#if JUCE_MAC
-        paths.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-            .getChildFile("Library/Audio/Plug-Ins/VST3").getFullPathName());
-        paths.add("/Library/Audio/Plug-Ins/VST3");
-#elif JUCE_WINDOWS
-        paths.add("C:\\Program Files\\Common Files\\VST3");
-        paths.add("C:\\Program Files (x86)\\Common Files\\VST3");
-#endif
-        return paths;
-    }
-
-    inline juce::StringArray getDefaultAUPaths()
-    {
-        juce::StringArray paths;
-#if JUCE_MAC
-        paths.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-            .getChildFile("Library/Audio/Plug-Ins/Components").getFullPathName());
-        paths.add("/Library/Audio/Plug-Ins/Components");
-#endif
-        return paths;
-    }
 }

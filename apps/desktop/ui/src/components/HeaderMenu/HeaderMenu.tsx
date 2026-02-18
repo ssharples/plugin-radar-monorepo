@@ -63,6 +63,13 @@ export function HeaderMenu() {
     return () => window.removeEventListener('sharePreset', handler);
   }, [loadPreset, setChainName]);
 
+  // Handle Cmd+S save shortcut from useChainEditorShortcuts
+  useEffect(() => {
+    const handler = () => setActive('save');
+    window.addEventListener('showSaveDropdown', handler);
+    return () => window.removeEventListener('showSaveDropdown', handler);
+  }, []);
+
   // Close on Escape (component priority)
   useEffect(() => {
     const registerShortcut = useKeyboardStore.getState().registerShortcut;

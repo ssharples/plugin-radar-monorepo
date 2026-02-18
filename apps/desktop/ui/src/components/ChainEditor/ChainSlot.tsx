@@ -526,11 +526,20 @@ export const ChainSlot = memo(function ChainSlot({
           height: 42,
           background: 'rgba(15, 15, 15, 0.95)',
           borderRadius: 6,
-          border: `1px solid ${isEditorOpen ? 'rgba(222, 255, 10, 0.25)' : isHovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
+          border: `1px solid ${
+            bypassed
+              ? 'rgba(255, 255, 255, 0.03)'
+              : isEditorOpen
+                ? 'rgba(222, 255, 10, 0.25)'
+                : isHovered
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'rgba(255,255,255,0.06)'
+          }`,
           boxShadow: isEditorOpen
             ? '0 0 12px rgba(222, 255, 10, 0.1), inset 0 1px 0 rgba(255,255,255,0.08)'
             : 'inset 0 1px 0 rgba(255,255,255,0.06)',
-          transition: 'border-color 150ms ease, box-shadow 150ms ease',
+          opacity: bypassed ? 0.5 : 1,
+          transition: 'border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease',
         }}
       >
         {/* Left side panel — slot number */}
@@ -564,7 +573,7 @@ export const ChainSlot = memo(function ChainSlot({
 
           {/* Plugin name */}
           <div
-            className={`absolute flex items-center justify-center text-white capitalize px-3 ${bypassed ? 'opacity-40' : ''}`}
+            className="absolute flex items-center justify-center text-white capitalize px-3"
             style={{
               left: 20,
               top: 9,
@@ -586,7 +595,7 @@ export const ChainSlot = memo(function ChainSlot({
           <div className="absolute flex items-center gap-1" style={{ left: 200, top: 13 }}>
             {/* Meter bar container */}
             <div
-              className={`relative overflow-hidden ${bypassed ? 'opacity-40' : ''} ${isProcessing ? 'meter-processing' : ''}`}
+              className={`relative overflow-hidden ${isProcessing ? 'meter-processing' : ''}`}
               style={{
                 width: 60,
                 height: 16,
@@ -630,7 +639,7 @@ export const ChainSlot = memo(function ChainSlot({
             {/* Peak dB value */}
             <button
               ref={outputPeakElRef}
-              className={`font-sans lowercase text-white hover:text-plugin-accent transition-colors cursor-pointer text-[11px] min-w-[32px] text-right ${bypassed ? 'opacity-40' : ''}`}
+              className="font-sans lowercase text-white hover:text-plugin-accent transition-colors cursor-pointer text-[11px] min-w-[32px] text-right"
               onClick={resetOutputPeak}
               onPointerDown={(e) => e.stopPropagation()}
               title="Click to reset all peak meters"
@@ -653,9 +662,49 @@ export const ChainSlot = memo(function ChainSlot({
           {/* Latency display */}
           {meterData?.latencyMs !== undefined && meterData.latencyMs > 0.1 && (
             <div className="absolute" style={{ left: 305, top: 16 }}>
-              <span className={`font-sans text-[10px] text-white ${bypassed ? 'opacity-40' : ''}`}>
+              <span className="font-sans text-[10px] text-white">
                 {meterData.latencyMs.toFixed(1)}ms
               </span>
+            </div>
+          )}
+
+          {/* Persistent state indicators — always visible when active (like console LEDs) */}
+          {!isHovered && !isSelected && (isSoloed || isMuted) && (
+            <div className="absolute flex flex-row gap-[3px]" style={{ right: 32, top: 15 }}>
+              {isSoloed && (
+                <div
+                  className="flex items-center justify-center rounded-[2px]"
+                  style={{
+                    width: 14,
+                    height: 12,
+                    background: '#c9944a',
+                    fontSize: 8,
+                    fontWeight: 800,
+                    color: '#000',
+                    lineHeight: '12px',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  S
+                </div>
+              )}
+              {isMuted && (
+                <div
+                  className="flex items-center justify-center rounded-[2px]"
+                  style={{
+                    width: 14,
+                    height: 12,
+                    background: '#dc2626',
+                    fontSize: 8,
+                    fontWeight: 800,
+                    color: '#000',
+                    lineHeight: '12px',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  M
+                </div>
+              )}
             </div>
           )}
 
@@ -744,7 +793,7 @@ export const ChainSlot = memo(function ChainSlot({
 
           {/* Bypass/power icon (10×12px) */}
           <button
-            className={`absolute transition-opacity ${bypassed ? 'opacity-100 brightness-150' : 'opacity-60 hover:opacity-100'}`}
+            className={`absolute transition-opacity ${bypassed ? 'brightness-150' : 'opacity-60 hover:opacity-100'}`}
             style={{ left: 420, top: 15, width: 10, height: 12 }}
             onClick={handleBypass}
             onPointerDown={(e) => e.stopPropagation()}

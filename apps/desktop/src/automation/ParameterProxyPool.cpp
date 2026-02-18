@@ -53,43 +53,57 @@ void ParameterProxyPool::rebindAll(ChainProcessor& chain)
     auto plugins = chain.getFlatPluginList();
     int numPlugins = static_cast<int>(plugins.size());
 
-    for (int i = 0; i < kMaxSlots; ++i)
+    if (numPlugins > kMaxSlots)
     {
-        if (i < numPlugins)
+        PCLOG("WARNING: chain has " + juce::String(numPlugins)
+              + " plugins but only " + juce::String(kMaxSlots)
+              + " automation slots — plugins beyond slot "
+              + juce::String(kMaxSlots - 1) + " will not be automatable");
+    }
+
+    int previousMax = maxBoundSlot;
+    int newMax = 0;
+
+    for (int i = 0; i < juce::jmin(numPlugins, kMaxSlots); ++i)
+    {
+        auto& leaf = *plugins[static_cast<size_t>(i)];
+        if (auto node = chain.getNodeForId(leaf.graphNodeId))
         {
-            auto& leaf = *plugins[static_cast<size_t>(i)];
-            if (auto node = chain.getNodeForId(leaf.graphNodeId))
+            juce::AudioProcessor* processor = nullptr;
+            if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(node->getProcessor()))
             {
-                juce::AudioProcessor* processor = nullptr;
-                if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(node->getProcessor()))
-                {
-                    processor = wrapper->getWrappedPlugin();
-                }
-                else
-                {
-                    processor = node->getProcessor();
-                }
-
-                if (processor == nullptr)
-                {
-                    PCLOG("WARNING: rebindAll slot " + juce::String(i)
-                          + " — processor is null for " + leaf.description.name);
-                }
-
-                bindSlot(i, processor);
+                processor = wrapper->getWrappedPlugin();
             }
             else
             {
-                PCLOG("WARNING: rebindAll slot " + juce::String(i)
-                      + " — graph node not found for nodeId=" + juce::String(leaf.graphNodeId.uid));
-                unbindSlot(i);
+                processor = node->getProcessor();
             }
+
+            if (processor == nullptr)
+            {
+                PCLOG("WARNING: rebindAll slot " + juce::String(i)
+                      + " — processor is null for " + leaf.description.name);
+            }
+
+            bindSlot(i, processor);
+            newMax = i + 1;
         }
         else
         {
+            PCLOG("WARNING: rebindAll slot " + juce::String(i)
+                  + " — graph node not found for nodeId=" + juce::String(leaf.graphNodeId.uid));
             unbindSlot(i);
         }
     }
+
+    // Only unbind slots that were previously bound but are no longer needed
+    int unbindLimit = juce::jmax(previousMax, kMaxSlots);
+    for (int i = juce::jmin(numPlugins, kMaxSlots); i < unbindLimit; ++i)
+    {
+        unbindSlot(i);
+    }
+
+    maxBoundSlot = newMax;
 
     PCLOG("rebindAll — done (" + juce::String(numPlugins) + " plugins)");
 }

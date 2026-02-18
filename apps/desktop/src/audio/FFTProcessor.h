@@ -15,7 +15,7 @@
  *
  * Thread safety:
  * - process() is called from the audio thread only
- * - getMagnitudesL/R/getMagnitudes() are safe to call from any thread (UI timer callback)
+ * - getMagnitudesL/R() are safe to call from any thread (UI timer callback)
  * - prepareToPlay()/reset() are called from the message thread before audio starts
  */
 class FFTProcessor
@@ -46,12 +46,6 @@ public:
      */
     const std::array<float, numBins>& getMagnitudesR() const;
 
-    /**
-     * Backward-compatible mono getter. Returns average of L and R channels.
-     * Copies into an internal buffer, so slightly less efficient than L/R getters.
-     */
-    const std::array<float, numBins>& getMagnitudes() const;
-
     /** Returns the number of output bins (numBins = fftSize/2). */
     int getNumBins() const { return numBins; }
 
@@ -59,7 +53,7 @@ public:
     double getSampleRate() const { return currentSampleRate; }
 
     /** Enable/disable FFT processing. When disabled, process() returns immediately
-     *  and getMagnitudes() returns the last computed frame (frozen spectrum). */
+     *  and getMagnitudesL/R() return the last computed frame (frozen spectrum). */
     void setEnabled(bool e) { enabled.store(e, std::memory_order_relaxed); }
     bool isEnabled() const { return enabled.load(std::memory_order_relaxed); }
 
@@ -92,9 +86,6 @@ private:
     std::array<float, numBins> magnitudeRBufferA;
     std::array<float, numBins> magnitudeRBufferB;
     std::atomic<int> activeReadBufferR{0};
-
-    // Mono average buffer (for backward compat getMagnitudes())
-    mutable std::array<float, numBins> monoAverageBuffer;
 
     // Flag: set by audio thread when new data is written
     std::atomic<bool> newDataReady{false};

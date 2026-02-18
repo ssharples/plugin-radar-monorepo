@@ -40,9 +40,10 @@ void ProxyParameter::unbind()
 {
     auto* prev = target.exchange(nullptr, std::memory_order_acq_rel);
     if (prev != nullptr)
+    {
         prev->removeListener(this);
-
-    sendValueChangedMessageToListeners(0.0f);
+        sendValueChangedMessageToListeners(0.0f);
+    }
 }
 
 float ProxyParameter::getValue() const
@@ -114,7 +115,7 @@ float ProxyParameter::getValueForText(const juce::String& text) const
 bool ProxyParameter::isAutomatable() const
 {
     auto* t = target.load(std::memory_order_acquire);
-    return t != nullptr ? t->isAutomatable() : true;
+    return t != nullptr ? t->isAutomatable() : false;
 }
 
 bool ProxyParameter::isMetaParameter() const

@@ -205,6 +205,7 @@ private:
     InstanceId instanceId = -1;
     MirrorManager* mirrorManager = nullptr;
     bool waveformStreamActive = false;
+    std::atomic<bool> nodeMetersEnabled{true};
     std::atomic<bool> matchLockEnabled{false};
     std::atomic<float> matchLockReferenceOffset{0.0f};  // Target offset in dB, captured on enable
     std::atomic<int> matchLockStuckCounter{0};           // Frames at gain limit
