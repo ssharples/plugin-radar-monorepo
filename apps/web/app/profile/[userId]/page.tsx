@@ -6,6 +6,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/components/auth-provider";
 import { UserAvatar } from "@/components/social/UserAvatar";
 import { FollowButton } from "@/components/social/FollowButton";
+import { FriendButton } from "@/components/social/FriendButton";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -16,9 +17,12 @@ import {
   Eye,
   Users,
   User,
+  Cpu,
+  LockKey,
+  Intersect,
 } from "@phosphor-icons/react";
 
-type Tab = "chains" | "followers" | "following";
+type Tab = "chains" | "library" | "stats" | "followers" | "following" | "common";
 
 export default function ProfilePage() {
   const params = useParams();
@@ -32,6 +36,13 @@ export default function ProfilePage() {
     api.social.isFollowing,
     isAuthenticated && sessionToken && currentUser?._id !== userId
       ? { sessionToken, userId }
+      : "skip"
+  );
+
+  const friendshipStatus = useQuery(
+    api.friends.getFriendshipStatus,
+    isAuthenticated && sessionToken && currentUser?._id !== userId
+      ? { sessionToken, targetUserId: userId }
       : "skip"
   );
 
@@ -82,6 +93,11 @@ export default function ProfilePage() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "chains", label: "Chains" },
+    { key: "library", label: "Plugins" },
+    ...(isAuthenticated && !isOwnProfile
+      ? [{ key: "common" as const, label: "In Common" }]
+      : []),
+    { key: "stats", label: "Stats" },
     { key: "followers", label: "Followers" },
     { key: "following", label: "Following" },
   ];
@@ -108,11 +124,10 @@ export default function ProfilePage() {
                   {profileUser.name || "Anonymous"}
                 </h1>
                 <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    profileUser.tier === "premium"
-                      ? "bg-white text-black"
-                      : "bg-stone-700 text-stone-300"
-                  }`}
+                  className={`px-2 py-0.5 rounded text-xs font-medium ${profileUser.tier === "premium"
+                    ? "bg-white text-black"
+                    : "bg-stone-700 text-stone-300"
+                    }`}
                 >
                   {profileUser.tier === "premium" ? "Premium" : "Free"}
                 </span>
@@ -125,13 +140,24 @@ export default function ProfilePage() {
                 })}
               </p>
             </div>
-            {isAuthenticated && !isOwnProfile && isFollowingUser !== undefined && (
-              <FollowButton
-                isFollowing={isFollowingUser}
-                onFollow={handleFollow}
-                onUnfollow={handleUnfollow}
-                loading={isFollowingUser === undefined}
-              />
+            {isAuthenticated && !isOwnProfile && (
+              <div className="flex gap-2">
+                {isFollowingUser !== undefined && (
+                  <FollowButton
+                    isFollowing={isFollowingUser}
+                    onFollow={handleFollow}
+                    onUnfollow={handleUnfollow}
+                    loading={isFollowingUser === undefined}
+                  />
+                )}
+                {friendshipStatus && sessionToken && (
+                  <FriendButton
+                    friendshipStatus={friendshipStatus}
+                    targetUserId={userId}
+                    sessionToken={sessionToken}
+                  />
+                )}
+              </div>
             )}
           </div>
 
@@ -168,16 +194,15 @@ export default function ProfilePage() {
         </div>
 
         {/* Tab navigation */}
-        <div className="flex gap-4 border-b border-white/[0.06] mb-8">
+        <div className="flex gap-4 border-b border-white/[0.06] mb-8 overflow-x-auto pb-1">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`pb-3 text-sm font-medium transition ${
-                activeTab === tab.key
-                  ? "text-[#deff0a] border-b-2 border-[#deff0a]"
-                  : "text-stone-400 hover:text-stone-200"
-              }`}
+              className={`pb-3 text-sm font-medium transition whitespace-nowrap ${activeTab === tab.key
+                ? "text-[#deff0a] border-b-2 border-[#deff0a]"
+                : "text-stone-400 hover:text-stone-200"
+                }`}
             >
               {tab.label}
             </button>
@@ -188,6 +213,9 @@ export default function ProfilePage() {
         {activeTab === "chains" && (
           <ChainsTab userId={userId} sessionToken={sessionToken} />
         )}
+        {activeTab === "library" && <LibraryTab userId={userId} sessionToken={sessionToken} />}
+        {activeTab === "common" && <CommonPluginsTab userId={userId} sessionToken={sessionToken} />}
+        {activeTab === "stats" && <StatsTab userId={userId} sessionToken={sessionToken} />}
         {activeTab === "followers" && <FollowersTab userId={userId} />}
         {activeTab === "following" && <FollowingTab userId={userId} />}
       </div>
@@ -247,7 +275,7 @@ function ChainsTab({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {chains.map((chain) => (
+      {chains.map((chain: any) => (
         <Link
           key={chain._id}
           href={`/chains/${chain.slug}`}
@@ -325,7 +353,7 @@ function FollowersTab({ userId }: { userId: Id<"users"> }) {
 
   return (
     <div className="space-y-2">
-      {followers.filter(Boolean).map((follower) => (
+      {followers.filter(Boolean).map((follower: any) => (
         <Link
           key={follower!._id}
           href={`/profile/${follower!._id}`}
@@ -384,7 +412,7 @@ function FollowingTab({ userId }: { userId: Id<"users"> }) {
 
   return (
     <div className="space-y-2">
-      {following.filter(Boolean).map((user) => (
+      {following.filter(Boolean).map((user: any) => (
         <Link
           key={user!._id}
           href={`/profile/${user!._id}`}
@@ -399,6 +427,275 @@ function FollowingTab({ userId }: { userId: Id<"users"> }) {
             {user!.name || "User"}
           </span>
         </Link>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
+// Library Tab
+// ============================================
+
+function LibraryTab({
+  userId,
+  sessionToken,
+}: {
+  userId: Id<"users">;
+  sessionToken: string | null;
+}) {
+  const ownedPlugins = useQuery(api.userProfiles.getProfileOwnedPlugins, {
+    userId,
+    sessionToken: sessionToken ?? undefined,
+  });
+
+  if (ownedPlugins === undefined) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="animate-pulse flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+            <div className="w-12 h-12 bg-white/[0.04] rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-white/[0.04] rounded w-32" />
+              <div className="h-3 bg-white/[0.04] rounded w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Handle Private State
+  if (ownedPlugins === null) {
+    return (
+      <div className="text-center py-16">
+        <LockKey className="w-12 h-12 text-stone-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-stone-100 mb-2">Private Library</h3>
+        <p className="text-stone-400">This user has chosen not to display their owned plugins.</p>
+      </div>
+    );
+  }
+
+  if (ownedPlugins.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <Cpu className="w-12 h-12 text-stone-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-stone-100 mb-2">No plugins to display</h3>
+        <p className="text-stone-400">This user hasn&apos;t synced any plugins yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {ownedPlugins.map((item) => (
+        <Link
+          key={item._id}
+          href={`/plugins/${item.pluginData?.slug}`}
+          className="flex items-center gap-4 p-4 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] rounded-xl transition group"
+        >
+          {item.pluginData?.imageUrl ? (
+            <img
+              src={item.pluginData.imageUrl}
+              alt={item.pluginData.name}
+              className="w-12 h-12 object-cover rounded-lg group-hover:scale-105 transition duration-300 pointer-events-none"
+            />
+          ) : (
+            <div className="w-12 h-12 bg-white/[0.05] rounded-lg flex items-center justify-center">
+              <Cpu className="w-6 h-6 text-stone-500" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h3 className="text-stone-100 font-semibold group-hover:text-[#deff0a] transition truncate">
+              {item.pluginData?.name}
+            </h3>
+            <p className="text-stone-500 text-sm truncate">
+              {item.pluginData?.manufacturer || "Unknown"}
+            </p>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
+// Common Plugins Tab
+// ============================================
+
+function CommonPluginsTab({
+  userId,
+  sessionToken,
+}: {
+  userId: Id<"users">;
+  sessionToken: string | null;
+}) {
+  const commonData = useQuery(
+    api.userProfiles.getCommonPlugins,
+    sessionToken ? { sessionToken, targetUserId: userId } : "skip"
+  );
+
+  if (commonData === undefined) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="animate-pulse flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+            <div className="w-12 h-12 bg-white/[0.04] rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-white/[0.04] rounded w-32" />
+              <div className="h-3 bg-white/[0.04] rounded w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (commonData === null) {
+    return null;
+  }
+
+  if ("private" in commonData && commonData.private) {
+    return (
+      <div className="text-center py-16">
+        <LockKey className="w-12 h-12 text-stone-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-stone-100 mb-2">Private Library</h3>
+        <p className="text-stone-400">This user has chosen not to display their owned plugins.</p>
+      </div>
+    );
+  }
+
+  const plugins = "commonPlugins" in commonData ? commonData.commonPlugins : [];
+  const theirTotal = "theirTotal" in commonData ? commonData.theirTotal : 0;
+
+  if (plugins.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <Intersect className="w-12 h-12 text-stone-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-stone-100 mb-2">No plugins in common</h3>
+        <p className="text-stone-400">You don&apos;t share any plugins with this user yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="glass-card rounded-xl p-4 mb-6">
+        <p className="text-sm text-stone-300">
+          <span className="text-[#deff0a] font-semibold">{plugins.length}</span> plugins in common
+          out of <span className="font-medium text-stone-200">{theirTotal}</span> in their library
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {plugins.map((plugin: any) => (
+          <Link
+            key={plugin.pluginId}
+            href={`/plugins/${plugin.slug}`}
+            className="flex items-center gap-4 p-4 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] rounded-xl transition group"
+          >
+            {plugin.imageUrl ? (
+              <img
+                src={plugin.imageUrl}
+                alt={plugin.name}
+                className="w-12 h-12 object-cover rounded-lg group-hover:scale-105 transition duration-300 pointer-events-none"
+              />
+            ) : (
+              <div className="w-12 h-12 bg-white/[0.05] rounded-lg flex items-center justify-center">
+                <Cpu className="w-6 h-6 text-stone-500" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-stone-100 font-semibold group-hover:text-[#deff0a] transition truncate">
+                {plugin.name}
+              </h3>
+              <p className="text-stone-500 text-sm truncate">
+                {plugin.manufacturer || "Unknown"}
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Stats Tab
+// ============================================
+
+function StatsTab({
+  userId,
+  sessionToken,
+}: {
+  userId: Id<"users">;
+  sessionToken: string | null;
+}) {
+  const topPlugins = useQuery(api.userProfiles.getProfileTopPlugins, {
+    userId,
+    sessionToken: sessionToken ?? undefined,
+    limit: 10,
+  });
+
+  if (topPlugins === undefined) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="animate-pulse bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 flex justify-between items-center">
+            <div className="space-y-2">
+              <div className="h-4 bg-white/[0.04] rounded w-40" />
+              <div className="h-3 bg-white/[0.04] rounded w-24" />
+            </div>
+            <div className="h-6 bg-white/[0.04] rounded w-16" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Handle Private State
+  if (topPlugins === null) {
+    return (
+      <div className="text-center py-16">
+        <LockKey className="w-12 h-12 text-stone-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-stone-100 mb-2">Private Stats</h3>
+        <p className="text-stone-400">This user has chosen not to display their plugin statistics.</p>
+      </div>
+    );
+  }
+
+  if (topPlugins.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <Cpu className="w-12 h-12 text-stone-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-stone-100 mb-2">No usage data</h3>
+        <p className="text-stone-400">This user hasn&apos;t generated any plugin usage stats yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {topPlugins.map((stat, idx) => (
+        <div
+          key={stat._id}
+          className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/[0.05] rounded-xl"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-8 h-8 rounded-full bg-white/[0.05] flex items-center justify-center font-mono text-sm text-stone-400 font-bold border border-white/[0.06]">
+              #{idx + 1}
+            </div>
+            <div>
+              <h3 className="text-stone-100 font-semibold">{stat.pluginName}</h3>
+              <p className="text-stone-500 text-sm">
+                {stat.manufacturer} {stat.category ? `• ${stat.category}` : ""}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[#deff0a] font-bold font-mono text-lg">{stat.loadCount}</div>
+            <div className="text-stone-500 text-[10px] sm:text-xs uppercase tracking-wider">Loads</div>
+          </div>
+        </div>
       ))}
     </div>
   );

@@ -17,6 +17,7 @@ import {
   XCircle,
   BookmarkSimple,
   CaretDown,
+  UserCirclePlus,
 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { StarRating } from "@/components/social/StarRating";
@@ -25,6 +26,7 @@ import type { Comment } from "@/components/social/CommentSection";
 import { FollowButton } from "@/components/social/FollowButton";
 import { ForkButton } from "@/components/social/ForkButton";
 import { UserAvatar } from "@/components/social/UserAvatar";
+import { SendChainModal } from "@/components/social/SendChainModal";
 
 interface ChainDetailClientProps {
   slug: string;
@@ -88,6 +90,7 @@ export default function ChainDetailClient({
   const [isDownloading, setIsDownloading] = useState(false);
   const [inCollection, setInCollection] = useState(false);
   const [addingToCollection, setAddingToCollection] = useState(false);
+  const [sendModalOpen, setSendModalOpen] = useState(false);
 
   if (chain === undefined) {
     return <ChainSkeleton />;
@@ -418,6 +421,17 @@ export default function ChainDetailClient({
               />
             )}
 
+            {/* Send to friend */}
+            {isAuthenticated && !isOwnChain && (
+              <button
+                onClick={() => setSendModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-xl transition text-sm border border-white/[0.06]"
+              >
+                <UserCirclePlus className="w-4 h-4" />
+                Send to Friend
+              </button>
+            )}
+
             {/* Share code */}
             <div className="glass-card rounded-xl p-3">
               <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Share Code</p>
@@ -487,6 +501,14 @@ export default function ChainDetailClient({
           />
         </section>
       </div>
+
+      {/* Send to friend modal */}
+      <SendChainModal
+        isOpen={sendModalOpen}
+        onClose={() => setSendModalOpen(false)}
+        preSelectedChainId={chain._id}
+        preSelectedChainName={chain.name}
+      />
     </div>
   );
 }

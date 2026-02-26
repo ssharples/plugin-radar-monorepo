@@ -5,14 +5,16 @@ import Link from "next/link";
 import { useAuth } from "./auth-provider";
 import {
   User,
+  Users,
   SignOut,
   LinkSimple,
   DownloadSimple,
   Gear,
+  Shield,
 } from "@phosphor-icons/react";
 
 export function AvatarDropdown() {
-  const { user, isAuthenticated, isLoading, login, register, logout } =
+  const { user, isAuthenticated, isAdmin, isLoading, login, register, logout } =
     useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -62,6 +64,7 @@ export function AvatarDropdown() {
           {isAuthenticated ? (
             <LoggedInMenu
               user={user}
+              isAdmin={isAdmin}
               onLogout={() => {
                 logout();
                 setOpen(false);
@@ -84,10 +87,12 @@ export function AvatarDropdown() {
 
 function LoggedInMenu({
   user,
+  isAdmin,
   onLogout,
   onClose,
 }: {
   user: any;
+  isAdmin: boolean;
   onLogout: () => void;
   onClose: () => void;
 }) {
@@ -103,10 +108,24 @@ function LoggedInMenu({
 
       {/* Links */}
       <div className="py-1">
+        {isAdmin && (
+          <DropdownLink
+            href="/admin"
+            icon={<Shield className="w-4 h-4" />}
+            label="Admin Dashboard"
+            onClick={onClose}
+          />
+        )}
         <DropdownLink
           href="/chains"
           icon={<LinkSimple className="w-4 h-4" />}
           label="My Chains"
+          onClick={onClose}
+        />
+        <DropdownLink
+          href="/friends"
+          icon={<Users className="w-4 h-4" />}
+          label="Friends"
           onClick={onClose}
         />
         <DropdownLink

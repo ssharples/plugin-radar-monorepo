@@ -321,6 +321,70 @@ export const getFriends = query({
 });
 
 /**
+ * Get the friendship status between the authenticated user and a target user.
+ * Used by the profile page to render the correct friend action button.
+ */
+export const getFriendshipStatus = query({
+  args: {
+    sessionToken: v.string(),
+    targetUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    if (userId === args.targetUserId) {
+      return { status: "self" as const };
+    }
+
+    // Check outgoing (user → target)
+    const outgoing = await ctx.db
+      .query("friends")
+      .withIndex("by_user_and_friend", (q) =>
+        q.eq("userId", userId).eq("friendId", args.targetUserId)
+      )
+      .first();
+
+    if (outgoing) {
+      if (outgoing.status === "accepted") {
+        return { status: "accepted" as const };
+      }
+      if (outgoing.status === "pending") {
+        return { status: "pending" as const, direction: "outgoing" as const };
+      }
+      if (outgoing.status === "blocked") {
+        return { status: "blocked" as const };
+      }
+    }
+
+    // Check incoming (target → user)
+    const incoming = await ctx.db
+      .query("friends")
+      .withIndex("by_user_and_friend", (q) =>
+        q.eq("userId", args.targetUserId).eq("friendId", userId)
+      )
+      .first();
+
+    if (incoming) {
+      if (incoming.status === "accepted") {
+        return { status: "accepted" as const };
+      }
+      if (incoming.status === "pending") {
+        return {
+          status: "pending" as const,
+          direction: "incoming" as const,
+          requestId: incoming._id,
+        };
+      }
+      if (incoming.status === "blocked") {
+        return { status: "none" as const };
+      }
+    }
+
+    return { status: "none" as const };
+  },
+});
+
+/**
  * Get incoming pending friend requests with sender profiles.
  */
 export const getPendingRequests = query({
