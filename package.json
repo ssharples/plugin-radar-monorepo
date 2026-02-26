@@ -10,17 +10,24 @@
     "dev:convex": "npx convex dev",
     "deploy": "npx convex deploy",
     "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
     "build:web": "pnpm --filter web build",
     "dev:desktop-ui": "pnpm --filter desktop-ui dev",
     "build:desktop-ui": "pnpm --filter desktop-ui build",
     "install:all": "pnpm install"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.45",
+    "@ai-sdk/deepseek": "^2.0.20",
     "@anthropic-ai/claude-agent-sdk": "^0.2.39",
+    "@convex-dev/stripe": "^0.1.3",
+    "ai": "^6.0.91",
     "convex": "^1.31.7",
-    "exa-js": "^2.3.0"
+    "exa-js": "^2.3.0",
+    "stripe": "^20.3.1"
   },
   "devDependencies": {
+    "@types/node": "^20",
     "typescript": "^5"
   },
   "engines": {
