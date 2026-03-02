@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import { User, SignOut, LinkSimple, DownloadSimple, Shield } from "@phosphor-icons/react";
@@ -17,6 +17,11 @@ export default function AccountPage() {
   const [error, setError] = useState("");
 
   const updatePreferences = useMutation(api.users.updatePreferences);
+  const upsertProfile = useMutation(api.userProfiles.upsertProfile);
+  const userProfile = useQuery(
+    api.userProfiles.getProfile,
+    isAuthenticated && user ? { sessionToken: localStorage.getItem("pluginradar_session") || "" } : "skip"
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +74,7 @@ export default function AccountPage() {
               <p className="text-stone-400">
                 {mode === "login"
                   ? "Sign in to share plugin chains, browse community presets, and download ProChain."
-                  : "Join Plugin Radar to discover and share plugin chains. Free during open beta."}
+                  : "Join Plugin Radar to discover and share plugin chains."}
               </p>
             </div>
 
@@ -126,8 +131,8 @@ export default function AccountPage() {
                 {isSubmitting
                   ? "Loading..."
                   : mode === "login"
-                  ? "Sign In"
-                  : "Create Account"}
+                    ? "Sign In"
+                    : "Create Account"}
               </button>
 
               {mode === "login" && (
@@ -215,8 +220,14 @@ export default function AccountPage() {
                 </span>
               </div>
               <div className="flex justify-between text-stone-400">
-                <span>Plan</span>
-                <span className="text-[#deff0a]">Free (open beta)</span>
+                <span>License</span>
+                {user?.hasPurchased ? (
+                  <span className="text-[#deff0a]">Active</span>
+                ) : (
+                  <Link href="/pricing" className="text-stone-300 hover:text-[#deff0a] transition">
+                    Buy ProChain — $50
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -292,6 +303,72 @@ export default function AccountPage() {
               </div>
             </div>
           </div>
+
+          {/* Privacy Settings */}
+          {userProfile && (
+            <div className="glass-card rounded-xl p-6">
+              <h3 className="font-semibold text-stone-100 mb-4">Privacy</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-stone-300 font-medium text-sm">Show Owned Plugins</label>
+                    <p className="text-xs text-stone-500 mt-0.5">Allow others to see the plugins in your library.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={userProfile.showOwnedPlugins !== false}
+                      onChange={(e) => {
+                        const token = localStorage.getItem("pluginradar_session");
+                        if (user && token) {
+                          upsertProfile({
+                            sessionToken: token,
+                            username: userProfile.username,
+                            email: userProfile.email,
+                            phoneNumber: userProfile.phoneNumber,
+                            instagramHandle: userProfile.instagramHandle,
+                            showOwnedPlugins: e.target.checked,
+                            showPluginStats: userProfile.showPluginStats !== false,
+                          });
+                        }
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-white/[0.1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#deff0a]"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-stone-300 font-medium text-sm">Show Plugin Stats</label>
+                    <p className="text-xs text-stone-500 mt-0.5">Let others see which plugins you use the most.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={userProfile.showPluginStats !== false}
+                      onChange={(e) => {
+                        const token = localStorage.getItem("pluginradar_session");
+                        if (user && token) {
+                          upsertProfile({
+                            sessionToken: token,
+                            username: userProfile.username,
+                            email: userProfile.email,
+                            phoneNumber: userProfile.phoneNumber,
+                            instagramHandle: userProfile.instagramHandle,
+                            showOwnedPlugins: userProfile.showOwnedPlugins !== false,
+                            showPluginStats: e.target.checked,
+                          });
+                        }
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-white/[0.1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#deff0a]"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

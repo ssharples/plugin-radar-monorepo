@@ -8,6 +8,7 @@ const navLinks = [
   { href: "/chains", label: "Chains" },
   { href: "/plugins", label: "Plugins" },
   { href: "/learn", label: "Learn" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/download", label: "Download" },
   { href: "/about", label: "About" },
 ];
@@ -54,7 +55,7 @@ export function Navigation() {
               href="/download"
               className="neon-button px-5 py-2 rounded-lg text-sm font-bold hidden sm:inline-flex"
             >
-              Download Free
+              Buy — $50
             </a>
 
             {/* Avatar / Auth */}
@@ -98,7 +99,7 @@ export function Navigation() {
               href="/download"
               className="neon-button px-5 py-2.5 rounded-lg text-sm font-bold text-center mt-2"
             >
-              Download Free
+              Buy — $50
             </a>
           </nav>
         </div>

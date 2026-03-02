@@ -9,7 +9,7 @@ export default function DownloadPage() {
         Download ProChain
       </h1>
       <p className="text-neutral-400 text-sm mb-12">
-        Free during open beta. Build, share, and discover plugin chains.
+        $50 one-time. Build, share, and discover plugin chains.
       </p>
 
       {/* Download cards */}
@@ -59,31 +59,20 @@ export default function DownloadPage() {
         </div>
       </div>
 
-      {/* Beta signup */}
-      <div className="glass-card-subtle rounded-xl p-6 mb-12">
+      {/* Purchase CTA */}
+      <div className="glass-card rounded-xl p-6 mb-12 border border-[#deff0a]/10">
         <h2 className="text-lg font-semibold text-neutral-100 mb-2">
-          Join the Open Beta
+          Get ProChain
         </h2>
         <p className="text-neutral-400 text-sm mb-4">
-          ProChain is in open beta. Leave your email to get notified when
-          downloads are ready, or join our Discord for early access.
+          One-time purchase, lifetime updates. No subscription required.
         </p>
-        <form
-          onSubmit={(e) => e.preventDefault()}
-          className="flex gap-2 max-w-md"
+        <Link
+          href="/pricing"
+          className="inline-block px-6 py-3 rounded-xl text-sm font-bold bg-white hover:bg-[#ccff00] text-stone-900 transition shadow-lg shadow-[#deff0a]/20 hover:shadow-[#deff0a]/30"
         >
-          <input
-            type="email"
-            placeholder="you@example.com"
-            className="flex-1 px-4 py-2.5 rounded-lg bg-neutral-900 border border-white/[0.08] text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-[#deff0a]/30"
-          />
-          <button
-            type="submit"
-            className="neon-button px-5 py-2.5 rounded-lg text-sm font-bold shrink-0"
-          >
-            Notify Me
-          </button>
-        </form>
+          Buy ProChain &mdash; $50
+        </Link>
       </div>
 
       {/* Features */}
