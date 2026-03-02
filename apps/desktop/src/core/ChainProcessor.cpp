@@ -295,6 +295,100 @@ bool ChainProcessor::addPlugin(const juce::PluginDescription &desc,
   return true;
 }
 
+void ChainProcessor::addPluginAsync(
+    const juce::PluginDescription &desc, ChainNodeId parentId, int insertIndex,
+    std::function<void(bool, const juce::String &)> onComplete) {
+  jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+
+  // Validate parent early, on the message thread
+  {
+    const juce::SpinLock::ScopedLockType lock(treeLock);
+    auto *parent = ChainNodeHelpers::findById(rootNode, parentId);
+    if (!parent || !parent->isGroup()) {
+      onComplete(false, "Parent group not found");
+      return;
+    }
+  }
+
+  PCLOG("addPluginAsync — launching background load for " + desc.name);
+
+  // Capture values needed for background thread
+  double sr = currentSampleRate;
+  int bs = currentBlockSize;
+  auto &pm = pluginManager;
+
+  juce::Thread::launch([this, desc, parentId, insertIndex, sr, bs, &pm,
+                        onComplete = std::move(onComplete)]() {
+    // ---------- BACKGROUND THREAD: plugin instantiation ----------
+    juce::String errorMessage;
+    auto instance = pm.createPluginInstance(desc, sr, bs, errorMessage);
+    auto *rawInstance = instance.release(); // release for capture in callAsync
+
+    // ---------- MESSAGE THREAD: tree mutation + rebuild ----------
+    juce::MessageManager::callAsync(
+        [this, rawInstance, desc, parentId, insertIndex, errorMessage,
+         onComplete = std::move(onComplete)]() {
+          std::unique_ptr<juce::AudioPluginInstance> instance(rawInstance);
+          if (!instance) {
+            PCLOG("addPluginAsync — FAILED to create " + desc.name + ": " +
+                  errorMessage);
+            onComplete(false, "Failed to instantiate: " + errorMessage);
+            return;
+          }
+
+          auto wrapper = std::make_unique<PluginWithMeterWrapper>(
+              std::move(instance));
+
+          auto node = std::make_unique<ChainNode>();
+          node->id = nextNodeId++;
+          node->name = desc.name;
+          PluginLeaf leaf;
+          leaf.description = desc;
+          leaf.bypassed = false;
+
+          if (auto graphNode = addNode(std::move(wrapper))) {
+            leaf.graphNodeId = graphNode->nodeID;
+          } else {
+            onComplete(false, "Failed to add node to graph");
+            return;
+          }
+
+          node->data = std::move(leaf);
+
+          {
+            const juce::SpinLock::ScopedLockType lock(treeLock);
+            auto *parent =
+                ChainNodeHelpers::findById(rootNode, parentId);
+            if (!parent || !parent->isGroup()) {
+              onComplete(false, "Parent group removed during load");
+              return;
+            }
+            auto &children = parent->getGroup().children;
+            if (children.size() >=
+                static_cast<size_t>(kMaxChildrenPerGroup)) {
+              onComplete(false, "Group is full");
+              return;
+            }
+            if (insertIndex < 0 ||
+                insertIndex >= static_cast<int>(children.size()))
+              children.push_back(std::move(node));
+            else
+              children.insert(children.begin() + insertIndex,
+                              std::move(node));
+            cachedSlotsDirty = true;
+          }
+
+          rebuildGraph();
+          notifyChainChanged();
+          if (onParameterBindingChanged)
+            onParameterBindingChanged();
+
+          PCLOG("addPluginAsync — done for " + desc.name);
+          onComplete(true, {});
+        });
+  });
+}
+
 ChainNodeId ChainProcessor::addDryPath(ChainNodeId parentId, int insertIndex) {
   jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
   PCLOG("addDryPath — parentId=" + juce::String(parentId));

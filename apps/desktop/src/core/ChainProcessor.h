@@ -39,6 +39,12 @@ public:
   bool addPlugin(const juce::PluginDescription &desc, ChainNodeId parentId,
                  int insertIndex);
 
+  // Async version — loads plugin on background thread, then finishes on
+  // message thread.  Callback receives (success, errorMessage).
+  void addPluginAsync(const juce::PluginDescription &desc,
+                      ChainNodeId parentId, int insertIndex,
+                      std::function<void(bool, const juce::String &)> onComplete);
+
   // Add an empty dry path branch to a parallel group
   ChainNodeId addDryPath(ChainNodeId parentId, int insertIndex = -1);
 

@@ -95,7 +95,31 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                   args.size() > 1 ? static_cast<int>(args[1]) : -1;
               if (insertIndex < -1)
                 insertIndex = -1; // M-4: validate >= -1
-              completion(addPlugin(pluginId, insertIndex));
+
+              auto desc = pluginManager.findPluginByIdentifier(pluginId);
+              if (!desc) {
+                auto *err = new juce::DynamicObject();
+                err->setProperty("success", false);
+                err->setProperty("error", "Plugin not found: " + pluginId);
+                completion(juce::var(err));
+                return;
+              }
+
+              // Async: load plugin on background thread, finish on message
+              // thread. The completion callback fires once the plugin is
+              // actually wired into the graph.
+              chainProcessor.addPluginAsync(
+                  *desc, 0, insertIndex,
+                  [this, completion = std::move(completion)](
+                      bool success, const juce::String &error) {
+                    auto *result = new juce::DynamicObject();
+                    result->setProperty("success", success);
+                    if (success)
+                      result->setProperty("chainState", getChainState());
+                    else
+                      result->setProperty("error", error);
+                    completion(juce::var(result));
+                  });
             } else {
               completion(juce::var());
             }
@@ -834,10 +858,49 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
           [this](
               const juce::Array<juce::var> &args,
               juce::WebBrowserComponent::NativeFunctionCompletion completion) {
-            if (args.size() >= 1)
-              completion(addPluginToGroup(args[0]));
-            else
+            if (args.size() >= 1) {
+              juce::var parsed = parseJsonArg(args[0]);
+              if (!parsed.isObject()) {
+                completion(errorResponse("Invalid arguments"));
+                return;
+              }
+              auto *obj = parsed.getDynamicObject();
+              if (!obj) {
+                completion(errorResponse("JSON parse returned null"));
+                return;
+              }
+              auto pluginId = obj->getProperty("pluginId").toString();
+              int parentId =
+                  static_cast<int>(obj->getProperty("parentId"));
+              int insertIndex =
+                  static_cast<int>(obj->getProperty("insertIndex"));
+
+              auto desc =
+                  pluginManager.findPluginByIdentifier(pluginId);
+              if (!desc) {
+                auto *err = new juce::DynamicObject();
+                err->setProperty("success", false);
+                err->setProperty("error",
+                                 "Plugin not found: " + pluginId);
+                completion(juce::var(err));
+                return;
+              }
+
+              chainProcessor.addPluginAsync(
+                  *desc, parentId, insertIndex,
+                  [this, completion = std::move(completion)](
+                      bool success, const juce::String &error) {
+                    auto *result = new juce::DynamicObject();
+                    result->setProperty("success", success);
+                    if (success)
+                      result->setProperty("chainState", getChainState());
+                    else
+                      result->setProperty("error", error);
+                    completion(juce::var(result));
+                  });
+            } else {
               completion(juce::var());
+            }
           })
       .withNativeFunction(
           "addDryPath",

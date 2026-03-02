@@ -740,6 +740,21 @@ export function ChainEditor() {
           onContextMenu={handleContextMenu}
           onClick={() => { selectNode(null); setSelectedIds(new Set()); }}
         >
+          {loading && hasNodes && (
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md mb-2 animate-pulse"
+              style={{
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-border-default)',
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--text-xs)',
+                letterSpacing: 'var(--tracking-wide)',
+              }}
+            >
+              <div className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+              Loading plugin...
+            </div>
+          )}
           {loading && !hasNodes ? (
             <div
               className="flex items-center justify-center h-32"
