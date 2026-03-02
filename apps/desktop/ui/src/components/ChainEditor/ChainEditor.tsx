@@ -5,150 +5,33 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  useDroppable,
   defaultDropAnimationSideEffects,
   type DragStartEvent,
   type DragEndEvent,
   type DragMoveEvent,
   pointerWithin,
   rectIntersection,
+  closestCenter,
   type CollisionDetection,
 } from '@dnd-kit/core';
-import { Layers, GitBranch, Undo2, Redo2, Power, AppWindow, Plus, Radio, Copy, Link2, Send, Star } from 'lucide-react';
+import { Layers, GitBranch, Undo2, Redo2, Power, Plus } from 'lucide-react';
 import { useChainStore, useChainActions } from '../../stores/chainStore';
 import { useChainEditorShortcuts } from '../../hooks/useChainEditorShortcuts';
 import { juceBridge } from '../../api/juce-bridge';
-import type { ChainNodeUI, OtherInstanceInfo, MirrorState, WaveformData } from '../../api/types';
+import type { ChainNodeUI, GainSettings } from '../../api/types';
 import { ChainNodeList } from './ChainNodeList';
 import { DragPreview } from './DragPreview';
-import { QuickPluginSearch } from './QuickPluginSearch';
-import { InlinePluginSearch } from './InlinePluginSearch';
 import { MirrorIndicator } from './MirrorIndicator';
 import { HeaderMenu } from '../HeaderMenu';
 import { EmptyStateKit } from './EmptyStateKit';
+import { LatencyDisplay } from './LatencyDisplay';
+import { InstancesBadge } from './InstancesBadge';
+import { EmptySlot } from './EmptySlot';
 import { ContextMenu, buildEmptySpaceMenu } from '../ContextMenu';
-
-/** Compact output waveform for the toolbar — neon yellow line */
-function ToolbarWaveform() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>();
-  const dataRef = useRef<number[]>([]);
-  const dimsRef = useRef({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const cvs = canvasRef.current;
-    if (!cvs) return;
-
-    const observer = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (entry) {
-        dimsRef.current = {
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        };
-      }
-    });
-    observer.observe(cvs);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const unsub = juceBridge.onWaveformData((d: WaveformData) => {
-      dataRef.current = d.post;
-    });
-
-    const draw = () => {
-      const cvs = canvasRef.current;
-      if (!cvs) { animRef.current = requestAnimationFrame(draw); return; }
-      const ctx = cvs.getContext('2d');
-      if (!ctx) { animRef.current = requestAnimationFrame(draw); return; }
-
-      const dims = dimsRef.current;
-      if (dims.width === 0 || dims.height === 0) { animRef.current = requestAnimationFrame(draw); return; }
-
-      const dpr = window.devicePixelRatio || 1;
-      if (cvs.width !== dims.width * dpr || cvs.height !== dims.height * dpr) {
-        cvs.width = dims.width * dpr;
-        cvs.height = dims.height * dpr;
-        ctx.scale(dpr, dpr);
-      }
-
-      const w = dims.width;
-      const h = dims.height;
-      ctx.clearRect(0, 0, w, h);
-
-      const data = dataRef.current;
-      if (data.length === 0) { animRef.current = requestAnimationFrame(draw); return; }
-
-      // Center line
-      ctx.strokeStyle = 'rgba(222, 255, 10, 0.06)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, h / 2);
-      ctx.lineTo(w, h / 2);
-      ctx.stroke();
-
-      // Draw waveform as a filled area from center
-      const step = data.length / w;
-      const cy = h / 2;
-      const amp = h * 0.85;
-
-      // Top half
-      ctx.beginPath();
-      ctx.moveTo(0, cy);
-      for (let x = 0; x < w; x++) {
-        const idx = Math.min(Math.floor(x * step), data.length - 1);
-        const v = Math.min(data[idx], 1);
-        ctx.lineTo(x, cy - v * amp / 2);
-      }
-      ctx.lineTo(w, cy);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(222, 255, 10, 0.35)';
-      ctx.fill();
-
-      // Bottom half (mirror)
-      ctx.beginPath();
-      ctx.moveTo(0, cy);
-      for (let x = 0; x < w; x++) {
-        const idx = Math.min(Math.floor(x * step), data.length - 1);
-        const v = Math.min(data[idx], 1);
-        ctx.lineTo(x, cy + v * amp / 2);
-      }
-      ctx.lineTo(w, cy);
-      ctx.closePath();
-      ctx.fill();
-
-      // Bright center line of the waveform
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgba(222, 255, 10, 0.7)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < w; x++) {
-        const idx = Math.min(Math.floor(x * step), data.length - 1);
-        const v = Math.min(data[idx], 1);
-        const y1 = cy - v * amp / 2;
-        if (x === 0) ctx.moveTo(x, y1);
-        else ctx.lineTo(x, y1);
-      }
-      ctx.stroke();
-
-      animRef.current = requestAnimationFrame(draw);
-    };
-
-    animRef.current = requestAnimationFrame(draw);
-    return () => {
-      unsub();
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="h-full w-full"
-      style={{ minWidth: 0 }}
-    />
-  );
-}
+import { MiniPluginBrowser } from '../MiniPluginBrowser';
+import { Knob } from '../Knob';
+import { findNodeById, computeSlotNumbers, countPluginsInTree, findIndexInParent, isAncestorOf, collectSubtreeIds, findParentOf } from '../../utils/chainHelpers';
+import { formatTimeAgo } from '../../utils/timeFormatting';
 
 // Root parent ID (the implicit root group)
 const ROOT_PARENT_ID = 0;
@@ -161,18 +44,6 @@ const ROOT_PARENT_ID = 0;
  * so we don't need to manually filter out disabled droppables here - they're
  * automatically excluded by dnd-kit's core logic after collision detection.
  */
-// Format timestamp as relative time (e.g., "2m ago", "just now")
-function formatRelativeTime(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 10) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 const customCollisionDetection: CollisionDetection = (args) => {
   const pointerCollisions = pointerWithin(args);
@@ -184,7 +55,14 @@ const customCollisionDetection: CollisionDetection = (args) => {
   const groupCollisions = pointerCollisions.filter(c => String(c.id).startsWith('group:'));
 
   // Prefer drop zones for reordering
-  if (dropCollisions.length > 0) return dropCollisions;
+  if (dropCollisions.length === 1) return dropCollisions;
+  if (dropCollisions.length > 1) {
+    // Multiple overlapping drop zones — use closestCenter as tiebreaker
+    // to pick a single deterministic result and prevent flickering
+    const dropIds = new Set(dropCollisions.map(c => c.id));
+    const filtered = args.droppableContainers.filter(c => dropIds.has(c.id));
+    return closestCenter({ ...args, droppableContainers: filtered });
+  }
   // Then group targets
   if (groupCollisions.length > 0) return groupCollisions;
 
@@ -197,12 +75,13 @@ export function ChainEditor() {
   const snapshots = useChainStore(s => s.snapshots);
   const activeSnapshot = useChainStore(s => s.activeSnapshot);
   const toastMessage = useChainStore(s => s.toastMessage);
+  const formatSubstitutions = useChainStore(s => s.formatSubstitutions);
   const pluginClipboard = useChainStore(s => s.pluginClipboard);
 
   const {
     fetchChainState, moveNode, createGroup, dissolveGroupSilent,
     selectNode, undo, redo, canUndo, canRedo, saveSnapshot, recallSnapshot,
-    openInlineEditor, openGalaxy,
+    openInlineEditor, addPluginToGroup,
   } = useChainActions();
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -210,6 +89,7 @@ export function ChainEditor() {
   const [contextMenuType, setContextMenuType] = useState<'multiselect' | 'empty'>('multiselect');
   const [activeDragNode, setActiveDragNode] = useState<ChainNodeUI | null>(null);
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const [activeBrowserPlugin, setActiveBrowserPlugin] = useState<{ name: string; manufacturer: string } | null>(null);
   const [groupSelectMode, setGroupSelectMode] = useState(false);
   const [disabledDropIds, setDisabledDropIds] = useState<Set<number>>(new Set());
   const [sourceGroupId, setSourceGroupId] = useState<number | null>(null);
@@ -222,7 +102,13 @@ export function ChainEditor() {
 
   // Chain-level toggle state
   const [bypassState, setBypassState] = useState<{ allBypassed: boolean; anyBypassed: boolean }>({ allBypassed: false, anyBypassed: false });
-  const [windowState, setWindowState] = useState<{ openCount: number; totalCount: number }>({ openCount: 0, totalCount: 0 });
+
+  // I/O controls state (moved from Footer)
+  const [inputGain, setInputGain] = useState(0);
+  const [outputGain, setOutputGain] = useState(0);
+  const [masterDryWet, setMasterDryWet] = useState(100);
+  // Mini browser collapse state
+  const [browserCollapsed, setBrowserCollapsed] = useState(false);
 
   // Register keyboard shortcuts via centralized manager
   useChainEditorShortcuts({
@@ -241,17 +127,62 @@ export function ChainEditor() {
   useEffect(() => {
     fetchChainState();
     // Fetch initial toggle states
-    juceBridge.getAllBypassState().then(setBypassState).catch(() => {});
-    juceBridge.getPluginWindowState().then(setWindowState).catch(() => {});
+    juceBridge.getAllBypassState().then(setBypassState).catch(() => { });
   }, [fetchChainState]);
 
-  // Refresh toggle states when chain changes
+  // I/O controls: load initial settings
   useEffect(() => {
-    const unsub = juceBridge.onChainChanged(() => {
-      juceBridge.getAllBypassState().then(setBypassState).catch(() => {});
-      juceBridge.getPluginWindowState().then(setWindowState).catch(() => {});
+    juceBridge.getGainSettings().then((settings: GainSettings) => {
+      setInputGain(settings.inputGainDB);
+      setOutputGain(settings.outputGainDB);
+    }).catch(() => { });
+    juceBridge.getMasterDryWet().then((mix: number) => {
+      setMasterDryWet(mix * 100);
+    }).catch(() => { });
+  }, []);
+
+  // I/O controls: subscribe to gain changed events (from autoCalibrate or match lock)
+  useEffect(() => {
+    const unsub = juceBridge.onGainChanged((data) => {
+      if (data.inputGainDB !== undefined) setInputGain(data.inputGainDB);
+      if (data.outputGainDB !== undefined) setOutputGain(data.outputGainDB);
     });
     return unsub;
+  }, []);
+
+  // I/O controls: subscribe to master dry/wet changed events (from snapshot restore)
+  useEffect(() => {
+    return juceBridge.onMasterDryWetChanged((data) => {
+      setMasterDryWet(data.mix * 100);
+    });
+  }, []);
+
+  // I/O control handlers
+  const handleInputGainChange = useCallback((value: number) => {
+    setInputGain(value);
+    juceBridge.setInputGain(value);
+  }, []);
+
+  const handleOutputGainChange = useCallback((value: number) => {
+    setOutputGain(value);
+    juceBridge.setOutputGain(value);
+  }, []);
+
+  const handleMasterDryWetChange = useCallback((value: number) => {
+    setMasterDryWet(value);
+    juceBridge.setMasterDryWet(value / 100);
+  }, []);
+
+  // Listen for browser overlay open/close to collapse mini browser
+  useEffect(() => {
+    const handleBrowserOpen = () => setBrowserCollapsed(true);
+    const handleBrowserClose = () => setBrowserCollapsed(false);
+    window.addEventListener('openPluginBrowser', handleBrowserOpen);
+    window.addEventListener('closePluginBrowser', handleBrowserClose);
+    return () => {
+      window.removeEventListener('openPluginBrowser', handleBrowserOpen);
+      window.removeEventListener('closePluginBrowser', handleBrowserClose);
+    };
   }, []);
 
   // Snapshot toast notifications
@@ -292,17 +223,12 @@ export function ChainEditor() {
     } catch { /* ignore */ }
   }, []);
 
-  const handleToggleAllWindows = useCallback(async () => {
-    try {
-      const result = await juceBridge.toggleAllPluginWindows();
-      setWindowState({ openCount: result.openCount, totalCount: result.totalCount });
-    } catch { /* ignore */ }
-  }, []);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        distance: 8,
       },
     })
   );
@@ -311,6 +237,13 @@ export function ChainEditor() {
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
     const data = active.data.current;
+
+    // Browser plugin drag
+    if (data?.type === 'browser-plugin' && data?.plugin) {
+      setActiveBrowserPlugin({ name: data.plugin.name, manufacturer: data.plugin.manufacturer });
+      return;
+    }
+
     if (data?.node) {
       const dragNode = data.node as ChainNodeUI;
       const dragNodeId = data.nodeId as number;
@@ -333,6 +266,7 @@ export function ChainEditor() {
   const handleDragCancel = useCallback(() => {
     setActiveDragNode(null);
     setActiveDragId(null);
+    setActiveBrowserPlugin(null);
     setDisabledDropIds(new Set());
     setSourceGroupId(null);
     if (autoScrollRafRef.current) {
@@ -383,6 +317,7 @@ export function ChainEditor() {
       const { active, over } = event;
       setActiveDragNode(null);
       setActiveDragId(null);
+      setActiveBrowserPlugin(null);
       setDisabledDropIds(new Set());
       setSourceGroupId(null);
       if (autoScrollRafRef.current) {
@@ -397,111 +332,150 @@ export function ChainEditor() {
       // active.data.current to become {} (dnd-kit issue #794). active.id is always reliable.
       const activeIdStr = String(active.id);
       if (!activeIdStr.startsWith('drag:')) return;
+
+      // Handle browser-plugin drags (drag:browser:{uid})
+      if (activeIdStr.startsWith('drag:browser:')) {
+        const plugin = active.data.current?.plugin;
+        if (!plugin || !over) return;
+        const overId = String(over.id);
+        if (overId.startsWith('drop:')) {
+          const parts = overId.split(':');
+          const parentId = parseInt(parts[1], 10);
+          const insertIndex = parseInt(parts[2], 10);
+          if (!isNaN(parentId) && !isNaN(insertIndex)) {
+            await addPluginToGroup(plugin.fileOrIdentifier, parentId, insertIndex);
+          }
+        } else if (overId.startsWith('group:')) {
+          const groupId = parseInt(overId.split(':')[1], 10);
+          if (!isNaN(groupId)) {
+            const freshState = useChainStore.getState().nodes;
+            const targetGroup = findNodeById(freshState, groupId);
+            const insertIdx = targetGroup?.type === 'group' ? targetGroup.children.length : 0;
+            await addPluginToGroup(plugin.fileOrIdentifier, groupId, insertIdx);
+          }
+        }
+        return;
+      }
+
       const draggedNodeId = parseInt(activeIdStr.split(':')[1], 10);
       if (isNaN(draggedNodeId)) return;
 
+      // P2-9: Always read fresh state to avoid stale closure over `nodes`
+      const freshState = useChainStore.getState().nodes;
+
       // Safety: Verify the dragged node exists in the tree
-      const draggedNode = findNodeById(nodes, draggedNodeId);
+      const draggedNode = findNodeById(freshState, draggedNodeId);
       if (!draggedNode) {
         return;
       }
 
       const overId = String(over.id);
 
-    // Parse the droppable ID
-    if (overId.startsWith('drop:')) {
-      // Format: drop:{parentId}:{insertIndex}
-      const parts = overId.split(':');
-      const targetParentId = parseInt(parts[1], 10);
-      let targetIndex = parseInt(parts[2], 10);
+      // Parse the droppable ID
+      if (overId.startsWith('drop:')) {
+        // Format: drop:{parentId}:{insertIndex}
+        const parts = overId.split(':');
+        const targetParentId = parseInt(parts[1], 10);
+        let targetIndex = parseInt(parts[2], 10);
 
-      if (isNaN(targetParentId) || isNaN(targetIndex)) return;
+        if (isNaN(targetParentId) || isNaN(targetIndex)) return;
 
-      // Bug 4: Prevent dropping into own subtree
-      if (isAncestorOf(nodes, draggedNodeId, targetParentId)) return;
+        // Bug 4: Prevent dropping into own subtree
+        if (isAncestorOf(freshState, draggedNodeId, targetParentId)) return;
 
-      // Bug 1: Same-parent index adjustment
-      // The C++ backend extracts the node first, then inserts at the given index.
-      // So if we're moving within the same parent and the source is before the target,
-      // we need to subtract 1 because extraction shifts everything down.
-      const sourceParent = findParentOf(nodes, draggedNodeId);
-      const sourceParentId = sourceParent?.id ?? ROOT_PARENT_ID;
-      const sourceIndex = findIndexInParent(nodes, draggedNodeId, sourceParentId);
+        // Bug 1: Same-parent index adjustment
+        // The C++ backend extracts the node first, then inserts at the given index.
+        // So if we're moving within the same parent and the source is before the target,
+        // we need to subtract 1 because extraction shifts everything down.
+        const sourceParent = findParentOf(freshState, draggedNodeId);
+        const sourceParentId = sourceParent?.id ?? ROOT_PARENT_ID;
+        const sourceIndex = findIndexInParent(freshState, draggedNodeId, sourceParentId);
 
-      if (sourceParentId === targetParentId && sourceIndex !== -1) {
-        // Bug 8: No-op detection — dropping in the same position
-        if (sourceIndex === targetIndex || sourceIndex === targetIndex - 1) return;
+        if (sourceParentId === targetParentId && sourceIndex !== -1) {
+          // Bug 8: No-op detection — dropping in the same position
+          if (sourceIndex === targetIndex || sourceIndex === targetIndex - 1) return;
 
-        // Bug 1: Adjust for extraction
-        if (sourceIndex < targetIndex) {
-          targetIndex -= 1;
+          // Bug 1: Adjust for extraction
+          if (sourceIndex < targetIndex) {
+            targetIndex -= 1;
+          }
         }
-      }
 
-      await moveNode(draggedNodeId, targetParentId, targetIndex);
+        await moveNode(draggedNodeId, targetParentId, targetIndex);
 
-      // Bug 2: Read fresh state for auto-dissolve (not stale closure `nodes`)
-      // Bug 3: Use dissolveGroupSilent to avoid double undo push
-      const freshNodes = useChainStore.getState().nodes;
-      if (sourceParent && sourceParent.type === 'group' && sourceParent.id !== ROOT_PARENT_ID) {
-        const freshParent = findNodeById(freshNodes, sourceParent.id);
-        if (freshParent && freshParent.type === 'group' && freshParent.children.length <= 1) {
-          // Animate collapse, then dissolve
-          setDissolvingGroupId(sourceParent.id);
-          await new Promise(r => setTimeout(r, 200));
+        // Bug 2: Read fresh state for auto-dissolve (not stale closure `nodes`)
+        // Bug 3: Use dissolveGroupSilent to avoid double undo push
+        // P2-10: Wrap dissolve in try-catch for error resilience
+        try {
+          const postMoveNodes = useChainStore.getState().nodes;
+          if (sourceParent && sourceParent.type === 'group' && sourceParent.id !== ROOT_PARENT_ID) {
+            const freshParent = findNodeById(postMoveNodes, sourceParent.id);
+            if (freshParent && freshParent.type === 'group' && freshParent.children.length <= 1) {
+              // Animate collapse, then dissolve
+              setDissolvingGroupId(sourceParent.id);
+              await new Promise(r => setTimeout(r, 200));
+              setDissolvingGroupId(null);
+              await dissolveGroupSilent(sourceParent.id);
+            }
+          }
+        } catch {
           setDissolvingGroupId(null);
-          await dissolveGroupSilent(sourceParent.id);
         }
-      }
-    } else if (overId.startsWith('group:')) {
-      // Dropped onto a group container → append to end
-      const targetGroupId = parseInt(overId.split(':')[1], 10);
-      if (isNaN(targetGroupId)) return;
+      } else if (overId.startsWith('group:')) {
+        // Dropped onto a group container → append to end
+        const targetGroupId = parseInt(overId.split(':')[1], 10);
+        if (isNaN(targetGroupId)) return;
 
-      // Bug 7: Prevent dropping a group onto itself
-      if (targetGroupId === draggedNodeId) return;
-      // Bug 4: Prevent dropping into own subtree
-      if (isAncestorOf(nodes, draggedNodeId, targetGroupId)) return;
+        // Bug 7: Prevent dropping a group onto itself
+        if (targetGroupId === draggedNodeId) return;
+        // Bug 4: Prevent dropping into own subtree
+        if (isAncestorOf(freshState, draggedNodeId, targetGroupId)) return;
 
-      // Find the group to determine insert index
-      const targetGroup = findNodeById(nodes, targetGroupId);
-      let insertIndex = targetGroup?.type === 'group' ? targetGroup.children.length : 0;
+        // Find the group to determine insert index
+        const targetGroup = findNodeById(freshState, targetGroupId);
+        let insertIndex = targetGroup?.type === 'group' ? targetGroup.children.length : 0;
 
-      // Bug 1: Same-parent index adjustment for group targets too
-      const sourceParent = findParentOf(nodes, draggedNodeId);
-      const sourceParentId = sourceParent?.id ?? ROOT_PARENT_ID;
+        // Bug 1: Same-parent index adjustment for group targets too
+        const sourceParent = findParentOf(freshState, draggedNodeId);
+        const sourceParentId = sourceParent?.id ?? ROOT_PARENT_ID;
 
-      if (sourceParentId === targetGroupId) {
-        const sourceIndex = findIndexInParent(nodes, draggedNodeId, targetGroupId);
-        // Bug 8: No-op if already at the end
-        if (sourceIndex === insertIndex - 1) return;
-        if (sourceIndex !== -1 && sourceIndex < insertIndex) {
-          insertIndex -= 1;
+        if (sourceParentId === targetGroupId) {
+          const sourceIndex = findIndexInParent(freshState, draggedNodeId, targetGroupId);
+          // Bug 8: No-op if already at the end
+          if (sourceIndex === insertIndex - 1) return;
+          if (sourceIndex !== -1 && sourceIndex < insertIndex) {
+            insertIndex -= 1;
+          }
         }
-      }
 
-      await moveNode(draggedNodeId, targetGroupId, insertIndex);
+        await moveNode(draggedNodeId, targetGroupId, insertIndex);
 
-      // Bug 2 & 3: Fresh state auto-dissolve with silent history
-      const freshNodes = useChainStore.getState().nodes;
-      if (sourceParent && sourceParent.type === 'group' && sourceParent.id !== ROOT_PARENT_ID) {
-        const freshParent = findNodeById(freshNodes, sourceParent.id);
-        if (freshParent && freshParent.type === 'group' && freshParent.children.length <= 1) {
-          // Animate collapse, then dissolve
-          setDissolvingGroupId(sourceParent.id);
-          await new Promise(r => setTimeout(r, 200));
+        // Bug 2 & 3: Fresh state auto-dissolve with silent history
+        // P2-10: Wrap dissolve in try-catch for error resilience
+        try {
+          const postMoveNodes = useChainStore.getState().nodes;
+          if (sourceParent && sourceParent.type === 'group' && sourceParent.id !== ROOT_PARENT_ID) {
+            const freshParent = findNodeById(postMoveNodes, sourceParent.id);
+            if (freshParent && freshParent.type === 'group' && freshParent.children.length <= 1) {
+              // Animate collapse, then dissolve
+              setDissolvingGroupId(sourceParent.id);
+              await new Promise(r => setTimeout(r, 200));
+              setDissolvingGroupId(null);
+              await dissolveGroupSilent(sourceParent.id);
+            }
+          }
+        } catch {
           setDissolvingGroupId(null);
-          await dissolveGroupSilent(sourceParent.id);
         }
       }
-    }
     } catch (error) {
       // Reset drag state on error to prevent UI from getting stuck
       setActiveDragNode(null);
       setActiveDragId(null);
+      setActiveBrowserPlugin(null);
       setDisabledDropIds(new Set());
     }
-  }, [nodes, moveNode, createGroup, dissolveGroupSilent]);
+  }, [moveNode, dissolveGroupSilent, addPluginToGroup]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -547,7 +521,7 @@ export function ChainEditor() {
 
   const hasNodes = nodes.length > 0;
   const totalPlugins = countPluginsInTree(nodes);
-  const isDragActive = activeDragNode !== null;
+  const isDragActive = activeDragNode !== null || activeBrowserPlugin !== null;
 
   // Compute 1-based DFS slot numbers for all plugins
   const slotNumbers = useMemo(() => computeSlotNumbers(nodes), [nodes]);
@@ -577,7 +551,6 @@ export function ChainEditor() {
                 color: canUndo() ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)',
                 transition: 'all var(--duration-fast) var(--ease-snap)',
                 cursor: canUndo() ? 'pointer' : 'not-allowed',
-                fontFamily: 'var(--font-mono)',
               }}
               onMouseEnter={(e) => { if (canUndo()) { e.currentTarget.style.color = 'var(--color-accent-cyan)'; e.currentTarget.style.background = 'rgba(222, 255, 10, 0.1)'; } }}
               onMouseLeave={(e) => { e.currentTarget.style.color = canUndo() ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)'; e.currentTarget.style.background = 'transparent'; }}
@@ -595,7 +568,6 @@ export function ChainEditor() {
                 color: canRedo() ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)',
                 transition: 'all var(--duration-fast) var(--ease-snap)',
                 cursor: canRedo() ? 'pointer' : 'not-allowed',
-                fontFamily: 'var(--font-mono)',
               }}
               onMouseEnter={(e) => { if (canRedo()) { e.currentTarget.style.color = 'var(--color-accent-cyan)'; e.currentTarget.style.background = 'rgba(222, 255, 10, 0.1)'; } }}
               onMouseLeave={(e) => { e.currentTarget.style.color = canRedo() ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)'; e.currentTarget.style.background = 'transparent'; }}
@@ -648,7 +620,7 @@ export function ChainEditor() {
                   }}
                   title={
                     snapshot
-                      ? `${isActive ? 'Active snapshot' : 'Recall snapshot'} ${label} \u2022 Saved ${formatRelativeTime(snapshot.savedAt)} \u2022 Shift+click to overwrite \u2022 \u2318\u2325${i + 1}`
+                      ? `${isActive ? 'Active snapshot' : 'Recall snapshot'} ${label} \u2022 Saved ${formatTimeAgo(snapshot.savedAt)} \u2022 Shift+click to overwrite \u2022 \u2318\u2325${i + 1}`
                       : `Save snapshot ${label} \u2022 \u2318\u2325\u21E7${i + 1}`
                   }
                 >
@@ -684,33 +656,7 @@ export function ChainEditor() {
             </button>
           )}
 
-          {/* Toggle All Plugin Windows */}
-          {totalPlugins > 0 && (
-            <button
-              onClick={handleToggleAllWindows}
-              className="p-1 rounded flex items-center gap-1"
-              style={{
-                color: windowState.openCount > 0 ? 'var(--color-accent-cyan)' : 'var(--color-text-secondary)',
-                background: windowState.openCount > 0 ? 'rgba(222, 255, 10, 0.08)' : 'transparent',
-                transition: 'all var(--duration-fast) var(--ease-snap)',
-              }}
-              title={
-                windowState.openCount > 0
-                  ? `Close all plugin windows (${windowState.openCount}/${windowState.totalCount} open)`
-                  : 'Open all plugin windows'
-              }
-            >
-              <AppWindow className="w-3.5 h-3.5" />
-              {windowState.totalCount > 0 && (
-                <span
-                  className="text-[10px] leading-none"
-                  style={{ fontFamily: 'var(--font-mono)' }}
-                >
-                  {windowState.openCount}/{windowState.totalCount}
-                </span>
-              )}
-            </button>
-          )}
+
 
           <span
             className="text-[10px] uppercase ml-1"
@@ -724,73 +670,90 @@ export function ChainEditor() {
           </span>
         </div>
 
-        {/* Output waveform — fills toolbar gap */}
-        <div className="flex-1 mx-3" style={{ height: 20, minWidth: 0 }}>
-          <ToolbarWaveform />
+        {/* I/O controls — fills toolbar gap */}
+        <div className="flex-1 flex items-center justify-center gap-3 mx-2" style={{ minWidth: 0 }}>
+          {/* Input gain knob */}
+          <div className="flex items-center gap-1">
+            <Knob
+              value={inputGain}
+              onChange={handleInputGainChange}
+              size={20}
+              min={-24}
+              max={24}
+              defaultValue={0}
+              hideLabel
+            />
+            <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>IN</span>
+          </div>
+
+          {/* Dry/Wet knob */}
+          <div className="flex items-center gap-1">
+            <Knob
+              value={masterDryWet}
+              onChange={handleMasterDryWetChange}
+              size={20}
+              min={0}
+              max={100}
+              defaultValue={100}
+              formatValue={(v) => `${Math.round(v)}%`}
+              hideLabel
+            />
+            <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>D/W</span>
+          </div>
+
+          {/* Output gain knob */}
+          <div className="flex items-center gap-1">
+            <Knob
+              value={outputGain}
+              onChange={handleOutputGainChange}
+              size={20}
+              min={-24}
+              max={24}
+              defaultValue={0}
+              hideLabel
+            />
+            <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>OUT</span>
+          </div>
         </div>
 
-        {/* Right side: galaxy, latency, instances, mirror */}
+        {/* Right side: latency, instances, mirror */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => openGalaxy()}
-            className="p-1 rounded"
-            style={{
-              color: 'var(--color-text-secondary)',
-              transition: 'all var(--duration-fast) var(--ease-snap)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#deff0a'; e.currentTarget.style.background = 'rgba(222, 255, 10, 0.1)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'transparent'; }}
-            title="Galaxy Visualizer"
-          >
-            <Star className="w-3.5 h-3.5" />
-          </button>
           <LatencyDisplay />
           <InstancesBadge />
           <MirrorIndicator />
         </div>
       </div>
 
-      {/* Chain */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto p-2 chain-scrollbar"
-        onContextMenu={handleContextMenu}
-        onClick={() => { selectNode(null); setSelectedIds(new Set()); }}
+      {/* DndContext wraps both chain area and mini browser for cross-drag */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={customCollisionDetection}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
-        {loading && !hasNodes ? (
-          <div
-            className="flex items-center justify-center h-32"
-            style={{
-              color: 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-sm)',
-              letterSpacing: 'var(--tracking-wide)',
-              textTransform: 'uppercase' as const,
-            }}
-          >
-            Loading...
-          </div>
-        ) : !hasNodes ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="w-full max-w-md">
-              <InlinePluginSearch
-                parentId={ROOT_PARENT_ID}
-                insertIndex={0}
-                onPluginAdded={() => {}}
-                onOpenFullBrowser={() => window.dispatchEvent(new Event('openPluginBrowser'))}
-                onClose={undefined}
-              />
+        {/* Chain */}
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto p-2 chain-scrollbar"
+          onContextMenu={handleContextMenu}
+          onClick={() => { selectNode(null); setSelectedIds(new Set()); }}
+        >
+          {loading && !hasNodes ? (
+            <div
+              className="flex items-center justify-center h-32"
+              style={{
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--text-sm)',
+                letterSpacing: 'var(--tracking-wide)',
+              }}
+            >
+              Loading...
             </div>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={customCollisionDetection}
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-          >
+          ) : !hasNodes ? (
+            <EmptyStateKit onOpenFullBrowser={() => window.dispatchEvent(new Event('openPluginBrowser'))} />
+          ) : (
             <div className="space-y-2">
               {/* Tree-based rendering with drop zones */}
               <ChainNodeList
@@ -816,29 +779,44 @@ export function ChainEditor() {
                 isDragActive={isDragActive}
               />
             </div>
+          )}
+        </div>
 
-            {/* Drag overlay - follows cursor */}
-            <DragOverlay dropAnimation={{
-              duration: 300,
-              easing: 'cubic-bezier(0.32, 1.6, 0.56, 1)', // Overshoot spring
-              keyframes({ transform: { initial, final } }) {
-                return [
-                  { transform: initial, opacity: '0.9' },
-                  { transform: `${final} scale(1.03)`, opacity: '0.6', offset: 0.6 },
-                  { transform: `${final} scale(1)`, opacity: '0' },
-                ];
-              },
-              sideEffects: defaultDropAnimationSideEffects({
-                styles: { active: { opacity: '0.4' } },
-              }),
-            }}>
-              {activeDragNode ? (
-                <DragPreview node={activeDragNode} />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        )}
-      </div>
+        {/* Mini Plugin Browser — replaces Footer */}
+        <div
+          className="flex-shrink-0 relative z-[1]"
+          style={{
+            height: browserCollapsed ? 0 : 72,
+            opacity: browserCollapsed ? 0 : 1,
+            overflow: 'hidden',
+            transition: 'height 200ms ease, opacity 150ms ease',
+          }}
+        >
+          <MiniPluginBrowser />
+        </div>
+
+        {/* Drag overlay - follows cursor */}
+        <DragOverlay dropAnimation={{
+          duration: 300,
+          easing: 'cubic-bezier(0.32, 1.6, 0.56, 1)', // Overshoot spring
+          keyframes({ transform: { initial, final } }) {
+            return [
+              { transform: initial, opacity: '0.9' },
+              { transform: `${final} scale(1.03)`, opacity: '0.6', offset: 0.6 },
+              { transform: `${final} scale(1)`, opacity: '0' },
+            ];
+          },
+          sideEffects: defaultDropAnimationSideEffects({
+            styles: { active: { opacity: '0.4' } },
+          }),
+        }}>
+          {activeDragNode ? (
+            <DragPreview node={activeDragNode} />
+          ) : activeBrowserPlugin ? (
+            <DragPreview browserPlugin={activeBrowserPlugin} />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Floating action bar when 2+ nodes selected */}
       {selectedIds.size >= 2 && (
@@ -855,10 +833,8 @@ export function ChainEditor() {
             <span
               className="text-[11px] mr-1"
               style={{
-                fontFamily: 'var(--font-mono)',
                 color: 'var(--color-text-secondary)',
                 letterSpacing: 'var(--tracking-wide)',
-                textTransform: 'uppercase' as const,
               }}
             >
               {selectedIds.size} selected
@@ -867,9 +843,7 @@ export function ChainEditor() {
               onClick={() => handleCreateGroup('serial')}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold"
               style={{
-                fontFamily: 'var(--font-mono)',
                 letterSpacing: 'var(--tracking-wide)',
-                textTransform: 'uppercase' as const,
                 background: 'rgba(255, 170, 0, 0.1)',
                 color: 'var(--color-status-warning)',
                 border: '1px solid rgba(255, 170, 0, 0.3)',
@@ -879,9 +853,8 @@ export function ChainEditor() {
               <Layers className="w-3.5 h-3.5" />
               Serial
               <kbd
-                className="text-[9px] ml-1"
+                className="text-micro font-mono ml-1"
                 style={{
-                  fontFamily: 'var(--font-mono)',
                   color: 'var(--color-text-tertiary)',
                 }}
               >
@@ -892,9 +865,7 @@ export function ChainEditor() {
               onClick={() => handleCreateGroup('parallel')}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold"
               style={{
-                fontFamily: 'var(--font-mono)',
                 letterSpacing: 'var(--tracking-wide)',
-                textTransform: 'uppercase' as const,
                 background: 'rgba(222, 255, 10, 0.1)',
                 color: 'var(--color-accent-cyan)',
                 border: '1px solid rgba(222, 255, 10, 0.3)',
@@ -904,9 +875,8 @@ export function ChainEditor() {
               <GitBranch className="w-3.5 h-3.5" />
               Parallel
               <kbd
-                className="text-[9px] ml-1"
+                className="text-micro font-mono ml-1"
                 style={{
-                  fontFamily: 'var(--font-mono)',
                   color: 'var(--color-text-tertiary)',
                 }}
               >
@@ -980,10 +950,8 @@ export function ChainEditor() {
           <div
             className="px-4 py-2 rounded-lg text-sm font-bold slide-in"
             style={{
-              fontFamily: 'var(--font-mono)',
               fontSize: 'var(--text-sm)',
               letterSpacing: 'var(--tracking-wide)',
-              textTransform: 'uppercase' as const,
               background: 'var(--color-accent-cyan)',
               color: 'var(--color-bg-primary)',
               boxShadow: '0 0 20px rgba(222, 255, 10, 0.5), var(--shadow-elevated)',
@@ -1000,10 +968,8 @@ export function ChainEditor() {
           <div
             className="px-4 py-2 rounded-lg text-sm font-bold slide-in"
             style={{
-              fontFamily: 'var(--font-mono)',
               fontSize: 'var(--text-sm)',
               letterSpacing: 'var(--tracking-wide)',
-              textTransform: 'uppercase' as const,
               background: 'rgba(15, 15, 15, 0.95)',
               backdropFilter: 'blur(12px)',
               color: 'var(--color-accent-cyan)',
@@ -1016,556 +982,45 @@ export function ChainEditor() {
         </div>
       )}
 
-    </div>
-  );
-}
-
-/**
- * Compact latency readout for the toolbar.
- * Subscribes to chain changes and polls total latency from C++.
- */
-function LatencyDisplay() {
-  const [latencySamples, setLatencySamples] = useState(0);
-  const [sampleRate, setSampleRate] = useState(44100);
-
-  useEffect(() => {
-    juceBridge.getTotalLatencySamples().then(setLatencySamples).catch(() => {});
-    juceBridge.getSampleRate().then(setSampleRate).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const unsub = juceBridge.onChainChanged(async () => {
-      try {
-        const latency = await juceBridge.getTotalLatencySamples();
-        setLatencySamples(latency);
-      } catch { /* ignore */ }
-    });
-    return unsub;
-  }, []);
-
-  const latencyMs = sampleRate > 0 ? (latencySamples / sampleRate) * 1000 : 0;
-
-  if (latencyMs <= 0) return null;
-
-  return (
-    <span
-      className="text-[10px] tabular-nums"
-      style={{
-        fontFamily: 'var(--font-mono)',
-        color: 'var(--color-text-tertiary)',
-        letterSpacing: 'var(--tracking-wide)',
-      }}
-      title={`Total chain latency: ${latencySamples} samples @ ${sampleRate} Hz`}
-    >
-      {latencyMs.toFixed(1)} ms
-    </span>
-  );
-}
-
-/**
- * Toolbar badge showing other ProChain instances in the DAW session.
- * Hidden when no other instances exist or when already mirrored.
- * Click to open a dropdown with Copy From / Send To / Mirror actions.
- */
-function InstancesBadge() {
-  const [instances, setInstances] = useState<OtherInstanceInfo[]>([]);
-  const [mirrorState, setMirrorState] = useState<MirrorState>({ isMirrored: false, mirrorGroupId: null, partners: [] });
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const showToast = useChainStore((s) => s.showToast);
-
-  useEffect(() => {
-    juceBridge.getOtherInstances().then(setInstances).catch(() => {});
-    juceBridge.getMirrorState().then(setMirrorState).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const unsub1 = juceBridge.onInstancesChanged((data) => setInstances(data));
-    const unsub2 = juceBridge.onMirrorStateChanged((data) => setMirrorState(data));
-    return () => { unsub1(); unsub2(); };
-  }, []);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-instances-badge]')) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const handleCopyFrom = useCallback(async (inst: OtherInstanceInfo) => {
-    setBusy(`copy-${inst.id}`);
-    try {
-      const result = await juceBridge.copyChainFromInstance(inst.id);
-      if (result.success && result.chainState) {
-        useChainStore.setState({
-          nodes: result.chainState.nodes || [],
-          slots: result.chainState.slots || [],
-          lastCloudChainId: null,
-        });
-        showToast(`Copied chain from ${inst.trackName}`);
-      } else {
-        showToast(result.error || 'Failed to copy chain');
-      }
-    } catch {
-      showToast('Failed to copy chain');
-    }
-    setBusy(null);
-    setOpen(false);
-  }, [showToast]);
-
-  const handleSendTo = useCallback(async (inst: OtherInstanceInfo) => {
-    console.log('InstancesBadge handleSendTo clicked', inst.id, inst.trackName);
-    setBusy(`send-${inst.id}`);
-    try {
-      const result = await juceBridge.sendChainToInstance(inst.id);
-      if (result.success) {
-        showToast(`Sending chain to ${inst.trackName}...`);
-      } else {
-        showToast(result.error || 'Failed to send chain');
-      }
-    } catch {
-      showToast('Failed to send chain');
-    }
-    setBusy(null);
-    setOpen(false);
-  }, [showToast]);
-
-  const handleMirror = useCallback(async (inst: OtherInstanceInfo) => {
-    console.log('InstancesBadge handleMirror clicked', inst.id, inst.trackName);
-    setBusy(`mirror-${inst.id}`);
-    try {
-      const result = await juceBridge.startMirror(inst.id);
-      if (result.success) {
-        showToast(`Mirrored with ${inst.trackName}`);
-      } else {
-        showToast(result.error || 'Failed to start mirror');
-      }
-    } catch {
-      showToast('Failed to start mirror');
-    }
-    setBusy(null);
-    setOpen(false);
-  }, [showToast]);
-
-  // Hide when no other instances or already mirrored (MirrorIndicator handles that)
-  if (instances.length === 0 || mirrorState.isMirrored) return null;
-
-  return (
-    <div className="relative" data-instances-badge>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-2 py-1 rounded-md"
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 'var(--text-xs)',
-          fontWeight: 700,
-          letterSpacing: 'var(--tracking-wide)',
-          background: open ? 'rgba(222, 255, 10, 0.12)' : 'rgba(0, 200, 255, 0.08)',
-          color: 'var(--color-accent-cyan)',
-          border: open ? '1px solid rgba(222, 255, 10, 0.4)' : '1px solid rgba(0, 200, 255, 0.2)',
-          cursor: 'pointer',
-          transition: 'all var(--duration-fast) var(--ease-snap)',
-        }}
-        title={`${instances.length} other instance${instances.length > 1 ? 's' : ''} detected`}
-      >
-        <Radio className="w-3 h-3" />
-        <span>{instances.length}</span>
-      </button>
-
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-1 z-50 min-w-[240px]"
-          style={{
-            background: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 'var(--radius-md)',
-            boxShadow: 'var(--shadow-elevated)',
-            overflow: 'hidden',
-          }}
-        >
+      {/* Format substitution notice (amber) */}
+      {formatSubstitutions.length > 0 && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50">
           <div
-            className="px-3 py-1.5"
+            className="px-4 py-2.5 rounded-lg slide-in"
             style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 700,
-              letterSpacing: 'var(--tracking-wide)',
-              textTransform: 'uppercase' as const,
-              color: 'var(--color-accent-cyan)',
-              borderBottom: '1px solid var(--color-border-subtle)',
+              background: 'rgba(15, 15, 15, 0.95)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              boxShadow: '0 0 16px rgba(245, 158, 11, 0.15), var(--shadow-elevated)',
+              maxWidth: '360px',
             }}
           >
-            Other Instances
-          </div>
-
-          <div className="p-1.5 space-y-1">
-            {instances.map((inst) => {
-              const chainPreview = inst.pluginNames.length > 0
-                ? inst.pluginNames.slice(0, 3).join(' \u2192 ') + (inst.pluginNames.length > 3 ? ' \u2026' : '')
-                : 'Empty chain';
-
-              return (
-                <div
-                  key={inst.id}
-                  className="rounded p-2"
-                  style={{
-                    background: 'var(--color-bg-primary)',
-                    border: '1px solid var(--color-border-default)',
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ background: 'var(--color-status-active)' }}
-                    />
-                    <span
-                      className="truncate"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 'var(--text-xs)',
-                        fontWeight: 700,
-                        letterSpacing: 'var(--tracking-wide)',
-                        color: 'var(--color-text-primary)',
-                        textTransform: 'uppercase' as const,
-                      }}
-                    >
-                      {inst.trackName || `Instance ${inst.id}`}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '10px',
-                        color: 'var(--color-text-tertiary)',
-                      }}
-                    >
-                      {inst.pluginCount} plugins
-                    </span>
-                  </div>
-
-                  <div
-                    className="truncate mb-2"
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '10px',
-                      color: 'var(--color-text-secondary)',
-                      paddingLeft: 'var(--space-3)',
-                    }}
-                  >
-                    {chainPreview}
-                  </div>
-
-                  <div className="flex items-center gap-1" style={{ paddingLeft: 'var(--space-3)' }}>
-                    {inst.pluginCount > 0 && (
-                      <button
-                        onClick={() => handleCopyFrom(inst)}
-                        disabled={busy !== null}
-                        className="inst-btn flex items-center gap-1 px-1.5 py-0.5 rounded"
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          letterSpacing: 'var(--tracking-wide)',
-                          textTransform: 'uppercase' as const,
-                          background: 'var(--color-bg-elevated)',
-                          color: 'var(--color-text-secondary)',
-                          border: '1px solid var(--color-border-default)',
-                          cursor: busy !== null ? 'not-allowed' : 'pointer',
-                          opacity: busy !== null ? 0.5 : 1,
-                          transition: 'all var(--duration-fast) var(--ease-snap)',
-                        }}
-                        title="Copy chain from this instance (one-time)"
-                      >
-                        <Copy className="w-2.5 h-2.5" />
-                        {busy === `copy-${inst.id}` ? '...' : 'Copy'}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleSendTo(inst)}
-                      disabled={busy !== null}
-                      className="inst-btn-send flex items-center gap-1 px-1.5 py-0.5 rounded"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        letterSpacing: 'var(--tracking-wide)',
-                        textTransform: 'uppercase' as const,
-                        background: 'var(--color-bg-elevated)',
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border-default)',
-                        cursor: busy !== null ? 'not-allowed' : 'pointer',
-                        opacity: busy !== null ? 0.5 : 1,
-                        transition: 'all var(--duration-fast) var(--ease-snap)',
-                      }}
-                      title="Send current chain to this instance"
-                    >
-                      <Send className="w-2.5 h-2.5" />
-                      {busy === `send-${inst.id}` ? 'Sending...' : 'Send'}
-                    </button>
-                    <button
-                      onClick={() => handleMirror(inst)}
-                      disabled={busy !== null}
-                      className="inst-btn flex items-center gap-1 px-1.5 py-0.5 rounded"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        letterSpacing: 'var(--tracking-wide)',
-                        textTransform: 'uppercase' as const,
-                        background: 'var(--color-bg-elevated)',
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border-default)',
-                        cursor: busy !== null ? 'not-allowed' : 'pointer',
-                        opacity: busy !== null ? 0.5 : 1,
-                        transition: 'all var(--duration-fast) var(--ease-snap)',
-                      }}
-                      title="Mirror chain (live sync)"
-                    >
-                      <Link2 className="w-2.5 h-2.5" />
-                      {busy === `mirror-${inst.id}` ? '...' : 'Mirror'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: '#f59e0b', letterSpacing: 'var(--tracking-wide)' }}>
+                  {formatSubstitutions.length} plugin{formatSubstitutions.length > 1 ? 's' : ''} loaded in a different format
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {formatSubstitutions.map((s, i) => (
+                    <li key={i} style={{ fontSize: 'var(--text-xs)', color: 'rgba(245, 158, 11, 0.7)' }}>
+                      {s.pluginName} ({s.savedFormat} &rarr; {s.loadedFormat}){s.hasPresetData ? ' — preset settings may differ' : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => useChainStore.getState().clearFormatSubstitutions()}
+                style={{ color: 'rgba(245, 158, 11, 0.5)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', lineHeight: 1, flexShrink: 0 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#f59e0b')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(245, 158, 11, 0.5)')}
+              >
+                &#x2715;
+              </button>
+            </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
-
-// ============================================
-// Tree utility functions
-// ============================================
-
-/**
- * Find the index of a node within its parent's children array.
- * Returns -1 if not found.
- */
-function findIndexInParent(allNodes: ChainNodeUI[], nodeId: number, parentId: number): number {
-  const parentChildren = parentId === 0
-    ? allNodes
-    : (() => {
-        const parent = findNodeById(allNodes, parentId);
-        return parent?.type === 'group' ? parent.children : [];
-      })();
-
-  return parentChildren.findIndex(n => n.id === nodeId);
-}
-
-/**
- * Check if potentialAncestorId is an ancestor of (or equal to) targetId in the tree.
- * Used to prevent dropping a group into itself or its descendants.
- */
-function isAncestorOf(nodes: ChainNodeUI[], potentialAncestorId: number, targetId: number): boolean {
-  if (potentialAncestorId === targetId) return true;
-  const ancestor = findNodeById(nodes, potentialAncestorId);
-  if (!ancestor || ancestor.type !== 'group') return false;
-  // Search the ancestor's subtree for targetId
-  for (const child of ancestor.children) {
-    if (containsNodeId(child, targetId)) return true;
-  }
-  return false;
-}
-
-/** Check if a node or any of its descendants has the given ID */
-function containsNodeId(node: ChainNodeUI, targetId: number): boolean {
-  if (node.id === targetId) return true;
-  if (node.type === 'group') {
-    for (const child of node.children) {
-      if (containsNodeId(child, targetId)) return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Collect all node IDs in a subtree (including the root node itself).
- * Used to build the set of disabled drop target IDs.
- */
-function collectSubtreeIds(node: ChainNodeUI, ids: Set<number>): void {
-  ids.add(node.id);
-  if (node.type === 'group') {
-    for (const child of node.children) {
-      collectSubtreeIds(child, ids);
-    }
-  }
-}
-
-/**
- * Compute a map of nodeId → 1-based DFS slot number for all plugin nodes.
- */
-function computeSlotNumbers(nodes: ChainNodeUI[]): Map<number, number> {
-  const map = new Map<number, number>();
-  let counter = 1;
-  function dfs(nodes: ChainNodeUI[]) {
-    for (const node of nodes) {
-      if (node.type === 'plugin') {
-        map.set(node.id, counter++);
-      } else if (node.type === 'group') {
-        dfs(node.children);
-      }
-    }
-  }
-  dfs(nodes);
-  return map;
-}
-
-function countPluginsInTree(nodes: ChainNodeUI[]): number {
-  let count = 0;
-  for (const node of nodes) {
-    if (node.type === 'plugin') count++;
-    else if (node.type === 'group') count += countPluginsInTree(node.children);
-  }
-  return count;
-}
-
-/**
- * Find a node by ID anywhere in the tree.
- */
-function findNodeById(nodes: ChainNodeUI[], id: number): ChainNodeUI | null {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    if (node.type === 'group') {
-      const found = findNodeById(node.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-/**
- * Find the parent group of a given node ID.
- * Returns null for root-level nodes (parent is implicit root).
- */
-function findParentOf(nodes: ChainNodeUI[], targetId: number, parent?: ChainNodeUI): ChainNodeUI | null {
-  for (const node of nodes) {
-    if (node.id === targetId) return parent ?? null;
-    if (node.type === 'group') {
-      const found = findParentOf(node.children, targetId, node);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-/**
- * Find the adjacent node ID at a given insert position within a parent.
- * Used for shift+drop group creation — returns the node that would be
- * "next to" the drop position.
- */
-function findAdjacentNodeId(
-  allNodes: ChainNodeUI[],
-  parentId: number,
-  insertIndex: number,
-): number | null {
-  const parentChildren = parentId === 0
-    ? allNodes
-    : (() => {
-        const parent = findNodeById(allNodes, parentId);
-        return parent?.type === 'group' ? parent.children : [];
-      })();
-
-  // Prefer the node just before the insert index, fall back to the one after
-  if (insertIndex > 0 && parentChildren[insertIndex - 1]) {
-    return parentChildren[insertIndex - 1].id;
-  }
-  if (parentChildren[insertIndex]) {
-    return parentChildren[insertIndex].id;
-  }
-  return null;
-}
-
-/**
- * Always-visible empty slot at the bottom of the chain.
- * Drop a plugin here to move it to the end.
- */
-function EmptySlot({
-  parentId,
-  insertIndex,
-  isDragActive,
-}: {
-  parentId: number;
-  insertIndex: number;
-  isDragActive: boolean;
-}) {
-  const [showSearch, setShowSearch] = useState(false);
-  const { isOver, setNodeRef } = useDroppable({
-    id: `drop:${parentId}:${insertIndex}`,
-  });
-
-  const handleClick = useCallback(() => {
-    if (!isDragActive) {
-      setShowSearch(true);
-    }
-  }, [isDragActive]);
-
-  if (showSearch) {
-    return (
-      <div ref={setNodeRef} className="mx-0 my-2">
-        <InlinePluginSearch
-          parentId={parentId}
-          insertIndex={insertIndex}
-          onPluginAdded={() => setShowSearch(false)}
-          onOpenFullBrowser={() => {
-            setShowSearch(false);
-            window.dispatchEvent(new Event('openPluginBrowser'));
-          }}
-          onClose={() => setShowSearch(false)}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      onClick={handleClick}
-      className="mx-0 rounded-lg flex items-center justify-center gap-2"
-      style={{
-        border: isOver && isDragActive
-          ? '2px dashed var(--color-accent-cyan)'
-          : isDragActive
-            ? '2px dashed var(--color-border-strong)'
-            : '2px dashed var(--color-border-default)',
-        background: isOver && isDragActive
-          ? 'rgba(222, 255, 10, 0.08)'
-          : 'transparent',
-        padding: isOver && isDragActive
-          ? '16px 0'
-          : isDragActive
-            ? '12px 0'
-            : '10px 0',
-        cursor: isDragActive ? 'default' : 'pointer',
-        transition: 'all var(--duration-fast) var(--ease-snap)',
-      }}
-    >
-      <Plus className="w-3.5 h-3.5" style={{
-        color: isOver && isDragActive ? 'var(--color-accent-cyan)' : 'var(--color-text-disabled)',
-      }} />
-      <span
-        className="text-xs"
-        style={{
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: 'var(--tracking-wide)',
-          textTransform: 'uppercase' as const,
-          color: isOver && isDragActive
-            ? 'var(--color-accent-cyan)'
-            : 'var(--color-text-disabled)',
-        }}
-      >
-        {isOver && isDragActive
-          ? 'Drop here'
-          : isDragActive
-            ? 'Move to end'
-            : 'Add plugin'
-        }
-      </span>
-    </div>
-  );
-}
-
