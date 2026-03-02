@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useChainStore, useChainActions } from '../stores/chainStore';
+import { useMeterStore } from '../stores/meterStore';
 import { Knob } from './Knob/Knob';
+import { SnapshotButton } from './ChainEditor/SnapshotButton';
 
 // Convert linear to dB
 function linearToDb(linear: number): number {
@@ -25,9 +27,9 @@ export function InlineEditorToolbar() {
   const nodes = useChainStore(s => s.nodes);
   const snapshots = useChainStore(s => s.snapshots);
   const activeSnapshot = useChainStore(s => s.activeSnapshot);
-  const nodeMeterData = useChainStore(s => s.nodeMeterData);
+  const nodeMeterData = useMeterStore(s => s.nodeMeterData);
   const {
-    saveSnapshot, recallSnapshot,
+    saveSnapshot, recallSnapshot, renameSnapshot,
     setNodeInputGain, setNodeOutputGain, setNodeDryWet,
     setNodeMidSideMode,
     _endContinuousGesture,
@@ -71,53 +73,18 @@ export function InlineEditorToolbar() {
     >
       {/* A/B/C/D Snapshots */}
       <div className="flex gap-0.5 shrink-0">
-        {[0, 1, 2, 3].map((i) => {
-          const label = ['A', 'B', 'C', 'D'][i];
-          const snapshot = snapshots[i];
-          const isActive = activeSnapshot === i && snapshot != null;
-          return (
-            <button
-              key={i}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (e.shiftKey) {
-                  saveSnapshot(i);
-                } else if (snapshot) {
-                  recallSnapshot(i);
-                } else {
-                  saveSnapshot(i);
-                }
-              }}
-              className="w-7 h-7 rounded text-[10px] font-bold font-mono"
-              style={{
-                transition: 'all 150ms ease',
-                background: isActive
-                  ? NEON
-                  : snapshot
-                    ? 'rgba(222, 255, 10, 0.12)'
-                    : 'rgba(255,255,255,0.05)',
-                color: isActive
-                  ? '#000'
-                  : snapshot
-                    ? NEON
-                    : 'var(--color-text-disabled, #555)',
-                border: snapshot && !isActive
-                  ? `1px solid rgba(222, 255, 10, 0.3)`
-                  : '1px solid rgba(255,255,255,0.08)',
-                boxShadow: isActive
-                  ? `0 0 8px rgba(222, 255, 10, 0.4)`
-                  : 'none',
-              }}
-              title={
-                snapshot
-                  ? `${isActive ? 'Active' : 'Recall'} ${label} \u2022 Shift+click to overwrite \u2022 \u2318\u2325${i + 1}`
-                  : `Save snapshot ${label} \u2022 \u2318\u2325\u21E7${i + 1}`
-              }
-            >
-              {label}
-            </button>
-          );
-        })}
+        {[0, 1, 2, 3].map((i) => (
+          <SnapshotButton
+            key={i}
+            index={i}
+            snapshot={snapshots[i]}
+            isActive={activeSnapshot === i && snapshots[i] != null}
+            onSave={saveSnapshot}
+            onRecall={recallSnapshot}
+            onRename={renameSnapshot}
+            size="lg"
+          />
+        ))}
       </div>
 
       {/* Separator */}
@@ -221,12 +188,18 @@ export function InlineEditorToolbar() {
             background: 'rgba(0,0,0,0.3)',
           }}
         >
-          {(['L/R', 'MID', 'SIDE', 'M/S'] as const).map((label, idx) => {
+          {([
+            { label: 'L/R', tooltip: 'Normal stereo processing (L/R)' },
+            { label: 'MID', tooltip: 'Process mid channel only — preserves stereo width' },
+            { label: 'SIDE', tooltip: 'Process side channel only — preserves center content' },
+            { label: 'M/S', tooltip: 'Full M/S processing — both mid and side channels processed' },
+          ] as const).map(({ label, tooltip }, idx) => {
             const isActive = (node.midSideMode ?? 0) === idx;
             return (
               <button
                 key={label}
                 onClick={() => setNodeMidSideMode(id, idx)}
+                title={tooltip}
                 className="px-1 py-0.5 text-[8px] font-bold font-mono"
                 style={{
                   background: isActive ? 'rgba(222, 255, 10, 0.15)' : 'transparent',

@@ -1,9 +1,39 @@
 import { create } from 'zustand';
-import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings } from '../api/types';
+import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings, FormatSubstitution, AutomationSlotWarning, LatencyWarning } from '../api/types';
+import { useMeterStore } from './meterStore';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
 import { usePluginStore } from './pluginStore';
 import { getParameterMapByName, contributeParameterDiscovery } from '../api/convex-client';
+
+// ============================================
+// Throttled bridge call helper for continuous controls (knobs/sliders)
+// Coalesces rapid updates to ~60fps, only sends latest value.
+// ============================================
+type PendingCall = { fn: (...args: unknown[]) => Promise<unknown>; args: unknown[]; key: string };
+const _pendingCalls = new Map<string, PendingCall>();
+let _rafScheduled = false;
+
+function _flushPendingCalls() {
+  _rafScheduled = false;
+  const calls = Array.from(_pendingCalls.values());
+  _pendingCalls.clear();
+  for (const { fn, args } of calls) {
+    fn(...args);
+  }
+}
+
+/**
+ * Throttle a bridge call to at most once per animation frame (~16ms / 60fps).
+ * Only the latest args for each key are kept — intermediate values are dropped.
+ */
+function throttledBridgeCall(key: string, fn: (...args: unknown[]) => Promise<unknown>, ...args: unknown[]) {
+  _pendingCalls.set(key, { fn, args, key });
+  if (!_rafScheduled) {
+    _rafScheduled = true;
+    requestAnimationFrame(_flushPendingCalls);
+  }
+}
 
 // ============================================
 // Undo/Redo snapshot type
@@ -20,6 +50,7 @@ const MAX_HISTORY = 50;
 interface ABSnapshot {
   data: unknown;
   savedAt: number;
+  name?: string;
 }
 
 interface ChainStoreState {
@@ -59,14 +90,14 @@ interface ChainStoreState {
   // Last cloud chain ID (for share-without-re-saving)
   lastCloudChainId: string | null;
 
-  // Per-node meter data (keyed by ChainNodeId as string)
-  nodeMeterData: Record<string, NodeMeterReadings>;
-
   // Plugin settings clipboard (copy/paste between slots)
   pluginClipboard: { name: string; fileOrIdentifier: string; nodeId: number } | null;
 
   // Toast notifications
   toastMessage: string | null;
+
+  // Format substitutions from last chain import (AU→VST3 etc.)
+  formatSubstitutions: FormatSubstitution[];
 
   // Inline plugin search state (nodeId + parentId + insertIndex)
   inlineSearchState: { nodeId: number; parentId: number; insertIndex: number } | null;
@@ -77,9 +108,23 @@ interface ChainStoreState {
   // Inline editor mode (plugin editor embedded in host window, null = webview mode)
   inlineEditorNodeId: number | null;
   searchOverlayActive: boolean;
+  searchOverlayMode: 'add' | 'replace';
 
-  // Galaxy visualizer mode
-  galaxyActive: boolean;
+  // AI chat mode (replaces Galaxy visualizer)
+  aiChatActive: boolean;
+
+  // Automation slot warning (Team 3)
+  automationWarning: AutomationSlotWarning | null;
+
+  // Latency info from C++ (Team 4)
+  totalLatencySamples: number;
+  sampleRate: number;
+  latencyWarning: LatencyWarning | null;
+
+  // Track where the current chain was loaded from (for context-aware preset navigation)
+  chainSource: 'browse' | 'myChains' | 'preset' | null;
+  chainSourceList: string[]; // List of chain IDs from the source
+  chainSourceIndex: number;  // Current index in the source list
 }
 
 interface ChainActions {
@@ -103,12 +148,14 @@ interface ChainActions {
   dissolveGroup: (groupId: number) => Promise<boolean>;
   /** Dissolve group without pushing to undo history (for auto-dissolve after moveNode) */
   dissolveGroupSilent: (groupId: number) => Promise<boolean>;
-  setGroupMode: (groupId: number, mode: 'serial' | 'parallel') => Promise<void>;
+  setGroupMode: (groupId: number, mode: 'serial' | 'parallel' | 'midside' | 'fxselector') => Promise<void>;
+  setActiveBranch: (groupId: number, branchIndex: number) => Promise<void>;
   setGroupDryWet: (groupId: number, mix: number) => Promise<void>;
-  setGroupDucking: (groupId: number, amount: number, releaseMs: number) => Promise<void>;
+  setGroupWetGain: (groupId: number, gainDb: number) => Promise<void>;
+  setGroupDucking: (groupId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => Promise<void>;
   setBranchGain: (nodeId: number, gainDb: number) => Promise<void>;
-  setBranchSolo: (nodeId: number, solo: boolean) => Promise<void>;
   setBranchMute: (nodeId: number, mute: boolean) => Promise<void>;
+  setBranchSolo: (nodeId: number, solo: boolean) => Promise<void>;
   addDryPath: (parentId: number, insertIndex?: number) => Promise<void>;
 
   // Per-plugin controls
@@ -116,7 +163,7 @@ interface ChainActions {
   setNodeOutputGain: (nodeId: number, gainDb: number) => Promise<void>;
   setNodeDryWet: (nodeId: number, mix: number) => Promise<void>;
   setNodeMidSideMode: (nodeId: number, mode: number) => Promise<void>;
-  setNodeSidechainSource: (nodeId: number, source: number) => Promise<void>;
+  setNodeAutoGain: (nodeId: number, enabled: boolean) => Promise<void>;
   toggleNodeExpanded: (nodeId: number) => void;
 
   // Editor management
@@ -153,9 +200,14 @@ interface ChainActions {
   // A/B/C Snapshots
   saveSnapshot: (index: number) => Promise<void>;
   recallSnapshot: (index: number) => Promise<void>;
+  renameSnapshot: (index: number, name: string) => void;
 
   // Plugin settings copy (direct copy between slots)
   pastePluginSettings: (sourceNodeId: number, targetNodeId: number) => Promise<boolean>;
+
+  // Format substitutions
+  setFormatSubstitutions: (subs: FormatSubstitution[]) => void;
+  clearFormatSubstitutions: () => void;
 
   // Toast
   showToast: (message: string, durationMs?: number) => void;
@@ -167,12 +219,21 @@ interface ChainActions {
   // Inline editor mode (plugin editor embedded in host window)
   openInlineEditor: (nodeId: number) => Promise<void>;
   closeInlineEditor: () => Promise<void>;
-  showSearchOverlay: () => Promise<void>;
+  showSearchOverlay: (mode?: 'add' | 'replace') => Promise<void>;
   hideSearchOverlay: () => Promise<void>;
 
-  // Galaxy visualizer
-  openGalaxy: () => void;
-  closeGalaxy: () => void;
+  // AI chat
+  openAiChat: () => void;
+  closeAiChat: () => void;
+
+  // Chain source tracking & clear
+  clearChain: () => void;
+  setChainSource: (source: 'browse' | 'myChains' | 'preset' | null, list?: string[], index?: number) => void;
+
+  // Slot colors (right-click palette)
+  slotColors: Record<number, string>;
+  setSlotColor: (nodeId: number, color: string) => void;
+  clearSlotColor: (nodeId: number) => void;
 }
 
 function applyState(state: ChainStateV2) {
@@ -180,6 +241,8 @@ function applyState(state: ChainStateV2) {
     nodes: state.nodes || [],
     slots: state.slots || [],
     lastCloudChainId: null,
+    totalLatencySamples: state.totalLatencySamples ?? 0,
+    sampleRate: state.sampleRate ?? 44100,
   };
 }
 
@@ -332,14 +395,23 @@ const initialState: ChainStoreState = {
   _continuousGestureLastActivity: 0,
   snapshots: [null, null, null, null],
   activeSnapshot: null,
-  nodeMeterData: {},
   pluginClipboard: null,
   toastMessage: null,
+  formatSubstitutions: [],
   inlineSearchState: null,
   expandedNodeIds: new Set<number>(),
   inlineEditorNodeId: null,
   searchOverlayActive: false,
-  galaxyActive: false,
+  searchOverlayMode: 'add' as const,
+  aiChatActive: false,
+  automationWarning: null,
+  totalLatencySamples: 0,
+  sampleRate: 44100,
+  latencyWarning: null,
+  chainSource: null,
+  chainSourceList: [],
+  chainSourceIndex: -1,
+  slotColors: {},
 };
 
 export const useChainStore = create<ChainStoreState & ChainActions>((set, get) => ({
@@ -506,6 +578,14 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
+  renameSnapshot: (index: number, name: string) => {
+    const snapshots = [...get().snapshots];
+    const existing = snapshots[index];
+    if (!existing) return;
+    snapshots[index] = { ...existing, name };
+    set({ snapshots });
+  },
+
   fetchChainState: async () => {
     set({ loading: true, error: null });
     try {
@@ -590,7 +670,27 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
       const result = await juceBridge.addPluginToGroup(pluginId, parentId, insertIndex);
       if (result.success && result.chainState) {
         const chainState = result.chainState as ChainStateV2;
-        set({ ...applyState(chainState), loading: false });
+        const newState = applyState(chainState);
+        set({ ...newState, loading: false });
+
+        // Fire-and-forget: auto-discover parameter map for the newly added plugin
+        const findPluginNode = (nodeList: ChainNodeUI[], pid: string): ChainNodeUI | null => {
+          for (const node of nodeList) {
+            if (node.type === 'plugin' && node.fileOrIdentifier === pid) return node;
+            if (node.type === 'group') {
+              const found = findPluginNode(node.children, pid);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        const addedNode = findPluginNode(newState.nodes, pluginId);
+        if (addedNode) {
+          const enrichedData = usePluginStore.getState().enrichedData;
+          const enriched = enrichedData.get(addedNode.uid);
+          autoDiscoverAndUpload(addedNode.id, addedNode.name, enriched?._id).catch(() => {});
+        }
+
         return true;
       } else {
         set({ error: result.error || 'Failed to add plugin to group', loading: false });
@@ -733,7 +833,9 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   toggleNodeBypass: async (nodeId: number) => {
     const { nodes } = get();
     const node = findNodeById(nodes, nodeId);
-    if (!node || node.type !== 'plugin') return;
+    if (!node) return;
+    // Allow both plugin and group bypass
+    if (node.type !== 'plugin' && node.type !== 'group') return;
     await get()._pushHistory();
 
     try {
@@ -809,7 +911,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
-  setGroupMode: async (groupId: number, mode: 'serial' | 'parallel') => {
+  setGroupMode: async (groupId: number, mode: 'serial' | 'parallel' | 'midside' | 'fxselector') => {
     await get()._pushHistory();
     try {
       const result = await juceBridge.setGroupMode(groupId, mode);
@@ -822,10 +924,9 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
-  setGroupDryWet: async (groupId: number, mix: number) => {
-    await get()._beginContinuousGesture();
+  setActiveBranch: async (groupId: number, branchIndex: number) => {
     try {
-      const result = await juceBridge.setGroupDryWet(groupId, mix);
+      const result = await juceBridge.setActiveBranch(groupId, branchIndex);
       if (result.success && result.chainState) {
         const chainState = result.chainState as ChainStateV2;
         set(applyState(chainState));
@@ -835,10 +936,42 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
-  setGroupDucking: async (groupId: number, amount: number, releaseMs: number) => {
+  setGroupDryWet: async (groupId: number, mix: number) => {
+    await get()._beginContinuousGesture();
+    // Optimistic local update for instant UI feedback
+    const nodes = get().nodes.map(n =>
+      n.id === groupId && n.type === 'group' ? { ...n, dryWetMix: mix } : n
+    );
+    set({ nodes });
+    // Throttle the actual bridge call
+    throttledBridgeCall(`groupDryWet_${groupId}`, async () => {
+      try {
+        await juceBridge.setGroupDryWet(groupId, mix);
+      } catch (err) {
+        set({ error: String(err) });
+      }
+    });
+  },
+
+  setGroupWetGain: async (groupId: number, gainDb: number) => {
+    await get()._beginContinuousGesture();
+    const nodes = get().nodes.map(n =>
+      n.id === groupId && n.type === 'group' ? { ...n, wetGainDb: gainDb } : n
+    );
+    set({ nodes });
+    throttledBridgeCall(`groupWetGain_${groupId}`, async () => {
+      try {
+        await juceBridge.setGroupWetGain(groupId, gainDb);
+      } catch (err) {
+        set({ error: String(err) });
+      }
+    });
+  },
+
+  setGroupDucking: async (groupId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => {
     await get()._beginContinuousGesture();
     try {
-      const result = await juceBridge.setGroupDucking(groupId, amount, releaseMs);
+      const result = await juceBridge.setGroupDucking(groupId, enabled, thresholdDb, attackMs, releaseMs);
       if (result.success && result.chainState) {
         const chainState = result.chainState as ChainStateV2;
         set(applyState(chainState));
@@ -850,8 +983,23 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   setBranchGain: async (nodeId: number, gainDb: number) => {
     await get()._beginContinuousGesture();
+    const nodes = get().nodes.map(n =>
+      n.id === nodeId ? { ...n, branchGainDb: gainDb } : n
+    );
+    set({ nodes });
+    throttledBridgeCall(`branchGain_${nodeId}`, async () => {
+      try {
+        await juceBridge.setBranchGain(nodeId, gainDb);
+      } catch (err) {
+        set({ error: String(err) });
+      }
+    });
+  },
+
+  setBranchMute: async (nodeId: number, mute: boolean) => {
+    await get()._pushHistory();
     try {
-      const result = await juceBridge.setBranchGain(nodeId, gainDb);
+      const result = await juceBridge.setBranchMute(nodeId, mute);
       if (result.success && result.chainState) {
         const chainState = result.chainState as ChainStateV2;
         set(applyState(chainState));
@@ -865,19 +1013,6 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     await get()._pushHistory();
     try {
       const result = await juceBridge.setBranchSolo(nodeId, solo);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
-    } catch (err) {
-      set({ error: String(err) });
-    }
-  },
-
-  setBranchMute: async (nodeId: number, mute: boolean) => {
-    await get()._pushHistory();
-    try {
-      const result = await juceBridge.setBranchMute(nodeId, mute);
       if (result.success && result.chainState) {
         const chainState = result.chainState as ChainStateV2;
         set(applyState(chainState));
@@ -906,41 +1041,49 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   setNodeInputGain: async (nodeId: number, gainDb: number) => {
     await get()._beginContinuousGesture();
-    try {
-      const result = await juceBridge.setNodeInputGain(nodeId, gainDb);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
+    const nodes = get().nodes.map(n =>
+      n.id === nodeId && n.type === 'plugin' ? { ...n, inputGainDb: gainDb } : n
+    );
+    set({ nodes });
+    throttledBridgeCall(`nodeInputGain_${nodeId}`, async () => {
+      try {
+        await juceBridge.setNodeInputGain(nodeId, gainDb);
+      } catch (err) {
+        set({ error: String(err) });
       }
-    } catch (err) {
-      set({ error: String(err) });
-    }
+    });
   },
 
   setNodeOutputGain: async (nodeId: number, gainDb: number) => {
     await get()._beginContinuousGesture();
-    try {
-      const result = await juceBridge.setNodeOutputGain(nodeId, gainDb);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
+    const nodes = get().nodes.map(n =>
+      n.id === nodeId && n.type === 'plugin' ? { ...n, outputGainDb: gainDb } : n
+    );
+    set({ nodes });
+    throttledBridgeCall(`nodeOutputGain_${nodeId}`, async () => {
+      try {
+        await juceBridge.setNodeOutputGain(nodeId, gainDb);
+      } catch (err) {
+        set({ error: String(err) });
       }
-    } catch (err) {
-      set({ error: String(err) });
-    }
+    });
   },
 
   setNodeDryWet: async (nodeId: number, mix: number) => {
     await get()._beginContinuousGesture();
-    try {
-      const result = await juceBridge.setNodeDryWet(nodeId, mix);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
+    // Optimistic local update for instant UI feedback
+    const nodes = get().nodes.map(n =>
+      n.id === nodeId && n.type === 'plugin' ? { ...n, pluginDryWet: mix } : n
+    );
+    set({ nodes });
+    // Throttle the actual bridge call
+    throttledBridgeCall(`nodeDryWet_${nodeId}`, async () => {
+      try {
+        await juceBridge.setNodeDryWet(nodeId, mix);
+      } catch (err) {
+        set({ error: String(err) });
       }
-    } catch (err) {
-      set({ error: String(err) });
-    }
+    });
   },
 
   setNodeMidSideMode: async (nodeId: number, mode: number) => {
@@ -956,13 +1099,11 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
-  setNodeSidechainSource: async (nodeId: number, source: number) => {
-    await get()._pushHistory();
+  setNodeAutoGain: async (nodeId: number, enabled: boolean) => {
     try {
-      const result = await juceBridge.setNodeSidechainSource(nodeId, source);
+      const result = await juceBridge.setNodeAutoGain(nodeId, enabled);
       if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
+        set(applyState(result.chainState as ChainStateV2));
       }
     } catch (err) {
       set({ error: String(err) });
@@ -1046,6 +1187,16 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   setChainName: (name: string) => {
     set({ chainName: name });
+    // Sync with cloudChainStore if this chain has a cloud ID
+    const cloudId = get().lastCloudChainId;
+    if (cloudId) {
+      // Lazy import to avoid circular dependency — cloudChainStore may import chainStore
+      import('./cloudChainStore').then(({ useCloudChainStore }) => {
+        useCloudChainStore.getState().updateLocalChainName(cloudId, name);
+      }).catch(() => {
+        // Silently ignored — cross-store sync is best-effort
+      });
+    }
   },
 
   setLastCloudChainId: (id: string | null) => {
@@ -1086,6 +1237,18 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   // =============================================
+  // Format substitutions
+  // =============================================
+
+  setFormatSubstitutions: (subs: FormatSubstitution[]) => {
+    set({ formatSubstitutions: subs });
+  },
+
+  clearFormatSubstitutions: () => {
+    set({ formatSubstitutions: [] });
+  },
+
+  // =============================================
   // Toast notifications
   // =============================================
 
@@ -1116,6 +1279,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // =============================================
 
   openInlineEditor: async (nodeId: number) => {
+    // Already showing this plugin — nothing to do
+    if (get().inlineEditorNodeId === nodeId) return;
     try {
       const result = await juceBridge.openPluginInline(nodeId);
       if (result.success) {
@@ -1140,15 +1305,12 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
-  showSearchOverlay: async () => {
-    try {
-      const result = await juceBridge.showSearchOverlay();
-      if (result.success) {
-        set({ searchOverlayActive: true });
-      }
-    } catch (err) {
-      console.error('[chainStore] showSearchOverlay failed:', err);
-    }
+  showSearchOverlay: async (mode: 'add' | 'replace' = 'add') => {
+    // Set state immediately so the overlay shows, then tell C++ to adjust layout
+    set({ searchOverlayActive: true, searchOverlayMode: mode });
+    juceBridge.showSearchOverlay().catch((err) => {
+      console.error('[chainStore] showSearchOverlay C++ call failed:', err);
+    });
   },
 
   hideSearchOverlay: async () => {
@@ -1161,20 +1323,73 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   // =============================================
-  // Galaxy Visualizer
+  // AI Chat
   // =============================================
 
-  openGalaxy: () => {
+  openAiChat: () => {
     // Close any open inline plugin editor first
     const current = get().inlineEditorNodeId;
     if (current !== null) {
       juceBridge.closePluginInline().catch(() => {});
     }
-    set({ galaxyActive: true, inlineEditorNodeId: null, searchOverlayActive: false });
+    set({ aiChatActive: true, inlineEditorNodeId: null, searchOverlayActive: false });
   },
 
-  closeGalaxy: () => {
-    set({ galaxyActive: false });
+  closeAiChat: () => {
+    set({ aiChatActive: false });
+  },
+
+  // =============================================
+  // Chain source tracking & clear
+  // =============================================
+
+  clearChain: () => {
+    // Try to clear the C++ chain via import with empty data
+    juceBridge.importChain('').catch(() => {
+      // If native clear fails, just clear local state
+    });
+    set({
+      nodes: [],
+      slots: [],
+      chainName: 'Untitled Chain',
+      selectedNodeId: null,
+      selectedSlotIndex: null,
+      lastCloudChainId: null,
+      history: [],
+      future: [],
+      snapshots: [null, null, null, null],
+      activeSnapshot: null,
+      expandedNodeIds: new Set<number>(),
+      chainSource: null,
+      chainSourceList: [],
+      chainSourceIndex: -1,
+      slotColors: {},
+    });
+    // Reset meter data in the dedicated meter store
+    useMeterStore.setState((s) => ({
+      nodeMeterData: {},
+      peakMeterVersion: s.peakMeterVersion + 1,
+    }));
+  },
+
+  setChainSource: (source, list = [], index = -1) => {
+    set({ chainSource: source, chainSourceList: list, chainSourceIndex: index });
+  },
+
+  // =============================================
+  // Slot colors
+  // =============================================
+
+  setSlotColor: (nodeId, color) => {
+    set((s) => ({ slotColors: { ...s.slotColors, [nodeId]: color } }));
+  },
+
+  clearSlotColor: (nodeId) => {
+    set((s) => {
+      const next = { ...s.slotColors };
+      delete next[nodeId];
+      return { slotColors: next };
+    });
   },
 
   // =============================================
@@ -1242,16 +1457,18 @@ const actionsSelector = (state: ChainStoreState & ChainActions) => ({
   dissolveGroupSilent: state.dissolveGroupSilent,
   setGroupMode: state.setGroupMode,
   setGroupDryWet: state.setGroupDryWet,
+  setGroupWetGain: state.setGroupWetGain,
   setGroupDucking: state.setGroupDucking,
   setBranchGain: state.setBranchGain,
-  setBranchSolo: state.setBranchSolo,
   setBranchMute: state.setBranchMute,
+  setBranchSolo: state.setBranchSolo,
+  setActiveBranch: state.setActiveBranch,
   addDryPath: state.addDryPath,
   setNodeInputGain: state.setNodeInputGain,
   setNodeOutputGain: state.setNodeOutputGain,
   setNodeDryWet: state.setNodeDryWet,
   setNodeMidSideMode: state.setNodeMidSideMode,
-  setNodeSidechainSource: state.setNodeSidechainSource,
+  setNodeAutoGain: state.setNodeAutoGain,
   toggleNodeExpanded: state.toggleNodeExpanded,
   openPluginEditor: state.openPluginEditor,
   closePluginEditor: state.closePluginEditor,
@@ -1272,16 +1489,21 @@ const actionsSelector = (state: ChainStoreState & ChainActions) => ({
   _endContinuousGesture: state._endContinuousGesture,
   saveSnapshot: state.saveSnapshot,
   recallSnapshot: state.recallSnapshot,
+  renameSnapshot: state.renameSnapshot,
   pastePluginSettings: state.pastePluginSettings,
   showToast: state.showToast,
+  setFormatSubstitutions: state.setFormatSubstitutions,
+  clearFormatSubstitutions: state.clearFormatSubstitutions,
   showInlineSearchBelow: state.showInlineSearchBelow,
   hideInlineSearch: state.hideInlineSearch,
   openInlineEditor: state.openInlineEditor,
   closeInlineEditor: state.closeInlineEditor,
   showSearchOverlay: state.showSearchOverlay,
   hideSearchOverlay: state.hideSearchOverlay,
-  openGalaxy: state.openGalaxy,
-  closeGalaxy: state.closeGalaxy,
+  openAiChat: state.openAiChat,
+  closeAiChat: state.closeAiChat,
+  clearChain: state.clearChain,
+  setChainSource: state.setChainSource,
 });
 
 // Hook for components to access chain actions without re-rendering on state changes.
@@ -1293,11 +1515,11 @@ juceBridge.onChainChanged((state: ChainStateV2) => {
   useChainStore.setState({ ...applyState(state), loading: false });
 });
 
-// Per-node meter data for inline plugin meters
-// Granular update: only replace entries whose values actually changed,
-// so Zustand selectors for unchanged nodes return the same reference.
+// Per-node meter data for inline plugin meters.
+// Writes to the dedicated meterStore so that 30fps updates only trigger
+// selector evaluations in meter-displaying components, not all chainStore subscribers.
 juceBridge.onNodeMeterData((data: Record<string, NodeMeterReadings>) => {
-  const prev = useChainStore.getState().nodeMeterData;
+  const prev = useMeterStore.getState().nodeMeterData;
   const next: Record<string, NodeMeterReadings> = { ...prev };
   let changed = false;
   for (const key in data) {
@@ -1324,8 +1546,18 @@ juceBridge.onNodeMeterData((data: Record<string, NodeMeterReadings>) => {
     }
   }
   if (changed) {
-    useChainStore.setState({ nodeMeterData: next });
+    useMeterStore.setState({ nodeMeterData: next });
   }
+});
+
+// Automation slot warning (Team 3)
+juceBridge.onAutomationSlotWarning((warning: AutomationSlotWarning | null) => {
+  useChainStore.setState({ automationWarning: warning });
+});
+
+// Latency warning (Team 4)
+juceBridge.onLatencyWarning((warning: LatencyWarning | null) => {
+  useChainStore.setState({ latencyWarning: warning });
 });
 
 // Inline editor mode changes (C++ → JS sync)

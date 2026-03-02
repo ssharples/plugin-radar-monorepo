@@ -1,15 +1,16 @@
 import { useMemo, useCallback } from 'react';
 import { useChainStore, useChainActions } from '../../stores/chainStore';
+import { useMeterStore } from '../../stores/meterStore';
 import { findNodeById } from '../../utils/chainHelpers';
 import { Knob } from '../Knob/Knob';
 
-const NEON = '#deff0a';
+const NEON = 'var(--color-accent-cyan)';
 
 const MS_MODES = [
-  { label: 'L/R', desc: 'Normal stereo' },
-  { label: 'MID', desc: 'Mid only' },
-  { label: 'SIDE', desc: 'Side only' },
-  { label: 'M/S', desc: 'Full mid/side' },
+  { label: 'L/R', desc: 'Normal stereo', tooltip: 'Normal stereo processing (L/R)' },
+  { label: 'MID', desc: 'Mid only', tooltip: 'Process mid channel only — preserves stereo width' },
+  { label: 'SIDE', desc: 'Side only', tooltip: 'Process side channel only — preserves center content' },
+  { label: 'M/S', desc: 'Full mid/side', tooltip: 'Full M/S processing — both mid and side channels processed' },
 ] as const;
 
 function formatGain(v: number): string {
@@ -20,7 +21,7 @@ function formatGain(v: number): string {
 export function RoutingPanel() {
   const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
   const nodes = useChainStore(s => s.nodes);
-  const nodeMeterData = useChainStore(s => s.nodeMeterData);
+  const nodeMeterData = useMeterStore(s => s.nodeMeterData);
   const {
     setNodeInputGain, setNodeOutputGain, setNodeDryWet,
     setNodeMidSideMode, _endContinuousGesture,
@@ -47,7 +48,7 @@ export function RoutingPanel() {
     <div className="flex items-start gap-4 h-full p-3 overflow-x-auto">
       {/* I/O Gains */}
       <div className="flex flex-col items-center gap-1 shrink-0">
-        <span className="text-[8px] font-sans text-plugin-accent uppercase tracking-wider mb-1">I/O</span>
+        <span className="text-pico font-sans text-plugin-accent uppercase tracking-wider mb-1">I/O</span>
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-center gap-0.5">
             <Knob
@@ -61,8 +62,8 @@ export function RoutingPanel() {
               onChange={(v) => setNodeInputGain(id, v)}
               onDragEnd={_endContinuousGesture}
             />
-            <span className="text-[8px] font-sans text-white">IN</span>
-            <span className="text-[9px] font-mono tabular-nums text-white">
+            <span className="text-pico font-sans text-white">IN</span>
+            <span className="text-micro font-mono tabular-nums text-white">
               {formatGain(node.inputGainDb)}
             </span>
           </div>
@@ -78,8 +79,8 @@ export function RoutingPanel() {
               onChange={(v) => setNodeOutputGain(id, v)}
               onDragEnd={_endContinuousGesture}
             />
-            <span className="text-[8px] font-sans text-white">OUT</span>
-            <span className="text-[9px] font-mono tabular-nums text-white">
+            <span className="text-pico font-sans text-white">OUT</span>
+            <span className="text-micro font-mono tabular-nums text-white">
               {formatGain(node.outputGainDb)}
             </span>
           </div>
@@ -91,7 +92,7 @@ export function RoutingPanel() {
 
       {/* Dry/Wet */}
       <div className="flex flex-col items-center gap-0.5 shrink-0">
-        <span className="text-[8px] font-sans text-plugin-accent uppercase tracking-wider mb-1">Mix</span>
+        <span className="text-pico font-sans text-plugin-accent uppercase tracking-wider mb-1">Mix</span>
         <Knob
           value={node.pluginDryWet * 100}
           min={0}
@@ -103,7 +104,7 @@ export function RoutingPanel() {
           onChange={(v) => setNodeDryWet(id, v / 100)}
           onDragEnd={_endContinuousGesture}
         />
-        <span className="text-[9px] font-mono tabular-nums text-white">
+        <span className="text-micro font-mono tabular-nums text-white">
           {Math.round(node.pluginDryWet * 100)}%
         </span>
       </div>
@@ -113,27 +114,25 @@ export function RoutingPanel() {
 
       {/* Mid/Side Mode */}
       <div className="flex flex-col items-center gap-1 shrink-0">
-        <span className="text-[8px] font-sans text-plugin-accent uppercase tracking-wider mb-1">M/S Mode</span>
-        <div className="flex flex-col gap-0.5">
+        <span className="text-pico font-sans text-plugin-accent uppercase tracking-wider mb-1">M/S Mode</span>
+        <div className="flex flex-row gap-0.5">
           {MS_MODES.map((mode, idx) => {
             const isActive = (node.midSideMode ?? 0) === idx;
             return (
               <button
                 key={mode.label}
                 onClick={() => setNodeMidSideMode(id, idx)}
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors"
+                title={mode.tooltip || mode.desc}
+                className="px-2 py-1 rounded transition-colors"
                 style={{
                   background: isActive ? 'rgba(222, 255, 10, 0.12)' : 'transparent',
                 }}
               >
                 <span
-                  className="text-[9px] font-sans font-bold w-7"
+                  className="text-micro font-sans font-bold"
                   style={{ color: isActive ? NEON : 'rgba(255,255,255,0.3)' }}
                 >
                   {mode.label}
-                </span>
-                <span className="text-[8px] font-sans text-white">
-                  {mode.desc}
                 </span>
               </button>
             );
@@ -144,27 +143,15 @@ export function RoutingPanel() {
       {/* Separator */}
       <div className="w-px self-stretch bg-white/10 shrink-0" />
 
-      {/* Sidechain info */}
-      <div className="flex flex-col items-center gap-1 shrink-0">
-        <span className="text-[8px] font-sans text-plugin-accent uppercase tracking-wider mb-1">Sidechain</span>
-        <div className="flex items-center gap-1 px-2 py-1 rounded bg-white/[0.03]">
-          <div
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{
-              background: node.hasSidechain ? NEON : 'rgba(255,255,255,0.1)',
-              boxShadow: node.hasSidechain ? `0 0 4px ${NEON}` : 'none',
-            }}
-          />
-          <span className="text-[9px] font-sans text-white">
-            {node.hasSidechain ? 'Available' : 'None'}
-          </span>
-        </div>
-        {node.latency != null && node.latency > 0 && (
-          <div className="text-[8px] font-sans text-white mt-1">
-            Latency: <span className="font-mono tabular-nums">{node.latency}</span> smp
+      {/* Latency info */}
+      {node.latency != null && node.latency > 0 && (
+        <div className="flex flex-col items-center gap-1 shrink-0">
+          <span className="text-pico font-sans text-plugin-accent uppercase tracking-wider mb-1">Latency</span>
+          <div className="text-micro font-sans text-white">
+            <span className="font-mono tabular-nums">{node.latency}</span> smp
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
