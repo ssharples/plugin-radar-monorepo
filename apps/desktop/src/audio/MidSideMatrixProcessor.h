@@ -1,6 +1,6 @@
 #pragma once
 
-#include <juce_audio_processors/juce_audio_processors.h>
+#include "SimpleAudioProcessor.h"
 
 /**
  * MidSideMatrixProcessor - Encodes L/R to Mid/Side or decodes Mid/Side to L/R.
@@ -13,7 +13,7 @@
  *
  * Stereo in, stereo out. Zero latency, no parameters, no state.
  */
-class MidSideMatrixProcessor : public juce::AudioProcessor
+class MidSideMatrixProcessor : public SimpleAudioProcessor
 {
 public:
     MidSideMatrixProcessor();
@@ -25,24 +25,10 @@ public:
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override;
 
-    double getTailLengthSeconds() const override { return 0.0; }
-    bool acceptsMidi() const override { return false; }
-    bool producesMidi() const override { return false; }
-
-    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
-    bool hasEditor() const override { return false; }
-
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram(int) override {}
-    const juce::String getProgramName(int) override { return {}; }
-    void changeProgramName(int, const juce::String&) override {}
-
-    void getStateInformation(juce::MemoryBlock&) override {}
-    void setStateInformation(const void*, int) override {}
-
 private:
     static constexpr float kInvSqrt2 = 0.7071067811865476f;
+    bool insufficientChannelsLogged_ = false;
+    juce::AudioBuffer<float> tempBuffer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidSideMatrixProcessor)
 };
