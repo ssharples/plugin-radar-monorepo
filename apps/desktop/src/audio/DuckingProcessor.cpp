@@ -1,23 +1,30 @@
 #include "DuckingProcessor.h"
+#include "FastMath.h"
+#include "../utils/ProChainLogger.h"
 #include <cmath>
 
 DuckingProcessor::DuckingProcessor()
-    : AudioProcessor(BusesProperties()
+    : SimpleAudioProcessor(BusesProperties()
           .withInput("Audio", juce::AudioChannelSet::stereo(), true)
           .withInput("Sidechain", juce::AudioChannelSet::stereo(), true)
           .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 {
-    smoothedGain.setCurrentAndTargetValue(1.0f);
 }
 
-void DuckingProcessor::setDuckAmount(float amount)
+void DuckingProcessor::setThresholdDb(float db)
 {
-    duckAmount.store(juce::jlimit(0.0f, 1.0f, amount), std::memory_order_relaxed);
+    thresholdDb.store(juce::jlimit(-60.0f, 0.0f, db), std::memory_order_relaxed);
+}
+
+void DuckingProcessor::setAttackMs(float ms)
+{
+    attackMs.store(juce::jlimit(0.1f, 500.0f, ms), std::memory_order_relaxed);
+    updateCoefficients();
 }
 
 void DuckingProcessor::setReleaseMs(float ms)
 {
-    releaseMs.store(juce::jlimit(50.0f, 1000.0f, ms), std::memory_order_relaxed);
+    releaseMs.store(juce::jlimit(50.0f, 5000.0f, ms), std::memory_order_relaxed);
     updateCoefficients();
 }
 
@@ -25,8 +32,6 @@ void DuckingProcessor::prepareToPlay(double sampleRate, int /*samplesPerBlock*/)
 {
     currentSampleRate = sampleRate;
     envelopeLevel = 0.0f;
-    smoothedGain.reset(sampleRate, 0.005); // 5ms ramp for gain changes
-    smoothedGain.setCurrentAndTargetValue(1.0f);
     updateCoefficients();
 }
 
@@ -35,13 +40,15 @@ void DuckingProcessor::updateCoefficients()
     if (currentSampleRate <= 0.0)
         return;
 
-    // Attack: fast (~5ms) to catch transients
-    const float attackMs = 5.0f;
-    attackCoeff = std::exp(-1.0f / static_cast<float>(currentSampleRate * attackMs * 0.001));
+    // Attack: user-configurable
+    float atkMs = attackMs.load(std::memory_order_relaxed);
+    attackCoeff.store(std::exp(-1.0f / static_cast<float>(currentSampleRate * atkMs * 0.001)),
+                      std::memory_order_relaxed);
 
     // Release: user-configurable
     float relMs = releaseMs.load(std::memory_order_relaxed);
-    releaseCoeff = std::exp(-1.0f / static_cast<float>(currentSampleRate * relMs * 0.001));
+    releaseCoeff.store(std::exp(-1.0f / static_cast<float>(currentSampleRate * relMs * 0.001)),
+                       std::memory_order_relaxed);
 }
 
 void DuckingProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& /*midi*/)
@@ -52,11 +59,16 @@ void DuckingProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     // We expect 4 input channels: ch0-1 = group audio, ch2-3 = sidechain reference
     if (numChannels < 4)
     {
-        // Fallback passthrough
+        // Fallback passthrough — copy ch0-1 to output so audio doesn't disappear
+        DBG("DuckingProcessor: expected 4+ channels, got " + juce::String(numChannels)
+            + ". Passing through input unchanged (ducking disabled).");
+        jassertfalse;
+        // Input ch0-1 are already in the output position — nothing to copy.
         return;
     }
 
-    const float amount = duckAmount.load(std::memory_order_relaxed);
+    const float thrDb = thresholdDb.load(std::memory_order_relaxed);
+    const float thresholdLin = FastMath::dbToLinear(thrDb);
 
     const float* audioL = buffer.getReadPointer(0);
     const float* audioR = buffer.getReadPointer(1);
@@ -66,42 +78,30 @@ void DuckingProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     float* outL = buffer.getWritePointer(0);
     float* outR = buffer.getWritePointer(1);
 
-    // No ducking: just pass through audio channels
-    if (amount < 0.001f)
-    {
-        // Audio is already in channels 0-1, clear sidechain channels
-        buffer.clear(2, 0, numSamples);
-        buffer.clear(3, 0, numSamples);
-
-        // Smooth gain back to 1.0 if we were previously ducking
-        smoothedGain.setTargetValue(1.0f);
-        if (smoothedGain.isSmoothing())
-        {
-            for (int i = 0; i < numSamples; ++i)
-            {
-                float g = smoothedGain.getNextValue();
-                outL[i] = audioL[i] * g;
-                outR[i] = audioR[i] * g;
-            }
-        }
-        return;
-    }
+    // Load coefficients once per block to avoid per-sample atomic reads
+    const float atkCoeff = attackCoeff.load(std::memory_order_relaxed);
+    const float relCoeff = releaseCoeff.load(std::memory_order_relaxed);
 
     // Per-sample envelope following and gain application
+    const float denom = std::max(0.001f, 1.0f - thresholdLin);
+
     for (int i = 0; i < numSamples; ++i)
     {
         // Peak detection on sidechain
         float scPeak = std::max(std::abs(scL[i]), std::abs(scR[i]));
 
-        // Envelope follower (attack/release)
-        if (scPeak > envelopeLevel)
-            envelopeLevel = attackCoeff * envelopeLevel + (1.0f - attackCoeff) * scPeak;
-        else
-            envelopeLevel = releaseCoeff * envelopeLevel + (1.0f - releaseCoeff) * scPeak;
+        // Compute how far above threshold the sidechain is (normalized 0..1)
+        float scAboveThreshold = std::max(0.0f, scPeak - thresholdLin) / denom;
 
-        // Calculate gain: 1.0 - (envelope * duckAmount)
+        // Envelope follower (attack/release)
+        if (scAboveThreshold > envelopeLevel)
+            envelopeLevel = atkCoeff * envelopeLevel + (1.0f - atkCoeff) * scAboveThreshold;
+        else
+            envelopeLevel = relCoeff * envelopeLevel + (1.0f - relCoeff) * scAboveThreshold;
+
+        // Calculate gain: 1.0 - envelope (clamped)
         float clampedEnv = juce::jlimit(0.0f, 1.0f, envelopeLevel);
-        float g = 1.0f - (clampedEnv * amount);
+        float g = 1.0f - clampedEnv;
         g = juce::jlimit(0.0f, 1.0f, g);
 
         outL[i] = audioL[i] * g;
