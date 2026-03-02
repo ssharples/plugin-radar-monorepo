@@ -6,11 +6,8 @@ import type {
   GroupTemplateInfo,
   ScanProgress,
   ApiResponse,
-  WaveformData,
-  MeterData,
   NodeMeterReadings,
   GainSettings,
-  FFTData,
   BlacklistedPluginEvent,
   OtherInstanceInfo,
   MirrorState,
@@ -19,9 +16,16 @@ import type {
   AutoScanState,
   NewPluginsDetectedEvent,
   InlineEditorState,
+  AutomationSlotWarning,
+  LatencyWarning,
+  BackupInfo,
 } from './types';
 
 type EventHandler<T> = (data: T) => void;
+
+// Gate verbose logging behind DEV mode — in production JUCE WebView contexts,
+// console.log serializes through the bridge and is extremely expensive at 30fps.
+const DEBUG_BRIDGE = import.meta.env.DEV;
 
 // Default timeout for native calls (10 seconds)
 const DEFAULT_TIMEOUT_MS = 10000;
@@ -44,7 +48,7 @@ class PromiseHandler {
     const juce = (window as any).__JUCE__;
     if (juce?.backend?.addEventListener) {
       juce.backend.addEventListener("__juce__complete", (data: { promiseId: number; result: unknown }) => {
-        console.log('Received __juce__complete:', data);
+        if (DEBUG_BRIDGE) console.log('Received __juce__complete:', data);
         if (this.promises.has(data.promiseId)) {
           this.promises.get(data.promiseId)!.resolve(data.result);
           this.promises.delete(data.promiseId);
@@ -85,7 +89,7 @@ class JuceBridge {
 
   constructor() {
     this.isNative = typeof (window as any).__JUCE__ !== 'undefined';
-    console.log('JuceBridge initialized, isNative:', this.isNative);
+    if (DEBUG_BRIDGE) console.log('JuceBridge initialized, isNative:', this.isNative);
 
     if (this.isNative && !promiseHandler) {
       promiseHandler = new PromiseHandler();
@@ -103,9 +107,6 @@ class JuceBridge {
       'scanProgress',
       'presetListChanged',
       'presetLoaded',
-      'waveformData',
-      'meterData',
-      'fftData',
       'gainChanged',
       'matchLockWarning',
       'nodeMeterData',
@@ -123,11 +124,14 @@ class JuceBridge {
       'inlineEditorChanged',
       'searchOverlayOpened',
       'searchOverlayClosed',
+      'masterDryWetChanged',
+      'automationSlotWarning',
+      'latencyWarning',
     ];
 
     events.forEach((eventName) => {
       window.__JUCE__?.backend.addEventListener(eventName, (data) => {
-        console.log(`[JuceBridge] Event received: ${eventName}`, data);
+        if (DEBUG_BRIDGE) console.log(`[JuceBridge] Event received: ${eventName}`, data);
         this.emitLocalEvent(eventName, data);
       });
     });
@@ -160,10 +164,10 @@ class JuceBridge {
       }
     }
 
-    console.log(`callNative: ${name}`, actualArgs, `(timeout: ${timeoutMs}ms)`);
+    if (DEBUG_BRIDGE) console.log(`callNative: ${name}`, actualArgs, `(timeout: ${timeoutMs}ms)`);
 
     if (!this.isNative) {
-      console.warn(`Native function ${name} called in non-native environment`);
+      if (DEBUG_BRIDGE) console.warn(`Native function ${name} called in non-native environment`);
       return {} as T;
     }
 
@@ -180,7 +184,7 @@ class JuceBridge {
 
     // Use JUCE 8's event-based mechanism for native function calls
     const [promiseId, promise] = promiseHandler.createPromise();
-    console.log(`Emitting __juce__invoke for ${name} with promiseId ${promiseId}`);
+    if (DEBUG_BRIDGE) console.log(`Emitting __juce__invoke for ${name} with promiseId ${promiseId}`);
 
     backend.emitEvent("__juce__invoke", {
       name: name,
@@ -194,7 +198,7 @@ class JuceBridge {
       timeoutId = setTimeout(() => {
         // Clean up the pending promise handler to prevent memory leaks
         if (promiseHandler?.hasPendingPromise(promiseId)) {
-          console.warn(`[JuceBridge] Native function '${name}' timed out after ${timeoutMs}ms (promiseId: ${promiseId})`);
+          if (DEBUG_BRIDGE) console.warn(`[JuceBridge] Native function '${name}' timed out after ${timeoutMs}ms (promiseId: ${promiseId})`);
           promiseHandler.cleanupPromise(promiseId);
         }
         reject(new NativeCallTimeoutError(name, timeoutMs));
@@ -204,17 +208,23 @@ class JuceBridge {
     try {
       // Race between the actual promise and the timeout
       const result = await Promise.race([promise, timeoutPromise]);
-      clearTimeout(timeoutId!);
-      console.log(`Native function ${name} returned:`, result);
+      if (DEBUG_BRIDGE) console.log(`Native function ${name} returned:`, result);
       return result as T;
     } catch (error) {
-      clearTimeout(timeoutId!);
       if (error instanceof NativeCallTimeoutError) {
         console.error(`[JuceBridge] Timeout error:`, error.message);
       } else {
         console.error(`Error calling native function ${name}:`, error);
       }
       throw error;
+    } finally {
+      // Always clean up: clear the timeout timer and remove any orphaned promise entry.
+      // - If native resolved first: clearTimeout prevents the timeout from firing;
+      //   __juce__complete already deleted from map, so cleanupPromise is a no-op.
+      // - If timeout fired first: timer already ran, cleanupPromise already called
+      //   in the timeout handler, but we ensure the timer ref is cleared here too.
+      clearTimeout(timeoutId!);
+      promiseHandler!.cleanupPromise(promiseId);
     }
   }
 
@@ -227,6 +237,14 @@ class JuceBridge {
    */
   async callNativeWithTimeout<T>(name: string, timeoutMs: number, ...args: unknown[]): Promise<T> {
     return this.callNative<T>(name, ...args, { __callOptions: true, timeout: timeoutMs });
+  }
+
+  /**
+   * Call a native JUCE function with a JSON-stringified object argument.
+   * Shorthand for `this.callNative(name, JSON.stringify(data))`.
+   */
+  private callNativeJson<T = void>(name: string, data: Record<string, unknown>): Promise<T> {
+    return this.callNative<T>(name, JSON.stringify(data));
   }
 
   // Event subscription
@@ -325,17 +343,30 @@ class JuceBridge {
     return this.callNative<string[]>('getCategories');
   }
 
+  // Backups
+  async getBackupList(): Promise<BackupInfo[]> {
+    return this.callNative<BackupInfo[]>('getBackupList');
+  }
+
+  async restoreBackup(path: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('restoreBackup', path);
+  }
+
   // Group Templates
   async getGroupTemplateList(): Promise<GroupTemplateInfo[]> {
     return this.callNative<GroupTemplateInfo[]>('getGroupTemplateList');
   }
 
   async saveGroupTemplate(groupId: number, name: string, category: string): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('saveGroupTemplate', JSON.stringify({ groupId, name, category }));
+    return this.callNativeJson<ApiResponse>('saveGroupTemplate', { groupId, name, category });
   }
 
   async loadGroupTemplate(path: string, parentId: number, insertIndex: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('loadGroupTemplate', JSON.stringify({ path, parentId, insertIndex }));
+    return this.callNativeJson<ApiResponse>('loadGroupTemplate', { path, parentId, insertIndex });
+  }
+
+  async renameGroupTemplate(path: string, newName: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('renameGroupTemplate', path, newName);
   }
 
   async deleteGroupTemplate(path: string): Promise<ApiResponse> {
@@ -356,24 +387,6 @@ class JuceBridge {
 
   onPresetLoaded(handler: EventHandler<PresetInfo | null>): () => void {
     return this.on('presetLoaded', handler);
-  }
-
-  // Waveform streaming
-  async startWaveformStream(): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('startWaveformStream');
-  }
-
-  async stopWaveformStream(): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('stopWaveformStream');
-  }
-
-  onWaveformData(handler: EventHandler<WaveformData>): () => void {
-    return this.on('waveformData', handler);
-  }
-
-  // FFT data streaming
-  onFFTData(handler: EventHandler<FFTData>): () => void {
-    return this.on('fftData', handler);
   }
 
   // Gain control
@@ -413,17 +426,16 @@ class JuceBridge {
     return this.callNative<number>('getSampleRate');
   }
 
+  async getBufferSize(): Promise<number> {
+    return this.callNative<number>('getBufferSize');
+  }
+
   async resetAllNodePeaks(): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('resetAllNodePeaks');
   }
 
   async setNodeMute(nodeId: number, muted: boolean): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setNodeMute', JSON.stringify({ nodeId, muted }));
-  }
-
-  // FFT enable/disable - toggle spectrum analyzer processing
-  async setFFTEnabled(enabled: boolean): Promise<void> {
-    return this.callNative<void>('setFFTEnabled', enabled);
+    return this.callNativeJson<ApiResponse>('setNodeMute', { nodeId, muted });
   }
 
   // PHASE 2: Conditional metering - set global meter mode
@@ -431,9 +443,9 @@ class JuceBridge {
     return this.callNative<boolean>('setMeterMode', mode);
   }
 
-  // Meter data
-  onMeterData(handler: EventHandler<MeterData>): () => void {
-    return this.on('meterData', handler);
+  // Enable/disable per-node meters (reduces CPU when meters panel is hidden)
+  async setNodeMetersEnabled(enabled: boolean): Promise<void> {
+    return this.callNative<void>('setNodeMetersEnabled', enabled);
   }
 
   // Per-node meter data (inline plugin meters)
@@ -444,6 +456,11 @@ class JuceBridge {
   // Gain change events (from match lock auto-adjustment or autoCalibrate)
   onGainChanged(handler: EventHandler<{ inputGainDB?: number; outputGainDB?: number }>): () => void {
     return this.on('gainChanged', handler);
+  }
+
+  // Master dry/wet change event (from snapshot restore)
+  onMasterDryWetChanged(handler: EventHandler<{ mix: number }>): () => void {
+    return this.on('masterDryWetChanged', handler);
   }
 
   // Auto-calibrate input gain to match a target peak level
@@ -462,6 +479,15 @@ class JuceBridge {
     return this.on('matchLockWarning', handler);
   }
 
+  onAutomationSlotWarning(handler: EventHandler<AutomationSlotWarning>): () => void {
+    return this.on('automationSlotWarning', handler);
+  }
+
+  // Latency warning events (when chain latency exceeds thresholds)
+  onLatencyWarning(handler: EventHandler<LatencyWarning | null>): () => void {
+    return this.on('latencyWarning', handler);
+  }
+
   // Plugin blacklist events (from scanner)
   onPluginBlacklisted(handler: EventHandler<BlacklistedPluginEvent>): () => void {
     return this.on('pluginBlacklisted', handler);
@@ -475,8 +501,8 @@ class JuceBridge {
   // Blacklist Management
   // ============================================
 
-  async getBlacklist(): Promise<unknown> {
-    return this.callNative<unknown>('getBlacklist');
+  async getBlacklist(): Promise<string[]> {
+    return this.callNative<string[]>('getBlacklist');
   }
 
   async addToBlacklist(pluginId: string): Promise<ApiResponse> {
@@ -542,6 +568,45 @@ class JuceBridge {
     return this.callNative('discoverPluginParameters', nodeId);
   }
 
+  /**
+   * Discover plugin parameters offline — creates a temporary instance without
+   * adding the plugin to the chain. Used for batch scanning.
+   * 30-second timeout since some plugins are slow to instantiate.
+   */
+  async discoverPluginParametersOffline(fileOrIdentifier: string): Promise<{
+    success: boolean;
+    map?: {
+      pluginName: string;
+      manufacturer: string;
+      category: string;
+      confidence: number;
+      matchedCount: number;
+      totalCount: number;
+      eqBandCount: number;
+      eqBandParameterPattern: string;
+      compHasParallelMix: boolean;
+      compHasAutoMakeup: boolean;
+      compHasLookahead: boolean;
+      source: string;
+      parameters: Array<{
+        juceParamId: string;
+        juceParamIndex: number;
+        semantic: string;
+        physicalUnit: string;
+        mappingCurve: string;
+        minValue: number;
+        maxValue: number;
+        defaultValue: number;
+        numSteps: number;
+        label: string;
+        matched: boolean;
+      }>;
+    };
+    error?: string;
+  }> {
+    return this.callNativeWithTimeout('discoverPluginParametersOffline', 30000, fileOrIdentifier);
+  }
+
   // ============================================
   // Parameter Translation / Plugin Swap
   // ============================================
@@ -576,7 +641,7 @@ class JuceBridge {
     appliedCount?: number;
     error?: string;
   }> {
-    return this.callNative('applyPluginParameters', JSON.stringify({ nodeId, params }));
+    return this.callNativeJson('applyPluginParameters', { nodeId, params });
   }
 
   /**
@@ -596,11 +661,11 @@ class JuceBridge {
     chainState?: ChainStateV2;
     error?: string;
   }> {
-    return this.callNative('swapPluginInChain', JSON.stringify({
+    return this.callNativeJson('swapPluginInChain', {
       nodeId,
       newPluginUid,
       translatedParams,
-    }));
+    });
   }
 
   // ============================================
@@ -608,80 +673,93 @@ class JuceBridge {
   // ============================================
 
   async createGroup(childIds: number[], mode: 'serial' | 'parallel', name: string): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('createGroup', JSON.stringify({ childIds, mode, name }));
+    return this.callNativeJson<ApiResponse>('createGroup', { childIds, mode, name });
   }
 
   async dissolveGroup(groupId: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('dissolveGroup', JSON.stringify({ groupId }));
+    return this.callNativeJson<ApiResponse>('dissolveGroup', { groupId });
   }
 
-  async setGroupMode(groupId: number, mode: 'serial' | 'parallel'): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setGroupMode', JSON.stringify({ groupId, mode }));
+  async setGroupMode(groupId: number, mode: 'serial' | 'parallel' | 'midside' | 'fxselector'): Promise<ApiResponse> {
+    return this.callNativeJson<ApiResponse>('setGroupMode', { groupId, mode });
+  }
+
+  async setActiveBranch(groupId: number, branchIndex: number): Promise<ApiResponse> {
+    return this.callNativeJson<ApiResponse>('setActiveBranch', { groupId, branchIndex });
   }
 
   async setGroupDryWet(groupId: number, mix: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setGroupDryWet', JSON.stringify({ groupId, mix }));
+    return this.callNativeJson<ApiResponse>('setGroupDryWet', { groupId, mix });
   }
 
-  async setGroupDucking(groupId: number, amount: number, releaseMs: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setGroupDucking', JSON.stringify({ groupId, amount, releaseMs }));
+  async setGroupWetGain(groupId: number, gainDb: number): Promise<ApiResponse> {
+    return this.callNativeJson<ApiResponse>('setGroupWetGain', { groupId, gainDb });
+  }
+
+  async setGroupDucking(groupId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number): Promise<ApiResponse> {
+    return this.callNativeJson<ApiResponse>('setGroupDucking', { groupId, enabled, thresholdDb, attackMs, releaseMs });
   }
 
   async setBranchGain(nodeId: number, gainDb: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setBranchGain', JSON.stringify({ nodeId, gainDb }));
-  }
-
-  async setBranchSolo(nodeId: number, solo: boolean): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setBranchSolo', JSON.stringify({ nodeId, solo }));
+    return this.callNativeJson<ApiResponse>('setBranchGain', { nodeId, gainDb });
   }
 
   async setBranchMute(nodeId: number, mute: boolean): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setBranchMute', JSON.stringify({ nodeId, mute }));
+    return this.callNativeJson<ApiResponse>('setBranchMute', { nodeId, mute });
+  }
+
+  async setBranchSolo(nodeId: number, solo: boolean): Promise<ApiResponse> {
+    return this.callNativeJson<ApiResponse>('setBranchSolo', { nodeId, solo });
   }
 
   async moveNode(nodeId: number, newParentId: number, newIndex: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('moveNode', JSON.stringify({ nodeId, newParentId, newIndex }));
+    return this.callNativeJson<ApiResponse>('moveNode', { nodeId, newParentId, newIndex });
   }
 
   async removeNode(nodeId: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('removeNode', JSON.stringify({ nodeId }));
+    return this.callNativeJson<ApiResponse>('removeNode', { nodeId });
   }
 
   async addPluginToGroup(pluginId: string, parentId: number, insertIndex: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('addPluginToGroup', JSON.stringify({ pluginId, parentId, insertIndex }));
+    return this.callNativeJson<ApiResponse>('addPluginToGroup', { pluginId, parentId, insertIndex });
   }
 
   async addDryPath(parentId: number, insertIndex = -1): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('addDryPath', JSON.stringify({ parentId, insertIndex }));
+    return this.callNativeJson<ApiResponse>('addDryPath', { parentId, insertIndex });
   }
 
   async setNodeBypassed(nodeId: number, bypassed: boolean): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setNodeBypassed', JSON.stringify({ nodeId, bypassed }));
+    return this.callNativeJson<ApiResponse>('setNodeBypassed', { nodeId, bypassed });
   }
 
   // Per-plugin controls
   async setNodeInputGain(nodeId: number, gainDb: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setNodeInputGain', JSON.stringify({ nodeId, gainDb }));
+    return this.callNativeJson<ApiResponse>('setNodeInputGain', { nodeId, gainDb });
   }
 
   async setNodeOutputGain(nodeId: number, gainDb: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setNodeOutputGain', JSON.stringify({ nodeId, gainDb }));
+    return this.callNativeJson<ApiResponse>('setNodeOutputGain', { nodeId, gainDb });
   }
 
   async setNodeDryWet(nodeId: number, mix: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setNodeDryWet', JSON.stringify({ nodeId, mix }));
-  }
-
-  async setNodeSidechainSource(nodeId: number, source: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setNodeSidechainSource', JSON.stringify({ nodeId, source }));
+    return this.callNativeJson<ApiResponse>('setNodeDryWet', { nodeId, mix });
   }
 
   async setNodeMidSideMode(nodeId: number, mode: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('setNodeMidSideMode', JSON.stringify({ nodeId, mode }));
+    return this.callNativeJson<ApiResponse>('setNodeMidSideMode', { nodeId, mode });
+  }
+
+  // Per-plugin auto-gain compensation
+  async setNodeAutoGain(nodeId: number, enabled: boolean): Promise<ApiResponse> {
+    return this.callNativeJson<ApiResponse>('setNodeAutoGain', { nodeId, enabled });
+  }
+
+  async getNodeAutoGain(nodeId: number): Promise<{ enabled: boolean }> {
+    return this.callNative<{ enabled: boolean }>('getNodeAutoGain', nodeId);
   }
 
   async duplicateNode(nodeId: number): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('duplicateNode', JSON.stringify({ nodeId }));
+    return this.callNativeJson<ApiResponse>('duplicateNode', { nodeId });
   }
 
   // ============================================
@@ -710,26 +788,7 @@ class JuceBridge {
     return this.callNative('getAllBypassState');
   }
 
-  /**
-   * Toggle all plugin windows: if any are open, close all. If none open, open all.
-   */
-  async toggleAllPluginWindows(): Promise<{
-    success: boolean;
-    openCount: number;
-    totalCount: number;
-  }> {
-    return this.callNative('toggleAllPluginWindows');
-  }
 
-  /**
-   * Get current plugin window state
-   */
-  async getPluginWindowState(): Promise<{
-    openCount: number;
-    totalCount: number;
-  }> {
-    return this.callNative('getPluginWindowState');
-  }
 
   // ============================================
   // Cloud Sharing - Export/Import with Presets
@@ -932,11 +991,11 @@ class JuceBridge {
   }
 
   async addCustomScanPath(path: string, format: string): Promise<{ success: boolean; error?: string }> {
-    return this.callNative<{ success: boolean; error?: string }>('addCustomScanPath', JSON.stringify({ path, format }));
+    return this.callNativeJson<{ success: boolean; error?: string }>('addCustomScanPath', { path, format });
   }
 
   async removeCustomScanPath(path: string, format: string): Promise<{ success: boolean }> {
-    return this.callNative<{ success: boolean }>('removeCustomScanPath', JSON.stringify({ path, format }));
+    return this.callNativeJson<{ success: boolean }>('removeCustomScanPath', { path, format });
   }
 
   // ============================================
@@ -1075,6 +1134,68 @@ class JuceBridge {
    */
   onSearchOverlayClosed(handler: EventHandler<void>): () => void {
     return this.on('searchOverlayClosed', handler);
+  }
+
+  /**
+   * Temporarily hide or show the native plugin editor window so that a
+   * WebView context menu can appear in front of it.
+   * Call with false before showing a context menu, then true when it closes.
+   */
+  async setNativeWindowVisible(visible: boolean): Promise<void> {
+    await this.callNative('setNativeWindowVisible', visible);
+  }
+
+  // ============================================
+  // Persistent Credentials (auth.json on disk)
+  // ============================================
+
+  async saveCredentials(data: {
+    sessionToken: string;
+    userId: string;
+    email: string;
+    name?: string;
+    hasPurchased?: boolean;
+    onboardingComplete?: boolean;
+  }): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('saveCredentials', JSON.stringify(data));
+  }
+
+  async loadCredentials(): Promise<{
+    sessionToken?: string;
+    userId?: string;
+    email?: string;
+    name?: string;
+    hasPurchased?: boolean;
+    onboardingComplete?: boolean;
+  }> {
+    return this.callNative('loadCredentials');
+  }
+
+  async clearCredentials(): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('clearCredentials');
+  }
+
+  // ============================================
+  // Persistent Settings (settings.json on disk)
+  // ============================================
+
+  async saveSettings(settings: Record<string, unknown>): Promise<{ success: boolean }> {
+    return this.callNative<{ success: boolean }>('saveSettings', JSON.stringify(settings));
+  }
+
+  async loadSettings(): Promise<Record<string, unknown>> {
+    return this.callNative<Record<string, unknown>>('loadSettings');
+  }
+
+  // ============================================
+  // Cross-Format Alias Groups
+  // ============================================
+
+  /**
+   * Push cross-format alias groups to C++ for improved AU↔VST3 matching.
+   */
+  async setCrossFormatAliases(groups: import('./types').CrossFormatAliasGroup[]): Promise<void> {
+    return this.callNative<void>('setCrossFormatAliases', JSON.stringify(groups));
   }
 }
 
