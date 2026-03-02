@@ -12,6 +12,7 @@ import { useUsageStore } from './usageStore';
 import {
   getScannedPlugins,
   fetchEnrichedPluginData,
+  fetchManufacturerLogos,
   clearEnrichmentCache,
   type EnrichedPluginData,
 } from '../api/convex-client';
@@ -35,6 +36,7 @@ interface PluginState {
 
   // Enrichment data
   enrichedData: Map<number, EnrichedPluginData>; // keyed by plugin UID
+  manufacturerLogos: Map<string, string>; // manufacturer name → logo URL (fallback)
   enrichmentLoading: boolean;
   enrichmentLoaded: boolean;
 
@@ -51,6 +53,7 @@ interface PluginState {
   autoScanState: AutoScanState;
   newPluginsDetected: NewPluginsDetectedEvent | null;
   scanSettingsOpen: boolean;
+  blacklistedPlugins: string[];
 }
 
 interface PluginActions {
@@ -69,6 +72,7 @@ interface PluginActions {
   applyFilters: () => void;
   loadEnrichmentData: () => Promise<void>;
   getEnrichedDataForPlugin: (uid: number) => EnrichedPluginData | undefined;
+  getManufacturerLogoUrl: (name: string) => string | undefined;
   hasActiveFilters: () => boolean;
 
   // Scanner management actions
@@ -86,6 +90,9 @@ interface PluginActions {
   checkForNewPlugins: () => Promise<void>;
   dismissNewPlugins: () => void;
   setScanSettingsOpen: (open: boolean) => void;
+  fetchBlacklist: () => Promise<void>;
+  removeFromBlacklist: (path: string) => Promise<void>;
+  clearBlacklist: () => Promise<void>;
 }
 
 const initialState: PluginState = {
@@ -102,6 +109,7 @@ const initialState: PluginState = {
   error: null,
 
   enrichedData: new Map(),
+  manufacturerLogos: new Map(),
   enrichmentLoading: false,
   enrichmentLoaded: false,
 
@@ -116,7 +124,10 @@ const initialState: PluginState = {
   autoScanState: { enabled: false, intervalMs: 300000, lastCheckTime: 0 },
   newPluginsDetected: null,
   scanSettingsOpen: false,
+  blacklistedPlugins: [],
 };
+
+let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const usePluginStore = create<PluginState & PluginActions>((set, get) => ({
   ...initialState,
@@ -145,7 +156,10 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
 
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
-    get().applyFilters();
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => {
+      usePluginStore.getState().applyFilters();
+    }, 150);
   },
 
   setFormatFilter: (format: string | null) => {
@@ -336,6 +350,35 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
       get().loadCustomScanPaths();
       get().loadAutoScanState();
       get().loadDeactivatedPlugins();
+      get().fetchBlacklist();
+    }
+  },
+
+  fetchBlacklist: async () => {
+    try {
+      const blacklist = await juceBridge.getBlacklist();
+      set({ blacklistedPlugins: Array.isArray(blacklist) ? blacklist : [] });
+    } catch {
+      // Ignore errors if feature not available
+    }
+  },
+
+  removeFromBlacklist: async (path: string) => {
+    try {
+      await juceBridge.removeFromBlacklist(path);
+      // Re-fetch to get updated list
+      await get().fetchBlacklist();
+    } catch {
+      // Ignore
+    }
+  },
+
+  clearBlacklist: async () => {
+    try {
+      await juceBridge.clearBlacklist();
+      set({ blacklistedPlugins: [] });
+    } catch {
+      // Ignore
     }
   },
 
@@ -345,8 +388,18 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
 
     set({ enrichmentLoading: true });
     try {
-      // Get user's scanned plugins with match data from Convex
-      const scannedPlugins = await getScannedPlugins();
+      // Collect unique manufacturer names from all scanned plugins (no auth needed)
+      const uniqueManufacturerNames = [...new Set(get().plugins.map((p) => p.manufacturer))];
+
+      // Run manufacturer logo fetch and auth-gated scanned plugin fetch in parallel
+      const [scannedPlugins, manufacturerLogos] = await Promise.all([
+        getScannedPlugins(),
+        fetchManufacturerLogos(uniqueManufacturerNames),
+      ]);
+
+      // Manufacturer logos are available regardless of auth state
+      set({ manufacturerLogos });
+
       if (!scannedPlugins || scannedPlugins.length === 0) {
         set({ enrichmentLoading: false, enrichmentLoaded: true });
         return;
@@ -396,6 +449,10 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
 
   getEnrichedDataForPlugin: (uid: number) => {
     return get().enrichedData.get(uid);
+  },
+
+  getManufacturerLogoUrl: (name: string) => {
+    return get().manufacturerLogos.get(name);
   },
 
   applyFilters: () => {
@@ -538,11 +595,19 @@ juceBridge.onScanProgress((progress: ScanProgress) => {
     import('./syncStore').then(({ useSyncStore }) => {
       const { isLoggedIn, autoSync } = useSyncStore.getState();
       if (isLoggedIn) {
-        autoSync().catch(() => {});
+        autoSync().catch(() => {
+          // P2-4: If autoSync fails, still reload enrichment data
+          clearEnrichmentCache();
+          usePluginStore.getState().loadEnrichmentData();
+        });
       } else {
         clearEnrichmentCache();
         usePluginStore.getState().loadEnrichmentData();
       }
+    }).catch(() => {
+      // P2-4: If syncStore import fails (circular dep timing), still load enrichment
+      clearEnrichmentCache();
+      usePluginStore.getState().loadEnrichmentData();
     });
   }
 });
@@ -566,4 +631,8 @@ juceBridge.onNewPluginsDetected((event) => {
 
 juceBridge.onAutoScanStateChanged((state) => {
   usePluginStore.setState({ autoScanState: state });
+});
+
+juceBridge.onBlacklistChanged(() => {
+  usePluginStore.getState().fetchBlacklist();
 });
