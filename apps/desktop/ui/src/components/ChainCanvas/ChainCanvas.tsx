@@ -19,6 +19,7 @@ import { AddNode } from './AddNode';
 import { SignalEdge } from './SignalEdge';
 import { CanvasContextMenu } from './CanvasContextMenu';
 import type { ContextMenuState } from './CanvasContextMenu';
+import { EmptyCanvasState } from './EmptyCanvasState';
 import { InlinePluginSearch } from '../ChainEditor/InlinePluginSearch';
 import { FloatingAiChat } from './FloatingAiChat';
 import type { ChainNodeUI } from '../../api/types';
@@ -48,10 +49,12 @@ interface CanvasSearchState {
 
 function ChainCanvasInner() {
   const nodes = useChainStore(s => s.nodes);
+  const loading = useChainStore(s => s.loading);
   const selectedNodeId = useChainStore(s => s.selectedNodeId);
   const selectNode = useChainStore(s => s.selectNode);
   const openInlineEditor = useChainStore(s => s.openInlineEditor);
   const reactFlowInstance = useReactFlow();
+  const isEmpty = nodes.length === 0;
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -211,6 +214,35 @@ function ChainCanvasInner() {
           size={1}
         />
       </ReactFlow>
+
+      {/* Loading indicator — shown only during initial load before any nodes arrive */}
+      {loading && isEmpty && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 4,
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            className="animate-spin"
+            style={{
+              width: 20,
+              height: 20,
+              border: '2px solid rgba(255,255,255,0.1)',
+              borderTopColor: 'rgba(255,255,255,0.4)',
+              borderRadius: '50%',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Empty state hint — visible when chain has no plugins and not loading */}
+      {isEmpty && !loading && <EmptyCanvasState />}
 
       {contextMenu && (
         <CanvasContextMenu state={contextMenu} onClose={closeContextMenu} />
