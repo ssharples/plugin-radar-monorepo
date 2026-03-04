@@ -20,6 +20,9 @@ import { SignalEdge } from './SignalEdge';
 import { CanvasContextMenu } from './CanvasContextMenu';
 import type { ContextMenuState } from './CanvasContextMenu';
 import { InlinePluginSearch } from '../ChainEditor/InlinePluginSearch';
+import { FloatingAiChat } from './FloatingAiChat';
+import type { ChainNodeUI } from '../../api/types';
+import { juceBridge } from '../../api/juce-bridge';
 
 const nodeTypes = {
   pluginNode: PluginNode,
@@ -54,6 +57,8 @@ function ChainCanvasInner() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   // Floating inline search state
   const [canvasSearch, setCanvasSearch] = useState<CanvasSearchState | null>(null);
+  // Ghost nodes from AI suggestions (shown with dashed borders + AI badge)
+  const [ghostNodes, setGhostNodes] = useState<ChainNodeUI[]>([]);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -72,7 +77,11 @@ function ChainCanvasInner() {
     isContextMenuOpen: contextMenu !== null || canvasSearch !== null,
   });
 
-  const { nodes: rfNodes, edges: rfEdges } = useChainToReactFlow(nodes, selectedNodeId);
+  const { nodes: rfNodes, edges: rfEdges } = useChainToReactFlow(
+    nodes,
+    selectedNodeId,
+    ghostNodes.length > 0 ? ghostNodes : undefined,
+  );
   const layoutNodes = useCanvasLayout(rfNodes, rfEdges);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -139,6 +148,20 @@ function ChainCanvasInner() {
     type: 'signalEdge' as const,
   }), []);
 
+  // Apply ghost nodes: add each plugin to the real chain via the bridge
+  const handleApplyGhostNodes = useCallback(async () => {
+    for (const ghost of ghostNodes) {
+      if (ghost.type === 'plugin' && ghost.fileOrIdentifier) {
+        try {
+          await juceBridge.addPlugin(ghost.fileOrIdentifier);
+        } catch (err) {
+          console.warn('[AI Ghost] Failed to add plugin:', ghost.name, err);
+        }
+      }
+    }
+    setGhostNodes([]);
+  }, [ghostNodes]);
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <ReactFlow
@@ -153,6 +176,10 @@ function ChainCanvasInner() {
         panOnScroll
         panOnDrag={false}
         zoomOnDoubleClick={false}
+        // TODO: drag reorder — enabling nodesDraggable requires an onNodeDragStop
+        // handler that determines the new parent group and insert index from the drop
+        // position. Non-trivial with nested serial/parallel groups and cross-group
+        // boundary detection. Implement when layout stabilizes.
         nodesDraggable={false}
         nodesConnectable={false}
         minZoom={0.5}
@@ -191,6 +218,13 @@ function ChainCanvasInner() {
           />
         </div>
       )}
+
+      {/* Floating AI chat overlay */}
+      <FloatingAiChat
+        ghostNodes={ghostNodes}
+        onSetGhostNodes={setGhostNodes}
+        onApplyGhostNodes={handleApplyGhostNodes}
+      />
     </div>
   );
 }
