@@ -2,7 +2,9 @@
 #include "../PluginEditor.h"
 #include "../PluginProcessor.h"
 #include "../audio/AudioMeter.h"
+#include "../audio/SignalAnalyzer.h"
 #include "../audio/GainProcessor.h"
+#include "../audio/PluginWithMeterWrapper.h"
 #include "../audio/NodeMeterProcessor.h"
 #include "../core/ChainNode.h"
 #include "../core/ParameterDiscovery.h"
@@ -15,12 +17,6 @@ WebViewBridge::WebViewBridge(PluginManager &pm, ChainProcessor &cp,
                              PresetManager &prm, GroupTemplateManager &gtm)
     : pluginManager(pm), chainProcessor(cp), presetManager(prm),
       groupTemplateManager(gtm) {
-  // Pre-allocate DynamicObject pool for per-node meter entries.
-  // Avoids heap allocation on every 30Hz timerCallback tick.
-  meterEntryPool.reserve(kMaxMeterPoolSize);
-  for (int i = 0; i < kMaxMeterPoolSize; ++i)
-    meterEntryPool.push_back(new juce::DynamicObject());
-
   bindCallbacks();
 }
 
@@ -114,9 +110,7 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                       bool success, const juce::String &error) {
                     auto *result = new juce::DynamicObject();
                     result->setProperty("success", success);
-                    if (success)
-                      result->setProperty("chainState", getChainState());
-                    else
+                    if (!success)
                       result->setProperty("error", error);
                     completion(juce::var(result));
                   });
@@ -543,47 +537,54 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
               juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             if (args.size() >= 1) {
               chainProcessor.setParameterWatcherSuppressed(true);
-              auto importResult =
-                  chainProcessor.importChainWithPresets(args[0]);
-              chainProcessor.setParameterWatcherSuppressed(false);
-              auto *result = new juce::DynamicObject();
-              result->setProperty("success", importResult.success);
-              result->setProperty("totalSlots", importResult.totalSlots);
-              result->setProperty("loadedSlots", importResult.loadedSlots);
-              result->setProperty("failedSlots", importResult.failedSlots);
-              if (importResult.success)
-                result->setProperty("chainState", getChainState());
-              else
-                result->setProperty("error", "Failed to import chain");
 
-              // Add per-slot failure details
-              if (!importResult.failures.empty()) {
-                juce::Array<juce::var> failuresArray;
-                for (const auto &f : importResult.failures) {
-                  auto *fObj = new juce::DynamicObject();
-                  fObj->setProperty("position", f.position);
-                  fObj->setProperty("pluginName", f.pluginName);
-                  fObj->setProperty("reason", f.reason);
-                  failuresArray.add(juce::var(fObj));
-                }
-                result->setProperty("failures", failuresArray);
-              }
+              // Use async import — plugin instantiation on background thread
+              auto sharedCompletion =
+                  std::make_shared<juce::WebBrowserComponent::NativeFunctionCompletion>(
+                      std::move(completion));
 
-              // Add cross-format substitution details
-              if (!importResult.formatSubstitutions.empty()) {
-                juce::Array<juce::var> subsArray;
-                for (const auto &s : importResult.formatSubstitutions) {
-                  auto *sObj = new juce::DynamicObject();
-                  sObj->setProperty("pluginName", s.pluginName);
-                  sObj->setProperty("savedFormat", s.savedFormat);
-                  sObj->setProperty("loadedFormat", s.loadedFormat);
-                  sObj->setProperty("hasPresetData", s.hasPresetData);
-                  subsArray.add(juce::var(sObj));
-                }
-                result->setProperty("formatSubstitutions", subsArray);
-              }
+              chainProcessor.importChainWithPresetsAsync(
+                  args[0],
+                  [this, sharedCompletion](
+                      ChainProcessor::ImportResult importResult) {
+                    chainProcessor.setParameterWatcherSuppressed(false);
 
-              completion(juce::var(result));
+                    auto *result = new juce::DynamicObject();
+                    result->setProperty("success", importResult.success);
+                    result->setProperty("totalSlots", importResult.totalSlots);
+                    result->setProperty("loadedSlots", importResult.loadedSlots);
+                    result->setProperty("failedSlots", importResult.failedSlots);
+                    if (!importResult.success)
+                      result->setProperty("error", "Failed to import chain");
+
+                    if (!importResult.failures.empty()) {
+                      juce::Array<juce::var> failuresArray;
+                      for (const auto &f : importResult.failures) {
+                        auto *fObj = new juce::DynamicObject();
+                        fObj->setProperty("position", f.position);
+                        fObj->setProperty("pluginName", f.pluginName);
+                        fObj->setProperty("reason", f.reason);
+                        failuresArray.add(juce::var(fObj));
+                      }
+                      result->setProperty("failures", failuresArray);
+                    }
+
+                    if (!importResult.formatSubstitutions.empty()) {
+                      juce::Array<juce::var> subsArray;
+                      for (const auto &s :
+                           importResult.formatSubstitutions) {
+                        auto *sObj = new juce::DynamicObject();
+                        sObj->setProperty("pluginName", s.pluginName);
+                        sObj->setProperty("savedFormat", s.savedFormat);
+                        sObj->setProperty("loadedFormat", s.loadedFormat);
+                        sObj->setProperty("hasPresetData", s.hasPresetData);
+                        subsArray.add(juce::var(sObj));
+                      }
+                      result->setProperty("formatSubstitutions", subsArray);
+                    }
+
+                    (*sharedCompletion)(juce::var(result));
+                  });
             } else {
               auto *result = new juce::DynamicObject();
               result->setProperty("success", false);
@@ -661,7 +662,6 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
 
                   auto *result = new juce::DynamicObject();
                   result->setProperty("success", true);
-                  result->setProperty("chainState", getChainState());
                   completion(juce::var(result));
                 } else {
                   // Fallback without mainProcessor cast
@@ -675,7 +675,6 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
 
                   auto *result = new juce::DynamicObject();
                   result->setProperty("success", true);
-                  result->setProperty("chainState", getChainState());
                   completion(juce::var(result));
                 }
               } else {
@@ -784,12 +783,12 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
               completion(juce::var());
           })
       .withNativeFunction(
-          "setGroupDucking",
+          "setNodeDucking",
           [this](
               const juce::Array<juce::var> &args,
               juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             if (args.size() >= 1)
-              completion(setGroupDucking(args[0]));
+              completion(setNodeDucking(args[0]));
             else
               completion(juce::var());
           })
@@ -892,9 +891,7 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                       bool success, const juce::String &error) {
                     auto *result = new juce::DynamicObject();
                     result->setProperty("success", success);
-                    if (success)
-                      result->setProperty("chainState", getChainState());
-                    else
+                    if (!success)
                       result->setProperty("error", error);
                     completion(juce::var(result));
                   });
@@ -976,9 +973,7 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                 bool ok = chainProcessor.setNodeAutoGain(nodeId, enabled);
                 auto *result = new juce::DynamicObject();
                 result->setProperty("success", ok);
-                if (ok)
-                  result->setProperty("chainState", getChainState());
-                else
+                if (!ok)
                   result->setProperty("error", "Failed to set auto-gain");
                 completion(juce::var(result));
                 return;
@@ -1024,9 +1019,6 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                 bool success = chainProcessor.duplicateNode(nodeId);
                 auto *result = new juce::DynamicObject();
                 result->setProperty("success", success);
-                if (success)
-                  result->setProperty("chainState",
-                                      chainProcessor.getChainStateAsJson());
                 completion(juce::var(result));
               } else
                 completion(juce::var());
@@ -1192,25 +1184,14 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
               auto translatedParams =
                   json.getProperty("translatedParams", juce::var());
 
-              // Find the position of this node in the flat plugin list
-              auto flatPlugins = chainProcessor.getFlatPluginList();
-              int flatIndex = -1;
-              {
-                const auto *targetNode = ChainNodeHelpers::findById(
-                    chainProcessor.getRootNode(), nodeId);
-                if (targetNode && targetNode->isPlugin()) {
-                  const auto *targetLeaf = &targetNode->getPlugin();
-                  for (int i = 0; i < static_cast<int>(flatPlugins.size());
-                       ++i) {
-                    if (flatPlugins[i] == targetLeaf) {
-                      flatIndex = i;
-                      break;
-                    }
-                  }
-                }
-              }
-
-              if (flatIndex < 0) {
+              // Find the node's parent group and index within that group
+              // so we can insert the replacement at the exact same position.
+              // const_cast is safe: we only read parent info before mutating
+              // via removeNode/addPlugin which handle locking internally.
+              auto *parentNode = ChainNodeHelpers::findParent(
+                  const_cast<ChainNode &>(chainProcessor.getRootNode()),
+                  nodeId);
+              if (!parentNode || !parentNode->isGroup()) {
                 auto *result = new juce::DynamicObject();
                 result->setProperty("success", false);
                 result->setProperty("error", "Node not found in chain");
@@ -1218,18 +1199,30 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                 return;
               }
 
-              // Find the new plugin description
-              auto pluginList = pluginManager.getKnownPlugins().getTypes();
-              const juce::PluginDescription *newDesc = nullptr;
-              for (auto &desc : pluginList) {
-                if (desc.createIdentifierString() == newPluginUid ||
-                    juce::String(desc.uniqueId) == newPluginUid) {
-                  newDesc = &desc;
-                  break;
+              ChainNodeId parentId = parentNode->id;
+              int indexInParent = -1;
+              {
+                auto &children = parentNode->getGroup().children;
+                for (int i = 0; i < static_cast<int>(children.size()); ++i) {
+                  if (children[i]->id == nodeId) {
+                    indexInParent = i;
+                    break;
+                  }
                 }
               }
 
-              if (!newDesc) {
+              if (indexInParent < 0) {
+                auto *result = new juce::DynamicObject();
+                result->setProperty("success", false);
+                result->setProperty("error", "Node not found in parent group");
+                completion(juce::var(result));
+                return;
+              }
+
+              // Find the new plugin description (same lookup as addPlugin)
+              auto newDescOpt =
+                  pluginManager.findPluginByIdentifier(newPluginUid);
+              if (!newDescOpt) {
                 auto *result = new juce::DynamicObject();
                 result->setProperty("success", false);
                 result->setProperty("error",
@@ -1237,9 +1230,10 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                 completion(juce::var(result));
                 return;
               }
+              const auto *newDesc = &*newDescOpt;
 
-              // Remove old, add new at same position
-              bool removed = chainProcessor.removePlugin(flatIndex);
+              // Remove old node, then add new at same parent + index
+              bool removed = chainProcessor.removeNode(nodeId);
               if (!removed) {
                 auto *result = new juce::DynamicObject();
                 result->setProperty("success", false);
@@ -1248,7 +1242,8 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                 return;
               }
 
-              bool added = chainProcessor.addPlugin(*newDesc, flatIndex);
+              bool added =
+                  chainProcessor.addPlugin(*newDesc, parentId, indexInParent);
               if (!added) {
                 auto *result = new juce::DynamicObject();
                 result->setProperty("success", false);
@@ -1257,23 +1252,47 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
                 return;
               }
 
-              // Apply translated parameters to the new plugin
-              int appliedCount = 0;
-              if (translatedParams.isArray()) {
-                // Get the new processor (should be at the same flat index)
-                auto *newProcessor = chainProcessor.getSlotProcessor(flatIndex);
-                if (newProcessor) {
-                  auto &procParams = newProcessor->getParameters();
-                  for (int i = 0; i < translatedParams.size(); ++i) {
-                    auto paramEntry = translatedParams[i];
-                    int paramIndex = static_cast<int>(
-                        paramEntry.getProperty("paramIndex", -1));
-                    float value = static_cast<float>(
-                        paramEntry.getProperty("value", 0.0f));
+              // Find the new node's ID (at indexInParent in the parent group)
+              ChainNodeId newNodeId = -1;
+              {
+                auto *updatedParent = ChainNodeHelpers::findById(
+                    chainProcessor.getRootNode(), parentId);
+                if (updatedParent && updatedParent->isGroup()) {
+                  auto &children = updatedParent->getGroup().children;
+                  if (indexInParent >= 0 &&
+                      indexInParent < static_cast<int>(children.size())) {
+                    newNodeId = children[static_cast<size_t>(indexInParent)]->id;
+                  }
+                }
+              }
 
-                    if (paramIndex >= 0 && paramIndex < procParams.size()) {
-                      procParams[paramIndex]->setValue(value);
-                      appliedCount++;
+              // Apply translated parameters to the new plugin (if any)
+              int appliedCount = 0;
+              if (translatedParams.isArray() && newNodeId >= 0) {
+                const auto *newNode = ChainNodeHelpers::findById(
+                    chainProcessor.getRootNode(), newNodeId);
+                if (newNode && newNode->isPlugin()) {
+                  if (auto gNode = chainProcessor.getNodeForId(
+                          newNode->getPlugin().graphNodeId)) {
+                    juce::AudioProcessor *rawProc = gNode->getProcessor();
+                    // Unwrap PluginWithMeterWrapper if needed
+                    if (auto *wrapper =
+                            dynamic_cast<PluginWithMeterWrapper *>(rawProc))
+                      rawProc = wrapper->getWrappedPlugin();
+                    if (rawProc) {
+                      auto &procParams = rawProc->getParameters();
+                      for (int i = 0; i < translatedParams.size(); ++i) {
+                        auto paramEntry = translatedParams[i];
+                        int paramIndex = static_cast<int>(
+                            paramEntry.getProperty("paramIndex", -1));
+                        float value = static_cast<float>(
+                            paramEntry.getProperty("value", 0.0f));
+                        if (paramIndex >= 0 &&
+                            paramIndex < procParams.size()) {
+                          procParams[paramIndex]->setValue(value);
+                          appliedCount++;
+                        }
+                      }
                     }
                   }
                 }
@@ -1281,8 +1300,8 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
 
               auto *result = new juce::DynamicObject();
               result->setProperty("success", true);
+              result->setProperty("newNodeId", newNodeId);
               result->setProperty("appliedParams", appliedCount);
-              result->setProperty("chainState", getChainState());
               completion(juce::var(result));
             } else {
               auto *result = new juce::DynamicObject();
@@ -1564,9 +1583,12 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
           [this](
               const juce::Array<juce::var> &args,
               juce::WebBrowserComponent::NativeFunctionCompletion completion) {
-            if (args.size() > 0)
-              nodeMetersEnabled.store(static_cast<bool>(args[0]),
-                                      std::memory_order_relaxed);
+            if (args.size() > 0) {
+              bool enabled = static_cast<bool>(args[0]);
+              nodeMetersEnabled.store(enabled, std::memory_order_relaxed);
+              // Also toggle audio-thread metering in ChainProcessor
+              chainProcessor.setAllMetersEnabled(enabled);
+            }
             completion(juce::var());
           })
       // ============================================
@@ -1829,6 +1851,58 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
               completion(juce::var(new juce::DynamicObject()));
           })
       .withNativeFunction(
+          "loadPluginPreset",
+          [this](
+              const juce::Array<juce::var> &args,
+              juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+              completion(loadPluginPreset(args[0]));
+            else
+              completion(errorResponse("Missing arguments"));
+          })
+      .withNativeFunction(
+          "getPluginState",
+          [this](
+              const juce::Array<juce::var> &args,
+              juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+              completion(getPluginState(args[0]));
+            else
+              completion(errorResponse("Missing arguments"));
+          })
+      .withNativeFunction(
+          "getSignalSnapshot",
+          [this](
+              const juce::Array<juce::var> &args,
+              juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            juce::ignoreUnused(args);
+            auto* obj = new juce::DynamicObject();
+
+            if (signalAnalyzer != nullptr)
+            {
+                auto snapshot = signalAnalyzer->getSnapshot();
+                obj->setProperty("inputPeakDb", snapshot.inputPeakDb);
+                obj->setProperty("inputRmsDb", snapshot.inputRmsDb);
+                obj->setProperty("spectralCentroid", snapshot.spectralCentroid);
+                obj->setProperty("crestFactor", snapshot.crestFactor);
+                obj->setProperty("dynamicRangeDb", snapshot.dynamicRangeDb);
+                obj->setProperty("sampleRate", snapshot.sampleRate);
+            }
+
+            // Read LUFS from the existing input meter
+            if (inputMeter != nullptr)
+            {
+                auto readings = inputMeter->getReadings();
+                obj->setProperty("inputLufs", readings.lufsShort);
+            }
+            else
+            {
+                obj->setProperty("inputLufs", -100.0f);
+            }
+
+            completion(juce::var(obj));
+          })
+      .withNativeFunction(
           "setCrossFormatAliases",
           [this](
               const juce::Array<juce::var> &args,
@@ -1850,8 +1924,10 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions() {
 
 void WebViewBridge::setBrowserComponent(juce::WebBrowserComponent *browser) {
   webBrowser = browser;
-  if (browser)
+  if (browser) {
+    noteActivity(); // Initialize activity timestamp
     startTimerHz(30); // 30fps — node meters, auto-gain, match-lock, latency checks
+  }
 }
 
 void WebViewBridge::bindCallbacks() {
@@ -1866,26 +1942,41 @@ void WebViewBridge::bindCallbacks() {
     emitEvent("pluginListChanged", getPluginList());
   };
 
-  pluginManager.onScanProgress = [this](float progress,
-                                        const juce::String &currentPlugin) {
+  pluginManager.onScanProgress = [this, lastKnownCount = 0](
+                                      float progress,
+                                      const juce::String &currentPlugin) mutable {
     auto *obj = new juce::DynamicObject();
     obj->setProperty("progress", progress);
     obj->setProperty("currentPlugin", currentPlugin);
     obj->setProperty("scanning", true);
     emitEvent("scanProgress", juce::var(obj));
 
-    // Also emit updated plugin list so UI can show plugins as they're
-    // discovered
-    emitEvent("pluginListChanged", getPluginList());
+    // Only emit pluginListChanged when a new plugin is actually discovered
+    int currentCount = pluginManager.getKnownPlugins().getNumTypes();
+    if (currentCount != lastKnownCount) {
+      lastKnownCount = currentCount;
+      emitEvent("pluginListChanged", getPluginList());
+    }
   };
 
   // Wrap existing onChainChanged callback (set by PluginProcessor for registry
   // updates)
   auto existingChainCallback = chainProcessor.onChainChanged;
   chainProcessor.onChainChanged = [this, existingChainCallback]() {
+    auto ccStart = juce::Time::getHighResolutionTicks();
     if (existingChainCallback)
       existingChainCallback();
-    emitEvent("chainChanged", getChainState());
+    noteActivity(); // Reset adaptive meter throttle on user interaction
+    auto t0 = juce::Time::getHighResolutionTicks();
+    auto state = getChainState();
+    auto serMs = juce::Time::highResolutionTicksToSeconds(
+        juce::Time::getHighResolutionTicks() - t0) * 1000.0;
+    emitEvent("chainChanged", state);
+    auto totalMs = juce::Time::highResolutionTicksToSeconds(
+        juce::Time::getHighResolutionTicks() - ccStart) * 1000.0;
+    if (totalMs > 5.0)
+      PCLOG("SLOW onChainChanged: serialize=" + juce::String(serMs, 1)
+            + " ms, total=" + juce::String(totalMs, 1) + " ms");
     // Propagate structural changes to mirror partners
     if (mirrorManager)
       mirrorManager->onLocalChainChanged();
@@ -1976,7 +2067,13 @@ void WebViewBridge::emitEvent(const juce::String &eventName,
   if (!webBrowser || !webBrowser->isVisible())
     return;
 
+  auto t0 = juce::Time::getHighResolutionTicks();
   webBrowser->emitEventIfBrowserIsVisible(eventName, data);
+  auto elapsed = juce::Time::highResolutionTicksToSeconds(
+      juce::Time::getHighResolutionTicks() - t0) * 1000.0;
+  if (elapsed > 5.0)
+    PCLOG("SLOW emitEvent('" + eventName + "') took "
+          + juce::String(elapsed, 1) + " ms");
 }
 
 std::optional<juce::WebBrowserComponent::Resource>
@@ -1989,6 +2086,8 @@ void WebViewBridge::timerCallback() {
   if (shuttingDown.load(std::memory_order_acquire))
     return;
 
+  auto timerStart = juce::Time::getHighResolutionTicks();
+
   // Snapshot raw pointers to locals so they remain consistent for
   // the entire callback body (prevents TOCTOU if a setter is called
   // concurrently, though setters are message-thread-only in practice).
@@ -1998,12 +2097,27 @@ void WebViewBridge::timerCallback() {
   auto *localMainProcessor = mainProcessor;
   auto *localWebBrowser = webBrowser;
 
+  // --- Short-circuit when nothing to do ---
+  const bool metersActive = nodeMetersEnabled.load(std::memory_order_relaxed);
+  const bool matchLockActive = matchLockEnabled.load(std::memory_order_relaxed);
+  const bool needsLatency = chainProcessor.needsLatencyRefresh();
+
+  if (!metersActive && !matchLockActive && !needsLatency) {
+    return;
+  }
+
   // Auto-detect latency changes from hosted plugins (runs even when stream is
   // inactive). Don't clear the flag until after the refresh succeeds — if the
   // tree is being modified (e.g., AU instantiation pumped the run loop), the
   // refresh will be skipped and we need to retry on the next tick.
-  if (chainProcessor.needsLatencyRefresh()) {
+  if (needsLatency) {
+    auto latT0 = juce::Time::getHighResolutionTicks();
     chainProcessor.refreshLatencyCompensation();
+    auto latMs = juce::Time::highResolutionTicksToSeconds(
+        juce::Time::getHighResolutionTicks() - latT0) * 1000.0;
+    if (latMs > 5.0)
+      PCLOG("SLOW refreshLatencyCompensation in timerCallback: "
+            + juce::String(latMs, 1) + " ms");
     // Only clear if the refresh actually ran (not skipped due to tree mod)
     if (!chainProcessor.isTreeModificationInProgress())
       chainProcessor.clearLatencyRefreshFlag();
@@ -2012,44 +2126,77 @@ void WebViewBridge::timerCallback() {
   if (!localWebBrowser)
     return;
 
-  // Emit per-node meter data for inline plugin meters
-  if (nodeMetersEnabled.load(std::memory_order_relaxed)) {
-    const auto &nodeMeterReadings = chainProcessor.getNodeMeterReadings();
-    if (!nodeMeterReadings.empty()) {
-      cachedNodeMetersObj->clear();
-      size_t nodeIndex = 0;
-      for (const auto &nm : nodeMeterReadings) {
-        // Reuse pooled DynamicObject; grow pool if chain is larger than initial size
-        if (static_cast<int>(nodeIndex) >= static_cast<int>(meterEntryPool.size()))
-          meterEntryPool.push_back(new juce::DynamicObject());
-        auto *entry = meterEntryPool[nodeIndex].get();
-        entry->getProperties().clear();
-        entry->setProperty("peakL", nm.peakL);
-        entry->setProperty("peakR", nm.peakR);
-        entry->setProperty("peakHoldL", nm.peakHoldL);
-        entry->setProperty("peakHoldR", nm.peakHoldR);
-        entry->setProperty("rmsL", nm.rmsL);
-        entry->setProperty("rmsR", nm.rmsR);
-        entry->setProperty("inputPeakL", nm.inputPeakL);
-        entry->setProperty("inputPeakR", nm.inputPeakR);
-        entry->setProperty("inputPeakHoldL", nm.inputPeakHoldL);
-        entry->setProperty("inputPeakHoldR", nm.inputPeakHoldR);
-        entry->setProperty("inputRmsL", nm.inputRmsL);
-        entry->setProperty("inputRmsR", nm.inputRmsR);
-        entry->setProperty("latencyMs", nm.latencyMs);
-        entry->setProperty("inputLufs", nm.inputLufs);
-        entry->setProperty("outputLufs", nm.outputLufs);
-        cachedNodeMetersObj->setProperty(juce::String(nm.nodeId),
-                                         juce::var(entry));
-        ++nodeIndex;
-      }
-      emitEvent("nodeMeterData", juce::var(cachedNodeMetersObj.get()));
+  // --- Adaptive meter emission — throttle to ~10Hz when idle ---
+  const int64_t now = juce::Time::currentTimeMillis();
+  const bool isIdle = (now - lastActivityTimestampMs) > kIdleThresholdMs;
+  bool shouldEmitMeters = true;
+  if (isIdle) {
+    ++meterSkipCounter;
+    if (meterSkipCounter < kIdleMeterDivisor) {
+      shouldEmitMeters = false;
+    } else {
+      meterSkipCounter = 0;
     }
+  } else {
+    meterSkipCounter = 0;
   }
 
-  // Per-node auto-gain compensation (LUFS-based level matching)
-  if (nodeMetersEnabled.load(std::memory_order_relaxed)) {
+  // Read meter data once for both emission and auto-gain
+  if (metersActive) {
     const auto &nodeMeterReadings = chainProcessor.getNodeMeterReadings();
+
+    // Emit per-node meter data for inline plugin meters (throttled).
+    // Uses a flat packed string instead of nested DynamicObjects to bypass
+    // JUCE's expensive recursive JSON serializer. Format: semicolon-delimited
+    // nodes, comma-delimited int values (floats scaled by 10000 for precision).
+    // Parsing is done in JS (see chainStore.ts onNodeMeterData handler).
+    if (shouldEmitMeters && !nodeMeterReadings.empty()) {
+      // Pre-allocate ~100 chars per node (16 ints × ~6 digits + delimiters)
+      meterPackedString.clear();
+      meterPackedString.preallocateBytes(
+          static_cast<size_t>(nodeMeterReadings.size()) * 100);
+      for (size_t i = 0; i < nodeMeterReadings.size(); ++i) {
+        const auto &nm = nodeMeterReadings[i];
+        if (i > 0)
+          meterPackedString += ';';
+        // nodeId, then 14 floats scaled to int (×10000), then latencyMs as int
+        meterPackedString += juce::String(nm.nodeId);
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.peakL * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.peakR * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.peakHoldL * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.peakHoldR * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.rmsL * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.rmsR * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.inputPeakL * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.inputPeakR * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.inputPeakHoldL * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.inputPeakHoldR * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.inputRmsL * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.inputRmsR * 10000));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.latencyMs * 100));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.inputLufs * 100));
+        meterPackedString += ',';
+        meterPackedString += juce::String(static_cast<int>(nm.outputLufs * 100));
+      }
+      emitEvent("nodeMeterData", juce::var(meterPackedString));
+    }
+
+    // Per-node auto-gain compensation (LUFS-based level matching)
+    // Auto-gain always runs at full 30Hz (not throttled) to avoid sluggish convergence
     for (const auto &nm : nodeMeterReadings) {
       auto *node =
           ChainNodeHelpers::findById(chainProcessor.getRootNode(), nm.nodeId);
@@ -2201,6 +2348,14 @@ void WebViewBridge::timerCallback() {
       }
     }
   }
+
+  auto timerElapsed = juce::Time::highResolutionTicksToSeconds(
+      juce::Time::getHighResolutionTicks() - timerStart) * 1000.0;
+  if (timerElapsed > 10.0)
+    PCLOG("SLOW timerCallback total: " + juce::String(timerElapsed, 1) + " ms"
+          + " (meters=" + juce::String(metersActive ? 1 : 0)
+          + " latency=" + juce::String(needsLatency ? 1 : 0)
+          + " matchLock=" + juce::String(matchLockActive ? 1 : 0) + ")");
 }
 
 // Native function implementations
@@ -2229,7 +2384,6 @@ juce::var WebViewBridge::addPlugin(const juce::String &pluginId,
     // desc is now a std::optional<PluginDescription> - a safe copy
     if (chainProcessor.addPlugin(*desc, insertIndex)) {
       result->setProperty("success", true);
-      result->setProperty("chainState", getChainState());
     } else {
       result->setProperty("success", false);
       result->setProperty("error", "Failed to instantiate plugin");
@@ -2247,7 +2401,6 @@ juce::var WebViewBridge::removePlugin(int slotIndex) {
 
   if (chainProcessor.removePlugin(slotIndex)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Invalid slot index");
@@ -2261,7 +2414,6 @@ juce::var WebViewBridge::movePlugin(int fromIndex, int toIndex) {
 
   if (chainProcessor.movePlugin(fromIndex, toIndex)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Invalid indices");
@@ -2275,7 +2427,6 @@ juce::var WebViewBridge::setSlotBypassed(int slotIndex, bool bypassed) {
 
   chainProcessor.setSlotBypassed(slotIndex, bypassed);
   result->setProperty("success", true);
-  result->setProperty("chainState", getChainState());
 
   return juce::var(result);
 }
@@ -2340,7 +2491,6 @@ juce::var WebViewBridge::loadPreset(const juce::String &path) {
 
   if (presetManager.loadPreset(presetFile)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
     if (auto *preset = presetManager.getCurrentPreset())
       result->setProperty("preset", preset->toJson());
 
@@ -2431,7 +2581,6 @@ juce::var WebViewBridge::restoreBackup(const juce::String &path) {
 
   if (presetManager.restoreBackup(path)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to restore backup");
@@ -2509,7 +2658,6 @@ juce::var WebViewBridge::loadGroupTemplate(const juce::var &args) {
   if (newGroupId >= 0) {
     result->setProperty("success", true);
     result->setProperty("groupId", newGroupId);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to load template");
@@ -2639,7 +2787,6 @@ juce::var WebViewBridge::createGroup(const juce::var &args) {
   if (groupId >= 0) {
     result->setProperty("success", true);
     result->setProperty("groupId", groupId);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to create group");
@@ -2665,7 +2812,6 @@ juce::var WebViewBridge::dissolveGroup(const juce::var &args) {
 
   if (chainProcessor.dissolveGroup(groupId)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to dissolve group");
@@ -2696,7 +2842,6 @@ juce::var WebViewBridge::setGroupMode(const juce::var &args) {
 
   if (chainProcessor.setGroupMode(groupId, mode)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to set group mode");
@@ -2757,9 +2902,7 @@ juce::var WebViewBridge::setGroupWetGain(const juce::var &args) {
   return juce::var(result);
 }
 
-juce::var WebViewBridge::setGroupDucking(const juce::var &args) {
-  auto *result = new juce::DynamicObject();
-
+juce::var WebViewBridge::setNodeDucking(const juce::var &args) {
   juce::var parsed = parseJsonArg(args);
 
   if (!parsed.isObject())
@@ -2768,7 +2911,8 @@ juce::var WebViewBridge::setGroupDucking(const juce::var &args) {
   auto *obj = parsed.getDynamicObject();
   if (!obj)
     return errorResponse("JSON parse returned null object");
-  int groupId = static_cast<int>(obj->getProperty("groupId"));
+
+  int nodeId = static_cast<int>(obj->getProperty("nodeId"));
   bool enabled = static_cast<bool>(obj->getProperty("enabled"));
   float thresholdDb = obj->hasProperty("thresholdDb")
                           ? static_cast<float>(obj->getProperty("thresholdDb"))
@@ -2780,16 +2924,12 @@ juce::var WebViewBridge::setGroupDucking(const juce::var &args) {
                         ? static_cast<float>(obj->getProperty("releaseMs"))
                         : 200.0f;
 
-  if (chainProcessor.setGroupDucking(groupId, enabled, thresholdDb, attackMs,
-                                     releaseMs)) {
-    result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
+  if (chainProcessor.setNodeDucking(nodeId, enabled, thresholdDb, attackMs,
+                                    releaseMs)) {
+    return successResponse();
   } else {
-    result->setProperty("success", false);
-    result->setProperty("error", "Failed to set ducking");
+    return errorResponse("Failed to set ducking — node must be a plugin inside a send bus");
   }
-
-  return juce::var(result);
 }
 
 juce::var WebViewBridge::setBranchGain(const juce::var &args) {
@@ -2835,7 +2975,6 @@ juce::var WebViewBridge::setBranchMute(const juce::var &args) {
 
   if (chainProcessor.setBranchMute(nodeId, mute)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to set branch mute");
@@ -2860,7 +2999,6 @@ juce::var WebViewBridge::setBranchSolo(const juce::var &args) {
 
   if (chainProcessor.setBranchSolo(nodeId, solo)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to set branch solo");
@@ -2885,7 +3023,6 @@ juce::var WebViewBridge::setActiveBranchOp(const juce::var &args) {
 
   if (chainProcessor.setActiveBranch(groupId, branchIndex)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to set active branch");
@@ -2986,7 +3123,6 @@ juce::var WebViewBridge::setNodeMidSideMode(const juce::var &args) {
 
   if (chainProcessor.setNodeMidSideMode(nodeId, mode)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to set mid/side mode");
@@ -3017,7 +3153,6 @@ juce::var WebViewBridge::moveNodeOp(const juce::var &args) {
 
   if (chainProcessor.moveNode(nodeId, newParentId, newIndex)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to move node");
@@ -3041,7 +3176,6 @@ juce::var WebViewBridge::removeNodeOp(const juce::var &args) {
 
   if (chainProcessor.removeNode(nodeId)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Failed to remove node");
@@ -3068,7 +3202,6 @@ juce::var WebViewBridge::addPluginToGroup(const juce::var &args) {
   if (auto desc = pluginManager.findPluginByIdentifier(pluginId)) {
     if (chainProcessor.addPlugin(*desc, parentId, insertIndex)) {
       result->setProperty("success", true);
-      result->setProperty("chainState", getChainState());
     } else {
       result->setProperty("success", false);
       result->setProperty("error", "Failed to instantiate plugin");
@@ -3101,7 +3234,6 @@ juce::var WebViewBridge::addDryPath(const juce::var &args) {
   if (newId >= 0) {
     result->setProperty("success", true);
     result->setProperty("nodeId", newId);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty(
@@ -3127,7 +3259,6 @@ juce::var WebViewBridge::setNodeBypassed(const juce::var &args) {
 
   chainProcessor.setNodeBypassed(nodeId, bypassed);
   result->setProperty("success", true);
-  result->setProperty("chainState", getChainState());
 
   return juce::var(result);
 }
@@ -3148,7 +3279,6 @@ juce::var WebViewBridge::setNodeMute(const juce::var &args) {
 
   if (chainProcessor.setBranchMute(nodeId, muted)) {
     result->setProperty("success", true);
-    result->setProperty("chainState", getChainState());
   } else {
     result->setProperty("success", false);
     result->setProperty("error", "Node not found");
@@ -3170,7 +3300,6 @@ juce::var WebViewBridge::toggleAllBypass() {
   result->setProperty("success", true);
   result->setProperty("allBypassed", state.allBypassed);
   result->setProperty("anyBypassed", state.anyBypassed);
-  result->setProperty("chainState", getChainState());
 
   return juce::var(result);
 }
@@ -3569,9 +3698,7 @@ juce::var WebViewBridge::copyChainFromInstance(int targetInstanceId) {
         juce::String(importResult.success ? "succeeded" : "failed"));
 
   result->setProperty("success", importResult.success);
-  if (importResult.success)
-    result->setProperty("chainState", getChainState());
-  else
+  if (!importResult.success)
     result->setProperty("error", "Failed to import chain from source instance");
 
   return juce::var(result);
@@ -3873,4 +4000,52 @@ juce::var WebViewBridge::getAutoScanState() {
 
 juce::var WebViewBridge::checkForNewPluginsOp() {
   return pluginManager.checkForNewPlugins();
+}
+
+//==============================================================================
+// Per-Plugin Preset Loading
+//==============================================================================
+
+juce::var WebViewBridge::loadPluginPreset(const juce::var &args) {
+  juce::var parsed = parseJsonArg(args);
+
+  if (!parsed.isObject())
+    return errorResponse("Invalid arguments");
+
+  auto *obj = parsed.getDynamicObject();
+  if (!obj)
+    return errorResponse("JSON parse returned null object");
+
+  int nodeId = static_cast<int>(obj->getProperty("nodeId"));
+  auto presetData = obj->getProperty("presetData").toString();
+
+  if (presetData.isEmpty())
+    return errorResponse("presetData is empty");
+
+  noteActivity();
+
+  bool ok = chainProcessor.setNodePresetData(nodeId, presetData);
+  if (ok)
+    return successResponse();
+
+  return errorResponse("Failed to load preset — node not found or invalid data");
+}
+
+juce::var WebViewBridge::getPluginState(const juce::var &args) {
+  juce::var parsed = parseJsonArg(args);
+
+  if (!parsed.isObject())
+    return errorResponse("Invalid arguments");
+
+  auto *obj = parsed.getDynamicObject();
+  if (!obj)
+    return errorResponse("JSON parse returned null object");
+
+  int nodeId = static_cast<int>(obj->getProperty("nodeId"));
+
+  auto base64 = chainProcessor.getNodePresetData(nodeId);
+  if (base64.isEmpty())
+    return errorResponse("Failed to get state — node not found or no processor");
+
+  return successResponse("presetData", juce::var(base64));
 }

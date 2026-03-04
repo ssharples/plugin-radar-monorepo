@@ -17,6 +17,20 @@ PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& 
     // Wire editor pointer into bridge so JS can call inline editor functions
     webViewBridge->setEditor(this);
 
+    // Wire automation slot limit warning from proxy pool → bridge
+    processorRef.getParameterPool().onSlotLimitWarning = [this](int totalPlugins, int maxSlots, const juce::StringArray& unautomatableNames) {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("totalPlugins", totalPlugins);
+        obj->setProperty("maxSlots", maxSlots);
+
+        juce::Array<juce::var> nameArray;
+        for (auto& name : unautomatableNames)
+            nameArray.add(name);
+        obj->setProperty("unautomatablePlugins", nameArray);
+
+        webViewBridge->emitEvent("automationSlotWarning", juce::var(obj));
+    };
+
     // Set the size — this triggers resized() which sets WebView to full bounds
     setResizable(true, true);
     setResizeLimits(500, 750, 3840, 2160);
@@ -25,6 +39,9 @@ PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& 
 
 PluginChainManagerEditor::~PluginChainManagerEditor()
 {
+    // Disconnect pool callback to avoid calling into destroyed bridge
+    processorRef.getParameterPool().onSlotLimitWarning = nullptr;
+
     // Clean up inline editor first
     if (currentMode == ViewMode::PluginEditor)
     {
@@ -35,8 +52,18 @@ PluginChainManagerEditor::~PluginChainManagerEditor()
     }
 
     KeyboardInterceptor::remove(webBrowser.get());
-    webBrowser.reset();
+
+    // P1-10: Remove WebBrowserComponent from the component hierarchy BEFORE
+    // destroying the bridge.  This prevents async WebView callbacks (which
+    // are delivered on the message thread) from firing into a deleted bridge
+    // while the component is still attached and receiving events.
+    if (webBrowser)
+        removeChildComponent(webBrowser.get());
+
+    // Reset bridge FIRST — its destructor stops the timer and clears callbacks,
+    // preventing dangling pointer dereferences if the timer fires during teardown.
     webViewBridge.reset();
+    webBrowser.reset();
 }
 
 void PluginChainManagerEditor::initializeWebView()
@@ -49,13 +76,11 @@ void PluginChainManagerEditor::initializeWebView()
         processorRef.getGroupTemplateManager()
     );
 
-    // Pass waveform capture to the bridge for streaming
-    webViewBridge->setWaveformCapture(&processorRef.getWaveformCapture());
     webViewBridge->setGainProcessor(&processorRef.getGainProcessor());
     webViewBridge->setInputMeter(&processorRef.getInputMeter());
     webViewBridge->setOutputMeter(&processorRef.getOutputMeter());
+    webViewBridge->setSignalAnalyzer(&processorRef.getSignalAnalyzer());
     webViewBridge->setMainProcessor(&processorRef);
-    webViewBridge->setFFTProcessor(&processorRef.getFFTProcessor());
     webViewBridge->setInstanceRegistry(&processorRef.getInstanceRegistry(), processorRef.getInstanceId());
     webViewBridge->setMirrorManager(&processorRef.getMirrorManager());
 
@@ -63,7 +88,7 @@ void PluginChainManagerEditor::initializeWebView()
     webBrowser = std::make_unique<juce::WebBrowserComponent>(webViewBridge->getOptions());
     webBrowser->setWantsKeyboardFocus(true);
     webViewBridge->setBrowserComponent(webBrowser.get());
-    addAndMakeVisible(*webBrowser);
+    addChildComponent(*webBrowser);
 
     // Use the resource provider root URL which enables native function integration
     auto url = webBrowser->getResourceProviderRoot();
@@ -142,6 +167,10 @@ void PluginChainManagerEditor::parentHierarchyChanged()
 
 bool PluginChainManagerEditor::showInlineEditor(ChainNodeId nodeId)
 {
+    // If already in inline editor mode, delegate to switch (handles same-node early return)
+    if (currentMode == ViewMode::PluginEditor)
+        return switchInlineEditor(nodeId);
+
     auto& chainProc = processorRef.getChainProcessor();
 
     // Find the node in the tree
@@ -184,31 +213,46 @@ bool PluginChainManagerEditor::showInlineEditor(ChainNodeId nodeId)
     int edH = editor->getHeight();
     bool needsViewport = (edW > 2000 || edH > 2000);
 
+    // Switch mode BEFORE adding the editor so any callbacks from addAndMakeVisible
+    // (including resized()) use the correct PluginEditor layout path.
+    currentMode = ViewMode::PluginEditor;
+    KeyboardInterceptor::setInlineEditorActive(true);
+
+    // Disable manual resize in inline mode
+    setResizable(false, false);
+
+    // Pre-calculate final window size and editor bounds BEFORE making the editor visible.
+    // This prevents the editor from flashing at (0,0) and covering the sidebar.
+    int newW = edW + sidebarWidth + rightPanelWidth;
+    int newH = edH + toolbarHeight + bottomPanelHeight;
+
+    auto editorArea = juce::Rectangle<int>(0, 0, newW, newH);
+    editorArea.removeFromLeft(sidebarWidth);
+    editorArea.removeFromBottom(toolbarHeight);
+    if (bottomPanelHeight > 0)
+        editorArea.removeFromBottom(bottomPanelHeight);
+    if (rightPanelWidth > 0)
+        editorArea.removeFromRight(rightPanelWidth);
+
     if (needsViewport)
     {
         editorViewport = std::make_unique<juce::Viewport>();
         editorViewport->setViewedComponent(inlineEditor.get(), false);
         editorViewport->setScrollBarsShown(true, true);
+        editorViewport->setBounds(editorArea);
         addAndMakeVisible(*editorViewport);
     }
     else
     {
         editorViewport.reset();
+        inlineEditor->setBounds(editorArea);
         addAndMakeVisible(*inlineEditor);
     }
 
     // Listen for plugin self-resize
     inlineEditor->addComponentListener(this);
 
-    // Switch mode BEFORE setSize so resized() uses the correct layout
-    currentMode = ViewMode::PluginEditor;
-
-    // Disable manual resize in inline mode
-    setResizable(false, false);
-
-    // Resize host window: sidebar + editor width + right panel, editor height + toolbar + bottom panel
-    int newW = edW + sidebarWidth + rightPanelWidth;
-    int newH = edH + toolbarHeight + bottomPanelHeight;
+    // Resize host window — resized() will reposition everything consistently
     setSize(newW, newH);
 
     // Give keyboard focus to the plugin editor
@@ -255,6 +299,7 @@ void PluginChainManagerEditor::hideInlineEditor()
 
     // Switch mode BEFORE setSize so resized() uses the correct layout
     currentMode = ViewMode::WebView;
+    KeyboardInterceptor::setInlineEditorActive(false);
 
     // Re-enable manual resize
     setResizable(true, true);
@@ -330,24 +375,36 @@ bool PluginChainManagerEditor::switchInlineEditor(ChainNodeId nodeId)
     int edH = newEditor->getHeight();
     bool needsViewport = (edW > 2000 || edH > 2000);
 
+    // Pre-calculate bounds so the editor never appears at (0,0) covering the sidebar
+    int newW = edW + sidebarWidth + rightPanelWidth;
+    int newH = edH + toolbarHeight + bottomPanelHeight;
+
+    auto editorArea = juce::Rectangle<int>(0, 0, newW, newH);
+    editorArea.removeFromLeft(sidebarWidth);
+    editorArea.removeFromBottom(toolbarHeight);
+    if (bottomPanelHeight > 0)
+        editorArea.removeFromBottom(bottomPanelHeight);
+    if (rightPanelWidth > 0)
+        editorArea.removeFromRight(rightPanelWidth);
+
     if (needsViewport)
     {
         editorViewport = std::make_unique<juce::Viewport>();
         editorViewport->setViewedComponent(inlineEditor.get(), false);
         editorViewport->setScrollBarsShown(true, true);
+        editorViewport->setBounds(editorArea);
         addAndMakeVisible(*editorViewport);
     }
     else
     {
         editorViewport.reset();
+        inlineEditor->setBounds(editorArea);
         addAndMakeVisible(*inlineEditor);
     }
 
     inlineEditor->addComponentListener(this);
 
-    // Resize to fit new editor (sidebar + editor width + right panel, editor + toolbar + bottom panel)
-    int newW = edW + sidebarWidth + rightPanelWidth;
-    int newH = edH + toolbarHeight + bottomPanelHeight;
+    // Resize host window — resized() will reposition everything consistently
     setSize(newW, newH);
 
     inlineEditor->grabKeyboardFocus();
@@ -422,6 +479,18 @@ void PluginChainManagerEditor::setPanelLayout(int rightWidth, int bottomHeight)
 }
 
 //==============================================================================
+// Native Window Visibility — hide/show for context menu z-order fix
+//==============================================================================
+
+void PluginChainManagerEditor::setNativeWindowVisible(bool visible)
+{
+    if (editorViewport)
+        editorViewport->setVisible(visible);
+    else if (inlineEditor)
+        inlineEditor->setVisible(visible);
+}
+
+//==============================================================================
 // Search Overlay Mode
 //==============================================================================
 
@@ -431,6 +500,7 @@ void PluginChainManagerEditor::showSearchOverlay()
         return;
 
     searchOverlayActive = true;
+    KeyboardInterceptor::setInlineEditorActive(false);
 
     // Hide the inline editor
     if (editorViewport)
@@ -448,6 +518,8 @@ void PluginChainManagerEditor::hideSearchOverlay()
         return;
 
     searchOverlayActive = false;
+    if (currentMode == ViewMode::PluginEditor)
+        KeyboardInterceptor::setInlineEditorActive(true);
 
     // Restore inline editor visibility
     if (editorViewport)

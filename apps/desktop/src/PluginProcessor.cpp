@@ -71,8 +71,12 @@ PluginChainManagerProcessor::PluginChainManagerProcessor()
   };
 
   // Rebind proxy parameters when plugins are added/removed/moved
-  chainProcessor.onParameterBindingChanged = [this]() {
-    parameterPool.rebindAll(chainProcessor);
+  // fromSlot=-1 means full rebind; fromSlot>=0 means incremental from that slot
+  chainProcessor.onParameterBindingChanged = [this](int fromSlot) {
+    if (fromSlot < 0)
+      parameterPool.rebindAll(chainProcessor);
+    else
+      parameterPool.rebindFrom(fromSlot, chainProcessor);
   };
 
   // Unbind a specific slot (used after duplication to clear automation)
@@ -89,8 +93,40 @@ PluginChainManagerProcessor::PluginChainManagerProcessor()
 
   chainProcessor.onBeforeDeletePlugin = [this]() { parameterPool.unbindAll(); };
 
+  // Wire full-state serialization for crash recovery so recovery files include
+  // master controls, oversampling, and mirror group state — not just chain data.
+  chainProcessor.onSerializeFullState = [this](juce::MemoryBlock &destData) {
+    juce::MemoryBlock chainData;
+    chainProcessor.serializeStateNoSuspend(chainData);
+
+    if (auto xml = getXmlFromBinary(chainData.getData(),
+                                    static_cast<int>(chainData.getSize()))) {
+      if (mirrorManager && mirrorManager->isMirrored()) {
+        auto *mirrorXml = xml->createNewChildElement("MirrorGroup");
+        mirrorXml->setAttribute("id", mirrorManager->getMirrorGroupId());
+        mirrorXml->setAttribute("wasLeader", mirrorManager->isLeader() ? 1 : 0);
+      }
+      auto *osXml = xml->createNewChildElement("Oversampling");
+      osXml->setAttribute("factor", oversamplingFactor);
+
+      auto *masterXml = xml->createNewChildElement("MasterControls");
+      masterXml->setAttribute("inputGainDB", gainProcessor.getInputGainDB());
+      masterXml->setAttribute("outputGainDB", gainProcessor.getOutputGainDB());
+      masterXml->setAttribute("masterDryWet", masterDryWetProcessor.getMix());
+
+      copyXmlToBinary(*xml, destData);
+    } else {
+      destData = chainData;
+    }
+  };
+
   // Create mirror manager (Phase 3)
   mirrorManager = std::make_unique<MirrorManager>(*this, *instanceRegistry);
+
+  // Wire parameter watcher → MirrorManager dirty flag so the 15Hz timer
+  // only captures snapshots when plugin parameters actually changed.
+  if (auto* watcher = chainProcessor.getParameterWatcher())
+    watcher->setExternalDirtyFlag(&mirrorManager->getParametersDirtyFlag());
 
   PCLOG("PluginProcessor constructor — instance #" + juce::String(instanceId) +
         " ready");
@@ -119,6 +155,9 @@ PluginChainManagerProcessor::~PluginChainManagerProcessor() {
   // its destructor would call removeListener() on dangling pointers
   // (use-after-free).
   chainProcessor.setParameterWatcherSuppressed(true);
+  // Clear external dirty flag before clearing watches (MirrorManager may be destroyed first)
+  if (auto* watcher = chainProcessor.getParameterWatcher())
+    watcher->setExternalDirtyFlag(nullptr);
   chainProcessor.clearParameterWatches();
 
   parameterPool.unbindAll();
@@ -209,6 +248,7 @@ void PluginChainManagerProcessor::prepareToPlay(double sampleRate,
   gainProcessor.prepareToPlay(sampleRate, samplesPerBlock);
   inputMeter.prepareToPlay(sampleRate, samplesPerBlock);
   outputMeter.prepareToPlay(sampleRate, samplesPerBlock);
+  signalAnalyzer.prepare(sampleRate, samplesPerBlock);
 
   // Initialize master dry/wet processor
   masterDryWetProcessor.prepareToPlay(sampleRate, samplesPerBlock);
@@ -295,11 +335,19 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float> &buffer,
       latency = latency / osFactor;
       latency += static_cast<int>(oversampling->getLatencyInSamples());
     }
-    PCLOG("processBlock — deferred latency update=" + juce::String(latency));
+    PCLOG_AUDIO("processBlock — deferred latency update=" + juce::String(latency));
     currentChainLatency = latency;
     if (latency > 0)
       dryDelayLine.setDelay(static_cast<float>(latency));
-    setLatencySamples(latency);
+    // Defer host notification to message thread — setLatencySamples() can
+    // trigger DAW callbacks (property changes, prepareToPlay) that must not
+    // run on the audio thread.  dryDelayLine.setDelay() above is a simple
+    // float store and stays on the audio thread.
+    auto alive = aliveFlag;
+    juce::MessageManager::callAsync([this, alive, latency]() {
+      if (alive->load(std::memory_order_acquire))
+        setLatencySamples(latency);
+    });
   }
 
   // P0-5: Validate buffer has at least 2 channels for stereo processing.
@@ -330,24 +378,31 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
   // Meter input AFTER gain (showing what actually enters the chain)
   inputMeter.process(buffer);
+  signalAnalyzer.process(buffer);
 
-  // Store dry signal (stereo only) for master dry/wet mixing (after input
-  // gain). CRITICAL: Only copy 2 channels — dryDelayLine is prepared for 2
-  // channels. Copying the full 4-ch DAW buffer causes out-of-bounds writes in
-  // the delay line.
-  // If the DAW sends a block larger than our pre-allocated buffer (4x headroom),
-  // clamp to what fits rather than allocating on the audio thread.
-  const int safeSamples = juce::jmin(buffer.getNumSamples(),
-                                     dryBufferForMaster.getNumSamples());
-  jassert(buffer.getNumSamples() <= dryBufferForMaster.getNumSamples()); // Should never exceed 4x headroom
-  dryBufferForMaster.copyFrom(0, 0, buffer, 0, 0, safeSamples);
-  dryBufferForMaster.copyFrom(1, 0, buffer, 1, 0, safeSamples);
+  // Only capture dry signal if master dry/wet mix is below 100% wet.
+  // At mix=1.0 (the default), skip the dry buffer copy and delay line entirely.
+  const bool masterMixNeedsDry = masterDryWetProcessor.getMix() < 0.9999f;
 
-  // Delay the dry signal to match chain latency (keeps dry/wet time-aligned)
-  if (currentChainLatency > 0) {
-    juce::dsp::AudioBlock<float> dryBlock(dryBufferForMaster);
-    juce::dsp::ProcessContextReplacing<float> dryContext(dryBlock);
-    dryDelayLine.process(dryContext);
+  if (masterMixNeedsDry) {
+    // Store dry signal (stereo only) for master dry/wet mixing (after input
+    // gain). CRITICAL: Only copy 2 channels — dryDelayLine is prepared for 2
+    // channels. Copying the full 4-ch DAW buffer causes out-of-bounds writes in
+    // the delay line.
+    // If the DAW sends a block larger than our pre-allocated buffer (4x headroom),
+    // clamp to what fits rather than allocating on the audio thread.
+    const int safeSamples = juce::jmin(buffer.getNumSamples(),
+                                       dryBufferForMaster.getNumSamples());
+    jassert(buffer.getNumSamples() <= dryBufferForMaster.getNumSamples()); // Should never exceed 4x headroom
+    dryBufferForMaster.copyFrom(0, 0, buffer, 0, 0, safeSamples);
+    dryBufferForMaster.copyFrom(1, 0, buffer, 1, 0, safeSamples);
+
+    // Delay the dry signal to match chain latency (keeps dry/wet time-aligned)
+    if (currentChainLatency > 0) {
+      juce::dsp::AudioBlock<float> dryBlock(dryBufferForMaster);
+      juce::dsp::ProcessContextReplacing<float> dryContext(dryBlock);
+      dryDelayLine.process(dryContext);
+    }
   }
 
   // Capture DAW play head safely before passing it to the graph.
@@ -395,7 +450,9 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float> &buffer,
   sanitiseBuffer(buffer);
 
   // Master dry/wet mixing (before output gain)
-  {
+  // At mix=1.0 (default), the chain output IS the final output — skip the
+  // 8 buffer copies + delay line processing entirely.
+  if (masterMixNeedsDry) {
     // Use pre-allocated 4-channel buffer: ch0-1 = dry (latency-compensated),
     // ch2-3 = wet. Clamp to pre-allocated size — never allocate on audio thread.
     const int mixSamples = juce::jmin(buffer.getNumSamples(),
@@ -470,6 +527,51 @@ void PluginChainManagerProcessor::getStateInformation(
 void PluginChainManagerProcessor::setStateInformation(const void *data,
                                                       int sizeInBytes) {
   PCLOG("setStateInformation — " + juce::String(sizeInBytes) + " bytes");
+
+  // --- Crash recovery scan ---
+  // Scan ~/Library/Application Support/ProChain/Recovery/ for recovery files.
+  // Use the most recent file that is < 30 minutes old, then clean up all files.
+  juce::MemoryBlock recoveryState;
+  {
+    auto recoveryDir =
+        juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+            .getChildFile("ProChain/Recovery");
+    if (recoveryDir.isDirectory()) {
+      juce::File bestFile;
+      juce::Time bestTime;
+      auto thirtyMinutes = juce::RelativeTime::minutes(30);
+
+      for (const auto &f :
+           juce::RangedDirectoryIterator(recoveryDir, false, "ProChain_Recovery_*.dat")) {
+        auto modTime = f.getFile().getLastModificationTime();
+        auto age = juce::Time::getCurrentTime() - modTime;
+        if (age < thirtyMinutes && modTime > bestTime) {
+          bestTime = modTime;
+          bestFile = f.getFile();
+        }
+      }
+
+      if (bestFile.existsAsFile()) {
+        if (bestFile.loadFileAsData(recoveryState) && recoveryState.getSize() > 0) {
+          // Reject oversized files (100 MB)
+          if (recoveryState.getSize() > 100 * 1024 * 1024) {
+            PCLOG("Crash recovery file too large, ignoring");
+            recoveryState.reset();
+          } else {
+            PCLOG("Restoring from crash recovery: " + bestFile.getFullPathName() +
+                  " (" + juce::String(static_cast<int64_t>(recoveryState.getSize())) + " bytes)");
+            data = recoveryState.getData();
+            sizeInBytes = static_cast<int>(recoveryState.getSize());
+          }
+        }
+      }
+
+      // Clean up all recovery files
+      for (const auto &f :
+           juce::RangedDirectoryIterator(recoveryDir, false, "ProChain_Recovery_*.dat"))
+        f.getFile().deleteFile();
+    }
+  }
 
   int savedMirrorGroupId = -1;
   int savedOversamplingFactor = 0;

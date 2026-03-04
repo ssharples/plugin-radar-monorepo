@@ -13,6 +13,7 @@
 
 class GainProcessor;
 class AudioMeter;
+class SignalAnalyzer;
 class PluginChainManagerEditor;
 
 class WebViewBridge : private juce::Timer,
@@ -34,6 +35,7 @@ public:
   void setGainProcessor(GainProcessor *processor) { gainProcessor = processor; }
   void setInputMeter(AudioMeter *meter) { inputMeter = meter; }
   void setOutputMeter(AudioMeter *meter) { outputMeter = meter; }
+  void setSignalAnalyzer(SignalAnalyzer *analyzer) { signalAnalyzer = analyzer; }
 
   // Set main processor reference (for latency polling)
   void setMainProcessor(juce::AudioProcessor *processor) {
@@ -58,6 +60,11 @@ public:
 
   // Event emission to JavaScript
   void emitEvent(const juce::String &eventName, const juce::var &data);
+
+  /** Mark that user/parameter activity occurred — resets adaptive meter throttle. */
+  void noteActivity() {
+    lastActivityTimestampMs = juce::Time::currentTimeMillis();
+  }
 
   // Bind events from core components
   void bindCallbacks();
@@ -109,7 +116,7 @@ private:
   juce::var setGroupMode(const juce::var &args);
   juce::var setGroupDryWet(const juce::var &args);
   juce::var setGroupWetGain(const juce::var &args);
-  juce::var setGroupDucking(const juce::var &args);
+  juce::var setNodeDucking(const juce::var &args);
   juce::var setBranchGain(const juce::var &args);
   juce::var setBranchMute(const juce::var &args);
   juce::var setBranchSolo(const juce::var &args);
@@ -153,6 +160,10 @@ private:
   // Auto-calibrate input gain to match a target peak level
   juce::var autoCalibrate(float targetMidpointDb);
 
+  // Per-plugin preset loading
+  juce::var loadPluginPreset(const juce::var &args);
+  juce::var getPluginState(const juce::var &args);
+
   // Parameter discovery
   juce::var discoverPluginParameters(int nodeId);
   juce::var
@@ -195,6 +206,7 @@ private:
   GainProcessor *gainProcessor = nullptr;
   AudioMeter *inputMeter = nullptr;
   AudioMeter *outputMeter = nullptr;
+  SignalAnalyzer *signalAnalyzer = nullptr;
   juce::AudioProcessor *mainProcessor = nullptr;
   InstanceRegistry *instanceRegistry = nullptr;
   InstanceId instanceId = -1;
@@ -206,18 +218,21 @@ private:
   std::atomic<int> matchLockStuckCounter{0}; // Frames at gain limit
   static constexpr int MaxStuckFrames = 120; // 2 seconds at 60Hz
 
+  // Adaptive meter throttle — reduce meter emission to ~10Hz when idle
+  // (no bridge calls or parameter changes for kIdleThresholdMs).
+  int64_t lastActivityTimestampMs{0};
+  int meterSkipCounter{0};
+  static constexpr int64_t kIdleThresholdMs = 2000;
+  static constexpr int kIdleMeterDivisor = 3; // emit every 3rd tick when idle (~10Hz)
+
   // Latency polling
   std::atomic<int> lastReportedLatency{0};
   std::atomic<int> latencyCheckCounter{0};
   juce::String lastLatencyWarningLevel;  // Track last emitted warning level for clear-on-drop
 
-  // Pre-allocated DynamicObject instances for timer callback (W4 fix)
-  juce::DynamicObject::Ptr cachedNodeMetersObj{new juce::DynamicObject()};
-
-  // Pre-allocated pool of DynamicObject entries for per-node meter data.
-  // Avoids heap allocation on every timerCallback tick (runs at 30Hz).
-  static constexpr int kMaxMeterPoolSize = 32;
-  std::vector<juce::DynamicObject::Ptr> meterEntryPool;
+  // Pre-allocated string for packed meter data (avoids DynamicObject → JSON
+  // serialization overhead, which was taking 5-16ms per emission).
+  juce::String meterPackedString;
 
   // Destruction guard — checked at the top of timerCallback() to prevent
   // dangling-pointer dereferences if the timer fires during teardown.

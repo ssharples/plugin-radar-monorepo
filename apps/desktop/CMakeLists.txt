@@ -5,15 +5,8 @@ project(ProChain VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Fetch JUCE
-include(FetchContent)
-FetchContent_Declare(
-    JUCE
-    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG 8.0.4
-    GIT_SHALLOW TRUE
-)
-FetchContent_MakeAvailable(JUCE)
+# Use local JUCE 8.0.12 (includes AAX SDK)
+add_subdirectory(JUCE/JUCE)
 
 # Plugin target
 juce_add_plugin(ProChain
@@ -26,8 +19,11 @@ juce_add_plugin(ProChain
     COPY_PLUGIN_AFTER_BUILD TRUE
     PLUGIN_MANUFACTURER_CODE Prcn
     PLUGIN_CODE PrCh
-    FORMATS AU VST3 Standalone
+    FORMATS AU VST3 AAX Standalone
+    AAX_CATEGORY AAX_ePlugInCategory_None
     PRODUCT_NAME "ProChain"
+    HARDENED_RUNTIME_ENABLED TRUE
+    HARDENED_RUNTIME_OPTIONS "com.apple.security.cs.disable-library-validation"
 )
 
 # Source files
@@ -45,12 +41,11 @@ target_sources(ProChain
         src/core/MirrorManager.cpp
         src/bridge/WebViewBridge.cpp
         src/bridge/ResourceProvider.cpp
-        src/audio/WaveformCapture.cpp
         src/audio/GainProcessor.cpp
         src/audio/AudioMeter.cpp
+        src/audio/SignalAnalyzer.cpp
         src/audio/PluginWithMeterWrapper.cpp
         src/audio/NodeMeterProcessor.cpp
-        src/audio/FFTProcessor.cpp
         src/audio/DryWetMixProcessor.cpp
         src/audio/BranchGainProcessor.cpp
         src/audio/MidSideMatrixProcessor.cpp
@@ -165,14 +160,26 @@ add_custom_command(TARGET PluginScannerHelper POST_BUILD
     COMMENT "Copying PluginScannerHelper to VST3 bundle"
 )
 
+# Copy scanner helper to AAX bundle's Resources folder
+add_custom_command(TARGET PluginScannerHelper POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/AAX/ProChain.aaxplugin/Contents/Resources"
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "$<TARGET_FILE:PluginScannerHelper>"
+        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/AAX/ProChain.aaxplugin/Contents/Resources/PluginScannerHelper"
+    COMMENT "Copying PluginScannerHelper to AAX bundle"
+)
+
 # Make sure scanner is built before the main plugin
 add_dependencies(ProChain_Standalone PluginScannerHelper)
 add_dependencies(ProChain_AU PluginScannerHelper)
 add_dependencies(ProChain_VST3 PluginScannerHelper)
+add_dependencies(ProChain_AAX PluginScannerHelper)
 
 #==============================================================================
 # Tests - Catch2 unit tests for scanner and plugin management logic
 #==============================================================================
+include(FetchContent)
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -214,9 +221,8 @@ add_executable(ProChain_Tests
     src/audio/LatencyCompensationProcessor.cpp
     src/audio/GainProcessor.cpp
     src/audio/AudioMeter.cpp
+    src/audio/SignalAnalyzer.cpp
     src/audio/PluginWithMeterWrapper.cpp
-    src/audio/WaveformCapture.cpp
-    src/audio/FFTProcessor.cpp
     src/audio/NodeMeterProcessor.cpp
     src/audio/PluginParameterWatcher.cpp
     src/automation/ProxyParameter.cpp
