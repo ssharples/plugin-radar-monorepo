@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -9,12 +9,15 @@ import type { Node } from '@xyflow/react';
 import { useChainStore } from '../../stores/chainStore';
 import { useChainToReactFlow } from '../../hooks/useChainToReactFlow';
 import { useCanvasLayout } from '../../hooks/useCanvasLayout';
-import type { PluginNodeData } from '../../hooks/useChainToReactFlow';
+import type { PluginNodeData, GroupHeaderNodeData } from '../../hooks/useChainToReactFlow';
+import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
 import { PluginNode } from './PluginNode';
 import { GroupHeaderNode } from './GroupHeaderNode';
 import { GroupMergeNode } from './GroupMergeNode';
 import { AddNode } from './AddNode';
 import { SignalEdge } from './SignalEdge';
+import { CanvasContextMenu } from './CanvasContextMenu';
+import type { ContextMenuState } from './CanvasContextMenu';
 
 const nodeTypes = {
   pluginNode: PluginNode,
@@ -35,6 +38,19 @@ function ChainCanvasInner() {
   const selectNode = useChainStore(s => s.selectNode);
   const openInlineEditor = useChainStore(s => s.openInlineEditor);
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Wire keyboard shortcuts
+  useCanvasKeyboard({
+    closeContextMenu,
+    isContextMenuOpen: contextMenu !== null,
+  });
+
   const { nodes: rfNodes, edges: rfEdges } = useChainToReactFlow(nodes, selectedNodeId);
   const layoutNodes = useCanvasLayout(rfNodes, rfEdges);
 
@@ -46,6 +62,36 @@ function ChainCanvasInner() {
       openInlineEditor(pluginData.chainNodeId);
     }
   }, [selectNode, openInlineEditor]);
+
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    const data = node.data as Record<string, unknown>;
+
+    if (data.nodeType === 'plugin') {
+      const pluginData = data as PluginNodeData;
+      selectNode(pluginData.chainNodeId);
+      setContextMenu({
+        nodeId: pluginData.chainNodeId,
+        nodeType: 'plugin',
+        x: event.clientX,
+        y: event.clientY,
+      });
+    } else if (data.nodeType === 'groupHeader') {
+      const headerData = data as GroupHeaderNodeData;
+      setContextMenu({
+        nodeId: headerData.chainNodeId,
+        nodeType: 'groupHeader',
+        x: event.clientX,
+        y: event.clientY,
+      });
+    }
+  }, [selectNode]);
+
+  // Close context menu on pane click
+  const onPaneClick = useCallback(() => {
+    if (contextMenu) setContextMenu(null);
+    selectNode(null);
+  }, [contextMenu, selectNode]);
 
   const defaultEdgeOptions = useMemo(() => ({
     type: 'signalEdge' as const,
@@ -59,6 +105,8 @@ function ChainCanvasInner() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeClick={onNodeClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneClick={onPaneClick}
         fitView
         panOnScroll
         panOnDrag={false}
@@ -77,6 +125,10 @@ function ChainCanvasInner() {
           size={1}
         />
       </ReactFlow>
+
+      {contextMenu && (
+        <CanvasContextMenu state={contextMenu} onClose={closeContextMenu} />
+      )}
     </div>
   );
 }
