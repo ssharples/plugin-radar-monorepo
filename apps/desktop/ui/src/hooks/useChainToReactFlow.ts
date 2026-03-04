@@ -40,6 +40,7 @@ export interface GroupMergeNodeData {
   nodeType: 'groupMerge';
   chainNodeId: number;
   mode: 'serial' | 'parallel' | 'midside' | 'fxselector';
+  branchCount: number;
   [key: string]: unknown;
 }
 
@@ -51,22 +52,24 @@ export interface AddButtonNodeData {
 }
 
 // ============================================
-// Conversion logic
+// Conversion logic — deterministic IDs from chain node IDs
 // ============================================
-
-let _nodeIdCounter = 0;
-function resetCounter() { _nodeIdCounter = 0; }
-function nextId(prefix: string) { return `${prefix}_${_nodeIdCounter++}`; }
 
 interface ConversionContext {
   nodes: Node[];
   edges: Edge[];
   ghostNodes?: ChainNodeUI[];
+  /** Whether we're inside a parallel branch (suppresses trailing + buttons) */
+  inParallelBranch: boolean;
 }
 
 function isGhost(chainNodeId: number, ghostNodes?: ChainNodeUI[]): boolean {
   if (!ghostNodes) return false;
   return ghostNodes.some(g => g.id === chainNodeId);
+}
+
+function ghostSuffix(ghost: boolean): string {
+  return ghost ? '-ghost' : '';
 }
 
 function addPluginNode(
@@ -75,7 +78,7 @@ function addPluginNode(
   selected: boolean,
   ghost: boolean,
 ): string {
-  const rfId = nextId('plugin');
+  const rfId = `plugin-${plugin.id}${ghostSuffix(ghost)}`;
   const data: PluginNodeData = {
     nodeType: 'plugin',
     chainNodeId: plugin.id,
@@ -91,6 +94,7 @@ function addPluginNode(
     autoGainEnabled: plugin.autoGainEnabled,
     duckEnabled: plugin.duckEnabled,
     isGhost: ghost,
+    // category: looked up from pluginStore at render time if needed
   };
   ctx.nodes.push({
     id: rfId,
@@ -103,7 +107,7 @@ function addPluginNode(
 }
 
 function addAddNode(ctx: ConversionContext, parentId: number, insertIndex: number): string {
-  const rfId = nextId('add');
+  const rfId = `add-${parentId}-${insertIndex}`;
   const data: AddButtonNodeData = {
     nodeType: 'addButton',
     parentId,
@@ -132,7 +136,9 @@ function addEdge(ctx: ConversionContext, source: string, target: string, ghost: 
 
 /**
  * Process a list of chain children (serial sequence).
- * Returns [firstNodeId, lastNodeId] for connecting to parent group header/merge.
+ * Returns [firstNodeId, lastRealNodeId] for connecting to parent group header/merge.
+ * Add buttons are placed between nodes but NOT as the last returned ID,
+ * so parent parallel branches connect directly to the last real node.
  */
 function processSerialChildren(
   ctx: ConversionContext,
@@ -144,13 +150,14 @@ function processSerialChildren(
 
   let prevId: string | null = null;
   let firstId: string | null = null;
+  let lastRealId: string | null = null;
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
     const ghost = isGhost(child.id, ctx.ghostNodes);
 
-    // Add "+" button before each child (except first, which gets handled by the header)
-    if (i > 0) {
+    // Add "+" button between children (not before the first)
+    if (i > 0 && !ctx.inParallelBranch) {
       const addId = addAddNode(ctx, parentId, i);
       if (prevId) addEdge(ctx, prevId, addId, false);
       prevId = addId;
@@ -174,13 +181,16 @@ function processSerialChildren(
     if (!firstId) firstId = childFirstId;
     if (prevId) addEdge(ctx, prevId, childFirstId, ghost);
     prevId = childLastId;
+    lastRealId = childLastId;
   }
 
-  // Add trailing "+" button
-  const trailAddId = addAddNode(ctx, parentId, children.length);
-  if (prevId) addEdge(ctx, prevId, trailAddId, false);
+  // Add trailing "+" button only at root / serial group level (not inside parallel branches)
+  if (!ctx.inParallelBranch) {
+    const trailAddId = addAddNode(ctx, parentId, children.length);
+    if (prevId) addEdge(ctx, prevId, trailAddId, false);
+  }
 
-  return [firstId, trailAddId];
+  return [firstId, lastRealId];
 }
 
 /**
@@ -192,8 +202,9 @@ function processGroup(
   group: GroupNodeUI,
   selectedNodeId: number | null,
 ): [string | null, string | null] {
-  const headerId = nextId('header');
-  const mergeId = nextId('merge');
+  const ghost = isGhost(group.id, ctx.ghostNodes);
+  const headerId = `group-header-${group.id}${ghostSuffix(ghost)}`;
+  const mergeId = `group-merge-${group.id}${ghostSuffix(ghost)}`;
 
   const branchCount = group.mode === 'parallel' || group.mode === 'midside'
     ? group.children.length
@@ -220,6 +231,7 @@ function processGroup(
     nodeType: 'groupMerge',
     chainNodeId: group.id,
     mode: group.mode,
+    branchCount,
   };
 
   ctx.nodes.push({
@@ -231,17 +243,20 @@ function processGroup(
 
   if (group.mode === 'parallel' || group.mode === 'midside') {
     // Each child is a separate branch
+    const savedInParallel = ctx.inParallelBranch;
+    ctx.inParallelBranch = true;
+
     for (let branchIdx = 0; branchIdx < group.children.length; branchIdx++) {
       const child = group.children[branchIdx];
-      const ghost = isGhost(child.id, ctx.ghostNodes);
+      const childGhost = isGhost(child.id, ctx.ghostNodes);
       const sourceHandle = `branch-${branchIdx}`;
       const targetHandle = `branch-${branchIdx}`;
 
       if (child.type === 'plugin') {
         const selected = child.id === selectedNodeId;
-        const plugId = addPluginNode(ctx, child, selected, ghost);
-        addEdge(ctx, headerId, plugId, ghost, sourceHandle);
-        addEdge(ctx, plugId, mergeId, ghost, undefined, targetHandle);
+        const plugId = addPluginNode(ctx, child, selected, childGhost);
+        addEdge(ctx, headerId, plugId, childGhost, sourceHandle);
+        addEdge(ctx, plugId, mergeId, childGhost, undefined, targetHandle);
       } else if (child.type === 'group' && child.mode === 'serial') {
         // Serial sub-group inside a parallel branch: process children inline
         const [first, last] = processSerialChildren(ctx, child.children, child.id, selectedNodeId);
@@ -250,10 +265,12 @@ function processGroup(
       } else {
         // Nested group within parallel branch
         const [gFirst, gLast] = processGroup(ctx, child, selectedNodeId);
-        if (gFirst) addEdge(ctx, headerId, gFirst, ghost, sourceHandle);
-        if (gLast) addEdge(ctx, gLast, mergeId, ghost, undefined, targetHandle);
+        if (gFirst) addEdge(ctx, headerId, gFirst, childGhost, sourceHandle);
+        if (gLast) addEdge(ctx, gLast, mergeId, childGhost, undefined, targetHandle);
       }
     }
+
+    ctx.inParallelBranch = savedInParallel;
   } else {
     // Serial group: chain children sequentially
     const [first, last] = processSerialChildren(ctx, group.children, group.id, selectedNodeId);
@@ -266,6 +283,7 @@ function processGroup(
 
 /**
  * Convert the chain tree (root children) into ReactFlow nodes and edges.
+ * Uses deterministic IDs based on chain node IDs for stable rendering.
  */
 export function useChainToReactFlow(
   chainNodes: ChainNodeUI[],
@@ -273,12 +291,11 @@ export function useChainToReactFlow(
   ghostNodes?: ChainNodeUI[],
 ): { nodes: Node[]; edges: Edge[] } {
   return useMemo(() => {
-    resetCounter();
-
     const ctx: ConversionContext = {
       nodes: [],
       edges: [],
       ghostNodes,
+      inParallelBranch: false,
     };
 
     if (chainNodes.length === 0) {
@@ -288,7 +305,6 @@ export function useChainToReactFlow(
     }
 
     // The root is a serial sequence (root group id=0)
-    // Process as serial children of the root
     processSerialChildren(ctx, chainNodes, 0, selectedNodeId);
 
     return { nodes: ctx.nodes, edges: ctx.edges };

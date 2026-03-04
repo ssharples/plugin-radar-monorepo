@@ -13,7 +13,7 @@ const MODE_COLORS: Record<string, string> = {
 function GroupMergeNodeComponent({ data }: NodeProps) {
   const d = data as GroupMergeNodeData;
   const color = MODE_COLORS[d.mode] ?? '#c9944a';
-  const branchCount = (d.mode === 'parallel' || d.mode === 'midside') ? 2 : 1;
+  const branchCount = d.branchCount ?? ((d.mode === 'parallel' || d.mode === 'midside') ? 2 : 1);
 
   return (
     <div
