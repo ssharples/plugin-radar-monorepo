@@ -3,11 +3,12 @@
  * Fast, keyboard-first workflow with cyber visual identity
  */
 
-import { useState, useRef, useEffect, useMemo, memo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useDraggable } from '@dnd-kit/core';
-import { Trash2, ChevronDown } from 'lucide-react';
+import { Trash2, ChevronDown, AudioLines } from 'lucide-react';
 import type { PluginNodeUI, ChainSlot as ChainSlotType } from '../../api/types';
-import { useChainStore } from '../../stores/chainStore';
+import { useChainStore, useChainActions } from '../../stores/chainStore';
 import { useMeterStore } from '../../stores/meterStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { PluginSwapMenu } from './PluginSwapMenu';
@@ -79,21 +80,16 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
   const isMuted = node?.mute ?? false;
   const latency = node?.latency ?? 0;
 
-  const duplicateNode = useChainStore((s) => s.duplicateNode);
-  const setBranchMute = useChainStore((s) => s.setBranchMute);
-  const setBranchGain = useChainStore((s) => s.setBranchGain);
-  const showToast = useChainStore((s) => s.showToast);
-  const createGroup = useChainStore((s) => s.createGroup);
+  const { duplicateNode, setBranchMute, setBranchGain, showToast,
+    toggleNodeExpanded, _endContinuousGesture, setNodeDucking } = useChainActions();
   const slotColor = useChainStore((s) => s.slotColors[id]);
 
-  // Per-plugin expandable controls
-  const expandedNodeIds = useChainStore((s) => s.expandedNodeIds);
-  const toggleNodeExpanded = useChainStore((s) => s.toggleNodeExpanded);
-  const _endContinuousGesture = useChainStore((s) => s._endContinuousGesture);
-  const isExpanded = expandedNodeIds.has(id);
+  // Per-plugin expandable controls — select boolean directly, not the full Set
+  const isExpanded = useChainStore((s) => s.expandedNodeIds.has(id));
 
   // Swap menu state
   const [showSwapMenu, setShowSwapMenu] = useState(false);
+  const swapMenuAnchorRef = useRef<HTMLDivElement>(null);
   const getEnrichedDataForPlugin = usePluginStore((s) => s.getEnrichedDataForPlugin);
   const enriched = node ? getEnrichedDataForPlugin(node.uid) : undefined;
   const matchedPluginId = enriched?._id;
@@ -173,19 +169,6 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
       peakMeterVersion: s.peakMeterVersion + 1,
     }));
     showToast('All meter peaks reset');
-  };
-
-  // Handle group creation
-  const handleCreateSerialGroup = () => {
-    if (node) {
-      createGroup([node.id], 'serial', 'Serial Group');
-    }
-  };
-
-  const handleCreateParallelGroup = () => {
-    if (node) {
-      createGroup([node.id], 'parallel', 'Parallel Group');
-    }
   };
 
   // Drag and drop setup
@@ -313,16 +296,18 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
             />
           )}
 
-          {/* Plugin Name - Extended Bold */}
-          <div
-            className={`slot-name ${glitchTrigger > 0 ? 'glitch-trigger' : ''}`}
-            key={glitchTrigger}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              onToggleEditor();
-            }}
-          >
-            {formatPluginName(name)}
+          {/* Plugin Name */}
+          <div className="slot-name-row" ref={swapMenuAnchorRef}>
+            <div
+              className={`slot-name ${glitchTrigger > 0 ? 'glitch-trigger' : ''}`}
+              key={glitchTrigger}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onToggleEditor();
+              }}
+            >
+              {formatPluginName(name)}
+            </div>
           </div>
 
           {/* Technical Info - Monospace */}
@@ -364,6 +349,40 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
 
           {/* Control Buttons */}
           <div className="slot-controls">
+            {node?.autoGainEnabled && (
+              <span
+                style={{
+                  fontSize: 'var(--text-nano)',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 700,
+                  color: '#deff0a',
+                  letterSpacing: '0.05em',
+                  lineHeight: 1,
+                  opacity: 0.8,
+                }}
+              >
+                AG
+              </span>
+            )}
+            {isParallelChild && node && !node.isDryPath && (
+              <button
+                className="ctrl-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNodeDucking(
+                    node.id,
+                    !node.duckEnabled,
+                    node.duckThresholdDb ?? -20,
+                    node.duckAttackMs ?? 5,
+                    node.duckReleaseMs ?? 200,
+                  );
+                }}
+                title={node.duckEnabled ? 'Disable ducking' : 'Enable ducking'}
+                style={{ color: node.duckEnabled ? 'var(--color-accent-cyan)' : undefined }}
+              >
+                <AudioLines className="w-3 h-3" />
+              </button>
+            )}
             <button
               className={`ctrl-btn inout ${!isMuted ? 'active' : ''}`}
               onClick={(e) => {
@@ -386,76 +405,6 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
             >
               B
             </button>
-
-            {/* Group Creation Buttons - Small stacked at end */}
-            <div className="flex flex-col gap-0.5 ml-1">
-              <button
-                className="ctrl-btn-mini"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCreateSerialGroup();
-                }}
-                title="Create Serial Group"
-                style={{
-                  width: '10px',
-                  height: '10px',
-                  fontSize: '6px',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  borderRadius: '2px',
-                  cursor: 'pointer',
-                  transition: 'all 100ms',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                }}
-              >
-                S
-              </button>
-              <button
-                className="ctrl-btn-mini"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCreateParallelGroup();
-                }}
-                title="Create Parallel Group"
-                style={{
-                  width: '10px',
-                  height: '10px',
-                  fontSize: '6px',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  borderRadius: '2px',
-                  cursor: 'pointer',
-                  transition: 'all 100ms',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                }}
-              >
-                P
-              </button>
-            </div>
 
           </div>
 
@@ -488,18 +437,6 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
             />
           )}
 
-          {/* Plugin Swap Menu */}
-          {showSwapMenu && node && (
-            <PluginSwapMenu
-              nodeId={node.id}
-              pluginName={node.name}
-              matchedPluginId={matchedPluginId}
-              pluginUid={node.uid}
-              onSwapComplete={() => setShowSwapMenu(false)}
-              onClose={() => setShowSwapMenu(false)}
-            />
-          )}
-
           {/* Selection Indicator - Neon Accent */}
           {(isSelected || isMultiSelected) && (
             <div className="selection-indicator" />
@@ -507,21 +444,6 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
 
           {/* Status Badges */}
           <div className="slot-badges">
-            {node?.autoGainEnabled && (
-              <span
-                className="badge"
-                style={{
-                  background: 'rgba(222, 255, 10, 0.2)',
-                  color: '#deff0a',
-                  border: '1px solid rgba(222, 255, 10, 0.3)',
-                }}
-              >
-                AG
-              </span>
-            )}
-            {isMuted && (
-              <span className="badge badge-inactive">OUT</span>
-            )}
             {bypassed && (
               <span className="badge badge-bypass">BYPASS</span>
             )}
@@ -532,6 +454,20 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
       {/* Expandable Controls Panel */}
       {node && (
         <PluginControlsPanel node={node} isExpanded={isExpanded} />
+      )}
+
+      {/* Plugin Swap Menu — rendered via portal to escape overflow-hidden */}
+      {showSwapMenu && node && createPortal(
+        <PluginSwapMenu
+          nodeId={node.id}
+          pluginName={node.name}
+          matchedPluginId={matchedPluginId}
+          pluginUid={node.uid}
+          anchorRef={swapMenuAnchorRef}
+          onSwapComplete={() => setShowSwapMenu(false)}
+          onClose={() => setShowSwapMenu(false)}
+        />,
+        document.body,
       )}
 
     </div>
