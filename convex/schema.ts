@@ -13,11 +13,11 @@ export default defineSchema({
     description: v.optional(v.string()),
     logoUrl: v.optional(v.string()),
     logoStorageId: v.optional(v.id("_storage")), // Convex storage for logo
-    
+
     // Newsletter tracking
     newsletterEmail: v.optional(v.string()), // email address they send from
     newsletterSubscribed: v.boolean(),
-    
+
     // Metadata
     pluginCount: v.number(),
     createdAt: v.number(),
@@ -31,33 +31,33 @@ export default defineSchema({
     name: v.string(),
     slug: v.string(),
     manufacturer: v.id("manufacturers"),
-    
+
     // Description
     description: v.optional(v.string()),
     shortDescription: v.optional(v.string()),
-    
+
     // Classification (effects only: eq, compressor, limiter, reverb, delay,
     // saturation, modulation, stereo-imaging, gate-expander, de-esser,
     // filter, channel-strip, metering, noise-reduction, multiband, utility)
     category: v.string(),
     subcategory: v.optional(v.string()),
     tags: v.array(v.string()), // ["analog-modeling", "vintage", "mastering", "free", "ai-powered"]
-    
+
     // Effect taxonomy (from plugin-radar)
     effectType: v.optional(v.string()), // Granular subtype: parametric, VCA, FET, optical, brickwall, algorithmic, convolution, etc.
     circuitEmulation: v.optional(v.string()), // e.g. "Neve 1073", "SSL G-Bus", "LA-2A", "1176"
     tonalCharacter: v.optional(v.array(v.string())), // ["warm", "transparent", "aggressive", "smooth", "colored", "clean"]
-    
+
     // Technical specs
     formats: v.array(v.string()), // ["VST3", "AU", "AAX", "CLAP", "Standalone"]
     platforms: v.array(v.string()), // ["windows", "mac", "linux"]
     systemRequirements: v.optional(v.string()),
-    
+
     // Version info
     currentVersion: v.optional(v.string()),
     releaseDate: v.optional(v.number()),
     lastUpdated: v.optional(v.number()),
-    
+
     // Pricing
     msrp: v.optional(v.number()), // regular price in cents (USD)
     currentPrice: v.optional(v.number()), // current best price in cents
@@ -66,7 +66,7 @@ export default defineSchema({
     hasDemo: v.boolean(),
     hasTrial: v.boolean(),
     trialDays: v.optional(v.number()),
-    
+
     // Media
     imageUrl: v.optional(v.string()),
     imageStorageId: v.optional(v.id("_storage")), // Convex storage for main image
@@ -76,21 +76,21 @@ export default defineSchema({
     screenshotStorageIds: v.optional(v.array(v.id("_storage"))), // Convex storage for screenshots
     videoUrl: v.optional(v.string()), // YouTube demo etc
     audioDemo: v.optional(v.string()),
-    
+
     // Links
     productUrl: v.string(), // manufacturer's product page
     manualUrl: v.optional(v.string()),
-    
+
     // Status
     isActive: v.boolean(), // still being sold
     isDiscontinued: v.boolean(),
-    
+
     // Mention/Trending stats
     mentionCount7d: v.optional(v.number()),
     mentionCount30d: v.optional(v.number()),
     mentionScore: v.optional(v.number()),  // weighted trending score
     lastMentionScan: v.optional(v.number()),
-    
+
     // Metadata
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -109,6 +109,9 @@ export default defineSchema({
     keyFeatures: v.optional(v.array(v.string())),
     recommendedDaws: v.optional(v.array(v.string())),
     isIndustryStandard: v.optional(v.boolean()),
+
+    // Crowd-pooled analytics
+    ownerCount: v.optional(v.number()), // Denormalized count of users who own this plugin
   })
     .index("by_slug", ["slug"])
     .index("by_mention_score", ["mentionScore"])
@@ -118,6 +121,7 @@ export default defineSchema({
     .index("by_updated", ["updatedAt"])
     .index("by_skill_level", ["skillLevel"])
     .index("by_cpu_usage", ["cpuUsage"])
+    .index("by_owner_count", ["ownerCount"])
     .searchIndex("search_name", {
       searchField: "name",
       filterFields: ["category", "manufacturer", "isFree"]
@@ -173,28 +177,28 @@ export default defineSchema({
   sales: defineTable({
     plugin: v.id("plugins"),
     store: v.optional(v.id("stores")), // null = direct from manufacturer
-    
+
     // Pricing
     salePrice: v.number(),
     originalPrice: v.number(),
     discountPercent: v.number(),
     currency: v.string(),
-    
+
     // Timing
     startsAt: v.number(),
     endsAt: v.optional(v.number()),
-    
+
     // Details
     saleName: v.optional(v.string()), // "Black Friday 2026", "Summer Sale"
     promoCode: v.optional(v.string()),
     url: v.string(),
-    
+
     // Tracking
     source: v.string(), // "email", "scrape", "manual", "reddit", "twitter"
     sourceUrl: v.optional(v.string()),
     isVerified: v.boolean(),
     isActive: v.boolean(),
-    
+
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -211,7 +215,7 @@ export default defineSchema({
     plugin: v.id("plugins"),
     version: v.string(),
     releaseDate: v.number(),
-    
+
     // Changelog
     changelogRaw: v.optional(v.string()), // original text
     changelogParsed: v.optional(v.object({
@@ -220,11 +224,11 @@ export default defineSchema({
       improvements: v.array(v.string()),
       breaking: v.array(v.string()),
     })),
-    
+
     // Source
     source: v.string(),
     sourceUrl: v.optional(v.string()),
-    
+
     createdAt: v.number(),
   })
     .index("by_plugin", ["plugin"])
@@ -262,14 +266,14 @@ export default defineSchema({
   emailSources: defineTable({
     manufacturer: v.optional(v.id("manufacturers")),
     store: v.optional(v.id("stores")),
-    
+
     emailAddress: v.string(), // sender address
     name: v.string(),
     type: v.string(), // "manufacturer", "store", "blog", "other"
-    
+
     isSubscribed: v.boolean(),
     subscribedAt: v.optional(v.number()),
-    
+
     // Stats
     emailsReceived: v.number(),
     lastEmailAt: v.optional(v.number()),
@@ -280,21 +284,21 @@ export default defineSchema({
 
   incomingEmails: defineTable({
     source: v.optional(v.id("emailSources")),
-    
+
     // Email metadata
     from: v.string(),
     subject: v.string(),
     receivedAt: v.number(),
     messageId: v.string(),
-    
+
     // Content
     bodyText: v.optional(v.string()),
     bodyHtml: v.optional(v.string()),
-    
+
     // Processing
     status: v.string(), // "pending", "processed", "irrelevant", "error"
     classification: v.optional(v.string()), // "sale", "new_release", "update", "promo", "newsletter", "irrelevant"
-    
+
     // Extracted data
     extractedData: v.optional(v.object({
       plugins: v.array(v.string()),
@@ -306,7 +310,7 @@ export default defineSchema({
       promoCodes: v.array(v.string()),
       saleEnds: v.optional(v.number()),
     })),
-    
+
     processedAt: v.optional(v.number()),
     error: v.optional(v.string()),
   })
@@ -322,18 +326,18 @@ export default defineSchema({
     name: v.string(),
     type: v.string(), // "manufacturer_site", "store", "rss", "reddit", "twitter"
     url: v.string(),
-    
+
     // Scraping config
     scrapeFrequency: v.string(), // "hourly", "daily", "weekly"
     scrapeScript: v.optional(v.string()), // script name/path
-    
+
     // Status
     isActive: v.boolean(),
     lastScrapeAt: v.optional(v.number()),
     lastSuccess: v.optional(v.number()),
     lastError: v.optional(v.string()),
     consecutiveFailures: v.number(),
-    
+
     // Stats
     totalScrapes: v.number(),
     successfulScrapes: v.number(),
@@ -347,14 +351,14 @@ export default defineSchema({
     source: v.id("scrapeSources"),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
-    
+
     status: v.string(), // "running", "success", "failed"
-    
+
     // Results
     itemsFound: v.number(),
     itemsCreated: v.number(),
     itemsUpdated: v.number(),
-    
+
     error: v.optional(v.string()),
     logs: v.optional(v.string()),
   })
@@ -371,19 +375,31 @@ export default defineSchema({
     email: v.string(),
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
-    
+
     // Password auth
     passwordHash: v.optional(v.string()),
     isAdmin: v.optional(v.boolean()),
-    
+
     // Subscription
     tier: v.optional(v.string()), // "free", "premium"
     premiumUntil: v.optional(v.number()),
-    
+    hasPurchased: v.optional(v.boolean()), // Perpetual license
+
+    // Free trial
+    trialEndsAt: v.optional(v.number()), // Unix ms — set on registration
+
+    // Affiliate referral
+    referredBy: v.optional(v.string()), // Affiliate code that referred this user
+
+    // Educator role
+    isEducator: v.optional(v.boolean()),
+    educatorSince: v.optional(v.number()),
+    educatorBio: v.optional(v.string()),
+
     // Preferences
     preferredCurrency: v.optional(v.string()),
     emailDigest: v.optional(v.string()), // "none", "daily", "weekly"
-    
+
     createdAt: v.optional(v.number()),
     lastSeenAt: v.optional(v.number()),
   })
@@ -418,10 +434,10 @@ export default defineSchema({
   wishlists: defineTable({
     user: v.id("users"),
     plugin: v.id("plugins"),
-    
+
     targetPrice: v.optional(v.number()), // alert when below this
     notes: v.optional(v.string()),
-    
+
     addedAt: v.number(),
     notifiedAt: v.optional(v.number()), // last time we sent an alert
   })
@@ -432,14 +448,14 @@ export default defineSchema({
   ownedPlugins: defineTable({
     user: v.id("users"),
     plugin: v.id("plugins"),
-    
+
     purchasePrice: v.optional(v.number()),
     purchaseDate: v.optional(v.number()),
     purchaseStore: v.optional(v.id("stores")),
-    
+
     // License (optional, encrypted in real app)
     licenseKey: v.optional(v.string()),
-    
+
     addedAt: v.number(),
   })
     .index("by_user", ["user"])
@@ -448,21 +464,21 @@ export default defineSchema({
 
   alerts: defineTable({
     user: v.id("users"),
-    
+
     type: v.string(), // "price_drop", "new_release", "update", "any_sale"
-    
+
     // What to watch (at least one should be set)
     plugin: v.optional(v.id("plugins")),
     manufacturer: v.optional(v.id("manufacturers")),
     category: v.optional(v.string()),
-    
+
     // Conditions
     priceThreshold: v.optional(v.number()),
-    
+
     // Status
     isActive: v.boolean(),
     lastTriggeredAt: v.optional(v.number()),
-    
+
     createdAt: v.number(),
   })
     .index("by_user", ["user"])
@@ -473,15 +489,15 @@ export default defineSchema({
   // User notification history
   notifications: defineTable({
     user: v.id("users"),
-    
+
     type: v.string(), // "price_drop", "new_release", "wishlist", "digest"
     title: v.string(),
     body: v.string(),
-    
+
     // Related entities
     plugin: v.optional(v.id("plugins")),
     sale: v.optional(v.id("sales")),
-    
+
     // Delivery
     channel: v.string(), // "email", "push", "in_app"
     sentAt: v.number(),
@@ -555,39 +571,39 @@ export default defineSchema({
 
   pluginVideos: defineTable({
     plugin: v.id("plugins"),
-    
+
     // Platform info
     platform: v.string(), // "youtube", "tiktok", "instagram"
     videoId: v.string(),
     videoUrl: v.string(),
-    
+
     // Content metadata
     title: v.optional(v.string()),
     caption: v.optional(v.string()),
     thumbnail: v.string(),
-    
+
     // Author info
     author: v.string(),
     authorHandle: v.string(),
     authorUrl: v.optional(v.string()),
     authorFollowers: v.optional(v.number()),
-    
+
     // Engagement metrics
     duration: v.optional(v.number()), // seconds
     views: v.optional(v.number()),
     likes: v.optional(v.number()),
     comments: v.optional(v.number()),
     shares: v.optional(v.number()),
-    
+
     // Timestamps
     publishedAt: v.optional(v.number()),
     fetchedAt: v.number(),
-    
+
     // Quality scoring
     relevanceScore: v.number(), // 0-100, higher = better match
     isVerified: v.boolean(), // manually curated/approved
     isFeatured: v.boolean(), // show prominently
-    
+
     // Status
     isActive: v.boolean(),
   })
@@ -605,18 +621,18 @@ export default defineSchema({
   tiktokPosts: defineTable({
     // Link to plugin (if matched)
     plugin: v.optional(v.id("plugins")),
-    
+
     // TikTok identifiers
     videoId: v.string(),
     videoUrl: v.string(),
-    
+
     // Search context
     searchKeyword: v.string(), // what keyword found this post
-    
+
     // Content
     caption: v.string(),
     coverUrl: v.string(),
-    
+
     // Author
     authorId: v.string(),
     authorUniqueId: v.string(), // @handle
@@ -624,26 +640,26 @@ export default defineSchema({
     authorAvatarUrl: v.optional(v.string()),
     authorFollowers: v.optional(v.number()),
     authorVerified: v.optional(v.boolean()),
-    
+
     // Engagement stats
     playCount: v.number(),
     likeCount: v.number(),
     commentCount: v.number(),
     shareCount: v.number(),
     collectCount: v.optional(v.number()), // saves/bookmarks
-    
+
     // Video metadata
     duration: v.number(), // seconds
-    
+
     // Music
     musicId: v.optional(v.string()),
     musicTitle: v.optional(v.string()),
     musicAuthor: v.optional(v.string()),
-    
+
     // Timestamps
     createTime: v.number(), // TikTok's timestamp
     fetchedAt: v.number(),
-    
+
     // Processing status
     isProcessed: v.boolean(), // linked to pluginVideos?
     isRelevant: v.optional(v.boolean()), // manually marked as relevant/not
@@ -661,36 +677,36 @@ export default defineSchema({
 
   pluginParameters: defineTable({
     plugin: v.id("plugins"),
-    
+
     // Core specs
     channels: v.optional(v.string()),        // "mono", "stereo", "mono-to-stereo", "surround"
     latency: v.optional(v.number()),         // samples
     oversampling: v.optional(v.array(v.string())), // ["Off", "2x", "4x", "8x"]
     sampleRates: v.optional(v.array(v.number())),  // [44100, 48000, 96000, 192000]
-    
+
     // Inputs/Outputs  
     hasSidechain: v.optional(v.boolean()),
     sidechainFilters: v.optional(v.array(v.string())), // ["HPF", "LPF", "BPF"]
     hasMidSide: v.optional(v.boolean()),
     hasExternalInput: v.optional(v.boolean()),
-    
+
     // UI/UX
     hasResizableUI: v.optional(v.boolean()),
     uiSizes: v.optional(v.array(v.string())),  // ["50%", "100%", "150%", "200%"]
     hasPresetBrowser: v.optional(v.boolean()),
     presetCount: v.optional(v.number()),
-    
+
     // Processing modes
     processingModes: v.optional(v.array(v.string())), // ["Digital", "Vintage", "Modern", "Smooth"]
     hasAutoGain: v.optional(v.boolean()),
     hasDryWetMix: v.optional(v.boolean()),
-    
+
     // EQ-specific
     bandCount: v.optional(v.number()),
     filterTypes: v.optional(v.array(v.string())), // ["Bell", "Shelf", "HPF", "LPF", "Notch"]
     hasLinearPhase: v.optional(v.boolean()),
     hasDynamicEQ: v.optional(v.boolean()),
-    
+
     // Compressor-specific
     compressionTypes: v.optional(v.array(v.string())), // ["VCA", "FET", "Opto", "Variable-Mu"]
     hasParallelMix: v.optional(v.boolean()),
@@ -698,20 +714,20 @@ export default defineSchema({
     attackRange: v.optional(v.object({ min: v.number(), max: v.number() })),
     releaseRange: v.optional(v.object({ min: v.number(), max: v.number() })),
     ratioRange: v.optional(v.object({ min: v.number(), max: v.number() })),
-    
+
     // Reverb-specific
     reverbTypes: v.optional(v.array(v.string())), // ["Hall", "Plate", "Room", "Chamber", "Spring", "Convolution"]
     hasModulation: v.optional(v.boolean()),
     hasPreDelay: v.optional(v.boolean()),
     hasEarlyReflections: v.optional(v.boolean()),
     irCount: v.optional(v.number()),  // for convolution reverbs
-    
+
     // Delay-specific
     delayModes: v.optional(v.array(v.string())), // ["Mono", "Stereo", "Ping-Pong", "Dual"]
     hasTapTempo: v.optional(v.boolean()),
     hasSyncToHost: v.optional(v.boolean()),
     maxDelayTime: v.optional(v.number()), // ms
-    
+
     // Extraction metadata
     extractedAt: v.number(),
     extractionSource: v.string(),  // "manual", "ai-docs", "ai-video"
@@ -727,15 +743,15 @@ export default defineSchema({
   // Plugin features (free-form, for discovery)
   pluginFeatures: defineTable({
     plugin: v.id("plugins"),
-    
+
     feature: v.string(),           // "Vintage Console Emulation"
     category: v.string(),          // "sound-character", "workflow", "compatibility"
     description: v.optional(v.string()),
-    
+
     // Voting (community can upvote/downvote accuracy)
     upvotes: v.number(),
     downvotes: v.number(),
-    
+
     addedBy: v.optional(v.id("users")),
     addedAt: v.number(),
     verifiedAt: v.optional(v.number()),
@@ -750,21 +766,21 @@ export default defineSchema({
 
   wikiEdits: defineTable({
     plugin: v.id("plugins"),
-    
+
     section: v.string(),           // "tips", "settings", "alternatives", "workflow", "compatibility"
     content: v.string(),           // Markdown content
-    
+
     version: v.number(),
     parentVersion: v.optional(v.number()),
-    
+
     author: v.id("users"),
     editSummary: v.optional(v.string()),
-    
+
     status: v.string(),            // "pending", "approved", "rejected", "superseded"
     moderatedBy: v.optional(v.id("users")),
     moderatedAt: v.optional(v.number()),
     moderationNote: v.optional(v.string()),
-    
+
     createdAt: v.number(),
     publishedAt: v.optional(v.number()),
   })
@@ -785,25 +801,25 @@ export default defineSchema({
 
   userReputation: defineTable({
     user: v.id("users"),
-    
+
     totalPoints: v.number(),
     editPoints: v.number(),
     votePoints: v.number(),
     helpfulPoints: v.number(),
-    
+
     level: v.number(),
     title: v.string(),
-    
+
     badges: v.array(v.object({
       id: v.string(),
       name: v.string(),
       awardedAt: v.number(),
     })),
-    
+
     totalEdits: v.number(),
     approvedEdits: v.number(),
     totalVotes: v.number(),
-    
+
     updatedAt: v.number(),
   })
     .index("by_user", ["user"])
@@ -816,17 +832,17 @@ export default defineSchema({
 
   comparisons: defineTable({
     slug: v.string(),
-    
+
     pluginA: v.id("plugins"),
     pluginB: v.id("plugins"),
-    
+
     title: v.string(),
     metaDescription: v.string(),
-    
+
     category: v.string(),
     priceWinner: v.optional(v.string()),
     trendingWinner: v.optional(v.string()),
-    
+
     summary: v.optional(v.string()),
     pros: v.optional(v.object({
       a: v.array(v.string()),
@@ -836,14 +852,14 @@ export default defineSchema({
       a: v.array(v.string()),
       b: v.array(v.string()),
     })),
-    
+
     faqs: v.optional(v.array(v.object({
       question: v.string(),
       answer: v.string(),
     }))),
-    
+
     views: v.number(),
-    
+
     generatedAt: v.number(),
     updatedAt: v.number(),
   })
@@ -860,15 +876,15 @@ export default defineSchema({
   glossaryTerms: defineTable({
     slug: v.string(),
     term: v.string(),
-    
+
     definition: v.string(),
     extendedDescription: v.optional(v.string()),
-    
+
     relatedTerms: v.array(v.string()),
     relatedCategories: v.array(v.string()),
-    
+
     metaDescription: v.optional(v.string()),
-    
+
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -884,15 +900,15 @@ export default defineSchema({
     plugin: v.id("plugins"),
     pluginSlug: v.string(),
     pluginName: v.string(),
-    
+
     status: v.string(),
     priority: v.string(),
-    
+
     requestedBy: v.optional(v.id("users")),
     requestedAt: v.number(),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
-    
+
     result: v.optional(v.string()),
     error: v.optional(v.string()),
   })
@@ -926,7 +942,7 @@ export default defineSchema({
   scannedPlugins: defineTable({
     user: v.optional(v.id("users")),
     userId: v.optional(v.string()), // Legacy field
-    
+
     // From JUCE plugin scan
     name: v.string(),
     manufacturer: v.string(),
@@ -937,12 +953,12 @@ export default defineSchema({
     numInputChannels: v.number(),
     numOutputChannels: v.number(),
     version: v.optional(v.string()),
-    
+
     // Matching to PluginRadar database
     matchedPlugin: v.optional(v.id("plugins")),
     matchConfidence: v.optional(v.number()),  // 0-100
     matchMethod: v.optional(v.string()),      // "exact", "normalized", "fuzzy", "uid", "manual"
-    
+
     // Timestamps
     firstSeenAt: v.optional(v.number()),
     lastSeenAt: v.optional(v.number()),
@@ -951,19 +967,20 @@ export default defineSchema({
     .index("by_user_uid", ["user", "uid"])
     .index("by_user_name_manufacturer", ["user", "name", "manufacturer"])
     .index("by_matched_plugin", ["matchedPlugin"])
-    .index("by_unmatched", ["user", "matchedPlugin"]),
+    .index("by_unmatched", ["user", "matchedPlugin"])
+    .index("by_name_manufacturer", ["name", "manufacturer"]),
 
   // Plugin chains created/saved by users
   pluginChains: defineTable({
     user: v.id("users"),
-    
+
     // Metadata
     name: v.string(),
     slug: v.string(),
     description: v.optional(v.string()),
     category: v.string(),            // "vocal", "drums", "mastering", "mixing", "creative", "live"
     tags: v.array(v.string()),       // ["warm", "punchy", "vintage", "modern", "subtle"]
-    
+
     // Genre/use case
     genre: v.optional(v.string()),   // "hip-hop", "rock", "edm", "acoustic", "orchestral"
     useCase: v.optional(v.string()), // "lead-vocal", "drum-bus", "master", "bass-guitar"
@@ -971,7 +988,7 @@ export default defineSchema({
 
     // Pre-computed matched plugin IDs for fast compatibility filtering during browse
     pluginIds: v.optional(v.array(v.string())),
-    
+
     // The actual chain
     slots: v.array(v.object({
       position: v.number(),
@@ -980,18 +997,22 @@ export default defineSchema({
       format: v.optional(v.string()),
       uid: v.optional(v.number()),
       version: v.optional(v.string()),       // Plugin version when saved
-      
+
       // Link to PluginRadar (if matched)
       matchedPlugin: v.optional(v.id("plugins")),
-      
+
       // Preset info
       presetName: v.optional(v.string()),
       presetData: v.optional(v.string()),    // Base64 encoded preset blob
       presetSizeBytes: v.optional(v.number()), // Size for UI display
-      
+
       // Settings
       bypassed: v.boolean(),
       notes: v.optional(v.string()),         // User notes for this slot
+
+      // AI training: per-slot educator annotations
+      annotation: v.optional(v.string()),
+      annotationIntent: v.optional(v.string()),
 
       // Captured plugin parameters (key params only, semantically filtered)
       parameters: v.optional(v.array(v.object({
@@ -1002,19 +1023,19 @@ export default defineSchema({
         unit: v.optional(v.string()),
       }))),
     })),
-    
+
     // Total plugins required
     pluginCount: v.number(),
-    
+
     // Engagement stats
     views: v.number(),
     downloads: v.number(),
     likes: v.number(),
-    
+
     // Sharing settings
     isPublic: v.boolean(),
     shareCode: v.optional(v.string()),     // Short code for private sharing: "ABC123"
-    
+
     // Forking
     forkedFrom: v.optional(v.id("pluginChains")),
 
@@ -1024,6 +1045,36 @@ export default defineSchema({
     // Peak dB target range — recommended input peak level for this chain
     targetInputPeakMin: v.optional(v.number()),
     targetInputPeakMax: v.optional(v.number()),
+
+    // Chain topology — full tree structure for AI training + topology visualization
+    treeData: v.optional(v.string()),  // JSON-serialized tree (recursive structure doesn't fit Convex validators)
+
+    // Signal analysis snapshot — captured from JUCE audio buffer at save time
+    signalSnapshot: v.optional(v.object({
+      inputPeakDb: v.number(),
+      inputRmsDb: v.number(),
+      inputLufs: v.optional(v.number()),
+      spectralCentroid: v.optional(v.number()),
+      crestFactor: v.optional(v.number()),
+      dynamicRangeDb: v.optional(v.number()),
+      sampleRate: v.number(),
+      capturedAt: v.number(),
+    })),
+
+    // Educator annotations — rich mixing decision explanations
+    educatorAnnotation: v.optional(v.object({
+      narrative: v.string(),
+      difficulty: v.optional(v.string()),
+      prerequisites: v.optional(v.array(v.string())),
+      listenFor: v.optional(v.string()),
+    })),
+
+    // Mixing context metadata
+    sourceInstrument: v.optional(v.string()),
+    signalType: v.optional(v.string()),    // "individual_track" | "bus" | "master" | "aux_send"
+    bpm: v.optional(v.number()),
+    subGenre: v.optional(v.string()),
+    referenceTrack: v.optional(v.string()),
 
     // Timestamps
     createdAt: v.number(),
@@ -1058,15 +1109,15 @@ export default defineSchema({
   chainDownloads: defineTable({
     chain: v.optional(v.id("pluginChains")),
     user: v.optional(v.id("users")),
-    
+
     // Legacy fields (old data uses chainId/userId instead of chain/user)
     chainId: v.optional(v.string()),
     userId: v.optional(v.string()),
-    
+
     // What plugins did they have at download time?
     ownedPluginCount: v.optional(v.number()),
     missingPluginCount: v.optional(v.number()),
-    
+
     createdAt: v.optional(v.number()),
   })
     .index("by_chain", ["chain"])
@@ -1128,6 +1179,28 @@ export default defineSchema({
     .index("by_chain", ["chain"])
     .index("by_user_chain", ["user", "chain"]),
 
+  // Pre-computed plugin pairing stats for recommendations
+  pluginPairings: defineTable({
+    pluginName: v.string(),
+    manufacturer: v.string(),
+    matchedPlugin: v.optional(v.id("plugins")),
+    category: v.string(),
+
+    nextPlugins: v.array(v.object({
+      pluginName: v.string(),
+      manufacturer: v.string(),
+      matchedPlugin: v.optional(v.id("plugins")),
+      count: v.number(),
+      avgRating: v.optional(v.number()),
+    })),
+
+    totalObservations: v.number(),
+    lastUpdatedAt: v.number(),
+  })
+    .index("by_plugin", ["pluginName", "manufacturer"])
+    .index("by_matched", ["matchedPlugin"])
+    .index("by_category", ["category"]),
+
   // ============================================
   // RATE LIMITING
   // ============================================
@@ -1149,6 +1222,10 @@ export default defineSchema({
     email: v.optional(v.string()),
     phoneNumber: v.optional(v.string()),
     instagramHandle: v.optional(v.string()), // stored lowercase, without @
+    showOwnedPlugins: v.optional(v.boolean()),
+    showPluginStats: v.optional(v.boolean()),
+    isEducator: v.optional(v.boolean()),
+    educatorBio: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
@@ -1278,4 +1355,224 @@ export default defineSchema({
   })
     .index("by_category", ["category"])
     .index("by_semantic", ["semanticId"]),
+
+  // ============================================
+  // AI CHAIN ASSISTANT
+  // ============================================
+
+  // Usage stats synced from desktop localStorage to enable AI recommendations
+  userPluginUsage: defineTable({
+    user: v.id("users"),
+    pluginUid: v.number(),
+    pluginName: v.string(),
+    manufacturer: v.string(),
+    category: v.optional(v.string()),
+    loadCount: v.number(),
+    lastUsedAt: v.number(),
+    firstUsedAt: v.number(),
+    preferredForCategories: v.optional(v.array(v.string())),
+  })
+    .index("by_user", ["user"])
+    .index("by_user_category", ["user", "category"]),
+
+  // AI chat threads (one per conversation)
+  aiChatThreads: defineTable({
+    user: v.id("users"),
+    chainId: v.optional(v.string()),
+    title: v.optional(v.string()),
+    status: v.string(),              // "active", "archived"
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["user"]),
+
+  // AI chat messages within a thread
+  aiChatMessages: defineTable({
+    thread: v.id("aiChatThreads"),
+    role: v.string(),                // "user", "assistant", "system"
+    content: v.string(),
+    chainAction: v.optional(v.object({
+      type: v.string(),              // "create_chain", "modify_chain", "set_parameters"
+      payload: v.string(),           // JSON of the chain action
+      applied: v.boolean(),
+    })),
+    toolCalls: v.optional(v.array(v.object({
+      id: v.string(),                // "tc_0", "tc_1", ...
+      toolName: v.string(),          // "build_chain", "get_plugin_details", etc.
+      status: v.string(),            // "running" | "completed" | "error"
+      args: v.string(),              // JSON stringified tool arguments
+      result: v.optional(v.string()), // JSON stringified result (when done)
+      startedAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+    }))),
+    thinkingStatus: v.optional(v.string()),  // "Building your chain...", etc.
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["thread"]),
+
+  // Plugin embedding vectors for semantic search
+  pluginEmbeddings: defineTable({
+    plugin: v.id("plugins"),
+    embedding: v.array(v.float64()),
+    textUsed: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_plugin", ["plugin"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 1536,
+      filterFields: ["plugin"],
+    }),
+
+  // AI-discovered cross-format plugin aliases (e.g. AU name ≠ VST3 name for same product)
+  pluginFormatAliases: defineTable({
+    userId: v.id("users"),
+    sourceName: v.string(),
+    sourceManufacturer: v.string(),
+    sourceFormat: v.string(),
+    targetName: v.string(),
+    targetManufacturer: v.string(),
+    targetFormat: v.string(),
+    confidence: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_source", ["userId", "sourceName", "sourceManufacturer"]),
+
+  // ============================================
+  // AFFILIATE PROGRAM
+  // ============================================
+
+  affiliates: defineTable({
+    userId: v.id("users"),
+    code: v.string(),                // Unique referral code, e.g. "JAKE2026"
+    payoutEmail: v.string(),         // PayPal or bank email for payouts
+    payoutMethod: v.string(),        // "paypal" | "bank_transfer" | "other"
+    status: v.string(),              // "active" | "suspended"
+    totalEarnedCents: v.number(),    // Lifetime earnings in cents
+    totalPaidCents: v.number(),      // Amount already paid out in cents
+    createdAt: v.number(),
+  })
+    .index("by_code", ["code"])
+    .index("by_user", ["userId"]),
+
+  affiliateCommissions: defineTable({
+    affiliateId: v.id("affiliates"),
+    purchasedByUserId: v.id("users"),
+    purchaseAmountCents: v.number(),
+    commissionAmountCents: v.number(),
+    commissionRate: v.number(),      // 0.3
+    status: v.string(),              // "pending" | "approved" | "paid" | "refunded"
+    stripeSessionId: v.optional(v.string()),
+    createdAt: v.number(),
+    paidAt: v.optional(v.number()),
+  })
+    .index("by_affiliate", ["affiliateId"])
+    .index("by_status", ["status"])
+    .index("by_purchased_user", ["purchasedByUserId"]),
+
+  // AI user profile — persistent memory that evolves with each conversation
+  userAiProfile: defineTable({
+    user: v.id("users"),
+
+    // Proficiency & communication style
+    proficiencyLevel: v.optional(v.string()),   // "beginner", "intermediate", "professional"
+
+    // Studio setup — informs chain recommendations
+    microphone: v.optional(v.string()),          // e.g. "Shure SM7B", "Neumann U87"
+    microphoneType: v.optional(v.string()),      // "dynamic", "condenser", "ribbon"
+    monitoringSetup: v.optional(v.string()),     // "headphones", "nearfield", "midfield"
+    daw: v.optional(v.string()),                 // "Logic Pro", "Ableton", "Pro Tools"
+    primaryGenres: v.optional(v.array(v.string())),  // ["hip-hop", "r&b", "pop"]
+    primaryUseCases: v.optional(v.array(v.string())), // ["vocals", "mixing", "mastering"]
+
+    // Learned preferences (updated by AI after conversations)
+    preferredPluginsByCategory: v.optional(v.string()),  // JSON map: {"eq": ["Pro-Q 3"], "comp": ["LA-2A"]}
+    dislikedPlugins: v.optional(v.array(v.string())),
+    styleNotes: v.optional(v.array(v.string())),         // Free-form AI observations, e.g. "Prefers warm analog tone", "Dislikes harsh digital compression"
+    chainPatterns: v.optional(v.array(v.string())),      // Observed patterns: "Always uses de-esser before compressor on vocals"
+
+    // Mix level preferences
+    preferredPeakLevel: v.optional(v.number()),      // e.g. -10 (dBFS)
+    preferredHeadroom: v.optional(v.number()),        // e.g. 10 (dB)
+    typicalVocalLevel: v.optional(v.number()),        // e.g. -12 (dBFS)
+
+    // Onboarding state
+    onboardingCompleted: v.optional(v.boolean()),
+
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["user"]),
+
+  // ============================================
+  // PLUGIN PRESETS (auto-extracted from chains)
+  // ============================================
+
+  pluginPresets: defineTable({
+    // Identity
+    user: v.id("users"),
+    name: v.string(),
+    slug: v.string(),
+
+    // Plugin link
+    pluginName: v.string(),
+    manufacturer: v.string(),
+    matchedPlugin: v.optional(v.id("plugins")),
+    normalizedKey: v.string(),
+
+    // Preset data
+    presetData: v.string(),
+    presetSizeBytes: v.number(),
+    parameters: v.optional(v.array(v.object({
+      name: v.string(),
+      value: v.string(),
+      normalizedValue: v.number(),
+      semantic: v.optional(v.string()),
+      unit: v.optional(v.string()),
+    }))),
+
+    // Context (inherited from parent chain)
+    sourceChain: v.id("pluginChains"),
+    sourceSlotPosition: v.number(),
+    category: v.string(),
+    useCase: v.optional(v.string()),
+    tags: v.array(v.string()),
+
+    // Social
+    downloads: v.number(),
+    averageRating: v.optional(v.number()),
+    isPublic: v.boolean(),
+
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_plugin", ["normalizedKey"])
+    .index("by_user", ["user"])
+    .index("by_source_chain", ["sourceChain", "sourceSlotPosition"])
+    .index("by_slug", ["slug"])
+    .index("by_popularity", ["downloads"])
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["normalizedKey", "category", "isPublic"],
+    }),
+
+  // Ratings on plugin presets (1-5 stars)
+  presetRatings: defineTable({
+    presetId: v.id("pluginPresets"),
+    userId: v.id("users"),
+    rating: v.number(),
+    createdAt: v.float64(),
+  })
+    .index("by_preset_user", ["presetId", "userId"]),
+
+  // Comments on plugin presets
+  presetComments: defineTable({
+    presetId: v.id("pluginPresets"),
+    userId: v.id("users"),
+    authorName: v.string(),
+    content: v.string(),
+    createdAt: v.float64(),
+  })
+    .index("by_preset", ["presetId"]),
 });

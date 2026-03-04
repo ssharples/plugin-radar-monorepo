@@ -1,11 +1,15 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { checkRateLimit } from "./lib/rateLimit";
 import { USE_CASE_TO_GROUP } from "./lib/chainUseCases";
 import { getSessionUser } from "./lib/auth";
+import { generateUniqueSlug, generateShareCode } from "./lib/slugUtils";
+import { verifyChainOwnership } from "./lib/chainHelpers";
 import {
   computeSimilarityScore,
+  cosineSimilarity,
   generateReasonString,
   similarityComparator,
   type SimilarityPlugin,
@@ -85,6 +89,13 @@ export const syncScannedPlugins = mutation({
                 plugin: match.pluginId,
                 addedAt: now,
               });
+              // Increment ownerCount on the matched plugin
+              const matchedPlugin = await ctx.db.get(match.pluginId);
+              if (matchedPlugin) {
+                await ctx.db.patch(match.pluginId, {
+                  ownerCount: (matchedPlugin.ownerCount ?? 0) + 1,
+                });
+              }
             }
           }
         }
@@ -117,7 +128,7 @@ export const syncScannedPlugins = mutation({
 
         if (match) {
           results.matched++;
-          
+
           // Also add to ownedPlugins if matched and not already there
           if (match.pluginId) {
             const alreadyOwned = await ctx.db
@@ -133,6 +144,13 @@ export const syncScannedPlugins = mutation({
                 plugin: match.pluginId,
                 addedAt: now,
               });
+              // Increment ownerCount on the matched plugin
+              const matchedPlugin = await ctx.db.get(match.pluginId);
+              if (matchedPlugin) {
+                await ctx.db.patch(match.pluginId, {
+                  ownerCount: (matchedPlugin.ownerCount ?? 0) + 1,
+                });
+              }
             }
           }
         } else if (!plugin.isInstrument) {
@@ -155,7 +173,7 @@ async function matchPlugin(
   name: string,
   manufacturer: string
 ): Promise<{ pluginId: Id<"plugins">; confidence: number; method: string } | null> {
-  
+
   // Normalize for matching
   const normName = normalizeName(name);
   const normManufacturer = normalizeName(manufacturer);
@@ -256,14 +274,14 @@ async function matchPlugin(
 
     const nameSimilarity = calculateSimilarity(normName, normalizeName(plugin.name));
     const mfgSimilarity = calculateSimilarity(normManufacturer, normalizeName(pluginManufacturer.name));
-    
+
     // Both name and manufacturer should be somewhat similar
     if (nameSimilarity >= 0.7 && mfgSimilarity >= 0.6) {
       const combined = (nameSimilarity * 0.7 + mfgSimilarity * 0.3);
-      return { 
-        pluginId: plugin._id, 
-        confidence: Math.round(combined * 100), 
-        method: "fuzzy" 
+      return {
+        pluginId: plugin._id,
+        confidence: Math.round(combined * 100),
+        method: "fuzzy"
       };
     }
   }
@@ -500,6 +518,8 @@ export const saveChain = mutation({
       presetSizeBytes: v.optional(v.number()),
       bypassed: v.boolean(),
       notes: v.optional(v.string()),
+      annotation: v.optional(v.string()),
+      annotationIntent: v.optional(v.string()),
       parameters: v.optional(v.array(v.object({
         name: v.string(),
         value: v.string(),
@@ -512,6 +532,29 @@ export const saveChain = mutation({
     targetInputLufs: v.optional(v.number()),
     targetInputPeakMin: v.optional(v.number()),
     targetInputPeakMax: v.optional(v.number()),
+    // AI training data fields
+    treeData: v.optional(v.string()),
+    signalSnapshot: v.optional(v.object({
+      inputPeakDb: v.number(),
+      inputRmsDb: v.number(),
+      inputLufs: v.optional(v.number()),
+      spectralCentroid: v.optional(v.number()),
+      crestFactor: v.optional(v.number()),
+      dynamicRangeDb: v.optional(v.number()),
+      sampleRate: v.number(),
+      capturedAt: v.number(),
+    })),
+    educatorAnnotation: v.optional(v.object({
+      narrative: v.string(),
+      difficulty: v.optional(v.string()),
+      prerequisites: v.optional(v.array(v.string())),
+      listenFor: v.optional(v.string()),
+    })),
+    sourceInstrument: v.optional(v.string()),
+    signalType: v.optional(v.string()),
+    bpm: v.optional(v.number()),
+    subGenre: v.optional(v.string()),
+    referenceTrack: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { userId } = await getSessionUser(ctx, args.sessionToken);
@@ -522,18 +565,7 @@ export const saveChain = mutation({
     const now = Date.now();
 
     // Generate slug
-    const baseSlug = args.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-    
-    // Check for existing slug and make unique
-    let slug = baseSlug;
-    let counter = 1;
-    while (await ctx.db.query("pluginChains").withIndex("by_slug", (q) => q.eq("slug", slug)).first()) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
-    }
+    const slug = await generateUniqueSlug(ctx, args.name);
 
     // Try to match each slot's plugin
     const enrichedSlots = await Promise.all(
@@ -580,9 +612,24 @@ export const saveChain = mutation({
       targetInputLufs: args.targetInputLufs,
       targetInputPeakMin: args.targetInputPeakMin,
       targetInputPeakMax: args.targetInputPeakMax,
+      treeData: args.treeData,
+      signalSnapshot: args.signalSnapshot,
+      educatorAnnotation: args.educatorAnnotation,
+      sourceInstrument: args.sourceInstrument,
+      signalType: args.signalType,
+      bpm: args.bpm,
+      subGenre: args.subGenre,
+      referenceTrack: args.referenceTrack,
       createdAt: now,
       updatedAt: now,
     });
+
+    // Auto-extract per-plugin presets from public chains
+    if (args.isPublic) {
+      await ctx.scheduler.runAfter(0, internal.pluginPresets.extractPresetsFromChain, {
+        chainId,
+      });
+    }
 
     return { chainId, slug, shareCode };
   },
@@ -599,29 +646,10 @@ export const renameChain = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await getSessionUser(ctx, args.sessionToken);
+    await verifyChainOwnership(ctx, args.chainId, userId);
 
-    const chain = await ctx.db.get(args.chainId);
-    if (!chain || chain.user !== userId) {
-      throw new Error("Chain not found or unauthorized");
-    }
-
-    // Generate new slug
-    const baseSlug = args.newName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-
-    let slug = baseSlug;
-    let counter = 1;
-    while (true) {
-      const existing = await ctx.db
-        .query("pluginChains")
-        .withIndex("by_slug", (q) => q.eq("slug", slug))
-        .first();
-      if (!existing || existing._id === args.chainId) break;
-      slug = `${baseSlug}-${counter}`;
-      counter++;
-    }
+    // Generate new slug (exclude current chain so it can keep its own slug)
+    const slug = await generateUniqueSlug(ctx, args.newName, args.chainId);
 
     await ctx.db.patch(args.chainId, {
       name: args.newName,
@@ -630,6 +658,46 @@ export const renameChain = mutation({
     });
 
     return { success: true, slug };
+  },
+});
+
+/**
+ * Update chain metadata (owner only). Allows editing description, category, tags, useCase after saving.
+ */
+export const updateChainMetadata = mutation({
+  args: {
+    chainId: v.id("pluginChains"),
+    sessionToken: v.string(),
+    description: v.optional(v.string()),
+    category: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    useCase: v.optional(v.string()),
+    genre: v.optional(v.string()),
+    targetInputPeakMin: v.optional(v.number()),
+    targetInputPeakMax: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+    await verifyChainOwnership(ctx, args.chainId, userId);
+
+    const updates: Record<string, any> = { updatedAt: Date.now() };
+
+    if (args.description !== undefined) updates.description = args.description;
+    if (args.category !== undefined) updates.category = args.category;
+    if (args.tags !== undefined) updates.tags = args.tags;
+    if (args.genre !== undefined) updates.genre = args.genre;
+    if (args.useCase !== undefined) {
+      updates.useCase = args.useCase;
+      updates.useCaseGroup = args.useCase
+        ? USE_CASE_TO_GROUP[args.useCase] ?? undefined
+        : undefined;
+    }
+    if (args.targetInputPeakMin !== undefined) updates.targetInputPeakMin = args.targetInputPeakMin;
+    if (args.targetInputPeakMax !== undefined) updates.targetInputPeakMax = args.targetInputPeakMax;
+
+    await ctx.db.patch(args.chainId, updates);
+
+    return { success: true };
   },
 });
 
@@ -643,11 +711,7 @@ export const deleteChain = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await getSessionUser(ctx, args.sessionToken);
-
-    const chain = await ctx.db.get(args.chainId);
-    if (!chain || chain.user !== userId) {
-      throw new Error("Chain not found or unauthorized");
-    }
+    await verifyChainOwnership(ctx, args.chainId, userId);
 
     // Cascade delete comments
     const comments = await ctx.db
@@ -685,6 +749,11 @@ export const deleteChain = mutation({
       await ctx.db.delete(like._id);
     }
 
+    // Cascade delete extracted presets (and their ratings/comments)
+    await ctx.scheduler.runAfter(0, internal.pluginPresets.deletePresetsForChain, {
+      chainId: args.chainId,
+    });
+
     // Delete the chain itself
     await ctx.db.delete(args.chainId);
 
@@ -703,11 +772,7 @@ export const updateChainVisibility = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await getSessionUser(ctx, args.sessionToken);
-
-    const chain = await ctx.db.get(args.chainId);
-    if (!chain || chain.user !== userId) {
-      throw new Error("Chain not found or unauthorized");
-    }
+    const chain = await verifyChainOwnership(ctx, args.chainId, userId);
 
     // Generate share code if making private and doesn't have one
     const updates: Record<string, any> = {
@@ -725,15 +790,6 @@ export const updateChainVisibility = mutation({
   },
 });
 
-function generateShareCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I, O, 0, 1 for clarity
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
-
 /**
  * Get a chain by slug (public) or share code (private)
  */
@@ -744,7 +800,7 @@ export const getChain = query({
   },
   handler: async (ctx, args) => {
     let chain;
-    
+
     if (args.slug) {
       chain = await ctx.db
         .query("pluginChains")
@@ -829,6 +885,16 @@ export const checkChainCompatibility = query({
       )
     );
 
+    // Build a map of normalized "name::manufacturer" -> format for scanned plugins
+    const scannedByNameMfg = new Map<string, string[]>();
+    for (const sp of scannedPlugins) {
+      const key = `${sp.name.toLowerCase()}::${sp.manufacturer.toLowerCase()}`;
+      if (!scannedByNameMfg.has(key)) {
+        scannedByNameMfg.set(key, []);
+      }
+      scannedByNameMfg.get(key)!.push(sp.format);
+    }
+
     // Check each slot
     const slotStatus = chain.slots.map((slot) => {
       // First: check by catalog match ID
@@ -843,24 +909,56 @@ export const checkChainCompatibility = query({
         isOwned = scannedKeys.has(slotKey);
       }
 
+      // Check for format substitutability: user has the same plugin in a different format
+      let isFormatSubstitutable = false;
+      if (!isOwned) {
+        const slotKey = `${slot.pluginName.toLowerCase()}::${slot.manufacturer.toLowerCase()}`;
+        const userFormats = scannedByNameMfg.get(slotKey);
+        if (userFormats && userFormats.length > 0) {
+          // User has this plugin but possibly in a different format
+          // (if same format existed, scannedKeys would have caught it above,
+          //  so this means format differs — but since scannedKeys is format-agnostic,
+          //  this case only triggers when the exact name::mfg match was NOT found above,
+          //  meaning no exact key matched. Re-check with looser name matching.)
+          isFormatSubstitutable = true;
+        } else {
+          // Try looser name matching: strip format suffixes and check by name+manufacturer
+          const normSlotName = slot.pluginName.toLowerCase().replace(/\s*(vst3?|au|aax|clap)\s*$/i, '').trim();
+          for (const sp of scannedPlugins) {
+            const normSpName = sp.name.toLowerCase().replace(/\s*(vst3?|au|aax|clap)\s*$/i, '').trim();
+            if (
+              normSpName === normSlotName &&
+              sp.manufacturer.toLowerCase() === slot.manufacturer.toLowerCase()
+            ) {
+              isFormatSubstitutable = true;
+              break;
+            }
+          }
+        }
+      }
+
       return {
         position: slot.position,
         pluginName: slot.pluginName,
         manufacturer: slot.manufacturer,
         matchedPlugin: slot.matchedPlugin,
         owned: isOwned,
+        formatSubstitutable: isFormatSubstitutable,
       };
     });
 
     const ownedCount = slotStatus.filter((s) => s.owned).length;
-    const missingCount = chain.pluginCount - ownedCount;
+    const formatSubCount = slotStatus.filter((s) => s.formatSubstitutable).length;
+    const loadableCount = ownedCount + formatSubCount;
+    const missingCount = chain.pluginCount - loadableCount;
 
     return {
       canFullyLoad: missingCount === 0,
       ownedCount,
+      formatSubstitutableCount: formatSubCount,
       missingCount,
       totalCount: chain.pluginCount,
-      percentage: Math.round((ownedCount / chain.pluginCount) * 100),
+      percentage: Math.round((loadableCount / chain.pluginCount) * 100),
       slots: slotStatus,
     };
   },
@@ -911,12 +1009,22 @@ export const getDetailedCompatibility = query({
       )
     );
 
+    // Build a map of normalized "name::manufacturer" -> formats for format substitution detection
+    const scannedByNameMfg = new Map<string, string[]>();
+    for (const sp of scannedPlugins) {
+      const key = `${sp.name.toLowerCase()}::${sp.manufacturer.toLowerCase()}`;
+      if (!scannedByNameMfg.has(key)) {
+        scannedByNameMfg.set(key, []);
+      }
+      scannedByNameMfg.get(key)!.push(sp.format);
+    }
+
     // Process each slot
     const slots: Array<{
       position: number;
       pluginName: string;
       manufacturer: string;
-      status: "owned" | "missing";
+      status: "owned" | "missing" | "format_substitutable";
       alternatives: Array<{
         id: string;
         name: string;
@@ -928,6 +1036,7 @@ export const getDetailedCompatibility = query({
     }> = [];
 
     let ownedCount = 0;
+    let formatSubCount = 0;
     let missingCount = 0;
     const missingList: Array<{
       pluginName: string;
@@ -955,125 +1064,197 @@ export const getDetailedCompatibility = query({
           status: "owned",
           alternatives: [],
         });
-      } else {
-        missingCount++;
+        continue;
+      }
 
-        // Find alternatives: same category plugins the user owns, ranked by similarity
-        const alternatives: Array<{
-          id: string;
-          name: string;
-          manufacturer: string;
-          slug?: string;
-          similarityScore?: number;
-          similarityReasons?: string;
-        }> = [];
-
-        // Get the full doc of the missing plugin (if matched)
-        let matchedPlugin: any = null;
-        if (slot.matchedPlugin) {
-          matchedPlugin = await ctx.db.get(slot.matchedPlugin);
-        }
-
-        // If we know the category, find user-owned plugins and score them
-        if (matchedPlugin) {
-          const sameCategoryPlugins = await ctx.db
-            .query("plugins")
-            .withIndex("by_category", (q) => q.eq("category", matchedPlugin.category))
-            .take(100);
-
-          // Filter to owned and score
-          const scoredAlternatives: Array<{
-            score: number;
-            plugin: any;
-            reasons: string[];
-          }> = [];
-
-          for (const candidate of sameCategoryPlugins) {
-            if (!ownedPluginIds.has(candidate._id.toString())) continue;
-            if (candidate._id.toString() === slot.matchedPlugin?.toString()) continue;
-
-            const { score, reasons } = computeSimilarityScore(
-              matchedPlugin as unknown as SimilarityPlugin,
-              candidate as unknown as SimilarityPlugin
-            );
-            scoredAlternatives.push({
-              score,
-              plugin: candidate,
-              reasons,
-            });
-          }
-
-          // Sort by score descending (with tiebreaker)
-          scoredAlternatives.sort((a, b) =>
-            similarityComparator(
-              { score: a.score, plugin: a.plugin as SimilarityPlugin },
-              { score: b.score, plugin: b.plugin as SimilarityPlugin }
-            )
-          );
-
-          // Take top 3
-          for (const alt of scoredAlternatives.slice(0, 3)) {
-            const mfg = await ctx.db.get(alt.plugin.manufacturer as Id<"manufacturers">);
-            alternatives.push({
-              id: alt.plugin._id,
-              name: alt.plugin.name,
-              manufacturer: mfg?.name ?? "Unknown",
-              slug: alt.plugin.slug,
-              similarityScore: alt.score,
-              similarityReasons: generateReasonString(alt.reasons),
-            });
-          }
-        }
-
-        // Fallback: fuzzy name matching against user's scanned plugins
-        if (alternatives.length === 0) {
-          const normSlotName = slot.pluginName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      // Check for format substitutability: user has same plugin in a different format
+      let isFormatSubstitutable = false;
+      {
+        const slotKey = `${slot.pluginName.toLowerCase()}::${slot.manufacturer.toLowerCase()}`;
+        const userFormats = scannedByNameMfg.get(slotKey);
+        if (userFormats && userFormats.length > 0) {
+          isFormatSubstitutable = true;
+        } else {
+          // Try looser matching: strip trailing format suffixes
+          const normSlotName = slot.pluginName.toLowerCase().replace(/\s*(vst3?|au|aax|clap)\s*$/i, '').trim();
           for (const sp of scannedPlugins) {
-            const normSpName = sp.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const normSpName = sp.name.toLowerCase().replace(/\s*(vst3?|au|aax|clap)\s*$/i, '').trim();
             if (
-              normSpName.includes(normSlotName.slice(0, 4)) ||
-              normSlotName.includes(normSpName.slice(0, 4))
+              normSpName === normSlotName &&
+              sp.manufacturer.toLowerCase() === slot.manufacturer.toLowerCase()
             ) {
-              if (sp.name.toLowerCase() !== slot.pluginName.toLowerCase()) {
-                alternatives.push({
-                  id: sp._id,
-                  name: sp.name,
-                  manufacturer: sp.manufacturer,
-                });
-                if (alternatives.length >= 3) break;
-              }
+              isFormatSubstitutable = true;
+              break;
             }
           }
         }
+      }
 
-        const suggestion =
-          alternatives.length > 0
-            ? `${alternatives[0].name} (${alternatives[0].manufacturer})`
-            : null;
-
-        missingList.push({
-          pluginName: slot.pluginName,
-          manufacturer: slot.manufacturer,
-          suggestion,
-        });
-
+      if (isFormatSubstitutable) {
+        formatSubCount++;
         slots.push({
           position: slot.position,
           pluginName: slot.pluginName,
           manufacturer: slot.manufacturer,
-          status: "missing",
-          alternatives,
+          status: "format_substitutable",
+          alternatives: [],
         });
+        continue;
       }
+
+      // Truly missing — find alternatives
+      missingCount++;
+
+      // Find alternatives: same category plugins the user owns, ranked by similarity
+      const alternatives: Array<{
+        id: string;
+        name: string;
+        manufacturer: string;
+        slug?: string;
+        similarityScore?: number;
+        similarityReasons?: string;
+      }> = [];
+
+      // Get the full doc of the missing plugin (if matched)
+      let matchedPlugin: any = null;
+      if (slot.matchedPlugin) {
+        matchedPlugin = await ctx.db.get(slot.matchedPlugin);
+      }
+
+      // If we know the category, find user-owned plugins and score them
+      if (matchedPlugin) {
+        const sameCategoryPlugins = await ctx.db
+          .query("plugins")
+          .withIndex("by_category", (q) => q.eq("category", matchedPlugin.category))
+          .take(100);
+
+        // Filter to owned and score
+        const scoredAlternatives: Array<{
+          score: number;
+          plugin: any;
+          reasons: string[];
+        }> = [];
+
+        // Pre-load source embedding for fallback (lazy — only if needed)
+        let sourceEmbedding: number[] | null = null;
+        let sourceEmbeddingLoaded = false;
+
+        for (const candidate of sameCategoryPlugins) {
+          if (!ownedPluginIds.has(candidate._id.toString())) continue;
+          if (candidate._id.toString() === slot.matchedPlugin?.toString()) continue;
+
+          let { score, reasons } = computeSimilarityScore(
+            matchedPlugin as unknown as SimilarityPlugin,
+            candidate as unknown as SimilarityPlugin
+          );
+
+          // Embedding fallback: when Jaccard-based score is low, try cosine similarity
+          if (score < 30) {
+            if (!sourceEmbeddingLoaded) {
+              sourceEmbeddingLoaded = true;
+              const srcEmb = await ctx.db
+                .query("pluginEmbeddings")
+                .withIndex("by_plugin", (q) => q.eq("plugin", matchedPlugin._id))
+                .first();
+              sourceEmbedding = srcEmb?.embedding ?? null;
+            }
+
+            if (sourceEmbedding) {
+              const candEmb = await ctx.db
+                .query("pluginEmbeddings")
+                .withIndex("by_plugin", (q) => q.eq("plugin", candidate._id))
+                .first();
+              if (candEmb?.embedding) {
+                const embScore = Math.round(cosineSimilarity(sourceEmbedding, candEmb.embedding) * 100);
+                if (embScore > score) {
+                  score = embScore;
+                  if (reasons.length === 0) {
+                    reasons = ["Similar based on overall plugin profile"];
+                  }
+                }
+              }
+            }
+          }
+
+          scoredAlternatives.push({
+            score,
+            plugin: candidate,
+            reasons,
+          });
+        }
+
+        // Sort by score descending (with tiebreaker)
+        scoredAlternatives.sort((a, b) =>
+          similarityComparator(
+            { score: a.score, plugin: a.plugin as SimilarityPlugin },
+            { score: b.score, plugin: b.plugin as SimilarityPlugin }
+          )
+        );
+
+        // Take top 3
+        for (const alt of scoredAlternatives.slice(0, 3)) {
+          const mfg = await ctx.db.get(alt.plugin.manufacturer as Id<"manufacturers">);
+          alternatives.push({
+            id: alt.plugin._id,
+            name: alt.plugin.name,
+            manufacturer: mfg?.name ?? "Unknown",
+            slug: alt.plugin.slug,
+            similarityScore: alt.score,
+            similarityReasons: generateReasonString(alt.reasons),
+          });
+        }
+      }
+
+      // Fallback: fuzzy name matching against user's scanned plugins
+      if (alternatives.length === 0) {
+        const normSlotName = slot.pluginName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        for (const sp of scannedPlugins) {
+          const normSpName = sp.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+          if (
+            normSpName.includes(normSlotName.slice(0, 4)) ||
+            normSlotName.includes(normSpName.slice(0, 4))
+          ) {
+            if (sp.name.toLowerCase() !== slot.pluginName.toLowerCase()) {
+              alternatives.push({
+                id: sp._id,
+                name: sp.name,
+                manufacturer: sp.manufacturer,
+              });
+              if (alternatives.length >= 3) break;
+            }
+          }
+        }
+      }
+
+      const suggestion =
+        alternatives.length > 0
+          ? `${alternatives[0].name} (${alternatives[0].manufacturer})`
+          : null;
+
+      missingList.push({
+        pluginName: slot.pluginName,
+        manufacturer: slot.manufacturer,
+        suggestion,
+      });
+
+      slots.push({
+        position: slot.position,
+        pluginName: slot.pluginName,
+        manufacturer: slot.manufacturer,
+        status: "missing",
+        alternatives,
+      });
     }
 
     const totalCount = chain.slots.length;
+    const loadableCount = ownedCount + formatSubCount;
     const percentage =
-      totalCount > 0 ? Math.round((ownedCount / totalCount) * 100) : 100;
+      totalCount > 0 ? Math.round((loadableCount / totalCount) * 100) : 100;
 
     return {
       slots,
       ownedCount,
+      formatSubstitutableCount: formatSubCount,
       missingCount,
       percentage,
       missing: missingList,
@@ -1257,15 +1438,47 @@ export const generateSubstitutionPlan = query({
           .withIndex("by_category", (q) => q.eq("category", matchedPlugin.category))
           .take(100);
 
+        // Pre-load source embedding for fallback (lazy — only if needed)
+        let sourceEmbedding: number[] | null = null;
+        let sourceEmbeddingLoaded = false;
+
         for (const candidate of sameCategoryPlugins) {
           if (!ownedPluginIds.has(candidate._id.toString())) continue;
           if (candidate._id.toString() === slot.matchedPlugin?.toString()) continue;
 
-          // Similarity score
-          const { score: similarityScore, reasons } = computeSimilarityScore(
+          // Similarity score (with embedding fallback for sparse enrichment)
+          let { score: similarityScore, reasons } = computeSimilarityScore(
             matchedPlugin as unknown as SimilarityPlugin,
             candidate as unknown as SimilarityPlugin
           );
+
+          // Embedding fallback: when Jaccard-based score is low, try cosine similarity
+          if (similarityScore < 30) {
+            if (!sourceEmbeddingLoaded) {
+              sourceEmbeddingLoaded = true;
+              const srcEmb = await ctx.db
+                .query("pluginEmbeddings")
+                .withIndex("by_plugin", (q) => q.eq("plugin", matchedPlugin._id))
+                .first();
+              sourceEmbedding = srcEmb?.embedding ?? null;
+            }
+
+            if (sourceEmbedding) {
+              const candEmb = await ctx.db
+                .query("pluginEmbeddings")
+                .withIndex("by_plugin", (q) => q.eq("plugin", candidate._id))
+                .first();
+              if (candEmb?.embedding) {
+                const embScore = Math.round(cosineSimilarity(sourceEmbedding, candEmb.embedding) * 100);
+                if (embScore > similarityScore) {
+                  similarityScore = embScore;
+                  if (reasons.length === 0) {
+                    reasons = ["Similar based on overall plugin profile"];
+                  }
+                }
+              }
+            }
+          }
 
           // Parameter translation confidence
           let paramTranslationConfidence = 0;
@@ -1290,9 +1503,19 @@ export const generateSubstitutionPlan = query({
             paramTranslationConfidence = Math.round(overlapRatio * minConfidence * 100);
           }
 
-          // Combined score: 40% similarity, 60% param translation
+          // Combined score: adaptive weights based on param map availability
+          // When both maps exist, param translation is the stronger signal (60%).
+          // When maps are missing, lean on similarity to avoid capping scores at 40.
+          let simWeight: number, paramWeight: number;
+          if (sourceMap && targetMap) {
+            simWeight = 0.4; paramWeight = 0.6;
+          } else if (sourceMap || targetMap) {
+            simWeight = 0.7; paramWeight = 0.3;
+          } else {
+            simWeight = 1.0; paramWeight = 0.0;
+          }
           const combinedScore = Math.round(
-            0.4 * similarityScore + 0.6 * paramTranslationConfidence
+            simWeight * similarityScore + paramWeight * paramTranslationConfidence
           );
 
           const mfg = await ctx.db.get(candidate.manufacturer as Id<"manufacturers">);
@@ -1359,6 +1582,7 @@ export const generateSubstitutionPlan = query({
 export const browseChains = query({
   args: {
     category: v.optional(v.string()),
+    categories: v.optional(v.array(v.string())),
     sortBy: v.optional(v.string()), // "popular", "recent", "downloads", "rating"
     limit: v.optional(v.number()),
   },
@@ -1366,12 +1590,34 @@ export const browseChains = query({
     const limit = args.limit || 20;
 
     let chains;
-    if (args.category) {
+    // Support both single category and multi-category filtering
+    const categoryList = args.categories ?? (args.category ? [args.category] : []);
+
+    if (categoryList.length === 1) {
+      // Single category — use index directly
       chains = await ctx.db
         .query("pluginChains")
-        .withIndex("by_category", (q) => q.eq("category", args.category!))
+        .withIndex("by_category", (q) => q.eq("category", categoryList[0]))
         .filter((q) => q.eq(q.field("isPublic"), true))
-        .take(limit * 2);  // Get extra for sorting
+        .take(limit * 2);
+    } else if (categoryList.length > 1) {
+      // Multiple categories — query each and merge
+      const allChains = [];
+      const seenIds = new Set<string>();
+      for (const cat of categoryList) {
+        const catChains = await ctx.db
+          .query("pluginChains")
+          .withIndex("by_category", (q) => q.eq("category", cat))
+          .filter((q) => q.eq(q.field("isPublic"), true))
+          .take(limit * 2);
+        for (const chain of catChains) {
+          if (!seenIds.has(chain._id.toString())) {
+            seenIds.add(chain._id.toString());
+            allChains.push(chain);
+          }
+        }
+      }
+      chains = allChains;
     } else {
       chains = await ctx.db
         .query("pluginChains")
@@ -1462,7 +1708,7 @@ export const downloadChain = mutation({
       .query("ownedPlugins")
       .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
-    
+
     const ownedPluginIds = new Set(owned.map((o) => o.plugin.toString()));
     const ownedCount = chain.slots.filter(
       (s) => s.matchedPlugin && ownedPluginIds.has(s.matchedPlugin.toString())
@@ -1477,7 +1723,10 @@ export const downloadChain = mutation({
       createdAt: Date.now(),
     });
 
-    // Increment download count
+    // Increment download count.
+    // Safe from lost-update races: Convex mutations are serialized per-document.
+    // If two mutations read the same chain concurrently, the second will be
+    // automatically retried with the updated document, so no counts are lost.
     await ctx.db.patch(args.chainId, {
       downloads: chain.downloads + 1,
     });
@@ -1510,6 +1759,9 @@ export const toggleChainLike = mutation({
       )
       .first();
 
+    // Counter updates below are safe from lost-update races: Convex mutations
+    // are serialized per-document. Concurrent toggles on the same chain will
+    // be retried automatically, so no counts are lost.
     if (existingLike) {
       // Unlike
       await ctx.db.delete(existingLike._id);
@@ -1545,6 +1797,7 @@ export const getChainsByUser = query({
   args: {
     userId: v.id("users"),
     sessionToken: v.optional(v.string()),
+    sortBy: v.optional(v.string()), // "recent" (default), "rating", "downloads", "az"
   },
   handler: async (ctx, args) => {
     const chains = await ctx.db
@@ -1567,8 +1820,39 @@ export const getChainsByUser = query({
     // Filter to public only if not the owner
     const filtered = isOwner ? chains : chains.filter((c) => c.isPublic);
 
-    // Sort by most recent
-    filtered.sort((a, b) => b.createdAt - a.createdAt);
+    // Sort based on sortBy parameter
+    if (args.sortBy === "rating") {
+      // Compute average ratings for each chain
+      const chainsWithRating = await Promise.all(
+        filtered.map(async (chain) => {
+          const ratings = await ctx.db
+            .query("chainRatings")
+            .withIndex("by_chain_user", (q) => q.eq("chainId", chain._id))
+            .collect();
+          const avg =
+            ratings.length > 0
+              ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+              : 0;
+          return { chain, avgRating: avg, ratingCount: ratings.length };
+        })
+      );
+      chainsWithRating.sort(
+        (a, b) => b.avgRating - a.avgRating || b.ratingCount - a.ratingCount
+      );
+      const sortedChains = chainsWithRating.map((c) => c.chain);
+      const user = await ctx.db.get(args.userId);
+      return sortedChains.map((chain) => ({
+        ...chain,
+        author: user ? { name: user.name, avatarUrl: user.avatarUrl } : null,
+      }));
+    } else if (args.sortBy === "downloads") {
+      filtered.sort((a, b) => b.downloads - a.downloads);
+    } else if (args.sortBy === "az") {
+      filtered.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      // Default: recent
+      filtered.sort((a, b) => b.createdAt - a.createdAt);
+    }
 
     // Enrich with author info
     const user = await ctx.db.get(args.userId);
@@ -1653,7 +1937,7 @@ export const browseChainsPaginated = query({
       }
     }
 
-    let chains;
+    let chains: any[];
 
     // Use search index if search text is provided
     if (args.search && args.search.trim()) {
@@ -1726,7 +2010,7 @@ export const browseChainsPaginated = query({
           return true;
         }
         const missing = chain.pluginIds.filter(
-          (id) => !ownedPluginIds!.has(id)
+          (id: string) => !ownedPluginIds!.has(id)
         ).length;
         if (args.compatibilityFilter === "full") {
           return missing === 0;
@@ -1771,7 +2055,7 @@ export const browseChainsPaginated = query({
     // Enrich with author info
     const enriched = await Promise.all(
       paged.map(async (chain) => {
-        const author = await ctx.db.get(chain.user);
+        const author = await ctx.db.get(chain.user) as any;
         return {
           ...chain,
           author: author
@@ -2056,5 +2340,520 @@ export const getChainLoadStats = query({
       avgLoadTimeMs,
       topFailures,
     };
+  },
+});
+
+// ============================================
+// USAGE STATS SYNC (for AI recommendations)
+// ============================================
+
+/**
+ * Sync plugin usage stats from the desktop app's localStorage.
+ * Upserts into userPluginUsage table for AI chain recommendations.
+ */
+export const syncUsageStats = mutation({
+  args: {
+    sessionToken: v.string(),
+    stats: v.array(v.object({
+      pluginUid: v.number(),
+      pluginName: v.string(),
+      manufacturer: v.string(),
+      category: v.optional(v.string()),
+      loadCount: v.number(),
+      lastUsedAt: v.number(),
+      firstUsedAt: v.number(),
+      preferredForCategories: v.optional(v.array(v.string())),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Rate limit: 5 syncs per minute per user
+    await checkRateLimit(ctx, `syncUsage:${userId}`, 5, 60 * 1000);
+
+    let upserted = 0;
+
+    for (const stat of args.stats) {
+      // Find existing record by user + pluginUid
+      const existing = await ctx.db
+        .query("userPluginUsage")
+        .withIndex("by_user", (q) => q.eq("user", userId))
+        .filter((q) => q.eq(q.field("pluginUid"), stat.pluginUid))
+        .first();
+
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          pluginName: stat.pluginName,
+          manufacturer: stat.manufacturer,
+          category: stat.category,
+          loadCount: stat.loadCount,
+          lastUsedAt: stat.lastUsedAt,
+          preferredForCategories: stat.preferredForCategories,
+        });
+      } else {
+        await ctx.db.insert("userPluginUsage", {
+          user: userId,
+          pluginUid: stat.pluginUid,
+          pluginName: stat.pluginName,
+          manufacturer: stat.manufacturer,
+          category: stat.category,
+          loadCount: stat.loadCount,
+          lastUsedAt: stat.lastUsedAt,
+          firstUsedAt: stat.firstUsedAt,
+          preferredForCategories: stat.preferredForCategories,
+        });
+      }
+      upserted++;
+    }
+
+    return { upserted };
+  },
+});
+
+// ============================================
+// CROSS-FORMAT ALIAS GROUPS
+// ============================================
+
+/**
+ * Get cross-format alias groups for the current user.
+ * Returns groups where the same catalog plugin has both AU and VST3 (or other) variants.
+ * Also merges in AI-discovered aliases from the pluginFormatAliases table.
+ */
+export const getCrossFormatAliases = query({
+  args: { sessionToken: v.string() },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Fetch all scanned plugins for this user that have a catalog match
+    const scanned = await ctx.db
+      .query("scannedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", userId))
+      .collect();
+
+    // Group by matchedPlugin (catalogId)
+    const groups = new Map<string, typeof scanned>();
+    for (const p of scanned) {
+      if (!p.matchedPlugin) continue;
+      const key = p.matchedPlugin.toString();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+    }
+
+    // Catalog-derived alias groups (multiple format variants of the same product)
+    const result: Array<{
+      catalogId: string;
+      variants: Array<{ name: string; manufacturer: string; format: string }>;
+    }> = [...groups.values()]
+      .filter((g) => new Set(g.map((p) => p.format)).size > 1)
+      .map((g) => ({
+        catalogId: g[0].matchedPlugin!.toString(),
+        variants: g.map((p) => ({
+          name: p.name,
+          manufacturer: p.manufacturer,
+          format: p.format,
+        })),
+      }));
+
+    // Merge AI-discovered aliases from pluginFormatAliases table
+    const aiAliases = await ctx.db
+      .query("pluginFormatAliases")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    for (const alias of aiAliases) {
+      // Verify both ends are still in the user's scanned plugins
+      const sourceEntry = scanned.find(
+        (p) =>
+          p.name === alias.sourceName &&
+          p.manufacturer === alias.sourceManufacturer
+      );
+      const targetEntry = scanned.find(
+        (p) =>
+          p.name === alias.targetName &&
+          p.manufacturer === alias.targetManufacturer
+      );
+      if (sourceEntry && targetEntry) {
+        result.push({
+          catalogId: `ai-alias-${alias._id}`,
+          variants: [
+            {
+              name: alias.sourceName,
+              manufacturer: alias.sourceManufacturer,
+              format: alias.sourceFormat,
+            },
+            {
+              name: alias.targetName,
+              manufacturer: alias.targetManufacturer,
+              format: alias.targetFormat,
+            },
+          ],
+        });
+      }
+    }
+
+    return result;
+  },
+});
+
+// ============================================
+// INTERNAL HELPERS FOR AI ALIAS ACTIONS
+// ============================================
+
+/** Check if an AI-discovered alias already exists for this user + source plugin */
+export const findPluginFormatAlias = internalQuery({
+  args: {
+    userId: v.id("users"),
+    sourceName: v.string(),
+    sourceManufacturer: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("pluginFormatAliases")
+      .withIndex("by_source", (q) =>
+        q
+          .eq("userId", args.userId)
+          .eq("sourceName", args.sourceName)
+          .eq("sourceManufacturer", args.sourceManufacturer)
+      )
+      .first();
+  },
+});
+
+/** Persist an AI-discovered cross-format alias */
+export const insertPluginFormatAlias = internalMutation({
+  args: {
+    userId: v.id("users"),
+    sourceName: v.string(),
+    sourceManufacturer: v.string(),
+    sourceFormat: v.string(),
+    targetName: v.string(),
+    targetManufacturer: v.string(),
+    targetFormat: v.string(),
+    confidence: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("pluginFormatAliases", {
+      userId: args.userId,
+      sourceName: args.sourceName,
+      sourceManufacturer: args.sourceManufacturer,
+      sourceFormat: args.sourceFormat,
+      targetName: args.targetName,
+      targetManufacturer: args.targetManufacturer,
+      targetFormat: args.targetFormat,
+      confidence: args.confidence,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+// ============================================
+// ADMIN: UNMATCHED PLUGIN REVIEW
+// ============================================
+
+/**
+ * Resolve an unmatched plugin from the enrichment queue by matching it to an
+ * existing catalog plugin. Retroactively updates all affected scannedPlugins
+ * records, creates ownedPlugins entries, and increments ownerCount.
+ */
+export const resolveUnmatchedPlugin = mutation({
+  args: {
+    sessionToken: v.string(),
+    queueItemId: v.id("enrichmentQueue"),
+    pluginId: v.id("plugins"),
+  },
+  handler: async (ctx, args) => {
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
+    const queueItem = await ctx.db.get(args.queueItemId);
+    if (!queueItem) throw new Error("Queue item not found");
+
+    const targetPlugin = await ctx.db.get(args.pluginId);
+    if (!targetPlugin) throw new Error("Target plugin not found");
+
+    const now = Date.now();
+
+    // Find all unmatched scannedPlugins with this name + manufacturer
+    const scannedRecords = await ctx.db
+      .query("scannedPlugins")
+      .withIndex("by_name_manufacturer", (q: any) =>
+        q.eq("name", queueItem.pluginName).eq("manufacturer", queueItem.manufacturer)
+      )
+      .collect();
+
+    const unmatchedRecords = scannedRecords.filter((r) => !r.matchedPlugin);
+
+    let newOwnedCount = 0;
+
+    // Collect unique users to create ownedPlugins entries
+    const seenUsers = new Set<string>();
+
+    for (const record of unmatchedRecords) {
+      // Update the scannedPlugin record
+      await ctx.db.patch(record._id, {
+        matchedPlugin: args.pluginId,
+        matchConfidence: 100,
+        matchMethod: "admin_manual",
+      });
+
+      // Create ownedPlugins entry for each unique user
+      const userId = record.user;
+      if (!userId || seenUsers.has(userId)) continue;
+      seenUsers.add(userId);
+
+      const alreadyOwned = await ctx.db
+        .query("ownedPlugins")
+        .withIndex("by_user_plugin", (q: any) =>
+          q.eq("user", userId).eq("plugin", args.pluginId)
+        )
+        .first();
+
+      if (!alreadyOwned) {
+        await ctx.db.insert("ownedPlugins", {
+          user: userId as Id<"users">,
+          plugin: args.pluginId,
+          addedAt: now,
+        });
+        newOwnedCount++;
+      }
+    }
+
+    // Increment ownerCount on the target plugin
+    if (newOwnedCount > 0) {
+      await ctx.db.patch(args.pluginId, {
+        ownerCount: (targetPlugin.ownerCount ?? 0) + newOwnedCount,
+      });
+    }
+
+    // Mark queue item as completed
+    await ctx.db.patch(args.queueItemId, {
+      status: "completed",
+      createdPluginId: args.pluginId,
+      processedAt: now,
+    });
+
+    return {
+      matched: unmatchedRecords.length,
+      newOwned: newOwnedCount,
+      pluginName: targetPlugin.name,
+    };
+  },
+});
+
+/**
+ * Resolve an unmatched plugin by API key (agent-safe, no session required).
+ * Creates the plugin in the catalog, then retroactively matches all scannedPlugins.
+ */
+export const resolveUnmatchedByApiKey = mutation({
+  args: {
+    apiKey: v.string(),
+    queueItemId: v.id("enrichmentQueue"),
+    pluginId: v.id("plugins"),
+  },
+  handler: async (ctx, args) => {
+    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    if (args.apiKey !== expectedKey) throw new Error("Invalid API key");
+
+    const queueItem = await ctx.db.get(args.queueItemId);
+    if (!queueItem) throw new Error("Queue item not found");
+
+    const targetPlugin = await ctx.db.get(args.pluginId);
+    if (!targetPlugin) throw new Error("Target plugin not found");
+
+    const now = Date.now();
+
+    // Find all unmatched scannedPlugins with this name + manufacturer
+    const scannedRecords = await ctx.db
+      .query("scannedPlugins")
+      .withIndex("by_name_manufacturer", (q: any) =>
+        q.eq("name", queueItem.pluginName).eq("manufacturer", queueItem.manufacturer)
+      )
+      .collect();
+
+    const unmatchedRecords = scannedRecords.filter((r) => !r.matchedPlugin);
+
+    let newOwnedCount = 0;
+    const seenUsers = new Set<string>();
+
+    for (const record of unmatchedRecords) {
+      await ctx.db.patch(record._id, {
+        matchedPlugin: args.pluginId,
+        matchConfidence: 95,
+        matchMethod: "auto_enrichment",
+      });
+
+      const userId = record.user;
+      if (!userId || seenUsers.has(userId)) continue;
+      seenUsers.add(userId);
+
+      const alreadyOwned = await ctx.db
+        .query("ownedPlugins")
+        .withIndex("by_user_plugin", (q: any) =>
+          q.eq("user", userId).eq("plugin", args.pluginId)
+        )
+        .first();
+
+      if (!alreadyOwned) {
+        await ctx.db.insert("ownedPlugins", {
+          user: userId as Id<"users">,
+          plugin: args.pluginId,
+          addedAt: now,
+        });
+        newOwnedCount++;
+      }
+    }
+
+    if (newOwnedCount > 0) {
+      await ctx.db.patch(args.pluginId, {
+        ownerCount: (targetPlugin.ownerCount ?? 0) + newOwnedCount,
+      });
+    }
+
+    await ctx.db.patch(args.queueItemId, {
+      status: "completed",
+      createdPluginId: args.pluginId,
+      processedAt: now,
+    });
+
+    return {
+      matched: unmatchedRecords.length,
+      newOwned: newOwnedCount,
+      pluginName: targetPlugin.name,
+    };
+  },
+});
+
+/**
+ * Dismiss an unmatched plugin from the enrichment queue (mark as ignored).
+ */
+export const dismissUnmatchedPlugin = mutation({
+  args: {
+    sessionToken: v.string(),
+    queueItemId: v.id("enrichmentQueue"),
+  },
+  handler: async (ctx, args) => {
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
+    const queueItem = await ctx.db.get(args.queueItemId);
+    if (!queueItem) throw new Error("Queue item not found");
+
+    await ctx.db.patch(args.queueItemId, {
+      status: "ignored",
+      processedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Get stats for the unmatched plugins queue (admin dashboard).
+ */
+export const getUnmatchedStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const pending = await ctx.db
+      .query("enrichmentQueue")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    const all = await ctx.db.query("enrichmentQueue").collect();
+
+    return {
+      pending: pending.length,
+      total: all.length,
+    };
+  },
+});
+
+/**
+ * Backfill ownerCount for all plugins based on existing ownedPlugins records.
+ * Admin-triggered one-time migration. Processes up to 100 plugins per call.
+ * Returns a cursor to continue from, or null if done.
+ */
+export const backfillOwnerCounts = mutation({
+  args: {
+    sessionToken: v.string(),
+    cursor: v.optional(v.string()), // Last processed plugin ID
+  },
+  handler: async (ctx, args) => {
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
+    // Get a batch of plugins
+    let pluginsQuery = ctx.db.query("plugins").order("asc");
+    const allPlugins = await pluginsQuery.take(5000); // Get all, filter below
+
+    // Find start position based on cursor
+    let startIdx = 0;
+    if (args.cursor) {
+      const cursorIdx = allPlugins.findIndex((p) => p._id === args.cursor);
+      if (cursorIdx >= 0) startIdx = cursorIdx + 1;
+    }
+
+    const batch = allPlugins.slice(startIdx, startIdx + 100);
+    let updated = 0;
+
+    for (const plugin of batch) {
+      const owners = await ctx.db
+        .query("ownedPlugins")
+        .withIndex("by_plugin", (q) => q.eq("plugin", plugin._id))
+        .collect();
+
+      const count = owners.length;
+      if (count !== (plugin.ownerCount ?? 0)) {
+        await ctx.db.patch(plugin._id, { ownerCount: count });
+        updated++;
+      }
+    }
+
+    const hasMore = startIdx + 100 < allPlugins.length;
+    return {
+      processed: batch.length,
+      updated,
+      hasMore,
+      cursor: hasMore ? batch[batch.length - 1]?._id : null,
+    };
+  },
+});
+
+// ============================================
+// EDUCATOR STATUS
+// ============================================
+
+/**
+ * Set educator status for the current user.
+ * Updates both the users table and userProfiles table.
+ */
+export const setEducatorStatus = mutation({
+  args: {
+    sessionToken: v.string(),
+    isEducator: v.boolean(),
+    educatorBio: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    await ctx.db.patch(userId, {
+      isEducator: args.isEducator,
+      ...(args.isEducator ? { educatorSince: Date.now() } : {}),
+      educatorBio: args.educatorBio,
+    });
+
+    // Also update userProfiles if exists
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (profile) {
+      await ctx.db.patch(profile._id, {
+        isEducator: args.isEducator,
+        educatorBio: args.educatorBio,
+        updatedAt: Date.now(),
+      });
+    }
+
+    return { success: true };
   },
 });
