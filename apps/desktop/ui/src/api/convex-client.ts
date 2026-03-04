@@ -2048,3 +2048,23 @@ export async function trackPresetDownload(presetId: string): Promise<boolean> {
     return false;
   }
 }
+
+// ============================================
+// Plugin Pairing Recommendations
+// ============================================
+
+export async function getPluginPairings(
+  pluginName: string,
+  manufacturer: string,
+  category?: string
+): Promise<Array<{ pluginName: string; manufacturer: string; count: number; avgRating?: number }>> {
+  try {
+    return await convex.query(api.pluginPairings.getPluginPairings, {
+      pluginName,
+      manufacturer,
+      category,
+    });
+  } catch {
+    return [];
+  }
+}
