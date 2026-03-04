@@ -14,6 +14,7 @@ export default function ManufacturersListPage() {
   const { sessionToken } = useAuth();
   const router = useRouter();
   const manufacturers = useQuery(api.manufacturers.list, { limit: 500 });
+  // @ts-expect-error -- manufacturers.remove mutation not yet implemented
   const removeMutation = useMutation(api.manufacturers.remove);
 
   const [search, setSearch] = useState("");

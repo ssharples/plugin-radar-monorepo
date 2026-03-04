@@ -853,6 +853,13 @@ export default defineSchema({
       b: v.array(v.string()),
     })),
 
+    bestFor: v.optional(v.object({
+      a: v.array(v.string()),
+      b: v.array(v.string()),
+    })),
+
+    verdict: v.optional(v.string()),
+
     faqs: v.optional(v.array(v.object({
       question: v.string(),
       answer: v.string(),

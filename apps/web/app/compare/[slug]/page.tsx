@@ -30,18 +30,37 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const title = `${data.title} | ProChain`;
+  const categoryLabel = data.category
+    ? data.category.charAt(0).toUpperCase() + data.category.slice(1)
+    : "Audio";
+
+  const title = `${data.pluginA.name} vs ${data.pluginB.name}: Which is Better? (2026 Comparison)`;
   const description =
     data.metaDescription ||
-    `Compare ${data.pluginA.name} vs ${data.pluginB.name} — pricing, features, and which ${data.category} plugin is right for you.`;
+    `Compare ${data.pluginA.name} vs ${data.pluginB.name} — pricing, features, and which ${categoryLabel} plugin is right for your mix.`;
+
+  const canonicalUrl = `https://procha.in/compare/${slug}`;
 
   return {
     title,
     description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
       title,
       description,
-      url: `https://pluginradar.com/compare/${slug}`,
+      type: "article",
+      url: canonicalUrl,
+      siteName: "Plugin Radar",
+      ...(data.pluginA.imageUrl && {
+        images: [{ url: data.pluginA.imageUrl, alt: data.pluginA.name }],
+      }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
     },
   };
 }

@@ -351,7 +351,8 @@ export const upsertComparison = mutation({
       
       category: args.category,
       summary: args.summary,
-      
+      verdict: args.verdict,
+
       pros: {
         a: args.prosA || [],
         b: args.prosB || [],
@@ -360,7 +361,11 @@ export const upsertComparison = mutation({
         a: args.consA || [],
         b: args.consB || [],
       },
-      
+      bestFor: (args.bestForA || args.bestForB) ? {
+        a: args.bestForA || [],
+        b: args.bestForB || [],
+      } : undefined,
+
       faqs: args.faqs,
       
       updatedAt: now,
@@ -488,6 +493,40 @@ export const getComparisonWithPlugins = query({
       ctx.db.get(pluginB.manufacturer),
     ]);
 
+    const buildPluginData = (plugin: typeof pluginA, mfr: typeof mfrA) => ({
+      name: plugin.name,
+      slug: plugin.slug,
+      manufacturer: mfr?.name ?? "Unknown",
+      manufacturerSlug: mfr?.slug ?? "",
+      description: plugin.description,
+      price: plugin.isFree ? "Free" : plugin.currentPrice != null ? `$${(plugin.currentPrice / 100).toFixed(2)}` : plugin.msrp != null ? `$${(plugin.msrp / 100).toFixed(2)}` : "N/A",
+      priceRaw: plugin.currentPrice ?? plugin.msrp,
+      isFree: plugin.isFree ?? false,
+      category: plugin.category,
+      formats: plugin.formats ?? [],
+      platforms: plugin.platforms ?? [],
+      tags: plugin.tags ?? [],
+      imageUrl: plugin.imageUrl,
+      productUrl: plugin.productUrl,
+      // Enrichment fields
+      tonalCharacter: plugin.tonalCharacter,
+      effectType: plugin.effectType,
+      circuitEmulation: plugin.circuitEmulation,
+      keyFeatures: plugin.keyFeatures,
+      worksWellOn: plugin.worksWellOn,
+      useCases: plugin.useCases,
+      genreSuitability: plugin.genreSuitability,
+      skillLevel: plugin.skillLevel,
+      learningCurve: plugin.learningCurve,
+      cpuUsage: plugin.cpuUsage,
+      subcategory: plugin.subcategory,
+      comparableTo: plugin.comparableTo,
+      mentionScore: plugin.mentionScore,
+      mentionCount30d: plugin.mentionCount30d,
+      hasDemo: plugin.hasDemo ?? false,
+      hasTrial: plugin.hasTrial ?? false,
+    });
+
     return {
       slug: comparison.slug,
       title: comparison.title,
@@ -498,40 +537,12 @@ export const getComparisonWithPlugins = query({
       summary: comparison.summary,
       pros: comparison.pros,
       cons: comparison.cons,
+      bestFor: comparison.bestFor,
+      verdict: comparison.verdict,
       faqs: comparison.faqs,
       generatedAt: comparison.generatedAt,
-      pluginA: {
-        name: pluginA.name,
-        slug: pluginA.slug,
-        manufacturer: mfrA?.name ?? "Unknown",
-        manufacturerSlug: mfrA?.slug ?? "",
-        description: pluginA.description,
-        price: pluginA.isFree ? "Free" : pluginA.currentPrice != null ? `$${(pluginA.currentPrice / 100).toFixed(2)}` : pluginA.msrp != null ? `$${(pluginA.msrp / 100).toFixed(2)}` : "N/A",
-        priceRaw: pluginA.currentPrice ?? pluginA.msrp,
-        isFree: pluginA.isFree ?? false,
-        category: pluginA.category,
-        formats: pluginA.formats ?? [],
-        platforms: pluginA.platforms ?? [],
-        tags: pluginA.tags ?? [],
-        imageUrl: pluginA.imageUrl,
-        productUrl: pluginA.productUrl,
-      },
-      pluginB: {
-        name: pluginB.name,
-        slug: pluginB.slug,
-        manufacturer: mfrB?.name ?? "Unknown",
-        manufacturerSlug: mfrB?.slug ?? "",
-        description: pluginB.description,
-        price: pluginB.isFree ? "Free" : pluginB.currentPrice != null ? `$${(pluginB.currentPrice / 100).toFixed(2)}` : pluginB.msrp != null ? `$${(pluginB.msrp / 100).toFixed(2)}` : "N/A",
-        priceRaw: pluginB.currentPrice ?? pluginB.msrp,
-        isFree: pluginB.isFree ?? false,
-        category: pluginB.category,
-        formats: pluginB.formats ?? [],
-        platforms: pluginB.platforms ?? [],
-        tags: pluginB.tags ?? [],
-        imageUrl: pluginB.imageUrl,
-        productUrl: pluginB.productUrl,
-      },
+      pluginA: buildPluginData(pluginA, mfrA),
+      pluginB: buildPluginData(pluginB, mfrB),
     };
   },
 });

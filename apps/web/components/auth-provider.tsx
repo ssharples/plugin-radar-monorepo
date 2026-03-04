@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation(api.auth.login);
   const registerMutation = useMutation(api.auth.register);
   const logoutMutation = useMutation(api.auth.logout);
+  // @ts-expect-error -- verifySession is a query used as mutation for imperative calls
   const verifySessionMutation = useMutation(api.auth.verifySession);
 
   // Load session from localStorage on mount and verify
