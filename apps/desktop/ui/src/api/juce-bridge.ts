@@ -19,6 +19,7 @@ import type {
   AutomationSlotWarning,
   LatencyWarning,
   BackupInfo,
+  ExportedChainData,
 } from './types';
 
 type EventHandler<T> = (data: T) => void;
@@ -795,25 +796,11 @@ class JuceBridge {
   // ============================================
 
   /**
-   * Export the current chain with full preset data for cloud sharing
+   * Export the current chain with full preset data for cloud sharing.
+   * C++ exportChainWithPresets() returns both nodes[] (full tree) and slots[] (flat).
    */
-  async exportChain(): Promise<{
-    version: number;
-    numSlots: number;
-    slots: Array<{
-      index: number;
-      name: string;
-      manufacturer: string;
-      format: string;
-      uid: number;
-      fileOrIdentifier: string;
-      version: string;
-      bypassed: boolean;
-      presetData: string;  // Base64 encoded
-      presetSizeBytes: number;
-    }>;
-  }> {
-    return this.callNative('exportChain');
+  async exportChain(): Promise<ExportedChainData> {
+    return this.callNative<ExportedChainData>('exportChain');
   }
 
   /**
@@ -1187,6 +1174,18 @@ class JuceBridge {
 
   async loadSettings(): Promise<Record<string, unknown>> {
     return this.callNative<Record<string, unknown>>('loadSettings');
+  }
+
+  // ============================================
+  // Per-Plugin Preset Loading
+  // ============================================
+
+  async loadPluginPreset(nodeId: number, presetData: string): Promise<{ success: boolean; error?: string }> {
+    return this.callNativeJson<{ success: boolean; error?: string }>('loadPluginPreset', { nodeId, presetData });
+  }
+
+  async getPluginState(nodeId: number): Promise<{ success: boolean; presetData?: string; error?: string }> {
+    return this.callNativeJson<{ success: boolean; presetData?: string; error?: string }>('getPluginState', { nodeId });
   }
 
   // ============================================

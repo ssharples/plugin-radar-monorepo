@@ -149,6 +149,33 @@ export interface ChainStateV2 {
   sampleRate?: number;
 }
 
+// =============================================
+// Exported chain data (from exportChainWithPresets)
+// =============================================
+
+export interface ExportedChainData {
+  version: number;
+  numSlots: number;
+  nodes: ChainNodeUI[];
+  slots: ExportedSlot[];
+}
+
+export interface ExportedSlot {
+  index: number;
+  name: string;
+  manufacturer: string;
+  format: string;
+  uid: number;
+  fileOrIdentifier: string;
+  version: string;
+  bypassed: boolean;
+  isInstrument: boolean;
+  numInputChannels: number;
+  numOutputChannels: number;
+  presetData?: string;
+  presetSizeBytes?: number;
+}
+
 // API response types
 export interface ApiResponse<T = void> {
   success: boolean;
