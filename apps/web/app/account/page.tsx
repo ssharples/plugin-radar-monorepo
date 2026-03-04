@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
-import { User, SignOut, LinkSimple, DownloadSimple, Shield } from "@phosphor-icons/react";
+import { User, SignOut, LinkSimple, DownloadSimple, Shield, GraduationCap } from "@phosphor-icons/react";
 
 export default function AccountPage() {
   const { user, isLoading, isAuthenticated, isAdmin, login, register, logout } = useAuth();
@@ -18,10 +18,14 @@ export default function AccountPage() {
 
   const updatePreferences = useMutation(api.users.updatePreferences);
   const upsertProfile = useMutation(api.userProfiles.upsertProfile);
+  const setEducatorStatusMutation = useMutation(api.pluginDirectory.setEducatorStatus);
   const userProfile = useQuery(
     api.userProfiles.getProfile,
     isAuthenticated && user ? { sessionToken: localStorage.getItem("pluginradar_session") || "" } : "skip"
   );
+
+  const [educatorBio, setEducatorBio] = useState("");
+  const [educatorSaving, setEducatorSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,10 +226,18 @@ export default function AccountPage() {
               <div className="flex justify-between text-stone-400">
                 <span>License</span>
                 {user?.hasPurchased ? (
-                  <span className="text-[#deff0a]">Active</span>
+                  <span className="text-[#deff0a]">Licensed (Perpetual)</span>
+                ) : user?.trialEndsAt && user.trialEndsAt > Date.now() ? (
+                  <span className="text-[#deff0a]">
+                    Trial — {Math.ceil((user.trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24))}d left
+                  </span>
+                ) : user?.trialEndsAt ? (
+                  <Link href="/pricing" className="text-stone-300 hover:text-[#deff0a] transition">
+                    Trial ended — Buy ProChain
+                  </Link>
                 ) : (
                   <Link href="/pricing" className="text-stone-300 hover:text-[#deff0a] transition">
-                    Buy ProChain — $50
+                    Start Free Trial
                   </Link>
                 )}
               </div>
@@ -301,6 +313,80 @@ export default function AccountPage() {
                   <option value="GBP">GBP (&pound;)</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Educator Mode */}
+          <div className="glass-card rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <GraduationCap className="w-5 h-5 text-[#deff0a]" weight="fill" />
+              <h3 className="font-semibold text-stone-100">Educator Mode</h3>
+            </div>
+            <p className="text-xs text-stone-500 mb-4">
+              Educators can annotate their shared chains with mixing explanations, difficulty levels, and teaching notes.
+            </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="block text-stone-300 font-medium text-sm">Enable Educator Mode</label>
+                  <p className="text-xs text-stone-500 mt-0.5">Show an educator badge on your chains and profile.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={user?.isEducator ?? false}
+                    onChange={async (e) => {
+                      const token = localStorage.getItem("pluginradar_session");
+                      if (!token) return;
+                      setEducatorSaving(true);
+                      try {
+                        await setEducatorStatusMutation({
+                          sessionToken: token,
+                          isEducator: e.target.checked,
+                          educatorBio: educatorBio || undefined,
+                        });
+                      } finally {
+                        setEducatorSaving(false);
+                      }
+                    }}
+                  />
+                  <div className="w-11 h-6 bg-white/[0.1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#deff0a]"></div>
+                </label>
+              </div>
+
+              {user?.isEducator && (
+                <div>
+                  <label className="block text-stone-300 text-sm mb-2">Educator Bio</label>
+                  <textarea
+                    value={educatorBio}
+                    onChange={(e) => setEducatorBio(e.target.value)}
+                    placeholder="Tell learners about your experience..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-[#deff0a]/50 transition text-sm resize-none"
+                  />
+                  <button
+                    onClick={async () => {
+                      const token = localStorage.getItem("pluginradar_session");
+                      if (!token) return;
+                      setEducatorSaving(true);
+                      try {
+                        await setEducatorStatusMutation({
+                          sessionToken: token,
+                          isEducator: true,
+                          educatorBio: educatorBio || undefined,
+                        });
+                      } finally {
+                        setEducatorSaving(false);
+                      }
+                    }}
+                    disabled={educatorSaving}
+                    className="mt-2 px-4 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-stone-200 rounded-lg text-sm transition disabled:opacity-50"
+                  >
+                    {educatorSaving ? "Saving..." : "Save Bio"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

@@ -12,6 +12,7 @@ interface User {
   avatarUrl?: string;
   tier: string;
   isAdmin?: boolean;
+  isEducator?: boolean;
   createdAt: number;
   lastSeenAt: number;
   emailDigest: string;
@@ -19,6 +20,7 @@ interface User {
   showOwnedPlugins?: boolean;
   showPluginStats?: boolean;
   hasPurchased?: boolean;
+  trialEndsAt?: number;
 }
 
 interface AuthContextType {
@@ -95,7 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name?: string) => {
     setIsLoading(true);
     try {
-      const result = await registerMutation({ email, password, name });
+      const referredBy = document.cookie.match(/(?:^|; )pr_ref=([^;]*)/)?.[1];
+      const result = await registerMutation({
+        email,
+        password,
+        name,
+        ...(referredBy && { referredBy: decodeURIComponent(referredBy) }),
+      });
       localStorage.setItem("pluginradar_session", result.sessionToken);
       setSessionToken(result.sessionToken);
       setValidatedSession(result);

@@ -845,7 +845,7 @@ export const getChain = query({
     return {
       ...chain,
       slots: enrichedSlots,
-      author: author ? { name: author.name, avatarUrl: author.avatarUrl } : null,
+      author: author ? { name: author.name, avatarUrl: author.avatarUrl, isEducator: author.isEducator } : null,
     };
   },
 });
@@ -1914,6 +1914,7 @@ export const browseChainsPaginated = query({
     sortBy: v.optional(v.string()),       // "popular" | "recent" | "downloads" | "rating"
     genre: v.optional(v.string()),
     compatibilityFilter: v.optional(v.string()), // "all" | "full" | "close"
+    educatorOnly: v.optional(v.boolean()),
     sessionToken: v.optional(v.string()),
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
@@ -2002,6 +2003,16 @@ export const browseChainsPaginated = query({
       );
     }
 
+    // Apply educator filter if requested
+    if (args.educatorOnly) {
+      const educatorUsers = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("isEducator"), true))
+        .collect();
+      const educatorIds = new Set(educatorUsers.map((u) => u._id.toString()));
+      chains = chains.filter((chain) => educatorIds.has(chain.user.toString()));
+    }
+
     // Apply compatibility filter if requested
     if (ownedPluginIds && args.compatibilityFilter !== "all") {
       chains = chains.filter((chain) => {
@@ -2059,7 +2070,7 @@ export const browseChainsPaginated = query({
         return {
           ...chain,
           author: author
-            ? { name: author.name, avatarUrl: author.avatarUrl }
+            ? { name: author.name, avatarUrl: author.avatarUrl, isEducator: author.isEducator }
             : null,
         };
       })

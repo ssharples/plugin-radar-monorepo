@@ -35,6 +35,8 @@ export function ChainBrowserSidebar({
   onSortChange,
   showCompatible,
   onCompatibleChange,
+  educatorOnly,
+  onEducatorOnlyChange,
 }: {
   searchQuery: string;
   onSearchChange: (value: string) => void;
@@ -46,6 +48,8 @@ export function ChainBrowserSidebar({
   onSortChange: (value: string) => void;
   showCompatible: boolean;
   onCompatibleChange: (value: boolean) => void;
+  educatorOnly?: boolean;
+  onEducatorOnlyChange?: (value: boolean) => void;
 }) {
   return (
     <aside className="w-full lg:w-[240px] shrink-0 space-y-6">
@@ -107,7 +111,7 @@ export function ChainBrowserSidebar({
       </div>
 
       {/* Compatibility filter */}
-      <div>
+      <div className="space-y-2">
         <label className="flex items-center gap-2 cursor-pointer group">
           <input
             type="checkbox"
@@ -119,6 +123,19 @@ export function ChainBrowserSidebar({
             Compatible only
           </span>
         </label>
+        {onEducatorOnlyChange && (
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={educatorOnly ?? false}
+              onChange={(e) => onEducatorOnlyChange(e.target.checked)}
+              className="w-4 h-4 rounded border-stone-700 bg-white/[0.04] text-[#deff0a] focus:ring-[#deff0a]/20 focus:ring-offset-0"
+            />
+            <span className="text-sm text-stone-400 group-hover:text-stone-300 transition">
+              Educator chains only
+            </span>
+          </label>
+        )}
       </div>
 
       {/* Sort */}

@@ -27,6 +27,7 @@ import { FollowButton } from "@/components/social/FollowButton";
 import { ForkButton } from "@/components/social/ForkButton";
 import { UserAvatar } from "@/components/social/UserAvatar";
 import { SendChainModal } from "@/components/social/SendChainModal";
+import { EducatorBadge } from "@/components/educator-badge";
 
 interface ChainDetailClientProps {
   slug: string;
@@ -263,6 +264,7 @@ export default function ChainDetailClient({
                   size="sm"
                 />
                 <span className="text-stone-400">by {chain.author.name}</span>
+                {chain.author.isEducator && <EducatorBadge />}
                 {isAuthenticated && !isOwnChain && (
                   <FollowButton
                     isFollowing={isFollowingAuthor ?? false}
@@ -282,6 +284,41 @@ export default function ChainDetailClient({
 
             {chain.description && (
               <p className="text-stone-400 mt-3 max-w-2xl">{chain.description}</p>
+            )}
+
+            {/* Educator Annotations */}
+            {chain.educatorAnnotation && (
+              <div className="mt-4 p-4 bg-[#deff0a]/[0.04] border border-[#deff0a]/15 rounded-xl max-w-2xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-sm font-semibold text-[#deff0a]">
+                    Educator Notes
+                  </h3>
+                  {chain.educatorAnnotation.difficulty && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                      chain.educatorAnnotation.difficulty === "Beginner"
+                        ? "bg-green-500/10 text-green-400 border-green-500/20"
+                        : chain.educatorAnnotation.difficulty === "Intermediate"
+                          ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                          : "bg-red-500/10 text-red-400 border-red-500/20"
+                    }`}>
+                      {chain.educatorAnnotation.difficulty}
+                    </span>
+                  )}
+                </div>
+                <p className="text-stone-300 text-sm leading-relaxed whitespace-pre-wrap">
+                  {chain.educatorAnnotation.narrative}
+                </p>
+                {chain.educatorAnnotation.listenFor && (
+                  <div className="mt-3 p-3 bg-white/[0.03] border border-white/[0.06] rounded-lg">
+                    <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">
+                      Listen For
+                    </p>
+                    <p className="text-stone-300 text-sm">
+                      {chain.educatorAnnotation.listenFor}
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Tags */}
@@ -649,6 +686,13 @@ function SlotRow({
       {substitution?.status === "owned" && substitution.paramMapInfo?.hasMap && substitution.paramMapInfo.contributorCount > 0 && (
         <div className="ml-8 mt-0.5 mb-1 text-[11px] text-stone-600">
           Map verified by {substitution.paramMapInfo.contributorCount} user{substitution.paramMapInfo.contributorCount > 1 ? "s" : ""}
+        </div>
+      )}
+
+      {/* Per-slot educator annotation */}
+      {slot.annotation && (
+        <div className="ml-8 mt-1 mb-1 px-3 py-2 bg-[#deff0a]/[0.03] border-l-2 border-[#deff0a]/30 rounded-r-lg">
+          <p className="text-xs text-stone-400">{slot.annotation}</p>
         </div>
       )}
 

@@ -11,6 +11,7 @@ import {
   Funnel,
   X,
   MagnifyingGlass,
+  GraduationCap,
 } from "@phosphor-icons/react";
 import { ChainBrowserSidebar } from "@/components/chains/ChainBrowserSidebar";
 import { ChainCardRedesign } from "@/components/chains/ChainCardRedesign";
@@ -58,6 +59,7 @@ export default function ChainsPageClient({
 
   const [searchInput, setSearchInput] = useState(searchFromUrl);
   const [showCompatible, setShowCompatible] = useState(false);
+  const [educatorOnly, setEducatorOnly] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
@@ -71,6 +73,7 @@ export default function ChainsPageClient({
     search: searchFromUrl.trim() || undefined,
     genre: genre || undefined,
     sortBy,
+    educatorOnly: educatorOnly || undefined,
     sessionToken: sessionToken || undefined,
     limit: displayCount,
     offset: 0,
@@ -174,6 +177,17 @@ export default function ChainsPageClient({
               <Funnel className="w-3.5 h-3.5" />
               Filters
             </button>
+            <button
+              onClick={() => setEducatorOnly(!educatorOnly)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm border transition ${
+                educatorOnly
+                  ? "bg-[#deff0a]/10 border-[#deff0a]/20 text-[#deff0a]"
+                  : "bg-white/[0.04] border-white/[0.06] text-stone-300"
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              Educator
+            </button>
             {CHAIN_USE_CASE_GROUPS.map((group) => (
               <button
                 key={group.value}
@@ -233,6 +247,8 @@ export default function ChainsPageClient({
                 onSortChange={handleSortChange}
                 showCompatible={showCompatible}
                 onCompatibleChange={setShowCompatible}
+                educatorOnly={educatorOnly}
+                onEducatorOnlyChange={setEducatorOnly}
               />
             </div>
           )}
@@ -253,13 +269,15 @@ export default function ChainsPageClient({
               onSortChange={handleSortChange}
               showCompatible={showCompatible}
               onCompatibleChange={setShowCompatible}
+              educatorOnly={educatorOnly}
+              onEducatorOnlyChange={setEducatorOnly}
             />
           </div>
 
           {/* Main Grid */}
           <div className="flex-1 min-w-0">
             {/* Active filter indicators */}
-            {(category || genre) && (
+            {(category || genre || educatorOnly) && (
               <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <span className="text-xs text-stone-500">Filtered by:</span>
                 {category && (
@@ -284,6 +302,17 @@ export default function ChainsPageClient({
                     </button>
                   </span>
                 )}
+                {educatorOnly && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#deff0a]/10 border border-[#deff0a]/20 rounded-full text-xs text-[#deff0a]">
+                    Educator
+                    <button
+                      onClick={() => setEducatorOnly(false)}
+                      className="hover:text-white transition"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
               </div>
             )}
 
@@ -301,7 +330,7 @@ export default function ChainsPageClient({
                     No chains found
                   </h3>
                   <p className="text-stone-400">
-                    {category || searchFromUrl || genre
+                    {category || searchFromUrl || genre || educatorOnly
                       ? "Try adjusting your filters or search terms."
                       : "No chains shared yet. Be the first — build a chain in ProChain and share it with the community."}
                   </p>

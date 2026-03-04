@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
 } from "@phosphor-icons/react";
 import { CompatibilityBadge } from "./CompatibilityBadge";
+import { EducatorBadge } from "@/components/educator-badge";
 
 export function ChainCardRedesign({ chain }: { chain: any }) {
   const { sessionToken, isAuthenticated } = useAuth();
@@ -107,6 +108,7 @@ export function ChainCardRedesign({ chain }: { chain: any }) {
           <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-0.5">
             <User className="w-3 h-3" />
             <span>{chain.author.name}</span>
+            {chain.author.isEducator && <EducatorBadge className="ml-1" />}
           </div>
         )}
       </div>
