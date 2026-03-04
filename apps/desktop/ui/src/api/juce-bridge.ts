@@ -449,7 +449,8 @@ class JuceBridge {
   }
 
   // Per-node meter data (inline plugin meters)
-  onNodeMeterData(handler: EventHandler<Record<string, NodeMeterReadings>>): () => void {
+  // C++ sends packed string format for performance; handler parses it in JS.
+  onNodeMeterData(handler: EventHandler<string | Record<string, NodeMeterReadings>>): () => void {
     return this.on('nodeMeterData', handler);
   }
 
@@ -657,8 +658,8 @@ class JuceBridge {
     translatedParams: Array<{ paramIndex: number; value: number }>
   ): Promise<{
     success: boolean;
+    newNodeId?: number;
     appliedParams?: number;
-    chainState?: ChainStateV2;
     error?: string;
   }> {
     return this.callNativeJson('swapPluginInChain', {
@@ -696,8 +697,8 @@ class JuceBridge {
     return this.callNativeJson<ApiResponse>('setGroupWetGain', { groupId, gainDb });
   }
 
-  async setGroupDucking(groupId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number): Promise<ApiResponse> {
-    return this.callNativeJson<ApiResponse>('setGroupDucking', { groupId, enabled, thresholdDb, attackMs, releaseMs });
+  async setNodeDucking(nodeId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number): Promise<ApiResponse> {
+    return this.callNativeJson<ApiResponse>('setNodeDucking', { nodeId, enabled, thresholdDb, attackMs, releaseMs });
   }
 
   async setBranchGain(nodeId: number, gainDb: number): Promise<ApiResponse> {
@@ -773,7 +774,6 @@ class JuceBridge {
     success: boolean;
     allBypassed: boolean;
     anyBypassed: boolean;
-    chainState?: ChainStateV2;
   }> {
     return this.callNative('toggleAllBypass');
   }
@@ -1155,6 +1155,7 @@ class JuceBridge {
     email: string;
     name?: string;
     hasPurchased?: boolean;
+    trialEndsAt?: number;
     onboardingComplete?: boolean;
   }): Promise<{ success: boolean }> {
     return this.callNative<{ success: boolean }>('saveCredentials', JSON.stringify(data));
@@ -1166,6 +1167,7 @@ class JuceBridge {
     email?: string;
     name?: string;
     hasPurchased?: boolean;
+    trialEndsAt?: number;
     onboardingComplete?: boolean;
   }> {
     return this.callNative('loadCredentials');

@@ -38,13 +38,20 @@ export interface PresetInfo {
   lastModified: string;
 }
 
+// Backup information
+export interface BackupInfo {
+  name: string;
+  path: string;
+  timestamp: number;
+}
+
 // Group template information
 export interface GroupTemplateInfo {
   name: string;
   category: string;
   path: string;
   lastModified: string;
-  mode: 'serial' | 'parallel';
+  mode: 'serial' | 'parallel' | 'midside' | 'fxselector';
   pluginCount: number;
 }
 
@@ -53,41 +60,6 @@ export interface ScanProgress {
   scanning: boolean;
   progress: number;
   currentPlugin: string;
-}
-
-// Waveform data
-export interface WaveformData {
-  pre: number[];
-  post: number[];
-}
-
-// FFT data from spectrum analyzer (stereo)
-export interface FFTData {
-  magnitudes: number[];      // Mono average (backward compat)
-  magnitudesL?: number[];    // Left channel magnitudes
-  magnitudesR?: number[];    // Right channel magnitudes
-  sampleRate: number;
-  fftSize: number;
-}
-
-// Meter data
-export interface MeterData {
-  inputPeakL: number;
-  inputPeakR: number;
-  inputPeakHoldL: number;
-  inputPeakHoldR: number;
-  inputRmsL: number;
-  inputRmsR: number;
-  inputLufs: number;
-  inputAvgPeakDbL: number;
-  inputAvgPeakDbR: number;
-  outputPeakL: number;
-  outputPeakR: number;
-  outputPeakHoldL: number;
-  outputPeakHoldR: number;
-  outputRmsL: number;
-  outputRmsR: number;
-  outputLufs: number;
 }
 
 // Per-node meter readings (from NodeMeterProcessor)
@@ -105,6 +77,8 @@ export interface NodeMeterReadings {
   inputRmsL: number;
   inputRmsR: number;
   latencyMs?: number;
+  inputLufs?: number;
+  outputLufs?: number;
 }
 
 // Gain settings
@@ -130,42 +104,55 @@ export interface PluginNodeUI {
   isDryPath?: boolean;
   manufacturer: string;
   branchGainDb: number;
-  solo: boolean;
   mute: boolean;
+  solo: boolean;
   // Per-plugin controls
   inputGainDb: number;
   outputGainDb: number;
   pluginDryWet: number;
-  sidechainSource: number;
   midSideMode: number;  // 0=off, 1=mid, 2=side, 3=midside
-  hasSidechain: boolean;
   latency?: number;
+  autoGainEnabled?: boolean;
+  duckEnabled: boolean;
+  duckThresholdDb: number;
+  duckAttackMs: number;
+  duckReleaseMs: number;
 }
 
 export interface GroupNodeUI {
   id: number;
   type: 'group';
   name: string;
-  mode: 'serial' | 'parallel';
+  mode: 'serial' | 'parallel' | 'midside' | 'fxselector';
   dryWet: number;
-  duckAmount: number;
-  duckReleaseMs: number;
+  wetGainDb: number;
+  bypassed: boolean;
   collapsed: boolean;
+  activeChildIndex?: number;  // FXSelector only
   children: ChainNodeUI[];
 }
 
 // V2 chain state with tree structure
+// Latency warning from C++ when chain latency exceeds thresholds
+export interface LatencyWarning {
+  level: 'high' | 'extreme';
+  latencyMs: number;
+  latencySamples: number;
+  message: string;
+}
+
 export interface ChainStateV2 {
   nodes: ChainNodeUI[];
   slots?: ChainSlot[];    // backward compat
   numSlots?: number;
+  totalLatencySamples?: number;
+  sampleRate?: number;
 }
 
 // API response types
 export interface ApiResponse<T = void> {
   success: boolean;
   error?: string;
-  chainState?: ChainStateV2;
   presetList?: PresetInfo[];
   preset?: PresetInfo;
   templateList?: GroupTemplateInfo[];
@@ -247,6 +234,20 @@ export interface CollectionItem {
   notes?: string;
 }
 
+// Cross-format substitution (AU→VST3 or vice versa)
+export interface FormatSubstitution {
+  pluginName: string;
+  savedFormat: string;
+  loadedFormat: string;
+  hasPresetData?: boolean;   // true when preset data was present (settings may differ)
+}
+
+// Catalog-mediated cross-format alias group (AU↔VST3 variants of the same plugin)
+export interface CrossFormatAliasGroup {
+  catalogId: string;
+  variants: Array<{ name: string; manufacturer: string; format: string }>;
+}
+
 // Chain import result with slot-level detail
 export interface ChainImportResult {
   success: boolean;
@@ -254,8 +255,22 @@ export interface ChainImportResult {
   loadedSlots: number;
   failedSlots: number;
   failures?: Array<{ position: number; pluginName: string; reason: string }>;
-  chainState?: ChainStateV2;
+  formatSubstitutions?: FormatSubstitution[];
   error?: string;
+}
+
+// AI parameter translation result
+export interface AiParameterMapping {
+  params: Array<{ index: number; name: string; value: number; confidence: number }>;
+  confidence: number;
+}
+
+// AI cross-format alias suggestion result
+export interface AiFormatAliasResult {
+  matched: boolean;
+  name?: string;
+  manufacturer?: string;
+  confidence?: number;
 }
 
 // Blacklisted plugin event (from scanner)
@@ -327,6 +342,12 @@ export interface PluginDescriptionWithStatus extends PluginDescription {
 export interface InlineEditorState {
   mode: 'webview' | 'plugin';
   nodeId?: number;
+}
+
+export interface AutomationSlotWarning {
+  totalPlugins: number;
+  maxSlots: number;
+  unautomatablePlugins: string[];
 }
 
 // Unified chain item for merged local + cloud view

@@ -5,6 +5,7 @@ import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
 import { usePluginStore } from './pluginStore';
 import { getParameterMapByName, contributeParameterDiscovery } from '../api/convex-client';
+import { getCategoryColor } from '../constants/categoryColors';
 
 // ============================================
 // Throttled bridge call helper for continuous controls (knobs/sliders)
@@ -46,13 +47,6 @@ interface ChainSnapshot {
 
 const MAX_HISTORY = 50;
 
-/** A/B/C snapshot — full chain export including preset data */
-interface ABSnapshot {
-  data: unknown;
-  savedAt: number;
-  name?: string;
-}
-
 interface ChainStoreState {
   // Tree-based state (V2)
   nodes: ChainNodeUI[];
@@ -82,10 +76,6 @@ interface ChainStoreState {
   _continuousDragSnapshot: ChainSnapshot | null;
   /** Timestamp of last _beginContinuousGesture call (for safety timer) */
   _continuousGestureLastActivity: number;
-
-  // A/B/C Snapshots
-  snapshots: (ABSnapshot | null)[];
-  activeSnapshot: number | null;
 
   // Last cloud chain ID (for share-without-re-saving)
   lastCloudChainId: string | null;
@@ -125,6 +115,9 @@ interface ChainStoreState {
   chainSource: 'browse' | 'myChains' | 'preset' | null;
   chainSourceList: string[]; // List of chain IDs from the source
   chainSourceIndex: number;  // Current index in the source list
+
+  // Dirty state (chain modified since last save/load)
+  isDirty: boolean;
 }
 
 interface ChainActions {
@@ -152,7 +145,7 @@ interface ChainActions {
   setActiveBranch: (groupId: number, branchIndex: number) => Promise<void>;
   setGroupDryWet: (groupId: number, mix: number) => Promise<void>;
   setGroupWetGain: (groupId: number, gainDb: number) => Promise<void>;
-  setGroupDucking: (groupId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => Promise<void>;
+  setNodeDucking: (nodeId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => Promise<void>;
   setBranchGain: (nodeId: number, gainDb: number) => Promise<void>;
   setBranchMute: (nodeId: number, mute: boolean) => Promise<void>;
   setBranchSolo: (nodeId: number, solo: boolean) => Promise<void>;
@@ -197,11 +190,6 @@ interface ChainActions {
   /** Push drag-start snapshot to history on drag end */
   _endContinuousGesture: () => void;
 
-  // A/B/C Snapshots
-  saveSnapshot: (index: number) => Promise<void>;
-  recallSnapshot: (index: number) => Promise<void>;
-  renameSnapshot: (index: number, name: string) => void;
-
   // Plugin settings copy (direct copy between slots)
   pastePluginSettings: (sourceNodeId: number, targetNodeId: number) => Promise<boolean>;
 
@@ -230,6 +218,9 @@ interface ChainActions {
   clearChain: () => void;
   setChainSource: (source: 'browse' | 'myChains' | 'preset' | null, list?: string[], index?: number) => void;
 
+  // Dirty state
+  setIsDirty: (dirty: boolean) => void;
+
   // Slot colors (right-click palette)
   slotColors: Record<number, string>;
   setSlotColor: (nodeId: number, color: string) => void;
@@ -256,6 +247,18 @@ function findNodeById(nodes: ChainNodeUI[], id: number): ChainNodeUI | null {
     }
   }
   return null;
+}
+
+/** Collect all plugin node IDs from a tree (for diffing new vs old). */
+function collectPluginNodeIds(nodes: ChainNodeUI[]): Set<number> {
+  const ids = new Set<number>();
+  for (const node of nodes) {
+    if (node.type === 'plugin') ids.add(node.id);
+    if (node.type === 'group') {
+      for (const id of collectPluginNodeIds(node.children)) ids.add(id);
+    }
+  }
+  return ids;
 }
 
 // Helper: find a node by ID anywhere in the tree
@@ -393,8 +396,6 @@ const initialState: ChainStoreState = {
   _undoRedoInProgress: false,
   _continuousDragSnapshot: null,
   _continuousGestureLastActivity: 0,
-  snapshots: [null, null, null, null],
-  activeSnapshot: null,
   pluginClipboard: null,
   toastMessage: null,
   formatSubstitutions: [],
@@ -411,6 +412,7 @@ const initialState: ChainStoreState = {
   chainSource: null,
   chainSourceList: [],
   chainSourceIndex: -1,
+  isDirty: false,
   slotColors: {},
 };
 
@@ -423,6 +425,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   _pushHistory: async () => {
     if (get()._undoRedoInProgress) return;
+    set({ isDirty: true });
     try {
       // Capture full binary snapshot (includes all plugin preset data).
       // We store only binaryData — nodes/slots are reconstructed from C++ on restore.
@@ -478,12 +481,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
       });
 
       // Restore full binary snapshot (includes all plugin presets)
-      const result = await juceBridge.restoreSnapshot(previousState.binaryData);
-      // Use the authoritative chain state from C++ after restore
-      if (result?.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      // Chain state will be applied via the chainChanged event
+      await juceBridge.restoreSnapshot(previousState.binaryData);
     } catch (_err) {
       // Silently ignored — undo restore failure leaves UI in last-known state
     }
@@ -522,68 +521,13 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
       });
 
       // Restore full binary snapshot (includes all plugin presets)
-      const result = await juceBridge.restoreSnapshot(nextState.binaryData);
-      if (result?.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      // Chain state will be applied via the chainChanged event
+      await juceBridge.restoreSnapshot(nextState.binaryData);
     } catch (_err) {
       // Silently ignored — redo restore failure leaves UI in last-known state
     }
 
     set({ _undoRedoInProgress: false });
-  },
-
-  // =============================================
-  // A/B/C Snapshots
-  // =============================================
-
-  saveSnapshot: async (index: number) => {
-    try {
-      // Use binary snapshot for 2-5x faster recall
-      const data = await juceBridge.captureSnapshot();
-      const snapshots = [...get().snapshots];
-      snapshots[index] = { data, savedAt: Date.now() };
-      set({ snapshots, activeSnapshot: index });
-
-      // Emit success event for UI toast
-      window.dispatchEvent(new CustomEvent('snapshot-saved', {
-        detail: { index, label: ['A', 'B', 'C', 'D'][index] }
-      }));
-    } catch (err) {
-      window.dispatchEvent(new CustomEvent('snapshot-error', {
-        detail: { message: 'Failed to save snapshot' }
-      }));
-    }
-  },
-
-  recallSnapshot: async (index: number) => {
-    const snapshot = get().snapshots[index];
-    if (!snapshot) return;
-
-    await get()._pushHistory();
-    try {
-      // Use binary restore for 2-5x faster recall
-      await juceBridge.restoreSnapshot(snapshot.data as string);
-      set({ activeSnapshot: index, lastCloudChainId: null });
-
-      // Emit success event for UI toast
-      window.dispatchEvent(new CustomEvent('snapshot-recalled', {
-        detail: { index, label: ['A', 'B', 'C', 'D'][index] }
-      }));
-    } catch (err) {
-      window.dispatchEvent(new CustomEvent('snapshot-error', {
-        detail: { message: 'Failed to recall snapshot' }
-      }));
-    }
-  },
-
-  renameSnapshot: (index: number, name: string) => {
-    const snapshots = [...get().snapshots];
-    const existing = snapshots[index];
-    if (!existing) return;
-    snapshots[index] = { ...existing, name };
-    set({ snapshots });
   },
 
   fetchChainState: async () => {
@@ -605,52 +549,46 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.addPlugin(pluginId, insertIndex);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        const newState = applyState(chainState);
-        set({ ...newState, loading: false });
-
-        // Track usage
-        const newSlots = newState.slots;
-        const newIndex = insertIndex === -1 ? newSlots.length - 1 : insertIndex;
-        const newPlugin = newSlots[newIndex];
-        if (newPlugin) {
-          const { recordPluginLoad, recordCoUsage } = useUsageStore.getState();
-          recordPluginLoad(newPlugin.uid, newPlugin.name, newPlugin.manufacturer);
-          newSlots.forEach((slot) => {
-            if (slot.uid !== newPlugin.uid) {
-              recordCoUsage(newPlugin.uid, slot.uid);
-              recordCoUsage(slot.uid, newPlugin.uid);
-            }
-          });
-        }
-
-        // Fire-and-forget: auto-discover parameter map and upload to Convex
-        // Find the node ID for the newly added plugin from the tree state
-        const newNodes = newState.nodes;
-        const findLastPluginNodeId = (nodes: ChainNodeUI[]): number | null => {
-          let lastId: number | null = null;
-          for (const node of nodes) {
-            if (node.type === 'plugin' && node.name === newPlugin?.name) {
-              lastId = node.id;
-            }
-            if (node.type === 'group') {
-              const found = findLastPluginNodeId(node.children);
-              if (found !== null) lastId = found;
-            }
+      if (result.success) {
+        // Chain state will be applied via chainChanged event (sets loading: false)
+        // Defer usage tracking and auto-discovery to after chainChanged fires
+        setTimeout(() => {
+          const { slots, nodes } = get();
+          const newIndex = insertIndex === -1 ? slots.length - 1 : insertIndex;
+          const newPlugin = slots[newIndex];
+          if (newPlugin) {
+            const { recordPluginLoad, recordCoUsage } = useUsageStore.getState();
+            recordPluginLoad(newPlugin.uid, newPlugin.name, newPlugin.manufacturer);
+            slots.forEach((slot) => {
+              if (slot.uid !== newPlugin.uid) {
+                recordCoUsage(newPlugin.uid, slot.uid);
+                recordCoUsage(slot.uid, newPlugin.uid);
+              }
+            });
           }
-          return lastId;
-        };
-        const newNodeId = newPlugin ? findLastPluginNodeId(newNodes) : null;
-        if (newNodeId !== null && newPlugin) {
-          // Look up matched Convex plugin ID from enrichment data
-          const enrichedData = usePluginStore.getState().enrichedData;
-          const enriched = enrichedData.get(newPlugin.uid);
-          const matchedPluginId = enriched?._id;
-          autoDiscoverAndUpload(newNodeId, newPlugin.name, matchedPluginId).catch(() => {
-            // Silently ignore — auto-discovery is best-effort
-          });
-        }
+
+          // Fire-and-forget: auto-discover parameter map and upload to Convex
+          const findLastPluginNodeId = (nodeList: ChainNodeUI[]): number | null => {
+            let lastId: number | null = null;
+            for (const node of nodeList) {
+              if (node.type === 'plugin' && node.name === newPlugin?.name) {
+                lastId = node.id;
+              }
+              if (node.type === 'group') {
+                const found = findLastPluginNodeId(node.children);
+                if (found !== null) lastId = found;
+              }
+            }
+            return lastId;
+          };
+          const newNodeId = newPlugin ? findLastPluginNodeId(nodes) : null;
+          if (newNodeId !== null && newPlugin) {
+            const enrichedData = usePluginStore.getState().enrichedData;
+            const enriched = enrichedData.get(newPlugin.uid);
+            const matchedPluginId = enriched?._id;
+            autoDiscoverAndUpload(newNodeId, newPlugin.name, matchedPluginId).catch(() => {});
+          }
+        }, 50);
 
         return true;
       } else {
@@ -668,28 +606,28 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.addPluginToGroup(pluginId, parentId, insertIndex);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        const newState = applyState(chainState);
-        set({ ...newState, loading: false });
-
-        // Fire-and-forget: auto-discover parameter map for the newly added plugin
-        const findPluginNode = (nodeList: ChainNodeUI[], pid: string): ChainNodeUI | null => {
-          for (const node of nodeList) {
-            if (node.type === 'plugin' && node.fileOrIdentifier === pid) return node;
-            if (node.type === 'group') {
-              const found = findPluginNode(node.children, pid);
-              if (found) return found;
+      if (result.success) {
+        // Chain state will be applied via chainChanged event (sets loading: false)
+        // Defer auto-discovery to after chainChanged fires
+        setTimeout(() => {
+          const { nodes } = get();
+          const findPluginNode = (nodeList: ChainNodeUI[], pid: string): ChainNodeUI | null => {
+            for (const node of nodeList) {
+              if (node.type === 'plugin' && node.fileOrIdentifier === pid) return node;
+              if (node.type === 'group') {
+                const found = findPluginNode(node.children, pid);
+                if (found) return found;
+              }
             }
+            return null;
+          };
+          const addedNode = findPluginNode(nodes, pluginId);
+          if (addedNode) {
+            const enrichedData = usePluginStore.getState().enrichedData;
+            const enriched = enrichedData.get(addedNode.uid);
+            autoDiscoverAndUpload(addedNode.id, addedNode.name, enriched?._id).catch(() => {});
           }
-          return null;
-        };
-        const addedNode = findPluginNode(newState.nodes, pluginId);
-        if (addedNode) {
-          const enrichedData = usePluginStore.getState().enrichedData;
-          const enriched = enrichedData.get(addedNode.uid);
-          autoDiscoverAndUpload(addedNode.id, addedNode.name, enriched?._id).catch(() => {});
-        }
+        }, 50);
 
         return true;
       } else {
@@ -707,9 +645,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.removePlugin(slotIndex);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set({ ...applyState(chainState), loading: false });
+      if (result.success) {
+        // Chain state applied via chainChanged event
         return true;
       } else {
         set({ error: result.error || 'Failed to remove plugin', loading: false });
@@ -733,9 +670,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
     try {
       const result = await juceBridge.movePlugin(fromIndex, toIndex);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
+      if (result.success) {
+        // Chain state applied via chainChanged event
         return true;
       } else {
         set({ slots, nodes, error: result.error || 'Failed to move plugin' });
@@ -752,17 +688,16 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     const slot = slots[slotIndex];
     if (!slot) return;
 
+    set({ isDirty: true });
+
     // Optimistic
     const newSlots = [...slots];
     newSlots[slotIndex] = { ...slot, bypassed: !slot.bypassed };
     set({ slots: newSlots });
 
     try {
-      const result = await juceBridge.setSlotBypassed(slotIndex, !slot.bypassed);
-      if (result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setSlotBypassed(slotIndex, !slot.bypassed);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ slots, error: String(err) });
     }
@@ -777,11 +712,11 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.removeNode(nodeId);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
+      if (result.success) {
+        // Chain state applied via chainChanged event
         const openEditors = new Set(get().openEditors);
         openEditors.delete(nodeId);
-        set({ ...applyState(chainState), loading: false, openEditors });
+        set({ openEditors });
         return true;
       } else {
         set({ error: result.error || 'Failed to remove node', loading: false });
@@ -798,9 +733,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.duplicateNode(nodeId);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set({ ...applyState(chainState), loading: false });
+      if (result.success) {
+        // Chain state applied via chainChanged event
         return true;
       } else {
         set({ error: result.error || 'Failed to duplicate node', loading: false });
@@ -816,9 +750,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     await get()._pushHistory();
     try {
       const result = await juceBridge.moveNode(nodeId, newParentId, newIndex);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
+      if (result.success) {
+        // Chain state applied via chainChanged event
         return true;
       } else {
         set({ error: result.error || 'Failed to move node' });
@@ -839,11 +772,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     await get()._pushHistory();
 
     try {
-      const result = await juceBridge.setNodeBypassed(nodeId, !node.bypassed);
-      if (result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setNodeBypassed(nodeId, !node.bypassed);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -857,11 +787,12 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     await get()._pushHistory();
     set({ loading: true, error: null });
     try {
-      const result = await juceBridge.createGroup(childIds, mode, name || 'Group');
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set({ ...applyState(chainState), loading: false });
-        return result.groupId ?? null;
+      const result = await juceBridge.createGroup(childIds, mode, name || 'Send Bus');
+      if (result.success) {
+        const groupId = result.groupId ?? null;
+        // C++ createGroup auto-inserts dry path for parallel groups
+        // Chain state applied via chainChanged event
+        return groupId;
       } else {
         set({ error: result.error || 'Failed to create group', loading: false });
         return null;
@@ -877,9 +808,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.dissolveGroup(groupId);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set({ ...applyState(chainState), loading: false });
+      if (result.success) {
+        // Chain state applied via chainChanged event
         return true;
       } else {
         set({ error: result.error || 'Failed to dissolve group', loading: false });
@@ -897,9 +827,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.dissolveGroup(groupId);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set({ ...applyState(chainState), loading: false });
+      if (result.success) {
+        // Chain state applied via chainChanged event
         return true;
       } else {
         set({ error: result.error || 'Failed to dissolve group', loading: false });
@@ -914,11 +843,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   setGroupMode: async (groupId: number, mode: 'serial' | 'parallel' | 'midside' | 'fxselector') => {
     await get()._pushHistory();
     try {
-      const result = await juceBridge.setGroupMode(groupId, mode);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setGroupMode(groupId, mode);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -926,11 +852,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   setActiveBranch: async (groupId: number, branchIndex: number) => {
     try {
-      const result = await juceBridge.setActiveBranch(groupId, branchIndex);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setActiveBranch(groupId, branchIndex);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -968,14 +891,10 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     });
   },
 
-  setGroupDucking: async (groupId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => {
+  setNodeDucking: async (nodeId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => {
     await get()._beginContinuousGesture();
     try {
-      const result = await juceBridge.setGroupDucking(groupId, enabled, thresholdDb, attackMs, releaseMs);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setNodeDucking(nodeId, enabled, thresholdDb, attackMs, releaseMs);
     } catch (err) {
       set({ error: String(err) });
     }
@@ -999,11 +918,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   setBranchMute: async (nodeId: number, mute: boolean) => {
     await get()._pushHistory();
     try {
-      const result = await juceBridge.setBranchMute(nodeId, mute);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setBranchMute(nodeId, mute);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -1012,11 +928,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   setBranchSolo: async (nodeId: number, solo: boolean) => {
     await get()._pushHistory();
     try {
-      const result = await juceBridge.setBranchSolo(nodeId, solo);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setBranchSolo(nodeId, solo);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -1025,11 +938,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   addDryPath: async (parentId: number, insertIndex = -1) => {
     await get()._pushHistory();
     try {
-      const result = await juceBridge.addDryPath(parentId, insertIndex);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.addDryPath(parentId, insertIndex);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -1089,11 +999,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   setNodeMidSideMode: async (nodeId: number, mode: number) => {
     await get()._pushHistory();
     try {
-      const result = await juceBridge.setNodeMidSideMode(nodeId, mode);
-      if (result.success && result.chainState) {
-        const chainState = result.chainState as ChainStateV2;
-        set(applyState(chainState));
-      }
+      await juceBridge.setNodeMidSideMode(nodeId, mode);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -1101,10 +1008,8 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   setNodeAutoGain: async (nodeId: number, enabled: boolean) => {
     try {
-      const result = await juceBridge.setNodeAutoGain(nodeId, enabled);
-      if (result.success && result.chainState) {
-        set(applyState(result.chainState as ChainStateV2));
-      }
+      await juceBridge.setNodeAutoGain(nodeId, enabled);
+      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
@@ -1357,8 +1262,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
       lastCloudChainId: null,
       history: [],
       future: [],
-      snapshots: [null, null, null, null],
-      activeSnapshot: null,
+      isDirty: false,
       expandedNodeIds: new Set<number>(),
       chainSource: null,
       chainSourceList: [],
@@ -1374,6 +1278,10 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
   setChainSource: (source, list = [], index = -1) => {
     set({ chainSource: source, chainSourceList: list, chainSourceIndex: index });
+  },
+
+  setIsDirty: (dirty: boolean) => {
+    set({ isDirty: dirty });
   },
 
   // =============================================
@@ -1458,7 +1366,7 @@ const actionsSelector = (state: ChainStoreState & ChainActions) => ({
   setGroupMode: state.setGroupMode,
   setGroupDryWet: state.setGroupDryWet,
   setGroupWetGain: state.setGroupWetGain,
-  setGroupDucking: state.setGroupDucking,
+  setNodeDucking: state.setNodeDucking,
   setBranchGain: state.setBranchGain,
   setBranchMute: state.setBranchMute,
   setBranchSolo: state.setBranchSolo,
@@ -1487,9 +1395,6 @@ const actionsSelector = (state: ChainStoreState & ChainActions) => ({
   _pushHistory: state._pushHistory,
   _beginContinuousGesture: state._beginContinuousGesture,
   _endContinuousGesture: state._endContinuousGesture,
-  saveSnapshot: state.saveSnapshot,
-  recallSnapshot: state.recallSnapshot,
-  renameSnapshot: state.renameSnapshot,
   pastePluginSettings: state.pastePluginSettings,
   showToast: state.showToast,
   setFormatSubstitutions: state.setFormatSubstitutions,
@@ -1504,21 +1409,90 @@ const actionsSelector = (state: ChainStoreState & ChainActions) => ({
   closeAiChat: state.closeAiChat,
   clearChain: state.clearChain,
   setChainSource: state.setChainSource,
+  setIsDirty: state.setIsDirty,
 });
 
 // Hook for components to access chain actions without re-rendering on state changes.
-export const useChainActions = () => useChainStore(actionsSelector);
+// Cached because action functions never change identity in Zustand (created once in create()).
+let _cachedActions: ReturnType<typeof actionsSelector> | null = null;
+export const useChainActions = () => useChainStore((state) => {
+  if (!_cachedActions) _cachedActions = actionsSelector(state);
+  return _cachedActions;
+});
 
 // Set up event listener - handles both V1 and V2 chain state
 juceBridge.onChainChanged((state: ChainStateV2) => {
+  const prev = useChainStore.getState();
+  const prevPluginIds = collectPluginNodeIds(prev.nodes);
+
   // Always reset loading flag when receiving chain updates (e.g., from mirror sync)
   useChainStore.setState({ ...applyState(state), loading: false });
+
+  // Auto-color new plugin nodes by their enriched category
+  const { enrichedData } = usePluginStore.getState();
+  if (enrichedData.size === 0) return;
+
+  const newColors: Record<number, string> = {};
+  const assignCategoryColors = (nodeList: ChainNodeUI[]) => {
+    for (const node of nodeList) {
+      if (node.type === 'plugin' && !prevPluginIds.has(node.id) && !prev.slotColors[node.id]) {
+        const enriched = enrichedData.get(node.uid);
+        if (enriched?.category) {
+          const color = getCategoryColor(enriched.category);
+          if (color !== 'rgba(255,255,255,0.15)') {
+            newColors[node.id] = color;
+          }
+        }
+      }
+      if (node.type === 'group') assignCategoryColors(node.children);
+    }
+  };
+  assignCategoryColors(state.nodes || []);
+
+  if (Object.keys(newColors).length > 0) {
+    useChainStore.setState((s) => ({
+      slotColors: { ...s.slotColors, ...newColors },
+    }));
+  }
 });
 
 // Per-node meter data for inline plugin meters.
 // Writes to the dedicated meterStore so that 30fps updates only trigger
 // selector evaluations in meter-displaying components, not all chainStore subscribers.
-juceBridge.onNodeMeterData((data: Record<string, NodeMeterReadings>) => {
+// C++ sends packed string format: "nodeId,v0,v1,...;nodeId,v0,v1,..."
+// where floats are scaled to ints (×10000 for levels, ×100 for latency/lufs).
+juceBridge.onNodeMeterData((raw: string | Record<string, NodeMeterReadings>) => {
+  let data: Record<string, NodeMeterReadings>;
+  if (typeof raw === 'string') {
+    // Parse packed string format (fast path)
+    data = {};
+    const nodes = raw.split(';');
+    for (let i = 0; i < nodes.length; i++) {
+      const parts = nodes[i].split(',');
+      if (parts.length < 16) continue;
+      const S = 0.0001; // scale factor for level values (÷10000)
+      const L = 0.01;   // scale factor for latency/lufs (÷100)
+      data[parts[0]] = {
+        peakL: +parts[1] * S,
+        peakR: +parts[2] * S,
+        peakHoldL: +parts[3] * S,
+        peakHoldR: +parts[4] * S,
+        rmsL: +parts[5] * S,
+        rmsR: +parts[6] * S,
+        inputPeakL: +parts[7] * S,
+        inputPeakR: +parts[8] * S,
+        inputPeakHoldL: +parts[9] * S,
+        inputPeakHoldR: +parts[10] * S,
+        inputRmsL: +parts[11] * S,
+        inputRmsR: +parts[12] * S,
+        latencyMs: +parts[13] * L,
+        inputLufs: +parts[14] * L,
+        outputLufs: +parts[15] * L,
+      };
+    }
+  } else {
+    data = raw;
+  }
   const prev = useMeterStore.getState().nodeMeterData;
   const next: Record<string, NodeMeterReadings> = { ...prev };
   let changed = false;
