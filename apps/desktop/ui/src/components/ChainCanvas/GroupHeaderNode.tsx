@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { GroupHeaderNodeData } from '../../hooks/useChainToReactFlow';
@@ -21,6 +21,15 @@ function GroupHeaderNodeComponent({ data }: NodeProps) {
   const d = data as GroupHeaderNodeData;
   const color = MODE_COLORS[d.mode] ?? '#c9944a';
   const icon = MODE_ICONS[d.mode] ?? '≡';
+  const isParallel = d.mode === 'parallel' || d.mode === 'midside';
+
+  const handleAddBranch = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Dispatch a custom event that ChainCanvas listens to for opening inline search
+    window.dispatchEvent(new CustomEvent('canvas-add-branch', {
+      detail: { groupId: d.chainNodeId, branchCount: d.branchCount },
+    }));
+  }, [d.chainNodeId, d.branchCount]);
 
   return (
     <div
@@ -62,8 +71,34 @@ function GroupHeaderNodeComponent({ data }: NodeProps) {
         </span>
       )}
 
+      {/* Add Branch button for parallel groups */}
+      {isParallel && (
+        <button
+          onClick={handleAddBranch}
+          className="flex-shrink-0 flex items-center justify-center"
+          style={{
+            marginLeft: d.bypassed || d.dryWet < 1.0 ? 4 : 'auto',
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            border: `1px solid ${color}60`,
+            background: `${color}15`,
+            color: `${color}`,
+            fontSize: 12,
+            lineHeight: 1,
+            cursor: 'pointer',
+            transition: 'background 80ms ease',
+          }}
+          title="Add branch"
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${color}40`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = `${color}15`; }}
+        >
+          +
+        </button>
+      )}
+
       {/* Source handles: one per branch for parallel, single for serial */}
-      {(d.mode === 'parallel' || d.mode === 'midside') && d.branchCount > 1 ? (
+      {isParallel && d.branchCount > 1 ? (
         Array.from({ length: d.branchCount }, (_, i) => {
           const offset = (i + 1) / (d.branchCount + 1) * 100;
           return (

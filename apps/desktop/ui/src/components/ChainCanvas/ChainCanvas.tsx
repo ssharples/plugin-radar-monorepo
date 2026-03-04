@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -76,6 +76,23 @@ function ChainCanvasInner() {
     }, [closeContextMenu, closeCanvasSearch]),
     isContextMenuOpen: contextMenu !== null || canvasSearch !== null,
   });
+
+  // Listen for "Add Branch" clicks from GroupHeaderNode
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { groupId, branchCount } = (e as CustomEvent).detail as { groupId: number; branchCount: number };
+      // Open the floating search panel targeting this parallel group at the next branch slot
+      // Position it roughly center-screen since we don't have the node's screen position
+      setCanvasSearch({
+        parentId: groupId,
+        insertIndex: branchCount,
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 3,
+      });
+    };
+    window.addEventListener('canvas-add-branch', handler);
+    return () => window.removeEventListener('canvas-add-branch', handler);
+  }, []);
 
   const { nodes: rfNodes, edges: rfEdges } = useChainToReactFlow(
     nodes,
