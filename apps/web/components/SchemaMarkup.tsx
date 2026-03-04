@@ -44,11 +44,11 @@ export function PluginSchema({ plugin }: PluginSchemaProps) {
       "@type": "Organization",
       "name": plugin.manufacturer,
       ...(plugin.manufacturerSlug && {
-        "url": `https://pluginradar.com/manufacturers/${plugin.manufacturerSlug}`
+        "url": `https://procha.in/manufacturers/${plugin.manufacturerSlug}`
       })
     },
     ...(plugin.imageUrl && { "image": plugin.imageUrl }),
-    "url": `https://pluginradar.com/plugins/${plugin.slug}`,
+    "url": `https://procha.in/plugins/${plugin.slug}`,
     ...(plugin.description && { "description": plugin.description }),
     ...(plugin.formats && plugin.formats.length > 0 && {
       "softwareRequirements": plugin.formats.join(", ")
@@ -94,7 +94,7 @@ export function BreadcrumbSchema({ items }: BreadcrumbSchemaProps) {
       "@type": "ListItem",
       "position": index + 1,
       "name": item.name,
-      "item": item.url.startsWith("http") ? item.url : `https://pluginradar.com${item.url}`
+      "item": item.url.startsWith("http") ? item.url : `https://procha.in${item.url}`
     }))
   };
 
@@ -178,7 +178,7 @@ export function ComparisonSchema({ title, description, slug, pluginA, pluginB }:
     "@type": "ItemList",
     "name": title,
     "description": description,
-    "url": `https://pluginradar.com/compare/${slug}`,
+    "url": `https://procha.in/compare/${slug}`,
     "numberOfItems": 2,
     "itemListElement": [
       {
@@ -187,7 +187,7 @@ export function ComparisonSchema({ title, description, slug, pluginA, pluginB }:
         "item": {
           "@type": "SoftwareApplication",
           "name": pluginA.name,
-          "url": `https://pluginradar.com/plugins/${pluginA.slug}`,
+          "url": `https://procha.in/plugins/${pluginA.slug}`,
           "applicationCategory": "MultimediaApplication",
           "offers": {
             "@type": "Offer",
@@ -202,7 +202,7 @@ export function ComparisonSchema({ title, description, slug, pluginA, pluginB }:
         "item": {
           "@type": "SoftwareApplication",
           "name": pluginB.name,
-          "url": `https://pluginradar.com/plugins/${pluginB.slug}`,
+          "url": `https://procha.in/plugins/${pluginB.slug}`,
           "applicationCategory": "MultimediaApplication",
           "offers": {
             "@type": "Offer",
@@ -266,13 +266,13 @@ export function WebsiteSchema() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "PluginRadar",
-    "url": "https://pluginradar.com",
+    "url": "https://procha.in",
     "description": "Track audio plugin deals, discover new tools, never miss a sale.",
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
         "@type": "EntryPoint",
-        "urlTemplate": "https://pluginradar.com/plugins?q={search_term_string}"
+        "urlTemplate": "https://procha.in/plugins?q={search_term_string}"
       },
       "query-input": "required name=search_term_string"
     }
@@ -301,17 +301,17 @@ export function ProChainSchema() {
     "operatingSystem": "macOS, Windows",
     "offers": {
       "@type": "Offer",
-      "price": "0",
+      "price": "30",
       "priceCurrency": "USD",
-      "availability": "https://schema.org/PreOrder",
-      "description": "Free during open beta"
+      "availability": "https://schema.org/InStock",
+      "description": "Launch price: $30 (regular $60). One-time purchase."
     },
     "author": {
       "@type": "Organization",
       "name": "Plugin Radar",
-      "url": "https://pluginradar.com"
+      "url": "https://procha.in"
     },
-    "url": "https://pluginradar.com/download",
+    "url": "https://procha.in/download",
     "description": "Build, share, and discover plugin chains for any VST3, AU, or AAX plugin. Rate, comment, and fork chains like GitHub repos.",
     "featureList": "Serial and parallel plugin chains, per-plugin metering, cloud sharing, cross-DAW presets, community ratings, chain forking"
   };

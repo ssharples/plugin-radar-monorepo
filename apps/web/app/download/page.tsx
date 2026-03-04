@@ -9,7 +9,7 @@ export default function DownloadPage() {
         Download ProChain
       </h1>
       <p className="text-neutral-400 text-sm mb-12">
-        $50 one-time. Build, share, and discover plugin chains.
+        $30 launch price (regular $60). Build, share, and discover plugin chains.
       </p>
 
       {/* Download cards */}
@@ -71,7 +71,7 @@ export default function DownloadPage() {
           href="/pricing"
           className="inline-block px-6 py-3 rounded-xl text-sm font-bold bg-white hover:bg-[#ccff00] text-stone-900 transition shadow-lg shadow-[#deff0a]/20 hover:shadow-[#deff0a]/30"
         >
-          Buy ProChain &mdash; $50
+          Get ProChain &mdash; $30
         </Link>
       </div>
 

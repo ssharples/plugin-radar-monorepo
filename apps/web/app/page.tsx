@@ -12,6 +12,10 @@ import {
   Minus,
   DownloadSimple,
 } from "@phosphor-icons/react/dist/ssr";
+import { AnimatedHeroContent } from "@/components/AnimatedHeroContent";
+import { InteractiveHeroBackground } from "@/components/InteractiveHeroBackground";
+import { InteractiveFeatureShowcase } from "@/components/InteractiveFeatureShowcase";
+import { LiquidMetalCard } from "@/components/LiquidMetalCard";
 
 export default function Home() {
   return (
@@ -19,55 +23,21 @@ export default function Home() {
       {/* ===== HERO SECTION ===== */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-transparent" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-[#deff0a]/[0.03] rounded-full blur-[140px]" />
 
-        <div className="container mx-auto px-4 lg:px-6 pt-20 pb-16 relative">
-          <div className="max-w-3xl">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-emerald-500/30 text-white text-xs font-medium mb-6">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-              </span>
-              Open Beta
-            </div>
+        {/* Interactive WebGL Background */}
+        <InteractiveHeroBackground />
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-5">
-              <span className="text-stone-100">Build it. Share it.</span>
-              <br />
-              <span className="text-white">Fork it.</span>
-            </h1>
-            <p className="text-lg text-stone-400 max-w-xl leading-relaxed mb-8">
-              Chain your plugins, share your vocal chains, and discover what
-              top producers are actually using. The GitHub for plugin chains
-              — built for hip-hop, pop, and EDM producers.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href="/download"
-                className="neon-button inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm"
-              >
-                <DownloadSimple weight="bold" className="w-4 h-4" />
-                Download Free — Open Beta
-              </a>
-              <a
-                href="/chains"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.05] hover:bg-white/[0.08] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.08] text-sm"
-              >
-                Browse Chains
-              </a>
-            </div>
-            <p className="text-stone-600 text-xs mt-4">
-              Free during open beta. macOS &amp; Windows. No account required.
-            </p>
-          </div>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-[#deff0a]/[0.03] rounded-full blur-[140px] pointer-events-none" />
+
+        <div className="container mx-auto px-4 lg:px-6 pt-20 pb-16 relative z-10">
+          <AnimatedHeroContent />
 
           {/* Stats row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-16">
-            <StatCard value="Any Plugin" label="VST3 / AU / AAX" />
-            <StatCard value="Cross-DAW" label="Share Anywhere" />
-            <StatCard value="100% Free" label="Open Beta" />
-            <StatCard value="Community Chains" label="Rate, Fork, Share" />
+            <StatCard value="Fast" label="Think in milliseconds" />
+            <StatCard value="Ergonomic" label="Keyboard first" />
+            <StatCard value="Unified" label="One view, every plugin" />
+            <StatCard value="Crash-safe" label="Out-of-process scanning" />
           </div>
         </div>
       </section>
@@ -75,56 +45,7 @@ export default function Home() {
       <div className="section-line" />
 
       {/* ===== FEATURE SHOWCASE ===== */}
-      <section className="container mx-auto px-4 lg:px-6 py-20">
-        <div className="text-center mb-14">
-          <p className="text-xs text-[#deff0a] uppercase tracking-[0.2em] font-semibold mb-3">Features</p>
-          <h2 className="text-3xl font-bold text-stone-100">
-            Everything missing from your DAW&apos;s channel strip
-          </h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
-          <FeatureCard
-            icon={<Plugs weight="duotone" className="w-6 h-6" />}
-            title="Any Plugin, Any DAW"
-            description="Use every VST3, AU, and AAX plugin you own. No ecosystem lock-in, no vendor restrictions."
-          />
-          <FeatureCard
-            icon={<GitFork weight="duotone" className="w-6 h-6" />}
-            title="Visual Signal Flow"
-            description="See your entire signal path at a glance. Drag-and-drop serial chains, parallel groups, and nested routing."
-          />
-          <FeatureCard
-            icon={<Gauge weight="duotone" className="w-6 h-6" />}
-            title="Per-Plugin Metering"
-            description="Peak and RMS levels after every insert. Find gain staging problems before they reach your mix bus."
-          />
-          <FeatureCard
-            icon={<Waveform weight="duotone" className="w-6 h-6" />}
-            title="LUFS Monitoring"
-            description="Broadcast-standard loudness metering (ITU-R BS.1770-4) built right into your chain."
-          />
-          <FeatureCard
-            icon={<WaveSquare weight="duotone" className="w-6 h-6" />}
-            title="Spectrum Analysis"
-            description="Real-time FFT at every stage. See exactly what each plugin is doing to your frequency balance."
-          />
-          <FeatureCard
-            icon={<Timer weight="duotone" className="w-6 h-6" />}
-            title="Auto Latency Comp"
-            description="Parallel branches stay phase-aligned automatically. No more manual delay compensation."
-          />
-          <FeatureCard
-            icon={<ShareNetwork weight="duotone" className="w-6 h-6" />}
-            title="Community Sharing"
-            description="Publish chains for others to rate, comment on, and fork. Discover what producers in your genre are using."
-          />
-          <FeatureCard
-            icon={<ArrowsLeftRight weight="duotone" className="w-6 h-6" />}
-            title="Cross-Instance Mirror"
-            description="Mirror chains across multiple DAW tracks. Change one instance, all others follow in real-time."
-          />
-        </div>
-      </section>
+      <InteractiveFeatureShowcase />
 
       <div className="section-line" />
 
@@ -133,10 +54,10 @@ export default function Home() {
         <div className="text-center mb-12">
           <p className="text-xs text-[#deff0a] uppercase tracking-[0.2em] font-semibold mb-3">Comparison</p>
           <h2 className="text-3xl font-bold text-stone-100 mb-3">
-            How ProChain stacks up
+            Built differently. Priced differently.
           </h2>
           <p className="text-stone-500 max-w-lg mx-auto">
-            The only plugin chainer with no ecosystem lock-in, no subscription, and full metering at every stage.
+            The only plugin chainer built around keyboard-first workflow — no ecosystem lock-in, no subscription, full metering at every stage.
           </p>
         </div>
         <div className="max-w-4xl mx-auto overflow-x-auto">
@@ -147,7 +68,7 @@ export default function Home() {
                 <th className="text-left py-4 px-4 text-stone-500 font-medium">Feature</th>
                 <th className="py-4 px-4 text-center bg-[#deff0a]/[0.03]">
                   <span className="text-white font-semibold">ProChain</span>
-                  <span className="block text-[10px] neon-text font-bold mt-0.5">Free (Open Beta)</span>
+                  <span className="block text-[10px] neon-text font-bold mt-0.5"><s className="opacity-60">$60</s> $30 launch</span>
                 </th>
                 <th className="py-4 px-4 text-center text-stone-500 font-medium">
                   Waves StudioVerse
@@ -176,8 +97,8 @@ export default function Home() {
               <CompareRow n={14} feature="Community chain library" pro="yes" proNote="Rate, comment, fork" waves="yes" wavesNote="Waves chains" kshmr="no" />
               <CompareRow n={15} feature="DAW parameter automation" pro="yes" waves="yes" kshmr="yes" kshmrNote="Macro" />
               <CompareRow n={16} feature="Oversampling" pro="yes" proNote="Up to 4x" waves="no" kshmr="yes" kshmrNote="Up to 16x" />
-              <CompareRow n={17} feature="Pricing model" pro="text" proText="Free (Open Beta)" waves="text" wavesText="$15–$25/mo" kshmr="text" kshmrText="~$49 one-time" />
-              <CompareRow n={18} feature="Free trial" pro="text" proText="Full product, free" waves="no" kshmr="no" />
+              <CompareRow n={17} feature="Pricing model" pro="text" proText="$30 launch ($60 regular)" waves="text" wavesText="$15–$25/mo" kshmr="text" kshmrText="~$49 one-time" />
+              <CompareRow n={18} feature="Free trial" pro="yes" waves="no" kshmr="no" />
             </tbody>
           </table>
         </div>
@@ -190,24 +111,24 @@ export default function Home() {
         <div className="text-center mb-14">
           <p className="text-xs text-[#deff0a] uppercase tracking-[0.2em] font-semibold mb-3">How It Works</p>
           <h2 className="text-3xl font-bold text-stone-100">
-            Up and running in minutes
+            Your DAW just got faster.
           </h2>
         </div>
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <StepCard
             number="01"
             title="Install"
-            description="Download ProChain and load it in your DAW. A crash-safe scanner finds every VST3, AU, and AAX plugin on your system automatically."
+            description="Load ProChain in your DAW. A crash-safe out-of-process scanner finds every VST3, AU, and AAX plugin on your system automatically — nothing to configure."
           />
           <StepCard
             number="02"
             title="Build"
-            description="Drag plugins into serial chains or parallel groups. See metering after every insert. Adjust dry/wet, gain, and routing visually."
+            description="Drag plugins into your chain. Keyboard shortcuts to navigate between every insert. Serial, parallel, nested routing — one view, no windows, no chaos."
           />
           <StepCard
             number="03"
-            title="Share"
-            description="Publish your chains for the community to rate, comment on, and fork — like GitHub for signal chains. Send chains privately to friends, or browse what other producers are using."
+            title="Flow"
+            description="Mix and record without breaking concentration. Every shortcut, every meter, every routing decision in one place. Share when you've got something great."
           />
         </div>
       </section>
@@ -217,26 +138,27 @@ export default function Home() {
       {/* ===== OPEN BETA CARD ===== */}
       <section id="pricing" className="container mx-auto px-4 lg:px-6 py-20">
         <div className="max-w-lg mx-auto">
-          <div className="glass-card-strong rounded-2xl p-8 text-center border border-[#deff0a]/20 animate-neon-pulse">
+          <LiquidMetalCard className="p-8 text-center">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#deff0a]/10 border border-[#deff0a]/20 text-[#deff0a] text-xs font-bold mb-6 uppercase tracking-wider">
-              Open Beta — Free
+              Launch Sale — 50% Off
             </div>
 
             {/* Price */}
             <div className="mb-6">
-              <span className="text-6xl font-extrabold neon-text">Free</span>
+              <span className="text-2xl font-bold text-stone-500 line-through mr-3">$60</span>
+              <span className="text-6xl font-extrabold neon-text">$30</span>
             </div>
 
             {/* Features */}
             <ul className="text-left space-y-3 mb-8 max-w-xs mx-auto">
               {[
                 "Every VST3, AU, and AAX plugin",
-                "Unlimited chains and presets",
-                "Per-plugin metering and spectrum analysis",
-                "Cloud sharing with compatibility check",
-                "Cross-instance mirroring",
-                "Community chains — rate, fork, share",
+                "Keyboard-first navigation",
+                "Serial & parallel routing",
+                "Per-plugin metering + spectrum analysis",
+                "Automatic latency compensation",
+                "Chain sharing — public or private",
                 "macOS and Windows",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-3 text-stone-300 text-sm">
@@ -248,16 +170,15 @@ export default function Home() {
 
             {/* CTA */}
             <a
-              href="/download"
+              href="/pricing"
               className="neon-button w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm"
             >
-              <DownloadSimple weight="bold" className="w-4 h-4" />
-              Download ProChain Free
+              Start Free Trial
             </a>
             <p className="text-stone-500 text-xs mt-4">
-              No credit card. No account required. Free during open beta.
+              7-day free trial. Then $30 (regular $60). One-time, no subscription.
             </p>
-          </div>
+          </LiquidMetalCard>
         </div>
       </section>
 
@@ -269,29 +190,28 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-br from-[#deff0a]/[0.03] via-transparent to-transparent" />
           <div className="relative px-8 py-14 text-center">
             <h2 className="text-3xl font-bold text-stone-100 mb-3">
-              Start building better signal chains today
+              Take the short way.
             </h2>
             <p className="text-stone-400 max-w-md mx-auto mb-8">
-              Completely free during open beta. Works with every major DAW on macOS and Windows.
+              $30 launch price. $60 regular. No subscription.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
-                href="/download?platform=mac"
+                href="/pricing"
                 className="neon-button inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm"
               >
                 <DownloadSimple weight="bold" className="w-4 h-4" />
-                Download for macOS
+                Start Free Trial — macOS
               </a>
               <a
-                href="/download?platform=windows"
+                href="/pricing"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.06] hover:bg-white/[0.1] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.08] text-sm"
               >
-                <DownloadSimple weight="bold" className="w-4 h-4" />
-                Download for Windows
+                Coming Soon — Windows
               </a>
             </div>
             <p className="text-stone-600 text-xs mt-4">
-              VST3 / AU / AAX — Free during open beta. No account required.
+              $30 launch price. No subscription required.
             </p>
           </div>
         </div>

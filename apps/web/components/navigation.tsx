@@ -6,6 +6,7 @@ import { AvatarDropdown } from "./avatar-dropdown";
 
 const navLinks = [
   { href: "/chains", label: "Chains" },
+  { href: "/presets", label: "Presets" },
   { href: "/plugins", label: "Plugins" },
   { href: "/learn", label: "Learn" },
   { href: "/pricing", label: "Pricing" },
@@ -52,10 +53,10 @@ export function Navigation() {
           <div className="flex items-center gap-3">
             {/* CTA */}
             <a
-              href="/download"
+              href="/pricing"
               className="neon-button px-5 py-2 rounded-lg text-sm font-bold hidden sm:inline-flex"
             >
-              Buy — $50
+              Try Free
             </a>
 
             {/* Avatar / Auth */}
@@ -96,10 +97,10 @@ export function Navigation() {
               </Link>
             ))}
             <a
-              href="/download"
+              href="/pricing"
               className="neon-button px-5 py-2.5 rounded-lg text-sm font-bold text-center mt-2"
             >
-              Buy — $50
+              Try Free
             </a>
           </nav>
         </div>

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Download ProChain — Free Open Beta",
+  title: "Download ProChain — $30 Launch Price",
   description:
-    "Download ProChain free during open beta. Build plugin chains with any VST3 or AU plugin, share them with the community, and discover what other producers use.",
+    "Download ProChain for $30 launch price (regular $60). Build plugin chains with any VST3 or AU plugin, share them with the community, and discover what other producers use.",
 };
 
 export default function DownloadLayout({

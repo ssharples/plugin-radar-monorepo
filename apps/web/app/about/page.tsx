@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "About | ProChain by Plugin Radar",
   description:
-    "ProChain is the open plugin chain platform. Build signal chains with any VST3 or AU plugin, share them with the community, and discover chains other producers have built.",
+    "ProChain is your shortcut to the mix. A collection of powerful mixing tools in one unified interface — fast, ergonomic and crash-safe. Built to keep you in the flow state.",
 };
 
 export default function AboutPage() {
@@ -23,13 +23,21 @@ export default function AboutPage() {
       <div className="space-y-8 text-neutral-300 text-sm leading-relaxed">
         <section>
           <h2 className="text-lg font-semibold text-neutral-100 mb-3">
-            What is ProChain?
+            Your shortcut to the mix.
           </h2>
+          <p className="mb-3">
+            ProChain is a collection of powerful mixing tools in one unified
+            interface. Fast, ergonomic and crash-safe.
+          </p>
           <p>
-            ProChain is the open plugin chain platform. Build signal chains with
-            any VST3 or AU plugin, share them with the community, and discover
-            chains other producers have built &mdash; rated, commented, and
-            forkable like GitHub repos.
+            The problem is simple: native DAW chains scatter your attention
+            across a dozen open windows. Every time you reach for a plugin
+            you&apos;re context switching &mdash; and every context switch is a
+            small interruption to the creative state that makes great recordings
+            happen. ProChain consolidates your entire signal path into a single
+            focused view. Navigate between every insert with a keystroke. Build
+            complex serial and parallel routing without ever opening a plugin
+            window. Stay in the zone.
           </p>
         </section>
 
@@ -39,19 +47,20 @@ export default function AboutPage() {
           </h2>
           <ul className="list-disc list-inside space-y-2 text-neutral-400">
             <li>
-              Load ProChain as a plugin in your DAW &mdash; it hosts other
-              plugins inside a configurable chain.
+              Load ProChain as a plugin in your DAW &mdash; it hosts every other
+              plugin inside one unified view.
             </li>
             <li>
-              Build serial or parallel signal paths with per-plugin metering,
-              gain staging, and latency compensation.
+              Navigate between inserts with keyboard shortcuts. No mouse, no
+              window hunting, no broken concentration.
             </li>
             <li>
-              Share chains to the community or send them privately to friends.
+              Build serial or parallel signal paths. Per-plugin metering, gain
+              staging, and auto latency compensation built in.
             </li>
             <li>
-              Browse and fork chains by genre, use case, or plugin
-              compatibility.
+              Share when you&apos;ve got something great. Send chains privately
+              to clients or publish them for the community.
             </li>
           </ul>
         </section>
@@ -62,21 +71,23 @@ export default function AboutPage() {
           </h2>
           <ul className="space-y-3 text-neutral-400">
             <li>
+              <span className="text-neutral-200 font-medium">Fast.</span>{" "}
+              Think in milliseconds. Keyboard shortcuts get you to any plugin in
+              your chain without lifting your hands.
+            </li>
+            <li>
+              <span className="text-neutral-200 font-medium">Ergonomic.</span>{" "}
+              Designed around how you actually work. One view, every tool,
+              no context switching.
+            </li>
+            <li>
               <span className="text-neutral-200 font-medium">Open.</span>{" "}
               Works with any VST3, AU, or AAX plugin &mdash; no ecosystem
-              lock-in.
+              lock-in, no vendor restrictions.
             </li>
             <li>
-              <span className="text-neutral-200 font-medium">Social.</span>{" "}
-              Rate, comment, and fork chains like GitHub repos.
-            </li>
-            <li>
-              <span className="text-neutral-200 font-medium">Smart.</span>{" "}
-              See which plugins you already own before loading a shared chain.
-            </li>
-            <li>
-              <span className="text-neutral-200 font-medium">Free.</span>{" "}
-              Completely free during open beta. No subscription, ever.
+              <span className="text-neutral-200 font-medium">Affordable.</span>{" "}
+              $30 during launch (regular $60). One-time purchase.
             </li>
           </ul>
         </section>
@@ -99,10 +110,10 @@ export default function AboutPage() {
 
       <div className="mt-12 pt-8 border-t border-white/[0.06]">
         <Link
-          href="/download"
+          href="/pricing"
           className="neon-button inline-block px-6 py-3 rounded-lg text-sm font-bold"
         >
-          Download ProChain Free
+          Start Free Trial
         </Link>
       </div>
     </div>
