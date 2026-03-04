@@ -1,6 +1,6 @@
 import { Component, ErrorInfo, ReactNode, useEffect, useCallback, useRef, useState } from 'react';
 import { ChainBrowser } from './components/ChainBrowser';
-import { ChainEditor } from './components/ChainEditor';
+import { ChainCanvas } from './components/ChainCanvas';
 import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
 import { KeyboardShortcutOverlay } from './components/KeyboardShortcutOverlay';
 import { AiChatView } from './components/AiAssistant/AiChatView';
@@ -295,7 +295,7 @@ function App() {
             {/* Chain area — fills remaining space */}
             <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
               <ErrorBoundary>
-                <ChainEditor />
+                <ChainCanvas />
               </ErrorBoundary>
             </div>
 
