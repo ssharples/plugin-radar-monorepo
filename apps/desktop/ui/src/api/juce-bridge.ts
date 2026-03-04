@@ -792,6 +792,30 @@ class JuceBridge {
 
 
   // ============================================
+  // Signal Analysis
+  // ============================================
+
+  /**
+   * Get a snapshot of the current input signal analysis from the C++ SignalAnalyzer.
+   * Returns null if not available (e.g., no audio flowing or C++ not ready).
+   */
+  async getSignalSnapshot(): Promise<{
+    inputPeakDb: number;
+    inputRmsDb: number;
+    inputLufs: number;
+    spectralCentroid: number;
+    crestFactor: number;
+    dynamicRangeDb: number;
+    sampleRate: number;
+  } | null> {
+    try {
+      return await this.callNative('getSignalSnapshot');
+    } catch {
+      return null;
+    }
+  }
+
+  // ============================================
   // Cloud Sharing - Export/Import with Presets
   // ============================================
 

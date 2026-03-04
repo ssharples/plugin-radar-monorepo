@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as convexClient from '../api/convex-client';
 import { juceBridge } from '../api/juce-bridge';
-import type { ChainSlot, BrowseChainSlot } from '../api/types';
+import type { ChainSlot, BrowseChainSlot, ChainNodeUI } from '../api/types';
 import { captureSlotParameters } from '../utils/captureParameters';
 
 interface CloudChain {
@@ -48,12 +48,14 @@ interface CloudChainState {
   compatibility: {
     canFullyLoad: boolean;
     ownedCount: number;
+    formatSubstitutableCount?: number;
     missingCount: number;
     percentage: number;
   } | null;
   detailedCompatibility: {
     percentage: number;
     ownedCount: number;
+    formatSubstitutableCount?: number;
     missingCount: number;
     missing: Array<{
       pluginName: string;
@@ -64,7 +66,7 @@ interface CloudChainState {
       position: number;
       pluginName: string;
       manufacturer: string;
-      status: "owned" | "missing";
+      status: "owned" | "missing" | "format_substitutable";
       alternatives: Array<{
         id: string;
         name: string;
@@ -79,7 +81,7 @@ interface CloudChainState {
       pluginName: string;
       manufacturer: string;
       matchedPluginId?: string;
-      status: "owned" | "missing";
+      status: "owned" | "missing" | "format_substitutable";
       paramMapInfo?: { hasMap: boolean; contributorCount: number; source: string };
       bestSubstitute?: {
         pluginId: string;
@@ -123,6 +125,16 @@ interface CloudChainState {
   myChainsLoading: boolean;
   // Owned plugin IDs (from scanned + matched plugins)
   ownedPluginIds: Set<string>;
+  // Browse context preservation
+  currentBrowseOptions: {
+    useCaseGroup: string;
+    useCase: string;
+    search: string;
+    sortBy: 'popular' | 'recent' | 'downloads' | 'rating';
+    compatFilter: 'all' | 'full' | 'close';
+  };
+  // My Chains sorting
+  myChainsSortBy: 'recent' | 'az' | 'rating' | 'downloads';
 }
 
 interface CloudChainActions {
@@ -138,7 +150,7 @@ interface CloudChainActions {
     offset?: number;
   }) => Promise<void>;
   loadChain: (slugOrCode: string) => Promise<CloudChain | null>;
-  checkCompatibility: (chainId: string) => Promise<void>;
+  checkCompatibility: (chainId: string, _version?: number) => Promise<void>;
   saveChain: (
     name: string,
     slots: ChainSlot[],
@@ -151,6 +163,17 @@ interface CloudChainActions {
       targetInputLufs?: number;
       targetInputPeakMin?: number;
       targetInputPeakMax?: number;
+      educatorAnnotation?: {
+        narrative: string;
+        difficulty?: string;
+        prerequisites?: string[];
+        listenFor?: string;
+      };
+      sourceInstrument?: string;
+      signalType?: string;
+      bpm?: number;
+      subGenre?: string;
+      referenceTrack?: string;
     }
   ) => Promise<{ chainId?: string; slug?: string; shareCode?: string; error?: string }>;
   fetchDetailedCompatibility: (chainId: string) => Promise<void>;
@@ -179,7 +202,25 @@ interface CloudChainActions {
   renameChain: (chainId: string, newName: string) => Promise<boolean>;
   deleteChain: (chainId: string) => Promise<boolean>;
   updateVisibility: (chainId: string, isPublic: boolean) => Promise<boolean>;
+  updateChainMetadata: (chainId: string, updates: {
+    description?: string;
+    category?: string;
+    tags?: string[];
+    useCase?: string;
+    genre?: string;
+    targetInputPeakMin?: number;
+    targetInputPeakMax?: number;
+  }) => Promise<boolean>;
+  // Browse context
+  setBrowseOptions: (options: Partial<CloudChainState['currentBrowseOptions']>) => void;
+  // Local chain name sync
+  updateLocalChainName: (chainId: string, newName: string) => void;
+  // My Chains sorting
+  setMyChainsSortBy: (sortBy: CloudChainState['myChainsSortBy']) => void;
 }
+
+// Version counter to cancel stale compatibility checks when a new loadChain is called
+let compatibilityVersion = 0;
 
 const initialState: CloudChainState = {
   chains: [],
@@ -197,6 +238,14 @@ const initialState: CloudChainState = {
   myChains: [],
   myChainsLoading: false,
   ownedPluginIds: new Set<string>(),
+  currentBrowseOptions: {
+    useCaseGroup: '',
+    useCase: '',
+    search: '',
+    sortBy: 'popular',
+    compatFilter: 'all',
+  },
+  myChainsSortBy: 'recent',
 };
 
 export const useCloudChainStore = create<CloudChainState & CloudChainActions>((set, get) => ({
@@ -228,27 +277,40 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
   },
 
   loadChain: async (slugOrCode: string) => {
+    // Bump version to cancel any in-flight compatibility checks from previous loadChain calls
+    const thisVersion = ++compatibilityVersion;
     set({ loading: true, error: null, currentChain: null, compatibility: null, detailedCompatibility: null, substitutionPlan: null });
     try {
       const chain = await convexClient.loadChain(slugOrCode);
+
+      // If another loadChain was called while we were fetching, discard this result
+      if (compatibilityVersion !== thisVersion) return null;
+
       set({ currentChain: chain, loading: false });
 
       if (chain?._id) {
-        // Auto-check compatibility
-        get().checkCompatibility(chain._id);
+        // Auto-check compatibility (passes version for staleness check)
+        get().checkCompatibility(chain._id, thisVersion);
       }
 
       return chain;
     } catch (err) {
-      set({ error: String(err), loading: false });
+      // Only update state if this is still the active request
+      if (compatibilityVersion === thisVersion) {
+        set({ error: String(err), loading: false });
+      }
       return null;
     }
   },
 
-  checkCompatibility: async (chainId: string) => {
+  checkCompatibility: async (chainId: string, _version?: number) => {
+    const expectedVersion = _version ?? compatibilityVersion;
     try {
       const compat = await convexClient.checkChainCompatibility(chainId);
-      set({ compatibility: compat });
+      // Only apply result if no newer loadChain has been called since
+      if (compatibilityVersion === expectedVersion) {
+        set({ compatibility: compat });
+      }
     } catch (_err) {
       // Silently ignored — compatibility check is non-critical
     }
@@ -258,8 +320,16 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
     set({ saving: true, error: null });
 
     try {
-      // Export chain with preset data from JUCE
+      // Export chain with preset data + tree from JUCE
       const exported = await juceBridge.exportChain();
+
+      // Capture signal snapshot (non-blocking — null if unavailable)
+      const signalSnapshot = await juceBridge.getSignalSnapshot();
+
+      // Serialize tree data from the exported nodes
+      const treeData = exported.nodes && exported.nodes.length > 0
+        ? JSON.stringify(serializeTreeForCloud(exported.nodes))
+        : undefined;
 
       // Capture semantically-filtered parameters for each slot
       const paramsByPosition = await captureSlotParameters(exported.slots);
@@ -278,7 +348,14 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
         ...(paramsByPosition.has(i) ? { parameters: paramsByPosition.get(i) } : {}),
       }));
 
-      const result = await convexClient.saveChain(name, mappedSlots, options);
+      const result = await convexClient.saveChain(name, mappedSlots, {
+        ...options,
+        treeData,
+        signalSnapshot: signalSnapshot ? {
+          ...signalSnapshot,
+          capturedAt: Date.now(),
+        } : undefined,
+      });
       set({ saving: false });
 
       if (result.error) {
@@ -495,4 +572,85 @@ export const useCloudChainStore = create<CloudChainState & CloudChainActions>((s
       return false;
     }
   },
+
+  updateChainMetadata: async (chainId, updates) => {
+    try {
+      const result = await convexClient.updateChainMetadata(chainId, updates);
+      if (result?.success) {
+        set((state) => ({
+          myChains: state.myChains.map((c) =>
+            c._id === chainId ? { ...c, ...updates } : c
+          ),
+          currentChain: state.currentChain?._id === chainId
+            ? { ...state.currentChain, ...updates }
+            : state.currentChain,
+        }));
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  // ── Browse Context ──
+
+  setBrowseOptions: (options) => {
+    set((state) => ({
+      currentBrowseOptions: { ...state.currentBrowseOptions, ...options },
+    }));
+  },
+
+  // ── Local Chain Name Sync ──
+
+  updateLocalChainName: (chainId: string, newName: string) => {
+    set((state) => ({
+      myChains: state.myChains.map((c) =>
+        c._id === chainId ? { ...c, name: newName } : c
+      ),
+    }));
+  },
+
+  // ── My Chains Sorting ──
+
+  setMyChainsSortBy: (sortBy) => {
+    set({ myChainsSortBy: sortBy });
+  },
 }));
+
+// ── Tree Serialization Helpers ──
+
+/** Convert the ChainNodeUI[] tree to a simplified format for cloud storage */
+function serializeTreeForCloud(nodes: ChainNodeUI[]): {
+  id: number;
+  type: string;
+  mode: string;
+  dryWet: number;
+  wetGainDb: number;
+  bypassed: boolean;
+  children: unknown[];
+} {
+  return {
+    id: 0,
+    type: 'group',
+    mode: 'serial',
+    dryWet: 100,
+    wetGainDb: 0,
+    bypassed: false,
+    children: nodes.map(serializeNode),
+  };
+}
+
+function serializeNode(node: ChainNodeUI): unknown {
+  if (node.type === 'plugin') {
+    return { type: 'plugin', slotIndex: node.id };
+  }
+  return {
+    type: 'group',
+    mode: node.mode,
+    dryWet: node.dryWet,
+    wetGainDb: node.wetGainDb,
+    bypassed: node.bypassed,
+    children: node.children.map(serializeNode),
+  };
+}

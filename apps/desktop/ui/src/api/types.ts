@@ -245,6 +245,27 @@ export interface BrowseChainResult {
   genre?: string;
   averageRating?: number;
   updatedAt?: number;
+  treeData?: string;
+  signalSnapshot?: {
+    inputPeakDb: number;
+    inputRmsDb: number;
+    inputLufs?: number;
+    spectralCentroid?: number;
+    crestFactor?: number;
+    dynamicRangeDb?: number;
+    sampleRate: number;
+    capturedAt: number;
+  };
+  educatorAnnotation?: {
+    narrative: string;
+    difficulty?: string;
+    prerequisites?: string[];
+    listenFor?: string;
+  };
+  sourceInstrument?: string;
+  signalType?: string;
+  bpm?: number;
+  subGenre?: string;
 }
 
 export interface BrowseChainsPaginatedResult {
