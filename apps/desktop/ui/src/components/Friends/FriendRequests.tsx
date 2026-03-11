@@ -19,7 +19,7 @@ const cardStyle: React.CSSProperties = {
 
 const headingStyle: React.CSSProperties = {
   color: '#deff0a',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: 'var(--tracking-wide)',
@@ -97,7 +97,7 @@ export function FriendRequests() {
   if (loading) {
     return (
       <div style={cardStyle}>
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>Loading requests...</div>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>Loading requests...</div>
       </div>
     );
   }
@@ -138,7 +138,7 @@ export function FriendRequests() {
               style={{ background: 'var(--color-bg-input)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}
             >
               <div>
-                <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{req.username}</div>
+                <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>{req.username}</div>
                 <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)' }}>{formatTime(req.sentAt)}</div>
               </div>
               <div className="flex gap-2">

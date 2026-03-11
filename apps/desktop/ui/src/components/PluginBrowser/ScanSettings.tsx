@@ -125,7 +125,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
       >
         <span
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             fontSize: 'var(--text-xs)',
             fontWeight: 700,
             textTransform: 'uppercase',
@@ -156,7 +156,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
           <label
             style={{
               display: 'block',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: '9px',
               textTransform: 'uppercase',
               letterSpacing: 'var(--tracking-wider)',
@@ -185,7 +185,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
               <span
                 className="flex-1 truncate"
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '10px',
                   color: 'var(--color-text-secondary)',
                 }}
@@ -194,7 +194,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
               </span>
               <span
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   color: 'var(--color-text-tertiary)',
                   flexShrink: 0,
@@ -223,7 +223,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
               <span
                 className="flex-1 truncate"
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '10px',
                   color: 'var(--color-text-primary)',
                 }}
@@ -232,7 +232,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
               </span>
               <span
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   color: 'var(--color-text-tertiary)',
                   flexShrink: 0,
@@ -281,7 +281,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
                 className="input px-1.5 py-1"
                 style={{
                   fontSize: '10px',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   width: '70px',
                   background: 'var(--color-bg-input)',
                   color: 'var(--color-text-secondary)',
@@ -318,7 +318,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
             {addError && (
               <p
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   color: 'var(--color-accent-magenta)',
                 }}
@@ -337,7 +337,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
           <label
             style={{
               display: 'block',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: '9px',
               textTransform: 'uppercase',
               letterSpacing: 'var(--tracking-wider)',
@@ -352,7 +352,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
           <div className="flex items-center justify-between mb-2">
             <span
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-xs)',
                 color: autoScanState.enabled
                   ? 'var(--color-text-primary)'
@@ -380,7 +380,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
               <div className="flex items-center gap-1">
                 <span
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: '9px',
                     color: 'var(--color-text-tertiary)',
                     textTransform: 'uppercase',
@@ -398,7 +398,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
                       className="fast-snap"
                       style={{
                         padding: '2px 6px',
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         fontSize: '9px',
                         fontWeight: 700,
                         borderRadius: 'var(--radius-base)',
@@ -431,7 +431,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
                 />
                 <span
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: '9px',
                     color: 'var(--color-text-tertiary)',
                   }}
@@ -447,7 +447,7 @@ export function ScanSettings({ onClose }: { onClose: () => void }) {
             onClick={() => checkForNewPlugins()}
             className="flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded fast-snap"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-xs)',
               fontWeight: 700,
               textTransform: 'uppercase',

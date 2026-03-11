@@ -66,7 +66,7 @@ export function UndoToast() {
 
   return (
     <div
-      className="fixed bottom-6 left-1/2 z-[9999] font-mono"
+      className="fixed bottom-6 left-1/2 z-[9999] font-sans"
       style={{
         transform: entering
           ? 'translate(-50%, 0)'

@@ -53,7 +53,7 @@ export function MirrorIndicator() {
     <div
       className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md ${pulse ? 'pulse-cyan' : ''}`}
       style={{
-        fontFamily: 'var(--font-mono)',
+        fontFamily: 'var(--font-system)',
         letterSpacing: 'var(--tracking-wide)',
         background: pulse ? 'rgba(222, 255, 10, 0.15)' : 'rgba(222, 255, 10, 0.06)',
         border: pulse ? '1px solid rgba(222, 255, 10, 0.6)' : '1px solid rgba(222, 255, 10, 0.2)',

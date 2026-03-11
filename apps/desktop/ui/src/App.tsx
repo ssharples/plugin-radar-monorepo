@@ -1,9 +1,8 @@
 import { Component, ErrorInfo, ReactNode, useEffect, useCallback, useRef, useState } from 'react';
-import { ChainBrowser } from './components/ChainBrowser';
-import { ChainCanvas } from './components/ChainCanvas';
-import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
+import { PluginBrowser } from './components/PluginBrowser';
+import { ChainEditor } from './components/ChainEditor';
 import { KeyboardShortcutOverlay } from './components/KeyboardShortcutOverlay';
-import { AiChatView } from './components/AiAssistant/AiChatView';
+// import { AiChatView } from './components/AiAssistant/AiChatView';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { usePresetStore } from './stores/presetStore';
 import { useSyncStore } from './stores/syncStore';
@@ -70,13 +69,13 @@ function InlineEditorLayout() {
       {/* Top area: sidebar (left) + plugin overlay or AI chat (right) */}
       <div className="flex flex-1 min-h-0">
         <InlineEditorSidebar
-          aiChatActive={aiChatActive}
-          onToggleAiChat={() => aiChatActive ? closeAiChat() : openAiChat()}
+          galaxyActive={aiChatActive}
+          onToggleGalaxy={() => aiChatActive ? closeAiChat() : openAiChat()}
         />
         <PanelContainer>
           {aiChatActive ? (
-            <div className="flex-1 min-h-0 overflow-hidden h-full">
-              <AiChatView />
+            <div className="flex-1 min-h-0 overflow-hidden h-full text-white flex items-center justify-center">
+              <div>AI Chat Not Installed</div>
             </div>
           ) : (
             /* Plugin editor is rendered natively by C++ in this space — leave transparent */
@@ -97,67 +96,69 @@ function InlineEditorLayout() {
 }
 
 function App() {
+  console.log('[App] Rendering...')
   const [browserOpen, setBrowserOpen] = useState(false);
 
-  const { isOnboardingComplete, isInitializing, initialize: initOnboarding } = useOnboardingStore();
-  const { fetchPresets, loadDefaultPresetOnStartup } = usePresetStore();
+  const { isInitializing, initialize: initOnboarding } = useOnboardingStore();
+  const { fetchPresets } = usePresetStore();
   const { initialize: initSync, isLoggedIn, autoSync } = useSyncStore();
   const { initialize: initOffline } = useOfflineStore();
   const { fetchPlugins, plugins, checkForNewPlugins } = usePluginStore();
   const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
   const aiChatActive = useChainStore(s => s.aiChatActive);
+  const nodeCount = useChainStore(s => s.nodes.length);
   const autoSyncFired = useRef(false);
+
+  console.log('[App] isInitializing:', isInitializing)
+  console.log('[App] isLoggedIn:', isLoggedIn)
+  console.log('[App] plugins.length:', plugins.length)
+  console.log('[App] inlineEditorNodeId:', inlineEditorNodeId)
+  console.log('[App] aiChatActive:', aiChatActive)
+  console.log('[App] nodeCount:', nodeCount)
 
   // Initialize onboarding check
   useEffect(() => {
-    initOnboarding().catch(() => { });
+    console.log('[App] Starting onboarding initialization...')
+    initOnboarding().then(() => {
+      console.log('[App] Onboarding initialization complete')
+    }).catch((err) => {
+      console.error('[App] Onboarding initialization error:', err)
+    })
   }, [initOnboarding]);
 
-  // All hooks must be called unconditionally (React Rules of Hooks)
-  const defaultPresetLoaded = useRef(false);
   useEffect(() => {
-    if (!isOnboardingComplete) return;
-    fetchPresets().then(() => {
-      if (!defaultPresetLoaded.current) {
-        defaultPresetLoaded.current = true;
-        loadDefaultPresetOnStartup();
-      }
-    });
+    fetchPresets();
     fetchPlugins();
-  }, [fetchPresets, fetchPlugins, isOnboardingComplete, loadDefaultPresetOnStartup]);
+  }, [fetchPresets, fetchPlugins]);
 
   useEffect(() => {
-    if (!isOnboardingComplete) return;
     initSync().catch(() => { });
-  }, [initSync, isOnboardingComplete]);
+  }, [initSync]);
 
   // Auto-check for new plugins once per session (after plugin list is loaded)
   const newPluginsCheckFired = useRef(false)
   useEffect(() => {
-    if (!isOnboardingComplete || plugins.length === 0) return
+    if (plugins.length === 0) return
     if (newPluginsCheckFired.current) return
     newPluginsCheckFired.current = true
     checkForNewPlugins().catch(() => { })
-  }, [isOnboardingComplete, plugins.length, checkForNewPlugins])
+  }, [plugins.length, checkForNewPlugins])
 
   // Auto-sync plugins to Convex once per session
   useEffect(() => {
-    if (!isOnboardingComplete || !isLoggedIn || plugins.length === 0) return;
+    if (!isLoggedIn || plugins.length === 0) return;
     if (autoSyncFired.current) return;
     autoSyncFired.current = true;
     autoSync().catch(() => { });
-  }, [isOnboardingComplete, isLoggedIn, plugins.length, autoSync]);
+  }, [isLoggedIn, plugins.length, autoSync]);
 
   useEffect(() => {
-    if (!isOnboardingComplete) return;
     initOffline();
     startRetryLoop(executeQueuedWrite);
-  }, [initOffline, isOnboardingComplete]);
+  }, [initOffline]);
 
   // Cmd+B to toggle browser
   useEffect(() => {
-    if (!isOnboardingComplete) return;
-
     const registerShortcut = useKeyboardStore.getState().registerShortcut;
     return registerShortcut({
       id: 'toggle-plugin-browser',
@@ -170,12 +171,10 @@ function App() {
         setBrowserOpen(prev => !prev);
       }
     });
-  }, [isOnboardingComplete]);
+  }, []);
 
   // Cmd+1..9 to jump to Nth plugin (works from both chain view and inline editor)
   useEffect(() => {
-    if (!isOnboardingComplete) return;
-
     const registerShortcut = useKeyboardStore.getState().registerShortcut;
     const cleanups: (() => void)[] = [];
 
@@ -215,15 +214,25 @@ function App() {
     }));
 
     return () => cleanups.forEach(fn => fn());
-  }, [isOnboardingComplete]);
+  }, []);
 
   // Listen for openPluginBrowser events from child components
   useEffect(() => {
-    if (!isOnboardingComplete) return;
     const handler = () => setBrowserOpen(true);
     window.addEventListener('openPluginBrowser', handler);
     return () => window.removeEventListener('openPluginBrowser', handler);
-  }, [isOnboardingComplete]);
+  }, []);
+
+
+
+  // Listen for openBrowser event from HeaderMenu
+  useEffect(() => {
+    const handler = () => {
+      setBrowserOpen(true);
+    };
+    window.addEventListener('openBrowser', handler);
+    return () => window.removeEventListener('openBrowser', handler);
+  }, []);
 
   const toggleBrowser = useCallback(() => {
     setBrowserOpen(prev => {
@@ -237,15 +246,6 @@ function App() {
   // Wait for initialization to complete before rendering anything
   if (isInitializing) {
     return <div style={{ width: '100%', height: '100%', backgroundColor: '#000000' }} />;
-  }
-
-  // Show onboarding flow if not complete
-  if (!isOnboardingComplete) {
-    return (
-      <ErrorBoundary>
-        <OnboardingFlow />
-      </ErrorBoundary>
-    );
   }
 
   const isInlineMode = inlineEditorNodeId !== null || aiChatActive;
@@ -295,14 +295,14 @@ function App() {
             {/* Chain area — fills remaining space */}
             <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
               <ErrorBoundary>
-                <ChainCanvas />
+                <ChainEditor />
               </ErrorBoundary>
             </div>
 
             {/* Plugin browser overlay - full screen */}
             {browserOpen && (
               <ErrorBoundary>
-                <ChainBrowser onClose={toggleBrowser} initialTab="plugins" />
+                <PluginBrowser onClose={toggleBrowser} />
               </ErrorBoundary>
             )}
 

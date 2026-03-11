@@ -70,7 +70,7 @@ function CommentItem({
         <div className="flex items-center gap-2 mb-1">
           <span
             className="text-xs font-medium"
-            style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}
+            style={{ fontFamily: 'var(--font-system)', color: 'var(--color-text-primary)' }}
           >
             {comment.authorName}
           </span>
@@ -83,7 +83,7 @@ function CommentItem({
         </div>
         <p
           className="text-sm whitespace-pre-wrap break-words"
-          style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}
+          style={{ fontFamily: 'var(--font-system)', color: 'var(--color-text-secondary)' }}
         >
           {comment.content}
         </p>
@@ -190,7 +190,7 @@ export function CommentSection({
       <h4
         className="text-sm font-medium mb-3"
         style={{
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           color: '#deff0a',
           textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wide)',

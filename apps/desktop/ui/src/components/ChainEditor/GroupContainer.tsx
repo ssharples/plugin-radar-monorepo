@@ -314,7 +314,7 @@ export const GroupContainer = memo(function GroupContainer({
         <div
           className="px-3 pb-2 text-body"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-tertiary)',
             letterSpacing: 'var(--tracking-wide)',
           }}

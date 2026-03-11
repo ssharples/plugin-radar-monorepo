@@ -63,7 +63,7 @@ export function RoutingPanel() {
               onDragEnd={_endContinuousGesture}
             />
             <span className="text-pico font-sans text-white">IN</span>
-            <span className="text-micro font-mono tabular-nums text-white">
+            <span className="text-micro font-sans tabular-nums text-white">
               {formatGain(node.inputGainDb)}
             </span>
           </div>
@@ -80,7 +80,7 @@ export function RoutingPanel() {
               onDragEnd={_endContinuousGesture}
             />
             <span className="text-pico font-sans text-white">OUT</span>
-            <span className="text-micro font-mono tabular-nums text-white">
+            <span className="text-micro font-sans tabular-nums text-white">
               {formatGain(node.outputGainDb)}
             </span>
           </div>
@@ -104,7 +104,7 @@ export function RoutingPanel() {
           onChange={(v) => setNodeDryWet(id, v / 100)}
           onDragEnd={_endContinuousGesture}
         />
-        <span className="text-micro font-mono tabular-nums text-white">
+        <span className="text-micro font-sans tabular-nums text-white">
           {Math.round(node.pluginDryWet * 100)}%
         </span>
       </div>
@@ -148,7 +148,7 @@ export function RoutingPanel() {
         <div className="flex flex-col items-center gap-1 shrink-0">
           <span className="text-pico font-sans text-plugin-accent uppercase tracking-wider mb-1">Latency</span>
           <div className="text-micro font-sans text-white">
-            <span className="font-mono tabular-nums">{node.latency}</span> smp
+            <span className="font-sans tabular-nums">{node.latency}</span> smp
           </div>
         </div>
       )}

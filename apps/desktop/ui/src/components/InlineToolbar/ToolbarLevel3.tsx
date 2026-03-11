@@ -27,12 +27,12 @@ export function ToolbarLevel3({ node }: ToolbarLevel3Props) {
       <div className="flex flex-col gap-1">
         <span className="text-nano text-white/60 tracking-wider">Latency</span>
         <div className="flex items-baseline gap-1">
-          <span className="text-[10px] font-mono text-white/80 tabular-nums">
+          <span className="text-[10px] font-sans text-white/80 tabular-nums">
             {node.latency != null ? `${node.latency} smp` : '\u2014'}
           </span>
           {latMs != null && latMs > 0.05 && (
             <span
-              className="text-pico font-mono tabular-nums"
+              className="text-pico font-sans tabular-nums"
               style={{ color: latColor ?? 'rgba(255,255,255,0.5)' }}
             >
               ({latMs.toFixed(1)} ms)

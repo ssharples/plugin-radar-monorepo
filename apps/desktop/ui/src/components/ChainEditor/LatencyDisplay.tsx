@@ -82,7 +82,7 @@ export function LatencyDisplay() {
           padding: '2px 6px',
           borderRadius: 'var(--radius-base)',
           fontSize: '10px',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           color,
           background: showWarning ? 'rgba(255, 0, 51, 0.08)' : 'transparent',
           border: 'none',
@@ -121,7 +121,7 @@ export function LatencyDisplay() {
             border: '1px solid var(--color-border-default)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
           }}
         >
           {/* Total */}

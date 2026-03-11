@@ -47,17 +47,20 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
 
   // Filter and sort plugins
   const displayPlugins = useMemo(() => {
+    if (!plugins || plugins.length === 0) return [];
+
     let results = [...plugins];
 
     // Text search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       results = results.filter(p => {
+        if (!p?.name || !p?.manufacturer) return false;
         if (p.name.toLowerCase().includes(q)) return true;
         if (p.manufacturer.toLowerCase().includes(q)) return true;
-        if (p.category.toLowerCase().includes(q)) return true;
-        const enriched = getEnrichedDataForPlugin(p.uid);
-        if (enriched?.category?.toLowerCase().includes(q)) return true;
+        if (p.category?.toLowerCase?.().includes(q)) return true;
+        const enriched = getEnrichedDataForPlugin?.(p.uid);
+        if (enriched?.category?.toLowerCase?.().includes(q)) return true;
         return false;
       });
     }
@@ -65,8 +68,8 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
     // Category filter
     if (selectedCategory !== 'all') {
       results = results.filter(p => {
-        const enriched = getEnrichedDataForPlugin(p.uid);
-        const category = enriched?.category?.toLowerCase() || p.category?.toLowerCase() || '';
+        const enriched = getEnrichedDataForPlugin?.(p.uid);
+        const category = enriched?.category?.toLowerCase?.() || p.category?.toLowerCase?.() || '';
         return category.includes(selectedCategory);
       });
     }
@@ -74,7 +77,7 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
     // Sort
     switch (sortMode) {
       case 'recent':
-        const recent = getMostRecentPlugins();
+        const recent = getMostRecentPlugins?.() || [];
         results.sort((a, b) => {
           const aIdx = recent.findIndex(r => r.uid === a.uid);
           const bIdx = recent.findIndex(r => r.uid === b.uid);
@@ -86,16 +89,16 @@ export function PluginBrowserRedesign({ collapsed = false, onClose }: PluginBrow
         break;
       case 'popular':
         results.sort((a, b) => {
-          const aCount = getPluginUsageCount(a.uid);
-          const bCount = getPluginUsageCount(b.uid);
+          const aCount = getPluginUsageCount?.(a.uid) || 0;
+          const bCount = getPluginUsageCount?.(b.uid) || 0;
           return bCount - aCount;
         });
         break;
       case 'name':
-        results.sort((a, b) => a.name.localeCompare(b.name));
+        results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         break;
       case 'manufacturer':
-        results.sort((a, b) => a.manufacturer.localeCompare(b.manufacturer));
+        results.sort((a, b) => (a.manufacturer || '').localeCompare(b.manufacturer || ''));
         break;
     }
 

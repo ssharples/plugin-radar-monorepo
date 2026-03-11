@@ -23,6 +23,13 @@ export function LiquidMetalCard({
       const style = document.createElement("style");
       style.id = styleId;
       style.textContent = `
+        .liquid-metal-card-shader {
+          width: 100% !important;
+          height: 100% !important;
+          position: absolute !important;
+          inset: 0 !important;
+          border-radius: 16px !important;
+        }
         .liquid-metal-card-shader canvas {
           width: 100% !important;
           height: 100% !important;
@@ -46,6 +53,8 @@ export function LiquidMetalCard({
           if (shaderMount.current?.destroy) {
             shaderMount.current.destroy();
           }
+
+          console.log("Mounting liquid metal shader to:", shaderRef.current);
 
           shaderMount.current = new ShaderMount(
             shaderRef.current,
@@ -111,13 +120,6 @@ export function LiquidMetalCard({
         <div
           ref={shaderRef}
           className="liquid-metal-card-shader"
-          style={{
-            width: "100%",
-            height: "100%",
-            position: "relative",
-            borderRadius: "16px",
-            overflow: "hidden",
-          }}
         />
       </div>
 
@@ -127,6 +129,8 @@ export function LiquidMetalCard({
         style={{
           margin: `${borderWidth}px`,
           background: "linear-gradient(180deg, rgba(20, 20, 18, 0.97) 0%, rgba(10, 10, 8, 0.99) 100%)",
+          zIndex: 1,
+          position: "relative",
         }}
       >
         {children}

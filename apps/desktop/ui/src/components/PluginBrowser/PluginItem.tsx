@@ -222,7 +222,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
             <span
               className="flex-shrink-0 px-1 py-px text-[9px] leading-tight rounded border font-medium"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 background: 'rgba(255, 59, 48, 0.15)',
                 color: 'rgb(255, 100, 80)',
                 borderColor: 'rgba(255, 59, 48, 0.3)',
@@ -234,7 +234,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
           {/* Category badge (SEMANTIC colors preserved) */}
           {enriched && categoryLabel && !isDeactivated && (
             <span className={`flex-shrink-0 px-1 py-px text-[9px] leading-tight rounded border font-medium ${categoryColor}`}
-              style={{ fontFamily: 'var(--font-mono)' }}
+              style={{ fontFamily: 'var(--font-system)' }}
             >
               {categoryLabel}
             </span>
@@ -243,7 +243,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
           {enriched?.isFree && !isDeactivated && (
             <span
               className="flex-shrink-0 px-1 py-px text-[9px] leading-tight rounded bg-green-500/20 text-green-300 border border-green-500/30 font-semibold"
-              style={{ fontFamily: 'var(--font-mono)' }}
+              style={{ fontFamily: 'var(--font-system)' }}
             >
               Free
             </span>
@@ -252,7 +252,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
             <span
               className="flex-shrink-0"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: '9px',
                 color: 'var(--color-text-tertiary)',
               }}
@@ -262,11 +262,11 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
           )}
         </div>
 
-        {/* Manufacturer + format / effect type — monospace */}
+        {/* Manufacturer + format / effect type — monospace replaced by brand font */}
         <p
           className="truncate leading-tight"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-brand)',
             fontSize: 'var(--text-xs)',
             color: 'var(--color-text-tertiary)',
           }}
@@ -284,7 +284,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
                 key={char}
                 style={{
                   padding: '0 4px',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   lineHeight: '14px',
                   borderRadius: 'var(--radius-sm)',
@@ -305,7 +305,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
           <p
             className="line-clamp-1"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: '9px',
               color: 'var(--color-text-tertiary)',
               lineHeight: '1.3',
@@ -324,7 +324,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
             className="flex-shrink-0 flex items-center gap-1 mt-0.5"
             style={{
               padding: '2px 6px',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-xs)',
               fontWeight: 700,
               color: 'var(--color-accent-cyan)',
@@ -443,7 +443,7 @@ function ContextMenuItem({
       }}
       className="w-full flex items-center gap-2 px-3 py-1.5 fast-snap text-left"
       style={{
-        fontFamily: 'var(--font-mono)',
+        fontFamily: 'var(--font-system)',
         fontSize: 'var(--text-xs)',
         fontWeight: 600,
         color: danger ? 'var(--color-accent-magenta)' : 'var(--color-text-secondary)',

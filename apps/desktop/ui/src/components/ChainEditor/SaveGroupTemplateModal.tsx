@@ -63,7 +63,7 @@ export function SaveGroupTemplateModal({ groupId, groupName, onClose }: SaveGrou
     display: 'block',
     fontSize: 'var(--text-xs)',
     color: 'var(--color-text-tertiary)',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-system)',
     textTransform: 'uppercase',
     letterSpacing: 'var(--tracking-wide)',
     marginBottom: '4px',
@@ -82,7 +82,7 @@ export function SaveGroupTemplateModal({ groupId, groupName, onClose }: SaveGrou
       >
         {/* Header */}
         <div className="flex items-center justify-between" style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-default)' }}>
-          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+          <h3 style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-lg)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
             Save Group Template
           </h3>
           <button

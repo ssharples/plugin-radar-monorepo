@@ -118,7 +118,7 @@ export function OtherInstancesList() {
   if (instances.length === 0) return null;
 
   const btnBase: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-system)',
     fontSize: 'var(--text-xs)',
     fontWeight: 700,
     letterSpacing: 'var(--tracking-wide)',
@@ -148,7 +148,7 @@ export function OtherInstancesList() {
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           fontSize: 'var(--text-xs)',
           fontWeight: 700,
           letterSpacing: 'var(--tracking-wide)',
@@ -216,7 +216,7 @@ export function OtherInstancesList() {
                   <span
                     className="truncate"
                     style={{
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 700,
                       letterSpacing: 'var(--tracking-wide)',
@@ -230,7 +230,7 @@ export function OtherInstancesList() {
                   {inst.isLeader && (
                     <span
                       style={{
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         fontSize: '9px',
                         fontWeight: 700,
                         letterSpacing: 'var(--tracking-wide)',
@@ -247,7 +247,7 @@ export function OtherInstancesList() {
                   {inst.isFollower && (
                     <span
                       style={{
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         fontSize: '9px',
                         fontWeight: 700,
                         letterSpacing: 'var(--tracking-wide)',
@@ -263,7 +263,7 @@ export function OtherInstancesList() {
                   )}
                   <span
                     style={{
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       fontSize: 'var(--text-xs)',
                       color: 'var(--color-text-tertiary)',
                     }}
@@ -276,7 +276,7 @@ export function OtherInstancesList() {
                 <div
                   className="truncate mb-2"
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: 'var(--text-xs)',
                     color: 'var(--color-text-secondary)',
                     paddingLeft: 'var(--space-4)',
@@ -292,7 +292,7 @@ export function OtherInstancesList() {
                       onClick={() => handleUnmirror()}
                       className="inst-btn flex items-center gap-1.5 px-2.5 py-1 rounded"
                       style={{
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         fontSize: 'var(--text-xs)',
                         fontWeight: 700,
                         letterSpacing: 'var(--tracking-wide)',

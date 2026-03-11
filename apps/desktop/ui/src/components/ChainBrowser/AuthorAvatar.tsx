@@ -4,7 +4,7 @@ interface AuthorAvatarProps {
   name?: string;
   avatarUrl?: string;
   size?: number;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
 export const AuthorAvatar = memo(function AuthorAvatar({ name, avatarUrl, size = 24, onClick }: AuthorAvatarProps) {
@@ -34,7 +34,7 @@ export const AuthorAvatar = memo(function AuthorAvatar({ name, avatarUrl, size =
 
   if (avatarUrl) {
     return (
-      <div style={style} onClick={onClick} title={name}>
+      <div style={style} onClick={(e) => onClick?.(e)} title={name}>
         <img
           src={avatarUrl}
           alt={name || 'Author'}
@@ -50,7 +50,7 @@ export const AuthorAvatar = memo(function AuthorAvatar({ name, avatarUrl, size =
         ...style,
         background: 'linear-gradient(135deg, #89572a, #c9944a)',
       }}
-      onClick={onClick}
+      onClick={(e) => onClick?.(e)}
       title={name}
     >
       {initials}

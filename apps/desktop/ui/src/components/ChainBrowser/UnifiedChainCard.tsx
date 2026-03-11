@@ -168,7 +168,7 @@ export function UnifiedChainCard({
                   fontSize: 'var(--text-xs)',
                   fontWeight: 600,
                   color: '#deff0a',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -186,7 +186,7 @@ export function UnifiedChainCard({
             className="flex items-center gap-0.5 px-1.5 py-0.5 rounded"
             style={{
               fontSize: '8px',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
@@ -262,7 +262,7 @@ export function UnifiedChainCard({
 
       {/* Plugin preview + stats */}
       {cloudData && (
-        <div className="flex items-center gap-2.5 mb-1" style={{ fontSize: '9px', color: 'var(--color-text-disabled)', fontFamily: 'var(--font-mono)' }}>
+        <div className="flex items-center gap-2.5 mb-1" style={{ fontSize: '9px', color: 'var(--color-text-disabled)', fontFamily: 'var(--font-system)' }}>
           <span>{cloudData.pluginCount}p</span>
           <span className="flex items-center gap-0.5">
             <Download className="w-2.5 h-2.5" /> {cloudData.downloads}
@@ -291,7 +291,7 @@ export function UnifiedChainCard({
             className="flex items-center gap-1 mt-1"
             style={{
               fontSize: '9px',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: 'var(--color-text-tertiary)',
               background: 'none',
               border: 'none',
@@ -312,7 +312,7 @@ export function UnifiedChainCard({
                   style={{
                     background: 'rgba(0, 0, 0, 0.2)',
                     fontSize: '9px',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                   }}
                 >
                   <span style={{ color: 'var(--color-text-disabled)', width: '16px', textAlign: 'right' }}>
@@ -368,7 +368,7 @@ function MenuButton({
       className="w-full flex items-center gap-2 px-3 py-1.5 text-left fast-snap"
       style={{
         fontSize: 'var(--text-xs)',
-        fontFamily: 'var(--font-mono)',
+        fontFamily: 'var(--font-system)',
         color: danger ? 'var(--color-status-error)' : 'var(--color-text-primary)',
         background: 'none',
         border: 'none',

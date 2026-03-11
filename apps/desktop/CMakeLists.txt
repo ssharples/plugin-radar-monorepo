@@ -5,8 +5,24 @@ project(ProChain VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Use local JUCE 8.0.12 (includes AAX SDK)
-add_subdirectory(JUCE/JUCE)
+# Prefer a vendored JUCE checkout when present. Fresh clones of this repo may
+# not have that directory populated, so fall back to the official JUCE source.
+set(PROCHAIN_VENDORED_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/JUCE")
+
+if (EXISTS "${PROCHAIN_VENDORED_JUCE_DIR}/CMakeLists.txt")
+    message(STATUS "Using vendored JUCE from ${PROCHAIN_VENDORED_JUCE_DIR}")
+    add_subdirectory(JUCE/JUCE)
+else()
+    message(STATUS "Vendored JUCE not found; fetching JUCE 8.0.12 from GitHub")
+    include(FetchContent)
+    FetchContent_Declare(
+        JUCE
+        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+        GIT_TAG 8.0.12
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(JUCE)
+endif()
 
 # Plugin target
 juce_add_plugin(ProChain
@@ -52,6 +68,8 @@ target_sources(ProChain
         src/audio/DuckingProcessor.cpp
         src/audio/LatencyCompensationProcessor.cpp
         src/audio/PluginParameterWatcher.cpp
+        src/audio/FFTProcessor.cpp
+        src/audio/WaveformCapture.cpp
         src/automation/ProxyParameter.cpp
         src/automation/ParameterProxyPool.cpp
         src/platform/KeyboardInterceptor.mm
@@ -179,7 +197,6 @@ add_dependencies(ProChain_AAX PluginScannerHelper)
 #==============================================================================
 # Tests - Catch2 unit tests for scanner and plugin management logic
 #==============================================================================
-include(FetchContent)
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -201,6 +218,9 @@ add_executable(ProChain_Tests
     tests/ChainProcessorTests.cpp
     tests/OversamplingTests.cpp
     tests/PluginProcessorLifecycleTests.cpp
+    tests/CrashPathChainProcessorTests.cpp
+    tests/SerializationCrashTests.cpp
+    tests/PluginLoadUnloadTests.cpp
     src/core/PluginManager.cpp
     src/core/ChainNode.cpp
     src/core/ChainProcessor.cpp
@@ -225,6 +245,8 @@ add_executable(ProChain_Tests
     src/audio/PluginWithMeterWrapper.cpp
     src/audio/NodeMeterProcessor.cpp
     src/audio/PluginParameterWatcher.cpp
+    src/audio/FFTProcessor.cpp
+    src/audio/WaveformCapture.cpp
     src/automation/ProxyParameter.cpp
     src/automation/ParameterProxyPool.cpp
 )

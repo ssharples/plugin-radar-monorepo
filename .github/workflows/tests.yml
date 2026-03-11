@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: apps/desktop/build/_deps
-          key: fetchcontent-${{ runner.os }}-juce8.0.4-catch2v3.5.2
+          key: fetchcontent-${{ runner.os }}-juce8.0.12-catch2v3.5.2
           restore-keys: |
             fetchcontent-${{ runner.os }}-
 
@@ -58,7 +58,7 @@ jobs:
 
       - name: Build test target
         working-directory: apps/desktop
-        run: cmake --build build --target PluginChainManager_Tests --parallel
+        run: cmake --build build --target ProChain_Tests --parallel
 
       - name: Run tests
         working-directory: apps/desktop/build

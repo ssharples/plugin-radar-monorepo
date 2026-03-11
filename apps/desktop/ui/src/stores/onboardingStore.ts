@@ -29,23 +29,41 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
   ...initialState,
 
   initialize: async () => {
+    console.log('[onboardingStore] initialize() called')
     const hasEverCompleted = localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true'
+    console.log('[onboardingStore] hasEverCompleted:', hasEverCompleted)
 
     if (hasEverCompleted) {
-      // Check if session is still valid
+      // Check if session is still valid - with 5 second timeout
+      console.log('[onboardingStore] Checking session...')
       try {
         const { initializeAuth } = await import('../api/convex-client')
-        const hasSession = await initializeAuth()
+        console.log('[onboardingStore] Calling initializeAuth()...')
+        const authPromise = initializeAuth()
+        const timeoutPromise = new Promise<false>((resolve) => {
+          console.log('[onboardingStore] Timeout timer started (5s)')
+          setTimeout(() => {
+            console.log('[onboardingStore] Timeout fired!')
+            resolve(false)
+          }, 5000)
+        })
+        console.log('[onboardingStore] Racing auth vs timeout...')
+        const hasSession = await Promise.race([authPromise, timeoutPromise])
+        console.log('[onboardingStore] Race result - hasSession:', hasSession)
         if (hasSession) {
+          console.log('[onboardingStore] Session valid, completing onboarding')
           set({ isOnboardingComplete: true, hasEverCompleted: true, isInitializing: false })
           return
         }
-      } catch {
+      } catch (err) {
+        console.error('[onboardingStore] Session check error:', err)
         // Session check failed, show auth
       }
       // Has completed before but session expired — show auth, then skip to scan
+      console.log('[onboardingStore] Session expired, showing auth')
       set({ hasEverCompleted: true, currentStep: 'auth', isInitializing: false })
     } else {
+      console.log('[onboardingStore] First time user, showing auth')
       set({ hasEverCompleted: false, currentStep: 'auth', isInitializing: false })
     }
   },

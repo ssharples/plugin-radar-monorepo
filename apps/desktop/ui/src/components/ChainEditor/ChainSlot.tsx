@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect, memo, type PointerEvent as ReactPointerEvent } from 'react';
-import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { Layers, GitBranch, X, ArrowLeftRight } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/core';
+import { Layers, GitBranch } from 'lucide-react';
 import type { PluginNodeUI, ChainSlot as ChainSlotType } from '../../api/types';
 import { useChainStore } from '../../stores/chainStore';
 import { PluginSwapMenu } from './PluginSwapMenu';
@@ -37,13 +37,6 @@ function formatDb(db: number): string {
   if (db <= -59) return '-\u221E';
   return Math.round(db).toString();
 }
-
-const AMBER_METER_GRADIENT = `linear-gradient(to top,
-  #444444 0%,
-  #999999 40%,
-  #cccccc 70%,
-  #ffffff 100%
-)`;
 
 interface ChainSlotProps {
   // V2: node-based
@@ -94,14 +87,12 @@ export const ChainSlot = memo(function ChainSlot({
   isDragActive: _isDragActive = false,
   groupSelectMode = false,
   onSelect,
-  disabledDropIds,
   parentId = 0,
   indexInParent = -1,
 }: ChainSlotProps) {
   // Unified data access
   const id = node?.id ?? slot?.index ?? 0;
   const name = node?.name ?? slot?.name ?? '';
-  const manufacturer = node?.manufacturer ?? slot?.manufacturer ?? '';
   const bypassed = node?.bypassed ?? slot?.bypassed ?? false;
   const uid = node?.uid ?? slot?.uid;
   const isSoloed = node?.solo ?? false;
@@ -144,32 +135,16 @@ export const ChainSlot = memo(function ChainSlot({
   // Peak-hold dB values — tracked via refs + direct DOM mutation to avoid
   // 2N state updates per frame. Only the formatted string is checked so the
   // DOM is touched only when the displayed text actually changes.
-  const inputPeakRef = useRef(-Infinity);
   const outputPeakRef = useRef(-Infinity);
-  const inputPeakElRef = useRef<HTMLButtonElement>(null);
   const outputPeakElRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!meterData || bypassed) return;
-    const inDb = Math.max(
-      linearToDb(meterData.inputPeakL ?? 0),
-      linearToDb(meterData.inputPeakR ?? 0),
-    );
     const outDb = Math.max(
       linearToDb(meterData.peakL),
       linearToDb(meterData.peakR),
     );
-    const newIn = Math.max(inputPeakRef.current, inDb);
     const newOut = Math.max(outputPeakRef.current, outDb);
-    // Only touch DOM when the rounded display value changes
-    if (formatDb(newIn) !== formatDb(inputPeakRef.current)) {
-      inputPeakRef.current = newIn;
-      if (inputPeakElRef.current) {
-        inputPeakElRef.current.firstChild!.textContent = formatDb(newIn);
-      }
-    } else {
-      inputPeakRef.current = newIn;
-    }
     if (formatDb(newOut) !== formatDb(outputPeakRef.current)) {
       outputPeakRef.current = newOut;
       if (outputPeakElRef.current) {
@@ -180,19 +155,10 @@ export const ChainSlot = memo(function ChainSlot({
     }
   }, [meterData, bypassed]);
 
-  const resetInputPeak = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    inputPeakRef.current = -Infinity;
-    if (inputPeakElRef.current) {
-      inputPeakElRef.current.firstChild!.textContent = formatDb(-Infinity);
-    }
-  }, []);
-
   const resetOutputPeak = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     // Reset all peaks (input, output, and all node peaks)
     juceBridge.resetAllNodePeaks();
-    inputPeakRef.current = -Infinity;
     outputPeakRef.current = -Infinity;
     if (outputPeakElRef.current) {
       outputPeakElRef.current.firstChild!.textContent = formatDb(-Infinity);
@@ -226,7 +192,7 @@ export const ChainSlot = memo(function ChainSlot({
       })));
       // Current plugin is at index 0
       setCurrentPluginIndex(0);
-    }).catch((err) => {
+    }).catch(() => {
       setSimilarPlugins([]);
     });
   }, [matchedPluginId]);
@@ -263,6 +229,16 @@ export const ChainSlot = memo(function ChainSlot({
       },
     };
   }, [listeners]);
+
+  useEffect(() => {
+    if (!showContextMenu) return;
+
+    void juceBridge.setNativeWindowVisible(false);
+
+    return () => {
+      void juceBridge.setNativeWindowVisible(true);
+    };
+  }, [showContextMenu]);
 
   const handleSwapComplete = useCallback((newPluginName: string, confidence: number) => {
     setSwapToast(`Swapped \u2192 ${newPluginName} (${confidence}%)`);
@@ -630,12 +606,12 @@ export const ChainSlot = memo(function ChainSlot({
           </div>
 
           {/* Visual meter bar with dB value */}
-          <div className="absolute flex items-center gap-1" style={{ left: 200, top: 13 }}>
+          <div className="absolute flex items-center gap-1" style={{ left: 200, right: 170, top: 13 }}>
             {/* Meter bar container */}
             <div
               className={`relative overflow-hidden ${isProcessing ? 'meter-processing' : ''}`}
               style={{
-                width: 60,
+                width: 'min(60px, 100%)',
                 height: 16,
                 background: 'rgba(0, 0, 0, 0.5)',
                 borderRadius: '2px',
@@ -708,7 +684,7 @@ export const ChainSlot = memo(function ChainSlot({
 
           {/* Persistent state indicators — always visible when active (like console LEDs) */}
           {!isHovered && !isSelected && (isSoloed || isMuted) && (
-            <div className="absolute flex flex-row gap-[3px]" style={{ right: 32, top: 15 }}>
+            <div className="absolute flex flex-row gap-[3px]" style={{ right: 84, top: 15 }}>
               {isSoloed && (
                 <div
                   className="flex items-center justify-center rounded-[2px]"
@@ -746,11 +722,13 @@ export const ChainSlot = memo(function ChainSlot({
             </div>
           )}
 
-          {/* Group creation icons - progressive disclosure */}
-          {(isHovered || isSelected) && (
-            <>
-              <div className="absolute flex flex-row gap-[3px] transition-opacity duration-200" style={{ left: 320, top: 13.5 }}>
-                {/* Serial group icon */}
+          <div
+            className="absolute flex items-center justify-end gap-[6px]"
+            style={{ right: 22, top: 12, minWidth: 152, height: 18 }}
+          >
+            {/* Group creation icons - progressive disclosure */}
+            {(isHovered || isSelected) && (
+              <>
                 <button
                   onClick={handleCreateSerialGroup}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -760,7 +738,6 @@ export const ChainSlot = memo(function ChainSlot({
                 >
                   <Layers className="w-2.5 h-2.5 text-black" strokeWidth={2.5} />
                 </button>
-                {/* Parallel group icon */}
                 <button
                   onClick={handleCreateParallelGroup}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -770,75 +747,67 @@ export const ChainSlot = memo(function ChainSlot({
                 >
                   <GitBranch className="w-2.5 h-2.5 text-black" strokeWidth={2.5} />
                 </button>
-              </div>
+                <div className="bg-white/20" style={{ width: 1, height: 18 }} />
+                <button
+                  className="transition-opacity duration-200 hover:opacity-100"
+                  style={{ width: 15, height: 15 }}
+                  onClick={(e) => { e.stopPropagation(); setBranchSolo(id, !isSoloed); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title="Solo plugin"
+                >
+                  <img
+                    src={isSoloed ? soloButtonActive : soloButtonInactive}
+                    alt="S"
+                    className="w-full h-full"
+                    draggable={false}
+                  />
+                </button>
+                <button
+                  className="transition-opacity duration-200 hover:opacity-100"
+                  style={{ width: 15, height: 15 }}
+                  onClick={handleMute}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  <img
+                    src={isMuted ? muteButtonActive : muteButtonInactive}
+                    alt="M"
+                    className="w-full h-full"
+                    draggable={false}
+                  />
+                </button>
+                <div className="bg-white/20" style={{ width: 1, height: 18 }} />
+                <button
+                  className="opacity-60 hover:opacity-100 transition-opacity duration-200"
+                  style={{ width: 13, height: 13 }}
+                  onClick={handleDuplicate}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title="Duplicate plugin"
+                >
+                  <img src={duplicateIconSvg} alt="" className="w-full h-full" draggable={false} />
+                </button>
+              </>
+            )}
 
-              {/* Separator 1 (after group icons) */}
-              <div
-                className="absolute bg-white/20 transition-opacity duration-200"
-                style={{ left: 356, top: 12, width: 1, height: 18 }}
-              />
+            <button
+              className="font-sans uppercase text-white hover:text-plugin-accent transition-colors cursor-pointer text-[11px] min-w-[36px] text-center px-1"
+              onClick={handleMute}
+              onPointerDown={(e) => e.stopPropagation()}
+              title={isMuted ? 'Unmute input/output' : 'Mute input/output'}
+            >
+              I/O
+            </button>
 
-              {/* Solo button (15×15px) */}
-              <button
-                className="absolute transition-opacity duration-200 hover:opacity-100"
-                style={{ left: 362, top: 13.5, width: 15, height: 15 }}
-                onClick={(e) => { e.stopPropagation(); setBranchSolo(id, !isSoloed); }}
-                onPointerDown={(e) => e.stopPropagation()}
-                title="Solo plugin"
-              >
-                <img
-                  src={isSoloed ? soloButtonActive : soloButtonInactive}
-                  alt="S"
-                  className="w-full h-full"
-                  draggable={false}
-                />
-              </button>
-
-              {/* Mute button (15×15px) */}
-              <button
-                className="absolute transition-opacity duration-200 hover:opacity-100"
-                style={{ left: 380, top: 13.5, width: 15, height: 15 }}
-                onClick={handleMute}
-                onPointerDown={(e) => e.stopPropagation()}
-                title={isMuted ? 'Unmute' : 'Mute'}
-              >
-                <img
-                  src={isMuted ? muteButtonActive : muteButtonInactive}
-                  alt="M"
-                  className="w-full h-full"
-                  draggable={false}
-                />
-              </button>
-
-              {/* Separator 2 (after S/M buttons) */}
-              <div
-                className="absolute bg-white/20 transition-opacity duration-200"
-                style={{ left: 398, top: 12, width: 1, height: 18 }}
-              />
-
-              {/* Duplicate icon (13×13px) */}
-              <button
-                className="absolute opacity-60 hover:opacity-100 transition-opacity duration-200"
-                style={{ left: 403, top: 14.5, width: 13, height: 13 }}
-                onClick={handleDuplicate}
-                onPointerDown={(e) => e.stopPropagation()}
-                title="Duplicate plugin"
-              >
-                <img src={duplicateIconSvg} alt="" className="w-full h-full" draggable={false} />
-              </button>
-            </>
-          )}
-
-          {/* Bypass/power icon (10×12px) */}
-          <button
-            className={`absolute transition-opacity ${bypassed ? 'brightness-150' : 'opacity-60 hover:opacity-100'}`}
-            style={{ left: 420, top: 15, width: 10, height: 12 }}
-            onClick={handleBypass}
-            onPointerDown={(e) => e.stopPropagation()}
-            title={bypassed ? 'Enable' : 'Bypass'}
-          >
-            <img src={bypassIconSvg} alt="" className="w-full h-full" draggable={false} />
-          </button>
+            <button
+              className={`transition-opacity ${bypassed ? 'brightness-150' : 'opacity-60 hover:opacity-100'}`}
+              style={{ width: 10, height: 12 }}
+              onClick={handleBypass}
+              onPointerDown={(e) => e.stopPropagation()}
+              title={bypassed ? 'Enable' : 'Bypass'}
+            >
+              <img src={bypassIconSvg} alt="" className="w-full h-full" draggable={false} />
+            </button>
+          </div>
         </div>
 
         {/* Right side panel — close/remove button */}

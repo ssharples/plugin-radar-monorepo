@@ -247,7 +247,7 @@ export function DropZone({
         >
           {slotNumber !== undefined && (
             <div
-              className="font-mono font-bold"
+              className="font-sans font-bold"
               style={{
                 fontSize: '20px',
                 color: 'rgba(222, 255, 10, 0.6)',
@@ -306,7 +306,7 @@ export function GroupDropZone({
         <span
           className="text-xs"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             letterSpacing: 'var(--tracking-wide)',
             textTransform: 'uppercase' as const,
             color: isOver ? accentColor : 'var(--color-text-tertiary)',

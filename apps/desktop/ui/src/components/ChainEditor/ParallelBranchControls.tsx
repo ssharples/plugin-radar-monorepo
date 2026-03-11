@@ -21,7 +21,7 @@ export function ParallelBranchControls({ node }: ParallelBranchControlsProps) {
           onClick={() => setBranchSolo(node.id, !isSolo)}
           className="px-1 py-0.5 rounded text-xxs font-bold"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             letterSpacing: 'var(--tracking-wide)',
             background: isSolo ? 'rgba(222, 255, 10, 0.2)' : 'rgba(255, 255, 255, 0.04)',
             color: isSolo ? '#deff0a' : 'var(--color-text-tertiary)',
@@ -36,7 +36,7 @@ export function ParallelBranchControls({ node }: ParallelBranchControlsProps) {
           onClick={() => setBranchMute(node.id, !isMute)}
           className="px-1 py-0.5 rounded text-xxs font-bold"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             letterSpacing: 'var(--tracking-wide)',
             background: isMute ? 'rgba(255, 0, 51, 0.2)' : 'rgba(255, 255, 255, 0.04)',
             color: isMute ? '#ff0033' : 'var(--color-text-tertiary)',
@@ -65,7 +65,7 @@ export function ParallelBranchControls({ node }: ParallelBranchControlsProps) {
         <span
           className="text-xxs w-10 text-right tabular-nums"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-tertiary)',
             letterSpacing: 'var(--tracking-wide)',
           }}

@@ -155,7 +155,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
               <div style={{ fontSize: 'var(--text-body)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: 'var(--space-1)' }}>
                 Share Code
               </div>
-              <div style={{ fontSize: 'var(--text-4xl)', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-accent-cyan)', letterSpacing: 'var(--tracking-widest)' }}>
+              <div style={{ fontSize: 'var(--text-4xl)', fontFamily: 'var(--font-system)', fontWeight: 700, color: 'var(--color-accent-cyan)', letterSpacing: 'var(--tracking-widest)' }}>
                 {savedResult.shareCode}
               </div>
             </div>

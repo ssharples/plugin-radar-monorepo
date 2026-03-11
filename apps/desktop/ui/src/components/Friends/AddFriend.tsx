@@ -19,7 +19,7 @@ const cardStyle: React.CSSProperties = {
 
 const headingStyle: React.CSSProperties = {
   color: '#deff0a',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: 'var(--tracking-wide)',
@@ -135,7 +135,7 @@ export function AddFriend() {
       )}
 
       {searching && (
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>Searching...</div>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>Searching...</div>
       )}
 
       {results.length > 0 && (
@@ -147,7 +147,7 @@ export function AddFriend() {
               style={{ background: 'var(--color-bg-input)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}
             >
               <div>
-                <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{user.username}</div>
+                <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>{user.username}</div>
                 <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)' }}>
                   Found by {user.matchedOn}
                 </div>

@@ -19,7 +19,7 @@ const cardStyle: React.CSSProperties = {
 
 const headingStyle: React.CSSProperties = {
   color: '#deff0a',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: 'var(--tracking-wide)',
@@ -74,7 +74,7 @@ export function FriendsList() {
   if (loading) {
     return (
       <div style={cardStyle}>
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>Loading friends...</div>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>Loading friends...</div>
       </div>
     );
   }
@@ -85,7 +85,7 @@ export function FriendsList() {
         <div className="flex items-center gap-2">
           <Users size={18} style={{ color: 'var(--color-accent-cyan)' }} />
           <h3 style={headingStyle}>Friends</h3>
-          <span style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)' }}>({friends.length})</span>
+          <span style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)' }}>({friends.length})</span>
         </div>
         <button
           onClick={loadFriends}
@@ -110,19 +110,19 @@ export function FriendsList() {
               className="flex items-center justify-between"
               style={{ background: 'var(--color-bg-input)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}
             >
-              <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{friend.username}</div>
+              <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>{friend.username}</div>
               {confirmRemoveId === friend.userId ? (
                 <div className="flex items-center gap-2">
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>Remove?</span>
                   <button
                     onClick={() => handleRemove(friend.userId)}
-                    style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-error)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontWeight: 600 }}
+                    style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-error)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-system)', fontWeight: 600 }}
                   >
                     Yes
                   </button>
                   <button
                     onClick={() => setConfirmRemoveId(null)}
-                    style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}
+                    style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-system)' }}
                   >
                     No
                   </button>

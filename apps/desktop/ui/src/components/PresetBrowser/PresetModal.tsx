@@ -92,7 +92,7 @@ export function PresetModal({ onClose }: PresetModalProps) {
         <div className="flex items-center justify-between" style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-default)' }}>
           <div className="flex items-center gap-2">
             <Folder className="w-5 h-5" style={{ color: 'var(--color-accent-cyan)' }} />
-            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Presets</h2>
+            <h2 style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-lg)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Presets</h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -117,8 +117,8 @@ export function PresetModal({ onClose }: PresetModalProps) {
         {/* Current preset */}
         {currentPreset && (
           <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'rgba(222, 255, 10, 0.06)', borderBottom: '1px solid var(--color-border-default)' }}>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Current preset:</p>
-            <p className="truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Current preset:</p>
+            <p className="truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>
               {currentPreset.name}
             </p>
           </div>
@@ -140,7 +140,7 @@ export function PresetModal({ onClose }: PresetModalProps) {
         {/* Preset list */}
         <div className="flex-1 overflow-y-auto scrollbar-cyber min-h-0" style={{ padding: 'var(--space-4)' }}>
           {loading ? (
-            <div className="flex items-center justify-center" style={{ height: '8rem', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <div className="flex items-center justify-center" style={{ height: '8rem', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
               Loading...
             </div>
           ) : filteredPresets.length === 0 ? (
@@ -181,7 +181,7 @@ export function PresetModal({ onClose }: PresetModalProps) {
                   >
                     <FileText className="flex-shrink-0 w-5 h-5" style={{ color: 'var(--color-text-disabled)' }} />
                     <div className="flex-1 min-w-0">
-                      <p className="truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                      <p className="truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>
                         {preset.name}
                       </p>
                       <p className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-disabled)' }}>
@@ -212,7 +212,7 @@ export function PresetModal({ onClose }: PresetModalProps) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--color-border-default)', fontSize: 'var(--text-sm)', color: 'var(--color-text-disabled)', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--color-border-default)', fontSize: 'var(--text-sm)', color: 'var(--color-text-disabled)', fontFamily: 'var(--font-system)' }}>
           {filteredPresets.length} preset{filteredPresets.length !== 1 ? 's' : ''}
         </div>
       </div>

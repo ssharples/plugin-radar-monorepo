@@ -176,7 +176,7 @@ export function PluginListPanel({ onClose }: PluginListPanelProps) {
                 background: 'var(--color-bg-tertiary)',
                 border: '1px solid var(--color-border-default)',
                 color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
               }}
             />
           </div>
@@ -189,7 +189,7 @@ export function PluginListPanel({ onClose }: PluginListPanelProps) {
                 onClick={() => setSelectedCategory(cat.id)}
                 className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-medium transition-all"
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   background: selectedCategory === cat.id ? 'rgba(0, 240, 255, 0.15)' : 'transparent',
                   color: selectedCategory === cat.id ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
                   border: `1px solid ${selectedCategory === cat.id ? 'var(--color-accent-cyan)' : 'var(--color-border-default)'}`,
@@ -204,7 +204,7 @@ export function PluginListPanel({ onClose }: PluginListPanelProps) {
 
         {/* Sort bar */}
         <div className="px-4 py-1.5 flex items-center justify-between" style={{ background: 'var(--color-bg-tertiary)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>
+          <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>
             {displayPlugins.length} plugin{displayPlugins.length !== 1 ? 's' : ''}
           </span>
           <div className="relative">
@@ -212,7 +212,7 @@ export function PluginListPanel({ onClose }: PluginListPanelProps) {
               onClick={() => setShowSortMenu(!showSortMenu)}
               className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-wider transition-all"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 color: 'var(--color-text-secondary)',
                 background: 'var(--color-bg-secondary)',
                 border: '1px solid var(--color-border-default)',
@@ -230,7 +230,7 @@ export function PluginListPanel({ onClose }: PluginListPanelProps) {
                     onClick={() => { setSortMode(mode); setShowSortMenu(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-[11px] uppercase tracking-wide transition-colors"
                     style={{
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       color: sortMode === mode ? 'var(--color-accent-cyan)' : 'var(--color-text-secondary)',
                       background: sortMode === mode ? 'rgba(0, 240, 255, 0.08)' : 'transparent',
                       borderLeft: sortMode === mode ? '2px solid var(--color-accent-cyan)' : '2px solid transparent',
@@ -263,7 +263,7 @@ export function PluginListPanel({ onClose }: PluginListPanelProps) {
           {displayPlugins.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Diamond className="w-12 h-12 mb-3" style={{ color: 'var(--color-text-disabled)' }} />
-              <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>No plugins found</div>
+              <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)', color: 'var(--color-text-secondary)' }}>No plugins found</div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: '4px' }}>Try adjusting your filters</div>
             </div>
           )}
@@ -272,7 +272,7 @@ export function PluginListPanel({ onClose }: PluginListPanelProps) {
 
       {/* Footer hints */}
       <div className="flex-shrink-0 px-4 py-2 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)' }}>
-        <div className="flex items-center gap-4" style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+        <div className="flex items-center gap-4" style={{ fontSize: '9px', fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
           <span><kbd className="px-1.5 py-0.5 rounded" style={{ background: 'var(--color-bg-tertiary)' }}>↑↓</kbd> Navigate</span>
           <span><kbd className="px-1.5 py-0.5 rounded" style={{ background: 'var(--color-bg-tertiary)' }}>Enter</kbd> Add</span>
           <span><kbd className="px-1.5 py-0.5 rounded" style={{ background: 'var(--color-bg-tertiary)' }}>Esc</kbd> Close</span>
@@ -320,7 +320,7 @@ function PluginCard({ plugin, isHighlighted, usageCount, enrichedData, onClick, 
           {manufacturerLogo ? (
             <img src={manufacturerLogo} alt={plugin.manufacturer} className="w-full h-full object-contain p-1" />
           ) : (
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-disabled)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-disabled)', fontFamily: 'var(--font-system)' }}>
               {plugin.manufacturer.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -329,17 +329,17 @@ function PluginCard({ plugin, isHighlighted, usageCount, enrichedData, onClick, 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-0.5">
-            <h3 className="text-sm leading-tight truncate" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: isHighlighted ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+            <h3 className="text-sm leading-tight truncate" style={{ fontFamily: 'var(--font-system)', fontWeight: 600, color: isHighlighted ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
               {plugin.name}
             </h3>
             {usageCount > 0 && (
-              <div className="flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded" style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent-cyan)', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)' }}>
+              <div className="flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded" style={{ fontSize: '9px', fontFamily: 'var(--font-system)', color: 'var(--color-accent-cyan)', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)' }}>
                 <Zap className="w-2.5 h-2.5" />
                 {usageCount}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+          <div className="flex items-center gap-2" style={{ fontSize: '10px', fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)' }}>
             <span className="truncate">{plugin.manufacturer}</span>
             {category && (
               <>

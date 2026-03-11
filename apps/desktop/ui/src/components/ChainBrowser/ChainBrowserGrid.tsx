@@ -85,7 +85,7 @@ export function ChainBrowserGrid({
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>Loading chains...</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>Loading chains...</div>
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function ChainBrowserGrid({
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2">
         <Globe className="w-8 h-8" style={{ color: 'var(--color-text-disabled)', opacity: 0.3 }} />
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>No chains found</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>No chains found</span>
       </div>
     );
   }
@@ -114,13 +114,13 @@ export function ChainBrowserGrid({
           }}
         >
           <User className="w-3 h-3" style={{ color: 'var(--color-accent-cyan)' }} />
-          <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)' }}>
+          <span style={{ fontSize: '10px', fontFamily: 'var(--font-system)', color: 'var(--color-text-disabled)' }}>
             Chains by
           </span>
-          <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-accent-cyan)' }}>
+          <span style={{ fontSize: '10px', fontFamily: 'var(--font-system)', fontWeight: 600, color: 'var(--color-accent-cyan)' }}>
             @{authorFilter}
           </span>
-          <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)' }}>
+          <span style={{ fontSize: '9px', fontFamily: 'var(--font-system)', color: 'var(--color-text-disabled)' }}>
             ({total})
           </span>
           <button
@@ -172,7 +172,7 @@ export function ChainBrowserGrid({
             className="flex items-center gap-1"
             style={{
               fontSize: '10px',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: offset === 0 ? 'var(--color-text-disabled)' : 'var(--color-text-tertiary)',
               cursor: offset === 0 ? 'not-allowed' : 'pointer',
               background: 'none',
@@ -183,7 +183,7 @@ export function ChainBrowserGrid({
           >
             <ChevronLeft className="w-3 h-3" /> Prev
           </button>
-          <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)', fontFamily: 'var(--font-system)' }}>
             {currentPage} / {totalPages} ({total} total)
           </span>
           <button
@@ -192,7 +192,7 @@ export function ChainBrowserGrid({
             className="flex items-center gap-1"
             style={{
               fontSize: '10px',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: !hasMore ? 'var(--color-text-disabled)' : 'var(--color-text-tertiary)',
               cursor: !hasMore ? 'not-allowed' : 'pointer',
               background: 'none',

@@ -50,7 +50,7 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-input)',
   border: '1px solid var(--color-border-default)',
   borderRadius: 'var(--radius-base)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontSize: 'var(--text-sm)',
   color: 'var(--color-text-primary)',
   padding: '6px 10px',
@@ -332,7 +332,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             <button
               onClick={() => setPreviewChain(null)}
               className="flex items-center gap-1 mb-3 transition-colors duration-150"
-              style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}
+              style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)', color: 'var(--color-text-secondary)' }}
             >
               <ChevronLeft className="w-3 h-3" /> Back
             </button>
@@ -347,12 +347,12 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
               "{previewChain.name}"
             </h3>
             {previewChain.author?.name && (
-              <p className="mb-2" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              <p className="mb-2" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
                 by @{previewChain.author.name}
               </p>
             )}
             {previewChain.description && (
-              <p className="mb-3" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              <p className="mb-3" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
                 {previewChain.description}
               </p>
             )}
@@ -374,15 +374,15 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             {/* Target Input Peak Range */}
             {(previewChain.targetInputPeakMin != null && previewChain.targetInputPeakMax != null) ? (
               <div className="flex items-center gap-2 mb-3">
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>Target:</span>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>Target:</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-system)', fontWeight: 700 }}>
                   {previewChain.targetInputPeakMin} to {previewChain.targetInputPeakMax} dBpk
                 </span>
               </div>
             ) : previewChain.targetInputLufs != null ? (
               <div className="flex items-center gap-2 mb-3">
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>Target:</span>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>Target:</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-system)', fontWeight: 700 }}>
                   {previewChain.targetInputLufs} to {previewChain.targetInputLufs + 6} dBpk
                 </span>
               </div>
@@ -397,7 +397,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                   border: `1px solid ${compatibility.canFullyLoad ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 170, 0, 0.2)'}`,
                 }}
               >
-                <div className="flex items-center justify-between mb-1.5" style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>
+                <div className="flex items-center justify-between mb-1.5" style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>
                   <span style={{ color: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)' }}>
                     {compatibility.canFullyLoad
                       ? 'All plugins available'
@@ -423,7 +423,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             <div className="mb-4">
               <h4 className="mb-2" style={{
                 fontSize: 'var(--text-xs)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 color: '#deff0a',
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wider)',
@@ -448,7 +448,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                       className="px-3 py-2 rounded"
                       style={{
                         fontSize: 'var(--text-sm)',
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         background: isMissing && !sub ? 'rgba(255, 0, 51, 0.05)' : sub ? 'rgba(0, 255, 136, 0.05)' : 'var(--color-bg-elevated)',
                         border: `1px solid ${isMissing && !sub ? 'rgba(255, 0, 51, 0.1)' : sub ? 'rgba(0, 255, 136, 0.1)' : 'var(--color-border-subtle)'}`,
                       }}
@@ -495,7 +495,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-4 mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            <div className="flex items-center gap-4 mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
               <span className="flex items-center gap-1">
                 <Download className="w-3 h-3" /> {previewChain.downloads}
               </span>
@@ -567,13 +567,13 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
           /* Chain list */
           <div className="flex-1 overflow-y-auto scrollbar-cyber">
             {loading ? (
-              <div className="py-12 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              <div className="py-12 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
                 Loading...
               </div>
             ) : filteredChains.length === 0 ? (
               <div className="py-12 text-center">
                 <Globe className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)', opacity: 0.3 }} />
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>No chains found</p>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>No chains found</p>
               </div>
             ) : (
               <div className="stagger-children">
@@ -605,7 +605,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
               className="flex items-center gap-1 transition-colors duration-150"
               style={{
                 fontSize: 'var(--text-sm)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 color: page === 0 ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
                 cursor: page === 0 ? 'not-allowed' : 'pointer',
                 background: 'none',
@@ -614,7 +614,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             >
               <ChevronLeft className="w-3 h-3" /> Prev
             </button>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
               Page {page + 1} of {totalPages}
             </span>
             <button
@@ -623,7 +623,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
               className="flex items-center gap-1 transition-colors duration-150"
               style={{
                 fontSize: 'var(--text-sm)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 color: page >= totalPages - 1 ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
                 cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer',
                 background: 'none',
@@ -672,7 +672,7 @@ function ChainCard({
           <div className="flex items-center gap-1.5">
             <span style={{
               fontSize: 'var(--text-base)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontWeight: 700,
               color: 'var(--color-text-primary)',
             }} className="truncate">
@@ -680,7 +680,7 @@ function ChainCard({
             </span>
           </div>
           {chain.author?.name && (
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
               by @{chain.author.name}
             </span>
           )}
@@ -688,7 +688,7 @@ function ChainCard({
       </div>
 
       {/* Plugin preview */}
-      <div className="mb-1.5 truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+      <div className="mb-1.5 truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
         {pluginPreview}
         {pluginCount > 4 ? ` ... (${pluginCount} plugins)` : ` (${pluginCount} plugins)`}
       </div>
@@ -696,18 +696,18 @@ function ChainCard({
       {/* Stats row */}
       <div className="flex items-center gap-3 mb-2">
         {(chain.targetInputPeakMin != null && chain.targetInputPeakMax != null) ? (
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-system)' }}>
             {chain.targetInputPeakMin} to {chain.targetInputPeakMax} dBpk
           </span>
         ) : chain.targetInputLufs != null ? (
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', fontFamily: 'var(--font-system)' }}>
             {chain.targetInputLufs}→{chain.targetInputLufs + 6} dBpk
           </span>
         ) : null}
-        <span className="flex items-center gap-0.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+        <span className="flex items-center gap-0.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
           <Download className="w-2.5 h-2.5" /> {chain.downloads}
         </span>
-        <span className="flex items-center gap-0.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+        <span className="flex items-center gap-0.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
           <Heart className="w-2.5 h-2.5" /> {chain.likes}
         </span>
       </div>

@@ -234,7 +234,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
         <p
           className="text-center mb-6"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             fontSize: 'var(--text-sm)',
             color: 'var(--color-text-tertiary)',
           }}
@@ -258,7 +258,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
             placeholder="Search plugins... (e.g. 'Pro-Q', 'reverb', 'Fab')"
             className="w-full pl-12 pr-14 py-4 focus:outline-none"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-lg)',
               color: 'var(--color-text-primary)',
               background: 'rgba(0, 0, 0, 0.6)',
@@ -312,7 +312,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                 <div
                   className="flex items-center gap-2"
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: 'var(--text-xs)',
                     textTransform: 'uppercase',
                     letterSpacing: 'var(--tracking-widest)',
@@ -327,7 +327,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                 </div>
                 <div
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: '9px',
                     color: 'var(--color-text-tertiary)',
                   }}
@@ -359,7 +359,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                     style={{
                       background: 'rgba(222, 255, 10, 0.03)',
                       borderTop: '1px solid var(--color-border-default)',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       fontSize: 'var(--text-xs)',
                       textTransform: 'uppercase',
                       letterSpacing: 'var(--tracking-widest)',
@@ -385,10 +385,10 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                     >
                       <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-serial)' }} />
                       <div className="flex-1 min-w-0">
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {preset.name}
                         </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
+                        <div style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
                           {preset.category}
                         </div>
                       </div>
@@ -405,7 +405,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                     style={{
                       background: 'rgba(222, 255, 10, 0.03)',
                       borderTop: '1px solid var(--color-border-default)',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       fontSize: 'var(--text-xs)',
                       textTransform: 'uppercase',
                       letterSpacing: 'var(--tracking-widest)',
@@ -431,10 +431,10 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                     >
                       <Globe className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-accent-cyan)' }} />
                       <div className="flex-1 min-w-0">
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {chain.name}
                         </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-text-disabled)' }}>
+                        <div style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-text-disabled)' }}>
                           {chain.pluginCount}p{chain.author?.name ? ` · @${chain.author.name}` : ''}
                         </div>
                       </div>
@@ -451,7 +451,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                     style={{
                       background: 'rgba(222, 255, 10, 0.03)',
                       borderTop: '1px solid var(--color-border-default)',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       fontSize: 'var(--text-xs)',
                       textTransform: 'uppercase',
                       letterSpacing: 'var(--tracking-widest)',
@@ -477,10 +477,10 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                     >
                       <Layers className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-parallel)' }} />
                       <div className="flex-1 min-w-0">
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {tmpl.name}
                         </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
+                        <div style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
                           {tmpl.mode} · {tmpl.pluginCount}p{tmpl.category ? ` · ${tmpl.category}` : ''}
                         </div>
                       </div>
@@ -508,7 +508,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                   }}
                 >
                   <Globe className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-accent-cyan)' }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-accent-cyan)' }}>
+                  <span style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-accent-cyan)' }}>
                     Browse All Chains
                   </span>
                 </button>
@@ -520,7 +520,7 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
                 style={{
                   background: 'var(--color-bg-primary)',
                   borderTop: '1px solid var(--color-border-default)',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   textTransform: 'uppercase',
                   letterSpacing: 'var(--tracking-widest)',
@@ -539,13 +539,13 @@ export function QuickPluginSearch({ onPluginAdded, onOpenFullBrowser }: QuickPlu
         <div className="mt-4 flex items-center justify-center gap-6">
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(222, 255, 10, 0.6)' }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+            <span style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
               Arrow keys to navigate
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(222, 255, 10, 0.6)' }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+            <span style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
               Enter to add
             </span>
           </div>
@@ -606,7 +606,7 @@ function SearchResultItem({ plugin, isHighlighted, usageCount, enrichedData, onC
           ) : (
             <div
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-base)',
                 fontWeight: 700,
                 color: isHighlighted ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
@@ -639,7 +639,7 @@ function SearchResultItem({ plugin, isHighlighted, usageCount, enrichedData, onC
                 style={{
                   background: 'rgba(222, 255, 10, 0.15)',
                   border: '1px solid rgba(222, 255, 10, 0.3)',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   color: 'var(--color-accent-cyan)',
                 }}
@@ -651,7 +651,7 @@ function SearchResultItem({ plugin, isHighlighted, usageCount, enrichedData, onC
           <div
             className="flex items-center gap-2"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-xs)',
               color: 'var(--color-text-tertiary)',
             }}
@@ -673,7 +673,7 @@ function SearchResultItem({ plugin, isHighlighted, usageCount, enrichedData, onC
             style={{
               background: 'var(--color-accent-cyan)',
               color: 'var(--color-bg-primary)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-sm)',
               fontWeight: 700,
             }}

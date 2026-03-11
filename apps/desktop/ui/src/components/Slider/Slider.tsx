@@ -19,7 +19,7 @@ interface SliderProps {
 
 const colorMap: Record<string, { fill: string; glow: string }> = {
   accent: { fill: '#deff0a', glow: 'rgba(222, 255, 10, 0.5)' },
-  blue:   { fill: '#deff0a', glow: 'rgba(222, 255, 10, 0.4)' },
+  blue: { fill: '#deff0a', glow: 'rgba(222, 255, 10, 0.4)' },
   orange: { fill: '#ccff00', glow: 'rgba(204, 255, 0, 0.4)' },
 };
 
@@ -128,13 +128,13 @@ export function Slider({
         />
       </div>
 
-      {/* Value tooltip - monospace */}
+      {/* Value tooltip */}
       {showTooltip && (
         <div
           className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none z-50"
           style={{
             left: `${fraction * 100}%`,
-            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+            fontFamily: "var(--font-brand)",
             fontSize: 'var(--text-xs, 10px)',
             color: colors.fill,
             background: 'var(--color-bg-primary, #0a0a0a)',

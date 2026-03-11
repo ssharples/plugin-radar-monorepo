@@ -352,7 +352,7 @@ export function InlinePluginSearch({
               padding: '2px 8px',
               borderRadius: 'var(--radius-sm)',
               fontSize: 'var(--text-body)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               textTransform: 'uppercase',
               letterSpacing: 'var(--tracking-wide)',
               border: '1px solid',
@@ -365,7 +365,7 @@ export function InlinePluginSearch({
             {t === 'all' ? 'All' : t === 'effects' ? 'FX' : 'Instr'}
           </button>
         ))}
-        <span style={{ marginLeft: 'auto', fontSize: 'var(--text-body)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--text-body)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
           {searchResults.length}
         </span>
       </div>
@@ -421,7 +421,7 @@ export function InlinePluginSearch({
                       className="flex-shrink-0 px-1 py-0.5 rounded"
                       style={{
                         background: 'rgba(222, 255, 10, 0.15)',
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         fontSize: 'var(--text-body)',
                         color: 'var(--color-accent-cyan)',
                       }}

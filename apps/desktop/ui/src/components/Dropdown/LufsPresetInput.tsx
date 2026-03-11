@@ -43,7 +43,7 @@ export function LufsPresetInput({
         max={max}
         step={step}
         disabled={disabled}
-        className="w-16 bg-black/30 border border-plugin-border rounded px-2 py-1.5 font-mono text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-16 bg-black/30 border border-plugin-border rounded px-2 py-1.5 font-sans text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label={label ? `${label} - Manual Input` : 'LUFS Value'}
       />
       <span className="text-xs text-white">dB</span>

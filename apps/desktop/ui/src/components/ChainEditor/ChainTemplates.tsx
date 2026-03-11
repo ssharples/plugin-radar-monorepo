@@ -47,8 +47,8 @@ export function ChainTemplates() {
       <div className="w-12 h-12 rounded-xl bg-plugin-accent/10 border border-plugin-accent/20 flex items-center justify-center mb-3">
         <Plus className="w-6 h-6 text-plugin-accent" />
       </div>
-      <h2 className="text-sm font-semibold font-mono uppercase text-[#deff0a] mb-1">Build your chain</h2>
-      <p className="text-xs font-mono uppercase text-white mb-5 text-center">
+      <h2 className="text-sm font-semibold font-sans uppercase text-[#deff0a] mb-1">Build your chain</h2>
+      <p className="text-xs font-sans uppercase text-white mb-5 text-center">
         Double-click a plugin from the browser, or get inspired
       </p>
 
@@ -68,9 +68,9 @@ export function ChainTemplates() {
             >
               <div className="flex items-center gap-1.5">
                 <Icon className="w-3.5 h-3.5 text-plugin-text" />
-                <span className="text-[11px] font-medium font-mono uppercase text-plugin-text">{t.name}</span>
+                <span className="text-[11px] font-medium font-sans uppercase text-plugin-text">{t.name}</span>
               </div>
-              <span className="text-[10px] font-mono uppercase text-white leading-tight">
+              <span className="text-[10px] font-sans uppercase text-white leading-tight">
                 {t.description}
               </span>
             </button>
@@ -82,7 +82,7 @@ export function ChainTemplates() {
         onClick={openBrowser}
         className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-plugin-accent hover:bg-plugin-accent/10 transition-colors"
       >
-        <span className="font-mono uppercase">Browse All Plugins</span>
+        <span className="font-sans uppercase">Browse All Plugins</span>
       </button>
     </div>
   );

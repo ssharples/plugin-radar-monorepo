@@ -21,7 +21,7 @@ export function NewPluginsBanner() {
       <div className="flex-1 min-w-0">
         <p
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             fontSize: 'var(--text-xs)',
             fontWeight: 700,
             color: 'var(--color-accent-cyan)',
@@ -39,7 +39,7 @@ export function NewPluginsBanner() {
           }}
           className="flex items-center gap-1 px-2 py-0.5 rounded fast-snap"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             fontSize: '10px',
             fontWeight: 700,
             textTransform: 'uppercase',

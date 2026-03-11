@@ -200,7 +200,7 @@ function ParameterRow({ param, onChange }: ParameterRowProps) {
       </div>
 
       {/* Value text */}
-      <span className="text-[8px] font-mono text-white tabular-nums w-10 text-right shrink-0">
+      <span className="text-[8px] font-sans text-white tabular-nums w-10 text-right shrink-0">
         {param.text || `${percent.toFixed(0)}%`}
       </span>
     </div>

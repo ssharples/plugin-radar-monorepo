@@ -84,7 +84,7 @@ export function StarRating({ rating, count, interactive = false, onRate, size = 
         <span
           className="text-xs"
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-tertiary)',
           }}
         >

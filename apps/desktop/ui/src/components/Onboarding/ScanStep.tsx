@@ -70,17 +70,17 @@ export function ScanStep() {
     <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
       <h2
         className="crt-text mb-2"
-        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
+        style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-lg)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
       >
         Scanning Your Plugins
       </h2>
-      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', textAlign: 'center', marginBottom: '2rem', maxWidth: '20rem', lineHeight: 1.6 }}>
+      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', textAlign: 'center', marginBottom: '2rem', maxWidth: '20rem', lineHeight: 1.6 }}>
         Finding all AU & VST3 plugins on your system. Plugins that crash or need authorization will be noted.
       </p>
 
       {scanError ? (
         <div className="w-full">
-          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '12px 16px', marginBottom: '16px' }}>
+          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '12px 16px', marginBottom: '16px' }}>
             {scanError}
           </div>
           <button
@@ -104,19 +104,19 @@ export function ScanStep() {
           </div>
 
           {/* Percentage */}
-          <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-mono)', color: 'var(--color-accent-cyan)', marginBottom: '8px' }}>
+          <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-system)', color: 'var(--color-accent-cyan)', marginBottom: '8px' }}>
             {progressPercent}%
           </div>
 
           {/* Currently scanning */}
           {scanActive && truncatedName && (
-            <div className="truncate max-w-full" style={{ color: 'var(--color-text-disabled)', fontFamily: 'var(--font-mono)', fontSize: '10px', marginBottom: '16px' }}>
+            <div className="truncate max-w-full" style={{ color: 'var(--color-text-disabled)', fontFamily: 'var(--font-system)', fontSize: '10px', marginBottom: '16px' }}>
               {truncatedName}
             </div>
           )}
 
           {/* Discovered counter */}
-          <div style={{ color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', marginBottom: '16px' }}>
+          <div style={{ color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', marginBottom: '16px' }}>
             {pluginsDiscovered} plugins found
           </div>
 
@@ -127,7 +127,7 @@ export function ScanStep() {
                 <div
                   key={i}
                   className="flex items-center gap-2 truncate"
-                  style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-status-warning)', background: 'rgba(255, 170, 0, 0.1)', border: '1px solid rgba(255, 170, 0, 0.2)', borderRadius: 'var(--radius-base)', padding: '6px 12px', marginBottom: '4px' }}
+                  style={{ fontSize: '10px', fontFamily: 'var(--font-system)', color: 'var(--color-status-warning)', background: 'rgba(255, 170, 0, 0.1)', border: '1px solid rgba(255, 170, 0, 0.2)', borderRadius: 'var(--radius-base)', padding: '6px 12px', marginBottom: '4px' }}
                 >
                   <span className="shrink-0">!</span>
                   <span className="truncate">{p.name}</span>
@@ -139,7 +139,7 @@ export function ScanStep() {
           {/* Skip link */}
           <button
             onClick={skipScan}
-            style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', transition: 'color var(--duration-fast)' }}
+            style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', transition: 'color var(--duration-fast)' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-disabled)')}
           >

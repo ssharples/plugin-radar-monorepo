@@ -110,7 +110,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
         <div className="flex items-center justify-between mb-4">
           <h2
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-3xl)',
               fontWeight: 700,
               color: '#deff0a',
@@ -141,7 +141,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
           <label
             style={{
               display: 'block',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-xs)',
               color: 'var(--color-text-tertiary)',
               textTransform: 'uppercase',
@@ -175,7 +175,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
           <div className="flex items-center justify-between mb-4">
             <h3
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-sm)',
                 fontWeight: 700,
                 color: '#deff0a',
@@ -257,7 +257,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
                   >
                     <div className="flex items-center justify-between">
                       <div
-                        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)' }}
+                        style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)' }}
                       >
                         {chain.name}
                       </div>

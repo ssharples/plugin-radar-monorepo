@@ -37,7 +37,7 @@ export default {
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Cutive Mono', 'SF Mono', 'Consolas', 'monospace'],
+        mono: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         brand: ['Nosifer', 'cursive'],
         extended: ['Extended Bold', 'Arial Black', 'Impact', 'sans-serif'],
       },

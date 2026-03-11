@@ -13,6 +13,7 @@ import type { PluginDescription } from '../api/types';
  */
 export function InlineSearchOverlay() {
   const searchOverlayActive = useChainStore(s => s.searchOverlayActive);
+  const searchOverlayMode = useChainStore(s => s.searchOverlayMode);
   const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
   const { hideSearchOverlay } = useChainActions();
 
@@ -29,9 +30,10 @@ export function InlineSearchOverlay() {
     if (searchOverlayActive) {
       setQuery('');
       setHighlightedIndex(0);
+      setMode(searchOverlayMode);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [searchOverlayActive]);
+  }, [searchOverlayActive, searchOverlayMode]);
 
   // Register Shift+Enter shortcut to toggle search overlay
   useEffect(() => {
@@ -116,14 +118,18 @@ export function InlineSearchOverlay() {
   }, [searchResults, highlightedIndex, hideSearchOverlay]);
 
   const handleSelect = useCallback(async (plugin: PluginDescription) => {
-    const { addPluginToGroup, removeNode, addPlugin, openInlineEditor } = useChainStore.getState();
+    const { addPluginToGroup, openInlineEditor } = useChainStore.getState();
     hideSearchOverlay();
 
     if (mode === 'replace' && inlineEditorNodeId != null) {
-      // Remove old, add new at same spot. Use the bridge swap function.
       try {
         const { juceBridge: bridge } = await import('../api/juce-bridge');
-        await bridge.swapPluginInChain(inlineEditorNodeId, plugin.fileOrIdentifier, []);
+        const result = await bridge.swapPluginInChain(inlineEditorNodeId, plugin.fileOrIdentifier, []);
+        if (result.success && result.newNodeId != null) {
+          await openInlineEditor(result.newNodeId);
+        } else {
+          await openInlineEditor(inlineEditorNodeId);
+        }
       } catch (err) {
         console.error('[InlineSearchOverlay] swap failed:', err);
       }
@@ -152,7 +158,7 @@ export function InlineSearchOverlay() {
             autoFocus
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+            <span className={`text-[9px] font-sans px-1.5 py-0.5 rounded ${
               mode === 'replace' ? 'bg-plugin-accent/20 text-plugin-accent' : 'bg-blue-500/20 text-blue-400'
             }`}>
               {mode === 'replace' ? 'SWAP' : 'ADD'}
@@ -170,7 +176,7 @@ export function InlineSearchOverlay() {
         <div className="flex gap-2 mt-2">
           <button
             onClick={() => setMode('replace')}
-            className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
+            className={`text-[10px] font-sans px-2 py-0.5 rounded transition-colors ${
               mode === 'replace'
                 ? 'bg-plugin-accent/20 text-plugin-accent border border-plugin-accent/30'
                 : 'text-white hover:text-plugin-accent border border-transparent'
@@ -181,7 +187,7 @@ export function InlineSearchOverlay() {
           </button>
           <button
             onClick={() => setMode('add')}
-            className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
+            className={`text-[10px] font-sans px-2 py-0.5 rounded transition-colors ${
               mode === 'add'
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                 : 'text-white hover:text-plugin-accent border border-transparent'
@@ -221,7 +227,7 @@ export function InlineSearchOverlay() {
                   {category && <span className="ml-2 text-plugin-accent/60">{category}</span>}
                 </div>
               </div>
-              <span className="text-[9px] font-mono text-white shrink-0">
+              <span className="text-[9px] font-sans text-white shrink-0">
                 {plugin.format}
               </span>
             </button>
@@ -230,7 +236,7 @@ export function InlineSearchOverlay() {
       </div>
 
       {/* Footer hints */}
-      <div className="mt-auto pb-4 text-[10px] text-white font-mono flex items-center gap-4">
+      <div className="mt-auto pb-4 text-[10px] text-white font-sans flex items-center gap-4">
         <span>↑↓ Navigate</span>
         <span>↵ Select</span>
         <span>Esc Close</span>

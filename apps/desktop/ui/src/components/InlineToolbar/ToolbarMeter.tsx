@@ -15,7 +15,7 @@ export function ToolbarMeter({ peakL, peakR, label }: ToolbarMeterProps) {
 
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="text-[7px] font-mono text-white tracking-wider">{label}</span>
+      <span className="text-[7px] font-sans text-white tracking-wider">{label}</span>
       <div className="flex gap-px" style={{ width: 24, height: 14 }}>
         {/* L bar */}
         <div className="flex-1 bg-white/5 rounded-sm overflow-hidden relative">
@@ -41,7 +41,7 @@ export function ToolbarMeter({ peakL, peakR, label }: ToolbarMeterProps) {
         </div>
       </div>
       <span
-        className="text-[8px] font-mono tabular-nums leading-none"
+        className="text-[8px] font-sans tabular-nums leading-none"
         style={{
           color:
             peakDb > -3

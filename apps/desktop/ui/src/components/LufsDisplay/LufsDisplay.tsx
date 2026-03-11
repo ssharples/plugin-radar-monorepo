@@ -64,7 +64,7 @@ export function LufsDisplay({
     }
   };
 
-  const monoFont = "var(--font-mono, 'JetBrains Mono', monospace)";
+  const monoFont = "var(--font-brand)";
 
   if (compact) {
     return (
