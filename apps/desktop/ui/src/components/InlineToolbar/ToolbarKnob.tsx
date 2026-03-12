@@ -168,12 +168,12 @@ export function ToolbarKnob({
         </svg>
       </div>
       {/* Label */}
-      <span className="text-[7px] font-mono text-white tracking-wider leading-none mt-0.5">
+      <span className="text-[7px] font-sans text-white tracking-wider leading-none mt-0.5">
         {label}
       </span>
       {/* Value */}
       <span
-        className="text-[8px] font-mono tabular-nums leading-none"
+        className="text-[8px] font-sans tabular-nums leading-none"
         style={{ color: isDragging ? '#deff0a' : 'rgba(255,255,255,0.5)' }}
       >
         {displayValue}

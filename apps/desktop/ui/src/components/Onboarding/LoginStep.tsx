@@ -19,14 +19,14 @@ export function LoginStep() {
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-sm px-6 animate-fade-in">
-      {/* Propane brand */}
+      {/* ProChain brand */}
       <h1
         className="font-brand crt-text mb-1"
         style={{ fontSize: '1.875rem', color: 'var(--color-accent-cyan)', letterSpacing: 'var(--tracking-wider)' }}
       >
-        PROPANE
+        ProChain
       </h1>
-      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)', marginBottom: '2rem' }}>
+      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', textTransform: 'capitalize', letterSpacing: 'var(--tracking-widest)', marginBottom: '2rem' }}>
         Plugin Chain Manager
       </p>
 
@@ -39,7 +39,7 @@ export function LoginStep() {
           style={{
             padding: '8px 0',
             fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wider)',
             border: 'none',
@@ -58,7 +58,7 @@ export function LoginStep() {
           style={{
             padding: '8px 0',
             fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wider)',
             border: 'none',
@@ -102,7 +102,7 @@ export function LoginStep() {
         />
 
         {authError && (
-          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '8px 12px' }}>
+          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '8px 12px' }}>
             {authError}
           </div>
         )}

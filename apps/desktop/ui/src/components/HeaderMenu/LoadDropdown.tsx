@@ -36,7 +36,7 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-input)',
   border: '1px solid var(--color-border-default)',
   borderRadius: 'var(--radius-base)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontSize: 'var(--text-sm)',
   color: 'var(--color-text-primary)',
   padding: '6px 10px',
@@ -146,7 +146,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
     flex: 1,
     padding: '8px 16px',
     fontSize: 'var(--text-xs)',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-system)',
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 'var(--tracking-wide)',
@@ -238,13 +238,13 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-3 pb-3 scrollbar-cyber">
         {loading ? (
-          <div className="py-8 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+          <div className="py-8 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
             Loading...
           </div>
         ) : items.length === 0 ? (
           <div className="py-8 text-center">
             <FileText className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)', opacity: 0.3 }} />
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
               {activeTab === 'presets'
                 ? 'No local presets found'
                 : 'No group templates found'
@@ -263,7 +263,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
                       <Clock className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
                       <span style={{
                         fontSize: 'var(--text-xs)',
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         color: 'var(--color-text-tertiary)',
                         textTransform: 'uppercase',
                         letterSpacing: 'var(--tracking-wider)',
@@ -290,7 +290,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
                     <FileText className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
                     <span style={{
                       fontSize: 'var(--text-xs)',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       color: 'var(--color-text-tertiary)',
                       textTransform: 'uppercase',
                       letterSpacing: 'var(--tracking-wider)',
@@ -300,7 +300,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
                     </span>
                   </div>
                   {filteredPresets.length === 0 ? (
-                    <div className="py-4 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                    <div className="py-4 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
                       No presets matching "{search}"
                     </div>
                   ) : (
@@ -325,7 +325,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
                   <Layers className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
                   <span style={{
                     fontSize: 'var(--text-xs)',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     color: 'var(--color-text-tertiary)',
                     textTransform: 'uppercase',
                     letterSpacing: 'var(--tracking-wider)',
@@ -335,7 +335,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
                   </span>
                 </div>
                 {filteredTemplates.length === 0 ? (
-                  <div className="py-4 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                  <div className="py-4 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
                     {search ? `No templates matching "${search}"` : 'No templates in this category'}
                   </div>
                 ) : (
@@ -365,7 +365,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
             style={{
               padding: '6px 12px',
               fontSize: 'var(--text-xs)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: 'var(--color-text-secondary)',
               border: '1px dashed var(--color-border-default)',
               background: 'transparent',
@@ -406,13 +406,13 @@ function PresetRow({
     >
       <span className="truncate" style={{
         fontSize: 'var(--text-sm)',
-        fontFamily: 'var(--font-mono)',
+        fontFamily: 'var(--font-system)',
         color: 'var(--color-text-primary)',
       }}>
         {preset.name}
       </span>
       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
           {preset.category}
         </span>
         <span
@@ -454,14 +454,14 @@ function TemplateRow({
         />
         <span className="truncate" style={{
           fontSize: 'var(--text-sm)',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           color: 'var(--color-text-primary)',
         }}>
           {template.name}
         </span>
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
           {template.pluginCount} plugin{template.pluginCount !== 1 ? 's' : ''}
         </span>
         <span

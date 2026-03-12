@@ -185,7 +185,7 @@ export function Knob({
         <div
           className="tabular-nums leading-tight transition-colors"
           style={{
-            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+            fontFamily: "var(--font-brand)",
             fontSize: 'var(--text-xs, 10px)',
             color: isDragging ? NEON : 'var(--color-text-secondary, #a0a0a0)',
             textShadow: isDragging ? `0 0 8px rgba(222, 255, 10, 0.5)` : 'none',
@@ -199,7 +199,7 @@ export function Knob({
         <div
           className="uppercase tracking-widest font-medium"
           style={{
-            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+            fontFamily: "var(--font-system)",
             fontSize: 'var(--text-xs, 10px)',
             letterSpacing: 'var(--tracking-wider, 0.1em)',
             color: 'var(--color-text-tertiary, #606060)',

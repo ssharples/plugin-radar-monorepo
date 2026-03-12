@@ -20,7 +20,7 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-input)',
   border: '1px solid var(--color-border-default)',
   borderRadius: 'var(--radius-base)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontSize: 'var(--text-sm)',
   color: 'var(--color-text-primary)',
   padding: '6px 10px',
@@ -45,7 +45,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
       <div className="w-80 rounded-md p-4 scale-in" style={glassPanel}>
         <div className="text-center">
           <AlertCircle className="w-5 h-5 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
             Log in to share chains
           </p>
         </div>
@@ -58,7 +58,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
       <div className="w-80 rounded-md p-4 scale-in" style={glassPanel}>
         <div className="text-center">
           <AlertCircle className="w-5 h-5 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
             Add plugins before sharing
           </p>
         </div>
@@ -195,7 +195,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
             className="block mb-1"
             style={{
               fontSize: 'var(--text-xs)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: 'var(--color-text-tertiary)',
               textTransform: 'uppercase',
               letterSpacing: 'var(--tracking-wide)',
@@ -225,26 +225,26 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
           className="rounded-md px-2.5 py-1.5"
           style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border-subtle)' }}
         >
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
             {chainName} ({slots.length} plugin{slots.length !== 1 ? 's' : ''})
           </div>
         </div>
 
         {/* Status messages */}
         {status === 'saving' && (
-          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
             <Loader2 className="w-3 h-3 animate-spin" />
             Saving chain to cloud...
           </div>
         )}
         {status === 'sending' && (
-          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
             <Loader2 className="w-3 h-3 animate-spin" />
             Sending to {recipient}...
           </div>
         )}
         {status === 'success' && (
-          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-active)', fontFamily: 'var(--font-mono)' }}>
+          <div className="flex items-center gap-1.5" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-status-active)', fontFamily: 'var(--font-system)' }}>
             <Check className="w-3 h-3" />
             Chain sent!
           </div>
@@ -257,7 +257,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
               color: 'var(--color-status-error)',
               background: 'rgba(255, 0, 51, 0.1)',
               border: '1px solid rgba(255, 0, 51, 0.2)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
             }}
           >
             {errorMsg}

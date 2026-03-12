@@ -195,7 +195,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
             style={{
               writingMode: 'vertical-rl',
               textOrientation: 'mixed',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-xs)',
               fontWeight: 700,
               textTransform: 'uppercase',
@@ -208,7 +208,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
         </div>
         <div
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             fontSize: '9px',
             color: 'var(--color-accent-cyan)',
           }}
@@ -242,7 +242,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
           </button>
           <h2
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-sm)',
               fontWeight: 700,
               textTransform: 'uppercase',
@@ -256,7 +256,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
             <span
               className="animate-pulse"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: '9px',
                 color: 'var(--color-accent-magenta)',
               }}
@@ -337,7 +337,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
                 className="fast-snap"
                 style={{
                   padding: '2px 8px',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 700,
                   textTransform: 'uppercase',
@@ -365,7 +365,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
                   className="fast-snap"
                   style={{
                     padding: '2px 8px',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: 'var(--text-xs)',
                     fontWeight: 700,
                     textTransform: 'uppercase',
@@ -396,13 +396,13 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
         <div className="flex items-center justify-between">
           {activeFilters ? (
             <div className="flex items-center gap-1">
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-accent-magenta)' }}>
+              <span style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-accent-magenta)' }}>
                 Filtered
               </span>
               <button
                 onClick={clearAllFilters}
                 className="flex items-center gap-0.5 fast-snap"
-                style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-text-tertiary)' }}
+                style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-text-tertiary)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
               >
@@ -415,7 +415,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
             onClick={() => setShowDeactivated(!showDeactivated)}
             className="flex items-center gap-1 fast-snap"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: '9px',
               color: showDeactivated ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
             }}
@@ -442,10 +442,10 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
           }}
         >
           <div className="flex items-center justify-between mb-1">
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-accent-cyan)' }}>
+            <span style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-accent-cyan)' }}>
               Scanning...
             </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+            <span style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
               {Math.round(scanProgress * 100)}%
             </span>
           </div>
@@ -464,7 +464,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
             />
           </div>
           {currentlyScanning && (
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-text-tertiary)', marginTop: '2px' }} className="truncate">
+            <p style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-text-tertiary)', marginTop: '2px' }} className="truncate">
               {currentlyScanning}
             </p>
           )}
@@ -474,19 +474,19 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
       {/* Plugin list */}
       <div className="flex-1 overflow-y-auto p-1.5 scrollbar-cyber" ref={listRef}>
         {loading && !scanning ? (
-          <div className="flex items-center justify-center h-24" style={{ color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+          <div className="flex items-center justify-center h-24" style={{ color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)' }}>
             Loading...
           </div>
         ) : filteredPlugins.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24">
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
+            <p style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
               No plugins found
             </p>
             {activeFilters && (
               <button
                 onClick={clearAllFilters}
                 className="mt-2 fast-snap"
-                style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)' }}
+                style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)' }}
               >
                 Clear filters
               </button>
@@ -495,7 +495,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
               <button
                 onClick={() => startScan(true)}
                 className="mt-2 fast-snap"
-                style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)' }}
+                style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)' }}
               >
                 Scan for plugins
               </button>
@@ -522,7 +522,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
         className="px-3 py-1 flex items-center"
         style={{
           borderTop: '1px solid var(--color-border-default)',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           fontSize: 'var(--text-xs)',
           color: 'var(--color-text-tertiary)',
         }}
@@ -549,7 +549,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
               padding: '8px 16px',
               background: 'var(--color-accent-cyan)',
               color: 'var(--color-bg-primary)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-sm)',
               fontWeight: 700,
               textTransform: 'uppercase',

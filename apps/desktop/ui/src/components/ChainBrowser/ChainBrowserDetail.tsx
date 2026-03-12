@@ -353,7 +353,7 @@ export function ChainBrowserDetail({
                   color: 'var(--color-accent-cyan)',
                   background: 'rgba(222, 255, 10, 0.06)',
                   padding: '3px 8px',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
                   border: '1px solid rgba(222, 255, 10, 0.12)',
@@ -380,7 +380,7 @@ export function ChainBrowserDetail({
               Target
             </span>
             <span style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontWeight: 700,
               color: 'var(--color-accent-cyan)',
               fontSize: 'var(--text-body)',
@@ -418,7 +418,7 @@ export function ChainBrowserDetail({
                     : <><AlertTriangle style={{ width: 13, height: 13 }} /> Missing {compatibility.missingCount} plugin{compatibility.missingCount !== 1 ? 's' : ''}</>}
                 </span>
                 <span style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontWeight: 800,
                   color: '#fff',
                   fontSize: 'var(--text-title)',
@@ -516,7 +516,7 @@ export function ChainBrowserDetail({
                         textAlign: 'right',
                         flexShrink: 0,
                         fontSize: 'var(--text-body)',
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-system)',
                         fontWeight: 600,
                       }}>
                         {slotPosition + 1}
@@ -571,7 +571,7 @@ export function ChainBrowserDetail({
                           <span style={{
                             fontSize: 'var(--text-body)',
                             color: 'rgba(255,255,255,0.3)',
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font-system)',
                             minWidth: '28px',
                             textAlign: 'center',
                             fontWeight: 600,
@@ -665,7 +665,7 @@ export function ChainBrowserDetail({
                           }}
                         >
                           <span style={{ color: 'rgba(255,255,255,0.3)' }}>{param.name}</span>
-                          <span style={{ color: 'rgba(222,255,10,0.7)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                          <span style={{ color: 'rgba(222,255,10,0.7)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>
                             {param.value}{param.unit ? ` ${param.unit}` : ''}
                           </span>
                         </div>

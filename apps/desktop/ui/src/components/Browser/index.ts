@@ -1,5 +1,3 @@
-export { UnifiedBrowser } from './UnifiedBrowser';
-export { PluginCard } from './PluginCard';
-export { ChainCard } from './ChainCard';
-export { GroupPresetCard } from './GroupPresetCard';
-export { AuthorAvatar } from './AuthorAvatar';
+// Re-export from ChainBrowser for backwards compatibility
+export { ChainBrowser } from '../ChainBrowser';
+export { ChainBrowser as UnifiedBrowser } from '../ChainBrowser';

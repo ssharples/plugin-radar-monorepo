@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useDraggable } from '@dnd-kit/core';
-import { Trash2, ChevronDown, AudioLines } from 'lucide-react';
+import { ChevronDown, AudioLines } from 'lucide-react';
 import type { PluginNodeUI, ChainSlot as ChainSlotType } from '../../api/types';
 import { useChainStore, useChainActions } from '../../stores/chainStore';
 import { useMeterStore } from '../../stores/meterStore';
@@ -15,7 +15,6 @@ import { PluginSwapMenu } from './PluginSwapMenu';
 import { BranchGainBadge } from './BranchGainBadge';
 import { PluginControlsPanel } from './PluginControlsPanel';
 import { SlotContextMenu } from './SlotContextMenu';
-import { useSwipeToDelete } from './useSwipeToDelete';
 
 // Convert linear to dB
 function linearToDb(linear: number): number {
@@ -97,12 +96,6 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
   // Hover and menu state
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number } | null>(null);
-
-  // Swipe-to-delete
-  const { swipeOffset, swipeThreshold, justSwipedRef, slotRef } = useSwipeToDelete({
-    onRemove,
-    disabled: groupSelectMode || isMultiSelected || !!showContextMenu,
-  });
 
   // Subscribe to this slot's meter data (dedicated store to avoid chainStore churn)
   const meterData = useMeterStore((s) => s.nodeMeterData[String(id)]);
@@ -203,12 +196,6 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
 
   // Click handler
   const handleClick = (e: React.MouseEvent) => {
-    // Don't trigger click if we just completed a swipe
-    if (justSwipedRef.current) {
-      justSwipedRef.current = false;
-      return;
-    }
-
     if (groupSelectMode || e.metaKey || e.ctrlKey) {
       onSelect?.(e);
     } else if (e.shiftKey) {
@@ -229,31 +216,8 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
   return (
     <div className="chain-slot-wrapper">
       <div className="relative overflow-hidden">
-        {/* Delete background - revealed during swipe */}
         <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            background: 'linear-gradient(90deg, rgba(255, 0, 51, 0.9), rgba(255, 0, 51, 0.7))',
-            opacity: Math.abs(swipeOffset) / swipeThreshold,
-            pointerEvents: 'none',
-          }}
-        >
-          <Trash2
-            className="w-6 h-6"
-            style={{
-              color: '#ffffff',
-              transform: `scale(${Math.min(1.5, Math.abs(swipeOffset) / swipeThreshold)})`,
-              transition: 'transform 100ms ease-out',
-            }}
-          />
-        </div>
-
-        {/* Swipeable slot content */}
-        <div
-          ref={(el) => {
-            (slotRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-            setDragRef(el);
-          }}
+          ref={setDragRef}
           className={`
           chain-slot-cyber
           ${bypassed ? 'bypassed' : ''}
@@ -263,9 +227,6 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
           ${isDragActive && !isDragging ? 'dim-during-drag' : ''}
         `}
           style={{
-            transform: `translateX(${swipeOffset}px)`,
-            transition: swipeOffset !== 0 ? 'none' : 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-            touchAction: 'none', // Prevent default touch behaviors
             zIndex: showContextMenu ? 100 : undefined,
             borderLeft: slotColor ? `3px solid ${slotColor}` : undefined,
           }}
@@ -353,7 +314,7 @@ export const ChainSlotCyber = memo(function ChainSlotCyber({
               <span
                 style={{
                   fontSize: 'var(--text-nano)',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontWeight: 700,
                   color: '#deff0a',
                   letterSpacing: '0.05em',

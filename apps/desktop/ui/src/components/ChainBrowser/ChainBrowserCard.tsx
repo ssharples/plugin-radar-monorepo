@@ -115,7 +115,7 @@ export function ChainBrowserCard({
           {slots && slots.length > 0 && (
             <>
               <span style={{ opacity: 0.5 }}>·</span>
-              <span className="truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="truncate" style={{ fontFamily: 'var(--font-system)' }}>
                 {pluginCount}p:{' '}
                 {slots.slice(0, 3).map((s, i) => {
                   const enriched = s.uid ? getEnrichedDataForPlugin(s.uid) : null;
@@ -152,7 +152,7 @@ export function ChainBrowserCard({
                   color: '#fff',
                   background: 'rgba(255,255,255,0.03)',
                   padding: '1px 4px',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
                 }}

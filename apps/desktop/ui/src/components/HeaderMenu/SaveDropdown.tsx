@@ -1,4 +1,3 @@
-import { useState, useCallback } from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Save, Cloud, Globe, X } from 'lucide-react';
 import { useChainStore } from '../../stores/chainStore';
@@ -11,54 +10,68 @@ import type { DropdownOption } from '../Dropdown';
 import type { MeterData } from '../../api/types';
 
 const USE_CASE_GROUPS = [
-  { value: 'vocals', label: 'Vocals', useCases: [
-    { value: 'rap-vocals', label: 'Rap Vocals' },
-    { value: 'female-vocals', label: 'Female Vocals' },
-    { value: 'male-vocals', label: 'Male Vocals' },
-    { value: 'backings', label: 'Backings' },
-    { value: 'adlibs', label: 'Adlibs' },
-    { value: 'harmonies', label: 'Harmonies' },
-    { value: 'spoken-word', label: 'Spoken Word' },
-  ]},
-  { value: 'drums', label: 'Drums', useCases: [
-    { value: 'kick', label: 'Kick' },
-    { value: 'snare', label: 'Snare' },
-    { value: 'hats', label: 'Hats' },
-    { value: 'drum-bus', label: 'Drum Bus' },
-    { value: 'overheads', label: 'Overheads' },
-    { value: 'toms', label: 'Toms' },
-    { value: 'percussion', label: 'Percussion' },
-  ]},
-  { value: 'bass', label: 'Bass', useCases: [
-    { value: 'bass-guitar', label: 'Bass Guitar' },
-    { value: 'sub-bass', label: 'Sub Bass' },
-    { value: '808', label: '808' },
-    { value: 'synth-bass', label: 'Synth Bass' },
-  ]},
-  { value: 'keys-synths', label: 'Keys & Synths', useCases: [
-    { value: 'piano', label: 'Piano' },
-    { value: 'pads', label: 'Pads' },
-    { value: 'leads', label: 'Leads' },
-    { value: 'organs', label: 'Organs' },
-    { value: 'strings', label: 'Strings' },
-  ]},
-  { value: 'guitar', label: 'Guitar', useCases: [
-    { value: 'electric-guitar', label: 'Electric Guitar' },
-    { value: 'acoustic-guitar', label: 'Acoustic Guitar' },
-    { value: 'guitar-bus', label: 'Guitar Bus' },
-  ]},
-  { value: 'fx-creative', label: 'FX & Creative', useCases: [
-    { value: 'experimental', label: 'Experimental' },
-    { value: 'sound-design', label: 'Sound Design' },
-    { value: 'ambient', label: 'Ambient' },
-    { value: 'risers-impacts', label: 'Risers & Impacts' },
-  ]},
-  { value: 'mixing-mastering', label: 'Mixing & Mastering', useCases: [
-    { value: 'mix-bus', label: 'Mix Bus' },
-    { value: 'master-chain', label: 'Master Chain' },
-    { value: 'stem-mixing', label: 'Stem Mixing' },
-    { value: 'live-performance', label: 'Live Performance' },
-  ]},
+  {
+    value: 'vocals', label: 'Vocals', useCases: [
+      { value: 'rap-vocals', label: 'Rap Vocals' },
+      { value: 'female-vocals', label: 'Female Vocals' },
+      { value: 'male-vocals', label: 'Male Vocals' },
+      { value: 'backings', label: 'Backings' },
+      { value: 'adlibs', label: 'Adlibs' },
+      { value: 'harmonies', label: 'Harmonies' },
+      { value: 'spoken-word', label: 'Spoken Word' },
+    ]
+  },
+  {
+    value: 'drums', label: 'Drums', useCases: [
+      { value: 'kick', label: 'Kick' },
+      { value: 'snare', label: 'Snare' },
+      { value: 'hats', label: 'Hats' },
+      { value: 'drum-bus', label: 'Drum Bus' },
+      { value: 'overheads', label: 'Overheads' },
+      { value: 'toms', label: 'Toms' },
+      { value: 'percussion', label: 'Percussion' },
+    ]
+  },
+  {
+    value: 'bass', label: 'Bass', useCases: [
+      { value: 'bass-guitar', label: 'Bass Guitar' },
+      { value: 'sub-bass', label: 'Sub Bass' },
+      { value: '808', label: '808' },
+      { value: 'synth-bass', label: 'Synth Bass' },
+    ]
+  },
+  {
+    value: 'keys-synths', label: 'Keys & Synths', useCases: [
+      { value: 'piano', label: 'Piano' },
+      { value: 'pads', label: 'Pads' },
+      { value: 'leads', label: 'Leads' },
+      { value: 'organs', label: 'Organs' },
+      { value: 'strings', label: 'Strings' },
+    ]
+  },
+  {
+    value: 'guitar', label: 'Guitar', useCases: [
+      { value: 'electric-guitar', label: 'Electric Guitar' },
+      { value: 'acoustic-guitar', label: 'Acoustic Guitar' },
+      { value: 'guitar-bus', label: 'Guitar Bus' },
+    ]
+  },
+  {
+    value: 'fx-creative', label: 'FX & Creative', useCases: [
+      { value: 'experimental', label: 'Experimental' },
+      { value: 'sound-design', label: 'Sound Design' },
+      { value: 'ambient', label: 'Ambient' },
+      { value: 'risers-impacts', label: 'Risers & Impacts' },
+    ]
+  },
+  {
+    value: 'mixing-mastering', label: 'Mixing & Mastering', useCases: [
+      { value: 'mix-bus', label: 'Mix Bus' },
+      { value: 'master-chain', label: 'Master Chain' },
+      { value: 'stem-mixing', label: 'Stem Mixing' },
+      { value: 'live-performance', label: 'Live Performance' },
+    ]
+  },
 ];
 
 const PEAK_PRESETS = [
@@ -81,7 +94,7 @@ const glassPanel: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 'var(--text-xs)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   color: 'var(--color-text-secondary)',
   textTransform: 'uppercase' as const,
   letterSpacing: 'var(--tracking-wide)',
@@ -93,7 +106,7 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-input)',
   border: '1px solid var(--color-border-default)',
   borderRadius: 'var(--radius-base)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontSize: 'var(--text-sm)',
   color: 'var(--color-text-primary)',
   padding: '6px 10px',
@@ -214,7 +227,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
           >
             <Save className="w-5 h-5" style={{ color: 'var(--color-status-active)' }} />
           </div>
-          <p style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          <p style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             Saved locally
           </p>
         </div>
@@ -232,22 +245,22 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
           >
             <Cloud className="w-5 h-5" style={{ color: 'var(--color-accent-cyan)' }} />
           </div>
-          <p className="mb-3" style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          <p className="mb-3" style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             Chain saved
           </p>
           <div
             className="rounded-md p-3 mb-3"
             style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border-default)' }}
           >
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: '4px' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: '4px' }}>
               Share Code
             </div>
-            <div style={{ fontSize: 'var(--text-3xl)', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-accent-cyan)', letterSpacing: 'var(--tracking-widest)' }}>
+            <div style={{ fontSize: 'var(--text-3xl)', fontFamily: 'var(--font-system)', fontWeight: 700, color: 'var(--color-accent-cyan)', letterSpacing: 'var(--tracking-widest)' }}>
               {savedResult.shareCode}
             </div>
           </div>
           {savedResult.isPublic && (
-            <p className="mb-3" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <p className="mb-3" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
               plugin-radar.com/chains/{savedResult.slug}
             </p>
           )}
@@ -293,7 +306,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
       </div>
 
       {!hasPlugins ? (
-        <div className="p-4 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+        <div className="p-4 text-center" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
           Add plugins to your chain before saving.
         </div>
       ) : (
@@ -306,7 +319,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                 color: 'var(--color-status-error)',
                 background: 'rgba(255, 0, 51, 0.1)',
                 border: '1px solid rgba(255, 0, 51, 0.2)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
               }}
             >
               {error}
@@ -379,7 +392,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                   className="flex items-center gap-0.5 px-1.5 py-0.5 rounded transition-colors duration-150"
                   style={{
                     fontSize: 'var(--text-xs)',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     color: 'var(--color-accent-cyan)',
                     background: 'rgba(222, 255, 10, 0.1)',
                     border: '1px solid rgba(222, 255, 10, 0.2)',
@@ -406,7 +419,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                     width: '64px',
                     background: 'transparent',
                     border: 'none',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: 'var(--text-xs)',
                     color: 'var(--color-text-secondary)',
                     outline: 'none',
@@ -425,7 +438,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                     className="px-1.5 py-0.5 rounded transition-colors duration-150"
                     style={{
                       fontSize: '9px',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-system)',
                       color: 'var(--color-text-tertiary)',
                       background: 'var(--color-bg-elevated)',
                       border: '1px solid var(--color-border-subtle)',
@@ -448,7 +461,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                 style={{
                   padding: '4px 8px',
                   fontSize: '10px',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontWeight: 700,
                   color: currentAvgPeak > -60 ? 'var(--color-accent)' : '#666',
                   background: currentAvgPeak > -60 ? 'rgba(137, 87, 42, 0.15)' : 'transparent',
@@ -462,7 +475,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
             </div>
             <div className="flex items-center gap-2">
               <div className="flex-1">
-                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>Min</span>
+                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>Min</span>
                 <input
                   type="number"
                   value={peakMin}
@@ -473,7 +486,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
               </div>
               <span style={{ color: 'var(--color-text-tertiary)', marginTop: '14px' }}>—</span>
               <div className="flex-1">
-                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>Max</span>
+                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>Max</span>
                 <input
                   type="number"
                   value={peakMax}
@@ -492,7 +505,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                   style={{
                     padding: '2px 6px',
                     fontSize: '9px',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     color: peakMin === p.min && peakMax === p.max ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                     background: peakMin === p.min && peakMax === p.max ? 'rgba(255,255,255,0.08)' : 'transparent',
                     border: `1px solid ${peakMin === p.min && peakMax === p.max ? 'var(--color-border-default)' : 'transparent'}`,
@@ -503,7 +516,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                 </button>
               ))}
             </div>
-            <p className="mt-1" style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <p className="mt-1" style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
               Recommended input peak level for this chain to work as intended
             </p>
           </div>
@@ -513,10 +526,10 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
             className="rounded-md p-2"
             style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border-subtle)' }}
           >
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
               {slots.length} plugin{slots.length !== 1 ? 's' : ''}
             </div>
-            <div className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            <div className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-system)' }}>
               {slots.map((s) => s.name).join(' → ')}
             </div>
           </div>
@@ -530,7 +543,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
               style={{
                 padding: '6px 12px',
                 fontSize: 'var(--text-xs)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wide)',
@@ -566,7 +579,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                   style={{
                     padding: '6px 12px',
                     fontSize: 'var(--text-xs)',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: 'var(--tracking-wide)',
@@ -582,7 +595,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                 </button>
               </>
             ) : (
-              <p className="text-center" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+              <p className="text-center" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
                 Log in to save to cloud
               </p>
             )}

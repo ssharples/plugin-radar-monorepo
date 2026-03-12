@@ -12,7 +12,9 @@ interface ToolbarLevel1Props {
 
 const NEON = 'var(--color-accent-cyan)';
 
-const PANEL_BTNS: { id: PanelId; icon: React.FC<React.SVGProps<SVGSVGElement>>; title: string }[] = [
+type ToolbarActionId = PanelId | 'browser';
+
+const PANEL_BTNS: { id: ToolbarActionId; icon: React.FC<React.SVGProps<SVGSVGElement>>; title: string }[] = [
   { id: 'browser', icon: ProPresetsIcon, title: 'Chain & Plugin Browser' },
   { id: 'routing', icon: ProRoutingIcon, title: 'Routing' },
   { id: 'chain-overview', icon: ProOverviewIcon, title: 'Chain Overview' },
@@ -23,6 +25,7 @@ export function ToolbarLevel1({ node }: ToolbarLevel1Props) {
   const nodes = useChainStore(s => s.nodes);
   const openPanels = usePanelStore(s => s.openPanels);
   const togglePanel = usePanelStore(s => s.togglePanel);
+  const closeAllPanels = usePanelStore(s => s.closeAllPanels);
 
   const inParallel = useMemo(() => isNodeInParallelGroup(nodes, node.id), [nodes, node.id]);
 
@@ -95,11 +98,18 @@ export function ToolbarLevel1({ node }: ToolbarLevel1Props) {
 
       {/* Panel toggle buttons */}
       {PANEL_BTNS.map(({ id, icon: Icon, title }) => {
-        const isOpen = openPanels.includes(id);
+        const isOpen = id !== 'browser' && openPanels.includes(id);
         return (
           <button
             key={id}
-            onClick={() => togglePanel(id)}
+            onClick={() => {
+              if (id === 'browser') {
+                closeAllPanels();
+                window.dispatchEvent(new Event('openPluginBrowser'));
+                return;
+              }
+              togglePanel(id);
+            }}
             className="w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors"
             style={{
               background: isOpen ? 'rgba(222, 255, 10, 0.15)' : 'transparent',

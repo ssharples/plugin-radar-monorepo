@@ -20,7 +20,7 @@ export function ChainBrowserSidebar({
         <div
           style={{
             fontSize: '9px',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-disabled)',
             textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wider)',

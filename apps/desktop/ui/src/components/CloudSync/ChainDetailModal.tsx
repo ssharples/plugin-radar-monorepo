@@ -336,7 +336,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
         <button
           onClick={onBack}
           className="mb-4 flex items-center gap-1"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', background: 'none', border: 'none', cursor: 'pointer' }}
+          style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', background: 'none', border: 'none', cursor: 'pointer' }}
           onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-accent-cyan)')}
           onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
         >
@@ -345,7 +345,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+          <h2 style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
             {currentChain.name}
           </h2>
           {currentChain.forkedFrom && (
@@ -423,7 +423,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                   ? 'All plugins available'
                   : `Missing ${compatibility.missingCount} of ${compatibility.ownedCount + compatibility.missingCount} plugins`}
               </span>
-              <span style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', fontWeight: 700, color: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)', fontWeight: 700, color: compatibility.canFullyLoad ? 'var(--color-status-active)' : 'var(--color-status-warning)' }}>
                 {compatibility.percentage}%
               </span>
             </div>
@@ -494,7 +494,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
 
         {/* Plugin list */}
         <div className="mb-4">
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: 'var(--space-2)', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: 'var(--space-2)', fontFamily: 'var(--font-system)' }}>
             Plugins ({currentChain.slots.length})
           </div>
           <div className="space-y-1">
@@ -518,7 +518,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
                   }}
                 >
                   <div className="min-w-0">
-                    <div style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }} className="truncate">{slot.pluginName}</div>
+                    <div style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)' }} className="truncate">{slot.pluginName}</div>
                     <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-xs)' }}>{slot.manufacturer}</div>
                   </div>
                   {isOwned ? (
@@ -533,7 +533,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
         </div>
 
         {/* Stats row */}
-        <div className="flex items-center gap-4 mb-4" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+        <div className="flex items-center gap-4 mb-4" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
           <span>Likes: {currentChain.likes}</span>
           <span>Downloads: {currentChain.downloads}</span>
         </div>
@@ -561,7 +561,7 @@ export function ChainDetailModal({ onClose, onLoad, onBack }: ChainDetailModalPr
         {/* Fork dialog */}
         {showForkDialog && (
           <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--color-bg-input)', border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-lg)' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Fork this chain</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)', fontFamily: 'var(--font-system)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Fork this chain</div>
             <div className="flex gap-2">
               <input
                 type="text"

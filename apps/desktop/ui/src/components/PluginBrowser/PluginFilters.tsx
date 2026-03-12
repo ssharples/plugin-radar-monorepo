@@ -98,7 +98,7 @@ const TONAL_CHARACTERS = [
 function chipStyle(isActive: boolean): React.CSSProperties {
   return {
     padding: '2px 6px',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-system)',
     fontSize: '9px',
     fontWeight: 700,
     textTransform: 'uppercase',
@@ -194,7 +194,7 @@ export function PluginFilters() {
               className="fast-snap"
               style={{
                 padding: '2px 6px',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-xs)',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -230,7 +230,7 @@ export function PluginFilters() {
             className="flex items-center gap-0.5 fast-snap"
             style={{
               padding: '2px 6px',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-xs)',
               fontWeight: 700,
               textTransform: 'uppercase',
@@ -272,7 +272,7 @@ export function PluginFilters() {
           <div className="flex items-center justify-between">
             <span
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-xs)',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -287,7 +287,7 @@ export function PluginFilters() {
                 onClick={clearAllFilters}
                 className="flex items-center gap-0.5 fast-snap"
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   color: 'var(--color-accent-magenta)',
                 }}
@@ -303,7 +303,7 @@ export function PluginFilters() {
             <label
               style={{
                 display: 'block',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: '9px',
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wider)',
@@ -335,7 +335,7 @@ export function PluginFilters() {
               <label
                 style={{
                   display: 'block',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontSize: '9px',
                   textTransform: 'uppercase',
                   letterSpacing: 'var(--tracking-wider)',
@@ -367,7 +367,7 @@ export function PluginFilters() {
             <label
               style={{
                 display: 'block',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: '9px',
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wider)',
@@ -395,7 +395,7 @@ export function PluginFilters() {
             <label
               style={{
                 display: 'block',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: '9px',
                 textTransform: 'uppercase',
                 letterSpacing: 'var(--tracking-wider)',

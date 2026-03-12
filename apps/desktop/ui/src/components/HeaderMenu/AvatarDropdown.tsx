@@ -18,7 +18,7 @@ const glassPanel: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 'var(--text-xs)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   color: 'var(--color-text-tertiary)',
   textTransform: 'uppercase',
   letterSpacing: 'var(--tracking-wide)',
@@ -29,7 +29,7 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-input)',
   border: '1px solid var(--color-border-default)',
   borderRadius: 'var(--radius-base)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontSize: 'var(--text-sm)',
   color: 'var(--color-text-primary)',
   padding: '6px 10px',
@@ -149,7 +149,7 @@ function LoggedInAvatar() {
       <span
         style={{
           fontSize: 'var(--text-xs)',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           fontWeight: 700,
           color: 'var(--color-bg-primary)',
           lineHeight: 1,
@@ -200,7 +200,7 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
 
   const tabStyle = (isActive: boolean): React.CSSProperties => ({
     fontSize: 'var(--text-xs)',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-system)',
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 'var(--tracking-wide)',
@@ -351,7 +351,7 @@ function LoggedInPanel({ onClose, onBadgeUpdate }: { onClose: () => void; onBadg
     gap: '6px',
     padding: '8px 12px',
     fontSize: 'var(--text-xs)',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-system)',
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 'var(--tracking-wide)',
@@ -390,7 +390,7 @@ function LoggedInPanel({ onClose, onBadgeUpdate }: { onClose: () => void; onBadg
                 background: 'var(--color-accent-magenta)',
                 color: '#fff',
                 fontSize: '9px',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 padding: '0 4px',
                 minWidth: '14px',
                 height: '14px',
@@ -496,7 +496,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
           <div
             style={{
               fontSize: 'var(--text-sm)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontWeight: 700,
               color: 'var(--color-text-primary)',
             }}
@@ -513,7 +513,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
         className="w-full flex items-center justify-between rounded px-2.5 py-1.5 transition-all duration-150"
         style={{
           fontSize: 'var(--text-xs)',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           color: 'var(--color-text-secondary)',
           border: '1px solid var(--color-border-default)',
           background: 'transparent',
@@ -609,7 +609,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
         className="w-full flex items-center justify-center gap-1.5 rounded px-2.5 py-1.5 transition-all duration-150"
         style={{
           fontSize: 'var(--text-xs)',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           fontWeight: 700,
           textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wide)',
@@ -655,7 +655,7 @@ function InboxTab({
           className="w-full flex items-center justify-between rounded px-2.5 py-1.5 transition-all duration-150"
           style={{
             fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-secondary)',
             border: '1px solid var(--color-border-default)',
             background: 'transparent',

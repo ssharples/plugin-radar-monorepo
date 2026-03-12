@@ -33,7 +33,7 @@ export function DryPathSlot({ node }: DryPathSlotProps) {
       <span
         className="text-xs font-bold flex-1"
         style={{
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           textTransform: 'uppercase' as const,
           letterSpacing: 'var(--tracking-wider)',
           color: 'var(--color-text-primary)',
@@ -46,7 +46,7 @@ export function DryPathSlot({ node }: DryPathSlotProps) {
       <span
         className="text-xxs"
         style={{
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           color: 'rgba(90, 120, 66, 0.8)',
           letterSpacing: 'var(--tracking-wide)',
         }}

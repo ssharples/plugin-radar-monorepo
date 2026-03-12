@@ -109,14 +109,14 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
       <div className="glass scale-in" style={modalPanelStyle} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-4">
           <Send size={18} style={{ color: 'var(--color-accent-cyan)' }} />
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+          <h2 style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xl)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
             Share Chain
           </h2>
         </div>
 
         <div style={{ background: 'var(--color-bg-input)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-4)', border: '1px solid var(--color-border-subtle)' }}>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>Sharing</div>
-          <div style={{ color: 'var(--color-text-primary)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{chainName}</div>
+          <div style={{ color: 'var(--color-text-primary)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>{chainName}</div>
         </div>
 
         {error && (
@@ -129,13 +129,13 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
         {success ? (
           <div className="text-center" style={{ padding: 'var(--space-4) 0' }}>
             <CheckCircle size={40} style={{ color: 'var(--color-status-active)', margin: '0 auto var(--space-3)' }} />
-            <div style={{ color: 'var(--color-status-active)', fontWeight: 600, marginBottom: 'var(--space-4)', fontFamily: 'var(--font-mono)' }}>{success}</div>
+            <div style={{ color: 'var(--color-status-active)', fontWeight: 600, marginBottom: 'var(--space-4)', fontFamily: 'var(--font-system)' }}>{success}</div>
             <button onClick={onClose} className="btn btn-primary w-full">Done</button>
           </div>
         ) : (
           <>
             {loading ? (
-              <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', padding: 'var(--space-4) 0', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>Loading friends...</div>
+              <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', padding: 'var(--space-4) 0', textAlign: 'center', fontFamily: 'var(--font-system)' }}>Loading friends...</div>
             ) : friends.length === 0 ? (
               <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-sm)', padding: 'var(--space-4) 0', textAlign: 'center' }}>
                 <Users size={24} style={{ margin: '0 auto 8px', opacity: 0.5, color: 'var(--color-text-disabled)' }} />
@@ -143,7 +143,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
               </div>
             ) : (
               <div className="space-y-2 mb-4 max-h-60 overflow-y-auto scrollbar-cyber">
-                <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: '8px' }}>Select a friend</label>
+                <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: '8px' }}>Select a friend</label>
                 {friends.map((friend) => (
                   <button
                     key={friend.userId}
@@ -162,7 +162,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(222, 255, 10, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent-cyan)', fontSize: 'var(--text-sm)', fontWeight: 700 }}>
                       {friend.username.charAt(0).toUpperCase()}
                     </div>
-                    <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>{friend.username}</div>
+                    <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>{friend.username}</div>
                   </button>
                 ))}
               </div>

@@ -402,7 +402,7 @@ function SortablePluginItem({ plugin, index, isActive, galaxyActive, onToggleGal
         className="flex items-center justify-center w-full"
       >
         <span className={`
-          font-mono text-xs w-6 h-6 rounded flex items-center justify-center
+          font-sans text-xs w-6 h-6 rounded flex items-center justify-center
           ${isActive ? 'bg-plugin-accent text-black' : 'bg-white/10 text-white'}
         `}>
           {index + 1}
@@ -416,9 +416,11 @@ function SortablePluginItem({ plugin, index, isActive, galaxyActive, onToggleGal
 // Panel toggle buttons for the sidebar
 // ============================================
 
-const PANEL_BUTTONS: { id: PanelId; icon: typeof SlidersHorizontal; title: string }[] = [
+type SidebarActionId = PanelId | 'browser';
+
+const PANEL_BUTTONS: { id: SidebarActionId; icon: typeof SlidersHorizontal; title: string }[] = [
   { id: 'parameters', icon: SlidersHorizontal, title: 'Parameters' },
-  { id: 'presets', icon: ListMusic, title: 'Presets' },
+  { id: 'browser', icon: ListMusic, title: 'Presets Browser' },
   { id: 'routing', icon: Route, title: 'Routing' },
   { id: 'chain-overview', icon: LayoutList, title: 'Chain Overview' },
 ];
@@ -426,15 +428,23 @@ const PANEL_BUTTONS: { id: PanelId; icon: typeof SlidersHorizontal; title: strin
 function PanelToggleButtons() {
   const openPanels = usePanelStore(s => s.openPanels);
   const togglePanel = usePanelStore(s => s.togglePanel);
+  const closeAllPanels = usePanelStore(s => s.closeAllPanels);
 
   return (
     <div className="flex flex-col border-t border-white/5 shrink-0">
       {PANEL_BUTTONS.map(({ id, icon: Icon, title }) => {
-        const isOpen = openPanels.includes(id);
+        const isOpen = id !== 'browser' && openPanels.includes(id);
         return (
           <button
             key={id}
-            onClick={() => togglePanel(id)}
+            onClick={() => {
+              if (id === 'browser') {
+                closeAllPanels();
+                window.dispatchEvent(new Event('openPluginBrowser'));
+                return;
+              }
+              togglePanel(id);
+            }}
             className={`
               flex items-center justify-center w-full py-2 transition-colors
               ${isOpen

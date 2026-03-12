@@ -25,7 +25,7 @@ export function CompletionStep() {
       </h1>
       <p
         className="animate-fade-in-up"
-        style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)' }}
+        style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)' }}
       >
         Welcome to your signal chain
       </p>

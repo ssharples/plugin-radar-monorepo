@@ -23,14 +23,6 @@
 
 /* Self-hosted fonts for JUCE WebView (no network access) */
 @font-face {
-  font-family: 'Cutive Mono';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('./fonts/CutiveMono-Regular.woff2') format('woff2');
-}
-
-@font-face {
   font-family: 'Nosifer';
   font-style: normal;
   font-weight: 400;
@@ -39,7 +31,7 @@
 }
 
 :root {
-  font-family: 'Cutive Mono', monospace;
+  font-family: var(--font-system);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -149,9 +141,9 @@ html, body, #root {
   text-shadow: 0 0 0.95px rgba(222, 255, 10, 0.4);
 }
 
-/* Mono label utility */
+/* Label utility */
 .propane-label {
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-family: var(--font-system);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -598,7 +590,7 @@ html, body, #root {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-family: 'Cutive Mono', 'JetBrains Mono', monospace;
+  font-family: var(--font-system);
   font-size: 11px;
   line-height: 1.4;
   white-space: nowrap;
@@ -659,7 +651,7 @@ html, body, #root {
 .context-menu-shortcut {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.35);
-  font-family: 'Cutive Mono', 'JetBrains Mono', monospace;
+  font-family: var(--font-system);
   letter-spacing: 0.02em;
 }
 

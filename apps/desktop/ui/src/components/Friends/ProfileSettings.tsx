@@ -12,7 +12,7 @@ const cardStyle: React.CSSProperties = {
 
 const headingStyle: React.CSSProperties = {
   color: '#deff0a',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: 'var(--tracking-wide)',
@@ -22,7 +22,7 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 'var(--text-xs)',
   color: 'var(--color-text-tertiary)',
-  fontFamily: 'var(--font-mono)',
+  fontFamily: 'var(--font-system)',
   textTransform: 'uppercase',
   letterSpacing: 'var(--tracking-wide)',
   marginBottom: '4px',
@@ -98,7 +98,7 @@ export function ProfileSettings() {
   if (loading) {
     return (
       <div style={cardStyle}>
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>Loading profile...</div>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>Loading profile...</div>
       </div>
     );
   }

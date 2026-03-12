@@ -28,7 +28,7 @@ export function DropdownOption({
       disabled={disabled}
       className={`
         w-full flex items-center gap-2 px-3 py-2
-        text-left text-xs font-mono
+        text-left text-xs font-sans
         transition-colors
         ${disabled
           ? 'opacity-40 cursor-not-allowed'

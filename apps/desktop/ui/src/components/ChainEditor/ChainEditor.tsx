@@ -23,12 +23,11 @@ import { ChainNodeList } from './ChainNodeList';
 import { DragPreview } from './DragPreview';
 import { MirrorIndicator } from './MirrorIndicator';
 import { HeaderMenu } from '../HeaderMenu';
-import { EmptyStateKit } from './EmptyStateKit';
 import { LatencyDisplay } from './LatencyDisplay';
-import { InstancesBadge } from './InstancesBadge';
-import { EmptySlot } from './EmptySlot';
+// import { InstancesBadge } from './InstancesBadge';
+// import { EmptySlot } from './EmptySlot';
 import { ContextMenu, buildEmptySpaceMenu } from '../ContextMenu';
-import { MiniPluginBrowser } from '../MiniPluginBrowser';
+// import { MiniPluginBrowser } from '../MiniPluginBrowser';
 import { Knob } from '../Knob';
 import { findNodeById, computeSlotNumbers, countPluginsInTree, findIndexInParent, isAncestorOf, collectSubtreeIds, findParentOf } from '../../utils/chainHelpers';
 import { formatTimeAgo } from '../../utils/timeFormatting';
@@ -72,17 +71,19 @@ const customCollisionDetection: CollisionDetection = (args) => {
 export function ChainEditor() {
   const nodes = useChainStore(s => s.nodes);
   const loading = useChainStore(s => s.loading);
-  const snapshots = useChainStore(s => s.snapshots);
-  const activeSnapshot = useChainStore(s => s.activeSnapshot);
+  const snapshots = useChainStore(s => (s as any).snapshots ?? [null, null, null, null]);
+  const activeSnapshot = useChainStore(s => (s as any).activeSnapshot ?? -1);
   const toastMessage = useChainStore(s => s.toastMessage);
   const formatSubstitutions = useChainStore(s => s.formatSubstitutions);
   const pluginClipboard = useChainStore(s => s.pluginClipboard);
 
   const {
     fetchChainState, moveNode, createGroup, dissolveGroupSilent,
-    selectNode, undo, redo, canUndo, canRedo, saveSnapshot, recallSnapshot,
+    selectNode, undo, redo, canUndo, canRedo,
     openInlineEditor, addPluginToGroup,
   } = useChainActions();
+  const saveSnapshot = (useChainActions() as any).saveSnapshot ?? (() => { });
+  const recallSnapshot = (useChainActions() as any).recallSnapshot ?? (() => { });
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -496,6 +497,12 @@ export function ChainEditor() {
     setContextMenu(null);
   }, [selectedIds, createGroup]);
 
+  const handleCreateEmptyParallelBus = useCallback(() => {
+    createGroup([], 'parallel');
+    setSelectedIds(new Set());
+    setContextMenu(null);
+  }, [createGroup]);
+
   // Click multi-select: always multi-select in group mode, otherwise require Ctrl/Cmd
   const handleNodeSelect = useCallback((e: React.MouseEvent, nodeId: number) => {
     if (groupSelectMode || e.ctrlKey || e.metaKey) {
@@ -598,7 +605,7 @@ export function ChainEditor() {
                   }}
                   className="w-5 h-5 rounded text-[10px] font-bold"
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     letterSpacing: 'var(--tracking-wide)',
                     transition: 'all var(--duration-fast) var(--ease-snap)',
                     background: isActive
@@ -656,12 +663,45 @@ export function ChainEditor() {
             </button>
           )}
 
+          {hasNodes && (
+            <button
+              onClick={handleCreateEmptyParallelBus}
+              className="flex items-center gap-1 px-2 py-1 rounded ml-1"
+              style={{
+                color: 'var(--color-accent-cyan)',
+                background: 'rgba(222, 255, 10, 0.08)',
+                border: '1px solid rgba(222, 255, 10, 0.22)',
+                transition: 'all var(--duration-fast) var(--ease-snap)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(222, 255, 10, 0.14)';
+                e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.38)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(222, 255, 10, 0.08)';
+                e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.22)';
+              }}
+              title="Create new parallel bus with its own ducking lane"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              <span
+                className="text-[10px] uppercase"
+                style={{
+                  fontFamily: 'var(--font-system)',
+                  letterSpacing: 'var(--tracking-wide)',
+                }}
+              >
+                Bus
+              </span>
+            </button>
+          )}
+
 
 
           <span
             className="text-[10px] uppercase ml-1"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: 'var(--color-text-tertiary)',
               letterSpacing: 'var(--tracking-wide)',
             }}
@@ -683,7 +723,7 @@ export function ChainEditor() {
               defaultValue={0}
               hideLabel
             />
-            <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>IN</span>
+            <span style={{ fontSize: '7px', fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>IN</span>
           </div>
 
           {/* Dry/Wet knob */}
@@ -698,7 +738,7 @@ export function ChainEditor() {
               formatValue={(v) => `${Math.round(v)}%`}
               hideLabel
             />
-            <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>D/W</span>
+            <span style={{ fontSize: '7px', fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>D/W</span>
           </div>
 
           {/* Output gain knob */}
@@ -712,14 +752,14 @@ export function ChainEditor() {
               defaultValue={0}
               hideLabel
             />
-            <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>OUT</span>
+            <span style={{ fontSize: '7px', fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>OUT</span>
           </div>
         </div>
 
         {/* Right side: latency, instances, mirror */}
         <div className="flex items-center gap-2">
           <LatencyDisplay />
-          <InstancesBadge />
+          {/* <InstancesBadge /> */}
           <MirrorIndicator />
         </div>
       </div>
@@ -767,7 +807,44 @@ export function ChainEditor() {
               Loading...
             </div>
           ) : !hasNodes ? (
-            <EmptyStateKit onOpenFullBrowser={() => window.dispatchEvent(new Event('openPluginBrowser'))} />
+            <div
+              className="flex flex-col items-center justify-center h-full gap-3"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            >
+              <p
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  fontFamily: 'var(--font-system)',
+                  letterSpacing: 'var(--tracking-wide)',
+                }}
+              >
+                Add plugins to start building your chain
+              </p>
+              <button
+                onClick={() => window.dispatchEvent(new Event('openPluginBrowser'))}
+                className="px-3 py-1.5 rounded transition-all duration-150"
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  fontFamily: 'var(--font-system)',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 'var(--tracking-wide)',
+                  color: 'var(--color-accent-cyan)',
+                  background: 'rgba(222, 255, 10, 0.08)',
+                  border: '1px solid rgba(222, 255, 10, 0.22)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(222, 255, 10, 0.14)';
+                  e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.38)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(222, 255, 10, 0.08)';
+                  e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.22)';
+                }}
+              >
+                Open Plugin Browser
+              </button>
+            </div>
           ) : (
             <div className="space-y-2">
               {/* Tree-based rendering with drop zones */}
@@ -788,11 +865,11 @@ export function ChainEditor() {
               />
 
               {/* Empty slot at bottom — always visible drop target */}
-              <EmptySlot
+              {/* <EmptySlot
                 parentId={ROOT_PARENT_ID}
                 insertIndex={nodes.length}
                 isDragActive={isDragActive}
-              />
+              /> */}
             </div>
           )}
         </div>
@@ -807,7 +884,7 @@ export function ChainEditor() {
             transition: 'height 200ms ease, opacity 150ms ease',
           }}
         >
-          <MiniPluginBrowser />
+          {/* <MiniPluginBrowser /> */}
         </div>
 
         {/* Drag overlay - follows cursor */}
@@ -868,7 +945,7 @@ export function ChainEditor() {
               <Layers className="w-3.5 h-3.5" />
               Serial
               <kbd
-                className="text-micro font-mono ml-1"
+                className="text-micro font-sans ml-1"
                 style={{
                   color: 'var(--color-text-tertiary)',
                 }}
@@ -890,7 +967,7 @@ export function ChainEditor() {
               <GitBranch className="w-3.5 h-3.5" />
               Parallel
               <kbd
-                className="text-micro font-mono ml-1"
+                className="text-micro font-sans ml-1"
                 style={{
                   color: 'var(--color-text-tertiary)',
                 }}

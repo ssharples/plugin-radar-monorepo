@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Globe, FolderOpen, Plug } from 'lucide-react';
+import { X, Globe, FolderOpen, Plug, Cloud, Users } from 'lucide-react';
 import { ChainBrowserSidebar } from './ChainBrowserSidebar';
 import { ChainBrowserGrid } from './ChainBrowserGrid';
 import { ChainBrowserDetail } from './ChainBrowserDetail';
@@ -10,8 +10,10 @@ import { useCloudChainStore } from '../../stores/cloudChainStore';
 import { useSyncStore } from '../../stores/syncStore';
 import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
 import type { BrowseChainResult } from '../../api/types';
+import { CloudSync } from '../CloudSync';
+import { AddFriend, FriendRequests, FriendsList } from '../Friends';
 
-export type BrowserTab = 'plugins' | 'my-chains' | 'browse';
+export type BrowserTab = 'plugins' | 'my-chains' | 'browse' | 'cloud' | 'friends';
 const PAGE_SIZE = 20;
 
 interface ChainBrowserProps {
@@ -58,7 +60,7 @@ export function ChainBrowser({ onClose, initialTab = 'plugins' }: ChainBrowserPr
 
   // Collection chain IDs for quick lookup
   const collectionIds = useMemo(() => {
-    return new Set(collection.map((c) => c.chain._id));
+    return new Set(collection.filter((c) => c.chain?._id).map((c) => c.chain._id));
   }, [collection]);
 
   // Fetch browse data when filters change
@@ -176,7 +178,7 @@ export function ChainBrowser({ onClose, initialTab = 'plugins' }: ChainBrowserPr
     alignItems: 'center',
     gap: '6px',
     padding: 'var(--space-1) var(--space-3)',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-system)',
     fontSize: 'var(--text-xs)',
     textTransform: 'uppercase',
     letterSpacing: 'var(--tracking-wide)',
@@ -203,6 +205,12 @@ export function ChainBrowser({ onClose, initialTab = 'plugins' }: ChainBrowserPr
           </button>
           <button onClick={() => setTab('browse')} style={tabBtnStyle('browse')}>
             <Globe className="w-3 h-3" /> Browse
+          </button>
+          <button onClick={() => setTab('cloud')} style={tabBtnStyle('cloud')}>
+            <Cloud className="w-3 h-3" /> Cloud
+          </button>
+          <button onClick={() => setTab('friends')} style={tabBtnStyle('friends')}>
+            <Users className="w-3 h-3" /> Friends
           </button>
         </div>
         <button
@@ -256,6 +264,16 @@ export function ChainBrowser({ onClose, initialTab = 'plugins' }: ChainBrowserPr
             onClose={onClose}
             onPreview={handlePreview}
           />
+        ) : tab === 'cloud' ? (
+          <div className="flex-1 overflow-y-auto p-4">
+            <CloudSync />
+          </div>
+        ) : tab === 'friends' ? (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <AddFriend />
+            <FriendRequests />
+            <FriendsList />
+          </div>
         ) : (
           <ChainBrowserGrid
             chains={chains as BrowseChainResult[]}

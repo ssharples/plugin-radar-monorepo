@@ -170,7 +170,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
   if (loading) {
     return (
       <div style={cardStyle}>
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>Loading received chains...</div>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>Loading received chains...</div>
       </div>
     );
   }
@@ -180,7 +180,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Inbox size={18} style={{ color: 'var(--color-accent-cyan)' }} />
-          <h3 style={{ color: '#deff0a', fontFamily: 'var(--font-mono)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Received Chains</h3>
+          <h3 style={{ color: '#deff0a', fontFamily: 'var(--font-system)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Received Chains</h3>
           {chains.length > 0 && (
             <span className="badge badge-cyan" style={{ animation: 'neon-pulse 2s ease-in-out infinite' }}>
               {chains.length}
@@ -218,7 +218,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
             >
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{chain.chainName}</div>
+                  <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>{chain.chainName}</div>
                   <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)' }}>
                     From <span style={{ color: 'var(--color-accent-cyan)' }}>{chain.senderUsername}</span> &bull; {formatTime(chain.sentAt)}
                   </div>

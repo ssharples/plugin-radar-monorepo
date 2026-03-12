@@ -3,8 +3,6 @@ import { Save, FolderOpen, Settings, X, Send, HelpCircle, ChevronLeft, ChevronRi
 import { SaveDropdown } from './SaveDropdown';
 import { AvatarDropdown } from './AvatarDropdown';
 import { QuickSharePanel } from './QuickSharePanel';
-import { ChainBrowser } from '../ChainBrowser';
-import { CustomDropdown } from '../Dropdown';
 import { useChainStore } from '../../stores/chainStore';
 import { usePresetStore } from '../../stores/presetStore';
 import type { PresetInfo } from '../../api/types';
@@ -157,7 +155,7 @@ export function HeaderMenu() {
         style={{
           background: 'var(--color-bg-primary)',
           borderBottom: '1px solid var(--color-border-default)',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
         }}
       >
         {/* Logo */}
@@ -169,7 +167,10 @@ export function HeaderMenu() {
 
         {/* Browse (includes local chains) */}
         <button
-          onClick={() => toggle('browse')}
+          onClick={() => {
+            window.dispatchEvent(new Event('openBrowser'));
+            close();
+          }}
           className={`${btnBase} ${active === 'browse' ? btnActive : btnInactive}`}
           title="Browse chains"
         >
@@ -206,7 +207,7 @@ export function HeaderMenu() {
                 background: 'var(--color-bg-input)',
                 border: '1px solid var(--color-accent-cyan)',
                 color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 boxShadow: '0 0 8px rgba(222, 255, 10, 0.2)',
               }}
               maxLength={64}
@@ -238,7 +239,7 @@ export function HeaderMenu() {
             className="flex-1 min-w-0 px-2 py-0.5 text-left truncate transition-colors duration-150 group"
             style={{
               fontSize: 'var(--text-sm)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontWeight: 700,
               letterSpacing: 'var(--tracking-wide)',
               color: 'var(--color-text-primary)',
@@ -313,10 +314,6 @@ export function HeaderMenu() {
         <div className="absolute left-0 top-full z-50 mt-0.5">
           <QuickSharePanel onClose={close} />
         </div>
-      )}
-
-      {active === 'browse' && (
-        <ChainBrowser onClose={close} initialTab="browse" />
       )}
 
       {active === 'settings' && (
@@ -412,7 +409,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
           className="block mb-1.5"
           style={{
             fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-secondary)',
             textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wide)',
@@ -433,7 +430,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
               background: 'var(--color-bg-input)',
               border: '1px solid var(--color-border-default)',
               color: 'var(--color-text-primary)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-sm)',
             }}
           />
@@ -450,7 +447,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
               background: 'var(--color-bg-input)',
               border: '1px solid var(--color-border-default)',
               color: 'var(--color-text-primary)',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               fontSize: 'var(--text-sm)',
             }}
           />
@@ -464,7 +461,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
               className="rounded px-2 py-0.5 transition-all duration-150"
               style={{
                 fontSize: '10px',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 color: peakMin === p.min && peakMax === p.max ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                 background: peakMin === p.min && peakMax === p.max ? 'rgba(255,255,255,0.08)' : 'transparent',
                 border: `1px solid ${peakMin === p.min && peakMax === p.max ? 'var(--color-border-default)' : 'transparent'}`,
@@ -486,7 +483,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
           className="block mb-1.5"
           style={{
             fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-secondary)',
             textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wide)',
@@ -510,7 +507,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
                 className="flex-1 py-1.5 text-center transition-all duration-150"
                 style={{
                   fontSize: 'var(--text-xs)',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   fontWeight: isActive ? 700 : 400,
                   color: isActive ? 'var(--color-accent-cyan)' : 'var(--color-text-secondary)',
                   background: isActive ? 'rgba(0, 240, 255, 0.1)' : 'transparent',
@@ -543,7 +540,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
           className="flex-1 rounded px-2 py-1.5 transition-all duration-150"
           style={{
             fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-secondary)',
             border: '1px solid var(--color-border-default)',
             background: 'transparent',

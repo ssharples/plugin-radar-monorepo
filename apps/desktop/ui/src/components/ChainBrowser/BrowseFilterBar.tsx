@@ -46,7 +46,7 @@ export function BrowseFilterBar({
         <span
           style={{
             fontSize: '9px',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-disabled)',
             textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wider)',
@@ -67,7 +67,7 @@ export function BrowseFilterBar({
         <span
           style={{
             fontSize: '9px',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-disabled)',
             textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wider)',
@@ -89,7 +89,7 @@ export function BrowseFilterBar({
                   padding: '2px 8px',
                   borderRadius: 'var(--radius-base)',
                   fontSize: '9px',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   cursor: disabled ? 'not-allowed' : 'pointer',
                   color: isActive ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
                   background: isActive ? 'rgba(222, 255, 10, 0.15)' : 'transparent',
@@ -124,7 +124,7 @@ export function BrowseFilterBar({
             width: '180px',
             padding: '3px 8px 3px 24px',
             fontSize: '10px',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             color: 'var(--color-text-primary)',
             background: 'rgba(0, 0, 0, 0.3)',
             border: '1px solid var(--color-border-subtle)',

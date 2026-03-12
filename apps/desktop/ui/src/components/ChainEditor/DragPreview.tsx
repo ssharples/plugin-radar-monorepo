@@ -29,7 +29,7 @@ export function DragPreview({ node }: DragPreviewProps) {
         >
           {/* Plugin name */}
           <div
-            className="font-mono font-bold uppercase truncate"
+            className="font-sans font-bold uppercase truncate"
             style={{
               fontSize: '14px',
               letterSpacing: '0.05em',
@@ -43,7 +43,7 @@ export function DragPreview({ node }: DragPreviewProps) {
           {/* Manufacturer badge */}
           {node.manufacturer && (
             <div
-              className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase whitespace-nowrap"
+              className="px-1.5 py-0.5 rounded text-[10px] font-sans font-bold uppercase whitespace-nowrap"
               style={{
                 background: 'rgba(222, 255, 10, 0.12)',
                 color: 'rgba(222, 255, 10, 0.7)',
@@ -78,7 +78,7 @@ export function DragPreview({ node }: DragPreviewProps) {
           <span
             className="text-[11px] font-bold"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               letterSpacing: 'var(--tracking-wide)',
               textTransform: 'uppercase' as const,
               color: accentColor,
@@ -89,7 +89,7 @@ export function DragPreview({ node }: DragPreviewProps) {
           <span
             className="text-[11px] ml-auto"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: 'var(--color-text-tertiary)',
             }}
           >

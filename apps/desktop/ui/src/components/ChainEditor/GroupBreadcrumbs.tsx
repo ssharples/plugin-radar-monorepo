@@ -36,7 +36,7 @@ export function GroupBreadcrumbs({ groupId, onNavigate }: GroupBreadcrumbsProps)
         onClick={() => onNavigate?.(0)}
         className="text-xxs font-bold flex-shrink-0"
         style={{
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           textTransform: 'uppercase' as const,
           letterSpacing: 'var(--tracking-wide)',
           color: 'var(--color-text-tertiary)',
@@ -62,7 +62,7 @@ export function GroupBreadcrumbs({ groupId, onNavigate }: GroupBreadcrumbsProps)
               onClick={() => !isLast && onNavigate?.(item.id)}
               className="text-xxs font-bold"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 textTransform: 'uppercase' as const,
                 letterSpacing: 'var(--tracking-wide)',
                 color: isLast ? color : 'var(--color-text-tertiary)',

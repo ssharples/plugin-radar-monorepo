@@ -209,7 +209,7 @@ export function CustomDropdown<T extends string | number>({
         className={`
           relative w-full flex items-center justify-between gap-2
           bg-black/30 border border-plugin-border rounded
-          text-white font-mono text-left
+          text-white font-sans text-left
           transition-colors
           ${sizeClasses[size]}
           ${
@@ -269,7 +269,7 @@ export function CustomDropdown<T extends string | number>({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search..."
-                className="w-full bg-black/40 border border-plugin-border rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+                className="w-full bg-black/40 border border-plugin-border rounded px-2 py-1 text-xs text-white font-sans focus:outline-none focus:ring-1 focus:ring-plugin-accent"
               />
             </div>
           )}
@@ -277,7 +277,7 @@ export function CustomDropdown<T extends string | number>({
           {/* Options */}
           <div role="listbox" aria-label={label}>
             {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-white font-mono">
+              <div className="px-3 py-2 text-xs text-white font-sans">
                 No options found
               </div>
             ) : (

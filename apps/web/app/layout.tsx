@@ -10,6 +10,7 @@ import { GrainientBackground } from "@/components/GrainientBackground";
 import { LenisProvider } from "@/components/lenis-provider";
 import { Suspense } from "react";
 import { RefTracker } from "@/components/ref-tracker";
+import { ReactGrab } from "@/components/react-grab";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -53,6 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={jetbrainsMono.variable}>
       <body className="font-mono antialiased bg-neutral-950 min-h-screen flex flex-col text-neutral-200">
+        <ReactGrab />
         <div className="fixed inset-0 -z-10">
           <GrainientBackground />
         </div>

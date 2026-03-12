@@ -91,7 +91,7 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
           </span>
         )}
         {!enriched.isFree && enriched.currentPrice !== undefined && (
-          <span className="px-1.5 py-0.5 text-[9px] rounded border" style={{ background: 'var(--color-bg-input)', color: 'var(--color-text-primary)', borderColor: 'var(--color-border-default)', fontFamily: 'var(--font-mono)' }}>
+          <span className="px-1.5 py-0.5 text-[9px] rounded border" style={{ background: 'var(--color-bg-input)', color: 'var(--color-text-primary)', borderColor: 'var(--color-border-default)', fontFamily: 'var(--font-system)' }}>
             {formatPrice(enriched.currentPrice, enriched.currency)}
             {enriched.msrp && enriched.currentPrice !== enriched.msrp && (
               <span className="line-through ml-1" style={{ color: 'var(--color-text-disabled)' }}>
@@ -343,7 +343,7 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
           style={{
             fontSize: '10px',
             fontWeight: 700,
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-system)',
             background: isSelected ? 'var(--color-accent-cyan)' : slot.bypassed ? 'var(--color-border-subtle)' : 'var(--color-border-default)',
             color: isSelected ? 'black' : slot.bypassed ? 'var(--color-text-disabled)' : 'var(--color-text-tertiary)',
           }}
@@ -358,7 +358,7 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
             style={{
               fontSize: 'var(--text-xs)',
               fontWeight: 500,
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: slot.bypassed ? 'var(--color-text-disabled)' : 'var(--color-text-primary)',
             }}
           >
@@ -493,9 +493,9 @@ export function PluginViewer() {
       <div className="flex items-center justify-between" style={{ padding: '6px 12px', borderBottom: '1px solid var(--color-border-default)' }}>
         <div className="flex items-center gap-1.5">
           <Link2 className="w-3.5 h-3.5" style={{ color: 'var(--color-accent-cyan)' }} />
-          <h2 style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: '#deff0a', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Chain</h2>
+          <h2 style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: '#deff0a', fontFamily: 'var(--font-system)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Chain</h2>
         </div>
-        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)', background: 'var(--color-bg-input)', padding: '2px 6px', borderRadius: 'var(--radius-base)', border: '1px solid var(--color-border-default)' }}>
+        <span style={{ fontSize: '10px', fontFamily: 'var(--font-system)', color: 'var(--color-text-disabled)', background: 'var(--color-bg-input)', padding: '2px 6px', borderRadius: 'var(--radius-base)', border: '1px solid var(--color-border-default)' }}>
           {slots.length}
         </span>
       </div>
@@ -523,7 +523,7 @@ export function PluginViewer() {
               {/* Input indicator */}
               <div className="flex items-center justify-center gap-1.5 py-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: 'white', boxShadow: '0 0 6px rgba(255,255,255,0.3)' }} />
-                <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>In</span>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)', fontWeight: 500, fontFamily: 'var(--font-system)' }}>In</span>
               </div>
               <div className="flex justify-center">
                 <div className="w-px h-2" style={{ background: 'var(--color-border-default)' }} />
@@ -545,7 +545,7 @@ export function PluginViewer() {
               {/* Output indicator */}
               <div className="flex items-center justify-center gap-1.5 pt-0.5">
                 <div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-accent-cyan)', boxShadow: '0 0 6px rgba(222, 255, 10, 0.4)' }} />
-                <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>Out</span>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)', fontWeight: 500, fontFamily: 'var(--font-system)' }}>Out</span>
               </div>
             </SortableContext>
           </DndContext>

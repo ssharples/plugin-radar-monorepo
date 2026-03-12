@@ -8,14 +8,14 @@ import {
   Clock,
   Grid3x3,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  GitBranch
 } from 'lucide-react';
-import { useChainStore } from '../../stores/chainStore';
 import { useCloudChainStore } from '../../stores/cloudChainStore';
-import { juceBridge } from '../../api/juce-bridge';
 
 interface EmptyStateKitProps {
   onOpenFullBrowser?: () => void;
+  onCreateParallelBus?: () => void;
 }
 
 interface ChainTemplate {
@@ -79,7 +79,7 @@ const CHAIN_TEMPLATES: ChainTemplate[] = [
  * - Recent chains from cloud (if available)
  * - Full browser access
  */
-export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
+export function EmptyStateKit({ onOpenFullBrowser, onCreateParallelBus }: EmptyStateKitProps) {
   const { myChains } = useCloudChainStore();
   const [loadingTemplate, setLoadingTemplate] = useState<string | null>(null);
 
@@ -155,7 +155,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
           <p
             className="text-sm max-w-md mx-auto"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               color: 'var(--color-text-secondary)',
             }}
           >
@@ -205,7 +205,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
                 <p
                   className="text-xs leading-relaxed"
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     color: 'var(--color-text-secondary)',
                   }}
                 >
@@ -248,7 +248,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
               <h2
                 className="text-xs"
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-system)',
                   letterSpacing: 'var(--tracking-widest)',
                   textTransform: 'uppercase' as const,
                   color: '#deff0a',
@@ -277,7 +277,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
                       <h3
                         className="text-sm font-bold truncate"
                         style={{
-                          fontFamily: 'var(--font-mono)',
+                          fontFamily: 'var(--font-system)',
                           color: '#deff0a',
                         }}
                       >
@@ -286,7 +286,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
                       <div className="flex items-center gap-2 mt-1">
                         <span
                           className="text-xs"
-                          style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)' }}
+                          style={{ fontFamily: 'var(--font-system)', color: 'var(--color-text-disabled)' }}
                         >
                           {chain.pluginCount || 0} plugins
                         </span>
@@ -295,7 +295,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
                             <span style={{ color: 'var(--color-text-disabled)' }}>•</span>
                             <span
                               className="text-xs capitalize"
-                              style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}
+                              style={{ fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)' }}
                             >
                               {chain.category}
                             </span>
@@ -308,7 +308,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
                               <TrendingUp className="w-3 h-3" style={{ color: 'var(--color-accent-cyan)' }} />
                               <span
                                 className="text-xs"
-                                style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}
+                                style={{ fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)' }}
                               >
                                 {chain.downloads}
                               </span>
@@ -334,7 +334,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
           <span
             className="text-xs"
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-system)',
               letterSpacing: 'var(--tracking-widest)',
               textTransform: 'uppercase' as const,
               color: 'var(--color-text-disabled)',
@@ -345,41 +345,95 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
           <div className="flex-1 h-px" style={{ background: 'var(--color-border-default)' }} />
         </div>
 
-        {/* Browse all plugins button */}
-        <button
-          onClick={onOpenFullBrowser}
-          className="w-full p-4 rounded-xl group"
-          style={{
-            border: '2px dashed var(--color-border-strong)',
-            background: 'transparent',
-            transition: 'all var(--duration-fast) var(--ease-snap)',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.4)'; e.currentTarget.style.background = 'rgba(222, 255, 10, 0.04)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-strong)'; e.currentTarget.style.background = 'transparent'; }}
-        >
-          <div className="flex items-center justify-center gap-3">
-            <Grid3x3
-              className="w-5 h-5"
-              style={{ color: 'var(--color-text-secondary)', transition: 'color var(--duration-fast) var(--ease-snap)' }}
-            />
-            <span
-              className="text-sm font-bold"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                letterSpacing: 'var(--tracking-wide)',
-                textTransform: 'uppercase' as const,
-                color: 'var(--color-text-secondary)',
-                transition: 'color var(--duration-fast) var(--ease-snap)',
-              }}
-            >
-              Browse All Plugins
-            </span>
-            <ChevronRight
-              className="w-4 h-4"
-              style={{ color: 'var(--color-text-disabled)', transition: 'color var(--duration-fast) var(--ease-snap)' }}
-            />
-          </div>
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            onClick={onOpenFullBrowser}
+            className="w-full p-4 rounded-xl group"
+            style={{
+              border: '2px dashed var(--color-border-strong)',
+              background: 'transparent',
+              transition: 'all var(--duration-fast) var(--ease-snap)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.4)'; e.currentTarget.style.background = 'rgba(222, 255, 10, 0.04)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-strong)'; e.currentTarget.style.background = 'transparent'; }}
+          >
+            <div className="flex items-center justify-center gap-3">
+              <Grid3x3
+                className="w-5 h-5"
+                style={{ color: 'var(--color-text-secondary)', transition: 'color var(--duration-fast) var(--ease-snap)' }}
+              />
+              <span
+                className="text-sm font-bold"
+                style={{
+                  fontFamily: 'var(--font-system)',
+                  letterSpacing: 'var(--tracking-wide)',
+                  textTransform: 'uppercase' as const,
+                  color: 'var(--color-text-secondary)',
+                  transition: 'color var(--duration-fast) var(--ease-snap)',
+                }}
+              >
+                Browse All Plugins
+              </span>
+              <ChevronRight
+                className="w-4 h-4"
+                style={{ color: 'var(--color-text-disabled)', transition: 'color var(--duration-fast) var(--ease-snap)' }}
+              />
+            </div>
+          </button>
+
+          <button
+            onClick={onCreateParallelBus}
+            className="w-full p-4 rounded-xl group"
+            style={{
+              border: '2px solid rgba(222, 255, 10, 0.22)',
+              background: 'rgba(222, 255, 10, 0.05)',
+              transition: 'all var(--duration-fast) var(--ease-snap)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.38)';
+              e.currentTarget.style.background = 'rgba(222, 255, 10, 0.1)';
+              e.currentTarget.style.boxShadow = '0 0 20px rgba(222, 255, 10, 0.14)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.22)';
+              e.currentTarget.style.background = 'rgba(222, 255, 10, 0.05)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <div className="flex items-center justify-center gap-3">
+              <GitBranch
+                className="w-5 h-5"
+                style={{ color: '#deff0a', transition: 'color var(--duration-fast) var(--ease-snap)' }}
+              />
+              <div className="text-left">
+                <div
+                  className="text-sm font-bold"
+                  style={{
+                    fontFamily: 'var(--font-system)',
+                    letterSpacing: 'var(--tracking-wide)',
+                    textTransform: 'uppercase' as const,
+                    color: '#deff0a',
+                  }}
+                >
+                  New Parallel Bus
+                </div>
+                <div
+                  className="text-[11px]"
+                  style={{
+                    fontFamily: 'var(--font-system)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                >
+                  Start with an empty send bus and per-branch ducking
+                </div>
+              </div>
+              <ChevronRight
+                className="w-4 h-4"
+                style={{ color: 'var(--color-text-disabled)', transition: 'color var(--duration-fast) var(--ease-snap)' }}
+              />
+            </div>
+          </button>
+        </div>
 
         {/* Keyboard shortcuts hint */}
         <div className="mt-6 flex items-center justify-center gap-6 text-xs">
@@ -387,7 +441,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
             <kbd
               className="px-2 py-1 rounded text-[10px]"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 background: 'var(--color-bg-elevated)',
                 border: '1px solid var(--color-border-default)',
                 color: 'var(--color-text-tertiary)',
@@ -396,13 +450,13 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
             >
               ⌘K
             </kbd>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)' }}>Quick search</span>
+            <span style={{ fontFamily: 'var(--font-system)', color: 'var(--color-text-disabled)' }}>Quick search</span>
           </div>
           <div className="flex items-center gap-2">
             <kbd
               className="px-2 py-1 rounded text-[10px]"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 background: 'var(--color-bg-elevated)',
                 border: '1px solid var(--color-border-default)',
                 color: 'var(--color-text-tertiary)',
@@ -411,7 +465,7 @@ export function EmptyStateKit({ onOpenFullBrowser }: EmptyStateKitProps) {
             >
               ⌘B
             </kbd>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)' }}>Browse plugins</span>
+            <span style={{ fontFamily: 'var(--font-system)', color: 'var(--color-text-disabled)' }}>Browse plugins</span>
           </div>
         </div>
       </div>

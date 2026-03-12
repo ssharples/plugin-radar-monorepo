@@ -307,7 +307,9 @@ function clearCachedUserData() {
  * Returns true if session was restored.
  */
 export async function initializeAuth(): Promise<boolean> {
+  console.log('[initializeAuth] Starting...')
   const token = getStoredSession();
+  console.log('[initializeAuth] Token found:', !!token)
   if (!token) return false;
 
   // If the session is older than 5 days, clear it and force re-login
@@ -320,10 +322,14 @@ export async function initializeAuth(): Promise<boolean> {
   }
 
   try {
+    console.log('[initializeAuth] Calling convex.mutation(api.auth.verifySession)...')
+    const startTime = Date.now()
     const session = await convex.mutation(api.auth.verifySession, {
       sessionToken: token,
     });
+    console.log('[initializeAuth] Mutation returned after', Date.now() - startTime, 'ms')
     if (session && session.userId) {
+      console.log('[initializeAuth] Session valid, userId:', session.userId)
       cachedUserId = session.userId;
       // Cache user data for offline use
       cacheUserData({ _id: session.userId, email: session.email, name: session.name, hasPurchased: session.hasPurchased, trialEndsAt: session.trialEndsAt });
@@ -331,19 +337,23 @@ export async function initializeAuth(): Promise<boolean> {
       saveCredentialsToDisk();
       return true;
     }
+    console.log('[initializeAuth] Session invalid (no userId)')
     // Server explicitly confirmed session is invalid — clear stored credentials
     clearSession();
     clearCachedUserData();
     return false;
-  } catch {
+  } catch (err) {
+    console.error('[initializeAuth] Error:', err)
     // Any exception (network error, timeout, server error, etc.) — do NOT clear
     // credentials. We can't confirm the session is invalid, so preserve auth.json
     // so the next boot can try again.
     const cached = getCachedUserData();
     if (cached) {
+      console.log('[initializeAuth] Using cached user data')
       cachedUserId = cached._id;
       return true;
     }
+    console.log('[initializeAuth] No cached data, returning false')
     // No cached data but keep auth.json intact — show login screen
     return false;
   }

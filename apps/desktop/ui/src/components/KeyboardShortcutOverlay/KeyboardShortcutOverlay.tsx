@@ -175,7 +175,7 @@ export function KeyboardShortcutOverlay() {
             style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(222, 255, 10, 0.15)' }}
           >
             <Command className="w-3.5 h-3.5" style={{ color: 'var(--color-accent-cyan)' }} />
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-system)' }}>
               Keyboard shortcuts active
             </span>
             <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
@@ -201,7 +201,7 @@ export function KeyboardShortcutOverlay() {
             <div className="flex items-center justify-between" style={{ padding: 'var(--space-4) var(--space-6)', borderBottom: '1px solid var(--color-border-default)' }}>
               <div className="flex items-center gap-3">
                 <Keyboard className="w-5 h-5" style={{ color: 'var(--color-accent-cyan)' }} />
-                <h2 className="crt-text" style={{ fontSize: 'var(--text-lg)', fontFamily: 'var(--font-mono)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', fontWeight: 700 }}>
+                <h2 className="crt-text" style={{ fontSize: 'var(--text-lg)', fontFamily: 'var(--font-system)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', fontWeight: 700 }}>
                   Keyboard Shortcuts
                 </h2>
               </div>
@@ -220,7 +220,7 @@ export function KeyboardShortcutOverlay() {
             <div className="overflow-y-auto scrollbar-cyber space-y-6" style={{ maxHeight: 'calc(80vh - 80px)', padding: 'var(--space-6)' }}>
               {Object.entries(shortcutsByCategory).map(([category, shortcuts]) => (
                 <div key={category}>
-                  <h3 style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
                     {CATEGORY_LABELS[category]}
                   </h3>
                   <div className="space-y-2">
@@ -241,7 +241,7 @@ export function KeyboardShortcutOverlay() {
                           background: 'var(--color-bg-input)',
                           border: '1px solid var(--color-border-default)',
                           fontSize: 'var(--text-xs)',
-                          fontFamily: 'var(--font-mono)',
+                          fontFamily: 'var(--font-system)',
                           color: 'var(--color-text-primary)',
                         }}>
                           {shortcut.keys}
@@ -256,7 +256,7 @@ export function KeyboardShortcutOverlay() {
             {/* Footer */}
             <div style={{ padding: 'var(--space-3) var(--space-6)', borderTop: '1px solid var(--color-border-default)', background: 'var(--color-bg-secondary)' }}>
               <p className="text-center" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-disabled)' }}>
-                Hold <kbd style={{ padding: '2px 6px', borderRadius: 'var(--radius-base)', background: 'var(--color-bg-input)', border: '1px solid var(--color-border-default)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{'\u2318'}</kbd> to see active shortcuts
+                Hold <kbd style={{ padding: '2px 6px', borderRadius: 'var(--radius-base)', background: 'var(--color-bg-input)', border: '1px solid var(--color-border-default)', fontFamily: 'var(--font-system)', color: 'var(--color-text-primary)' }}>{'\u2318'}</kbd> to see active shortcuts
               </p>
             </div>
           </div>

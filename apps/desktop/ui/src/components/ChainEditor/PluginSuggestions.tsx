@@ -123,7 +123,7 @@ export function PluginSuggestions({
               className="flex-shrink-0 px-1.5 py-0.5 rounded"
               style={{
                 background: 'rgba(222, 255, 10, 0.12)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-body)',
                 color: 'var(--color-accent-cyan)',
               }}

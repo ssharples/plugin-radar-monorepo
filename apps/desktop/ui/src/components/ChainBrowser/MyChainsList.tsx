@@ -112,7 +112,7 @@ export function MyChainsList({ onClose, onPreview }: MyChainsListProps) {
   if (loading && unifiedChains.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
           Loading chains...
         </div>
       </div>
@@ -165,7 +165,7 @@ export function MyChainsList({ onClose, onPreview }: MyChainsListProps) {
         ) : (
           <div className="flex flex-col items-center justify-center gap-2 py-8">
             <FolderOpen className="w-8 h-8" style={{ color: 'var(--color-text-disabled)', opacity: 0.3 }} />
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)' }}>
               {searchQuery ? 'No chains match your search' : 'No chains yet'}
             </span>
             <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>

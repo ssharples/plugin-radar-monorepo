@@ -81,7 +81,7 @@ export function CloudSync() {
           >
             <h3
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-lg)',
                 fontWeight: 700,
                 color: '#deff0a',
@@ -107,7 +107,7 @@ export function CloudSync() {
               onClick={() => setShowForgotPassword(false)}
               className="w-full text-center"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-sm)',
                 color: 'var(--color-accent-cyan)',
                 background: 'none',
@@ -133,7 +133,7 @@ export function CloudSync() {
           <form onSubmit={handleAuth} className="space-y-3">
             <h3
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-lg)',
                 fontWeight: 700,
                 color: '#deff0a',
@@ -182,7 +182,7 @@ export function CloudSync() {
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-system)',
                     fontSize: 'var(--text-xs)',
                     color: 'var(--color-text-tertiary)',
                     background: 'none',
@@ -215,7 +215,7 @@ export function CloudSync() {
               onClick={() => setIsRegister(!isRegister)}
               className="w-full text-center"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-system)',
                 fontSize: 'var(--text-sm)',
                 color: 'var(--color-accent-cyan)',
                 background: 'none',
@@ -260,7 +260,7 @@ export function CloudSync() {
       </button>
 
       {lastSyncAt && (
-        <div style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+        <div style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', color: 'var(--color-text-tertiary)' }}>
           <span>{syncedCount} synced</span>
           <span className="mx-1">&bull;</span>
           <span style={{ color: 'var(--color-status-active)' }}>{inCatalog} in database</span>
@@ -278,7 +278,7 @@ export function CloudSync() {
       <button
         onClick={logout}
         style={{
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-system)',
           fontSize: 'var(--text-xs)',
           color: 'var(--color-text-tertiary)',
           background: 'none',

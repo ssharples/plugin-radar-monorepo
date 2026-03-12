@@ -70,5 +70,5 @@ export const GR_GRADIENT = `linear-gradient(to bottom,
 /** The 0 dB mark as a normalized position (0..1). */
 export const ZERO_DB_NORM = dbToNorm(0);
 
-/** Common monospace font stack. */
-export const MONO_FONT = "var(--font-mono, 'JetBrains Mono', monospace)";
+/** Replaced mono font with the brand font. */
+export const MONO_FONT = "var(--font-brand)";

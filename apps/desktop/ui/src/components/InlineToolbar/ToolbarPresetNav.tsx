@@ -51,7 +51,7 @@ export function ToolbarPresetNav({ onSave }: ToolbarPresetNavProps) {
 
       {/* Preset name */}
       <span
-        className="text-[9px] font-mono text-white truncate max-w-[80px] px-1"
+        className="text-[9px] font-sans text-white truncate max-w-[80px] px-1"
         title={presetName}
       >
         {presetName}
