@@ -23,7 +23,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 8.15.9
+          version: 9.13.0
 
       - uses: actions/setup-node@v4
         with:
@@ -36,6 +36,22 @@ jobs:
 
       - name: Run Vitest
         run: pnpm test
+
+  swift-tests:
+    name: Swift Build and Tests (Studio Time Machine)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Studio Time Machine
+        run: swift build --package-path apps/studio-macos --product StudioTimeMachine
+
+      - name: Build studio-index
+        run: swift build --package-path apps/studio-macos --product studio-index
+
+      - name: Run Studio Time Machine tests
+        run: swift test --package-path apps/studio-macos
 
   cpp-tests:
     name: C++ Tests (Catch2 + JUCE)

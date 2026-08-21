@@ -1,0 +1,608 @@
+{
+  "automationLanes" : {
+    "note" : "The current Ableton parser counts automation envelopes but does not expose lane detail.",
+    "provenance" : "unsupported"
+  },
+  "evidenceSummary" : {
+    "automationEnvelopeCount" : {
+      "provenance" : "parsed",
+      "value" : 0
+    },
+    "deviceSummary" : {
+      "provenance" : "parsed",
+      "value" : {
+        "maxForLiveDeviceCount" : 0,
+        "rackDeviceCount" : 1,
+        "thirdPartyDeviceCount" : 1
+      }
+    },
+    "trackSummary" : {
+      "provenance" : "parsed",
+      "value" : {
+        "audioTrackCount" : 1,
+        "groupTrackCount" : 1,
+        "midiTrackCount" : 0,
+        "returnTrackCount" : 0
+      }
+    },
+    "warpMarkerCount" : {
+      "provenance" : "parsed",
+      "value" : 2
+    },
+    "xmlBytes" : {
+      "provenance" : "parsed",
+      "value" : 4096
+    }
+  },
+  "exportReferences" : {
+    "note" : "Ableton export references are outside the current parser contract.",
+    "provenance" : "unknown"
+  },
+  "handoffReferences" : {
+    "note" : "Handoff references are not represented in the current parser output.",
+    "provenance" : "unknown"
+  },
+  "identity" : {
+    "daw" : {
+      "provenance" : "parsed",
+      "value" : "abletonLive"
+    },
+    "displayName" : {
+      "note" : "Derived from the Set filename, not the document body.",
+      "provenance" : "derived",
+      "value" : "Example Set"
+    },
+    "sourceApplication" : {
+      "provenance" : "parsed",
+      "value" : {
+        "creator" : {
+          "provenance" : "parsed",
+          "value" : "Ableton Live 12.1"
+        },
+        "majorVersion" : {
+          "provenance" : "parsed",
+          "value" : "5"
+        },
+        "minorVersion" : {
+          "provenance" : "parsed",
+          "value" : "12.0_12000"
+        },
+        "revision" : {
+          "provenance" : "parsed",
+          "value" : "abc123"
+        },
+        "schemaChangeCount" : {
+          "provenance" : "parsed",
+          "value" : 3
+        }
+      }
+    },
+    "sourceDocument" : {
+      "note" : "Filesystem origin is derived from the adapter input.",
+      "provenance" : "derived",
+      "value" : {
+        "fileURL" : "file:\/\/\/Volumes\/Example%20Archive%20Drive\/Sets\/Example%20Set.als"
+      }
+    }
+  },
+  "locators" : {
+    "note" : "Locator names and times may include parser fallbacks when the source document omits them.",
+    "provenance" : "derived",
+    "value" : [
+      {
+        "beatTime" : {
+          "note" : "Locator beat times can include a parser fallback when the Set omits a locator time.",
+          "provenance" : "derived",
+          "value" : 32
+        },
+        "id" : {
+          "note" : "Stable ID derived from the current parser's normalized locator representation.",
+          "provenance" : "derived",
+          "value" : "locator-1"
+        },
+        "name" : {
+          "note" : "Locator names can include parser fallbacks when the Set omits a locator label.",
+          "provenance" : "derived",
+          "value" : "Drop"
+        }
+      }
+    ]
+  },
+  "mediaDependencies" : {
+    "provenance" : "parsed",
+    "value" : [
+      {
+        "availability" : {
+          "provenance" : "parsed",
+          "value" : "available"
+        },
+        "id" : {
+          "note" : "Stable dependency ID derived from the normalized parsed dependency representation.",
+          "provenance" : "derived",
+          "value" : "dependency-1"
+        },
+        "kind" : {
+          "provenance" : "parsed",
+          "value" : "clipAudio"
+        },
+        "ownerID" : {
+          "note" : "Owner IDs reference normalized parsed clip or device identifiers.",
+          "provenance" : "derived",
+          "value" : "clip-1"
+        },
+        "reference" : {
+          "provenance" : "parsed",
+          "value" : {
+            "absolutePath" : {
+              "provenance" : "parsed",
+              "value" : "\/Volumes\/Example Archive Drive\/Samples\/Lead Vox.wav"
+            },
+            "assetIdentity" : {
+              "note" : "Content-asset identity is not available in the current Ableton parser output.",
+              "provenance" : "unknown"
+            },
+            "relativePath" : {
+              "provenance" : "parsed",
+              "value" : "Samples\/Recorded\/Lead Vox.wav"
+            }
+          }
+        },
+        "resolvedURL" : {
+          "provenance" : "parsed",
+          "value" : "file:\/\/\/Volumes\/Example%20Archive%20Drive\/Samples\/Lead%20Vox.wav"
+        }
+      },
+      {
+        "availability" : {
+          "provenance" : "parsed",
+          "value" : "unresolved"
+        },
+        "id" : {
+          "note" : "Stable dependency ID derived from the normalized parsed dependency representation.",
+          "provenance" : "derived",
+          "value" : "dependency-2"
+        },
+        "kind" : {
+          "provenance" : "parsed",
+          "value" : "deviceResource"
+        },
+        "ownerID" : {
+          "note" : "Owner IDs reference normalized parsed clip or device identifiers.",
+          "provenance" : "derived",
+          "value" : "device-rack-1"
+        },
+        "reference" : {
+          "provenance" : "parsed",
+          "value" : {
+            "absolutePath" : {
+              "note" : "The parser did not expose an absolute media path.",
+              "provenance" : "unknown"
+            },
+            "assetIdentity" : {
+              "note" : "Content-asset identity is not available in the current Ableton parser output.",
+              "provenance" : "unknown"
+            },
+            "relativePath" : {
+              "provenance" : "parsed",
+              "value" : "Presets\/Nested Rack.adg"
+            }
+          }
+        },
+        "resolvedURL" : {
+          "note" : "This dependency does not currently resolve to a concrete local file URL.",
+          "provenance" : "unknown"
+        }
+      }
+    ]
+  },
+  "timeline" : {
+    "tempo" : {
+      "provenance" : "parsed",
+      "value" : 127.5
+    },
+    "timeSignature" : {
+      "note" : "The current Ableton parser does not populate a project time signature.",
+      "provenance" : "unknown"
+    }
+  },
+  "tracks" : {
+    "provenance" : "parsed",
+    "value" : [
+      {
+        "clips" : {
+          "provenance" : "parsed",
+          "value" : [
+
+          ]
+        },
+        "colorIndex" : {
+          "provenance" : "parsed",
+          "value" : 3
+        },
+        "devices" : {
+          "provenance" : "parsed",
+          "value" : [
+
+          ]
+        },
+        "hierarchy" : {
+          "provenance" : "parsed",
+          "value" : {
+            "parentTrackID" : {
+              "note" : "No parsed parent track identifier could be resolved.",
+              "provenance" : "unknown"
+            },
+            "sourceParentIdentifier" : {
+              "note" : "This track is not grouped under another parsed track.",
+              "provenance" : "unknown"
+            }
+          }
+        },
+        "id" : {
+          "note" : "Stable ID derived from the current parser's normalized track representation.",
+          "provenance" : "derived",
+          "value" : "track-group-1"
+        },
+        "isFolded" : {
+          "provenance" : "parsed",
+          "value" : true
+        },
+        "kind" : {
+          "provenance" : "parsed",
+          "value" : "group"
+        },
+        "mixer" : {
+          "provenance" : "parsed",
+          "value" : {
+            "pan" : {
+              "note" : "The current parser did not expose a pan value for this track.",
+              "provenance" : "unknown"
+            },
+            "volume" : {
+              "note" : "The current parser did not expose a volume value for this track.",
+              "provenance" : "unknown"
+            }
+          }
+        },
+        "name" : {
+          "note" : "Track names can include parser fallbacks when the Set omits a user-visible name.",
+          "provenance" : "derived",
+          "value" : "Vocals"
+        },
+        "routing" : {
+          "provenance" : "parsed",
+          "value" : {
+            "armEnabled" : {
+              "note" : "The current parser did not expose an arm state for this track.",
+              "provenance" : "unknown"
+            },
+            "monitoringMode" : {
+              "note" : "The current parser did not expose a monitoring mode for this track.",
+              "provenance" : "unknown"
+            },
+            "soloEnabled" : {
+              "note" : "The current parser did not expose a solo state for this track.",
+              "provenance" : "unknown"
+            },
+            "speakerEnabled" : {
+              "note" : "The current parser did not expose a speaker state for this track.",
+              "provenance" : "unknown"
+            }
+          }
+        },
+        "sourceIdentifier" : {
+          "provenance" : "parsed",
+          "value" : "group-1"
+        }
+      },
+      {
+        "clips" : {
+          "provenance" : "parsed",
+          "value" : [
+            {
+              "endBeat" : {
+                "provenance" : "parsed",
+                "value" : 12
+              },
+              "fades" : {
+                "note" : "The current Ableton parser does not expose clip fade curves or durations.",
+                "provenance" : "unsupported"
+              },
+              "id" : {
+                "note" : "Stable ID derived from the current parser's normalized clip representation.",
+                "provenance" : "derived",
+                "value" : "clip-1"
+              },
+              "kind" : {
+                "provenance" : "parsed",
+                "value" : "audio"
+              },
+              "loopEnabled" : {
+                "provenance" : "parsed",
+                "value" : false
+              },
+              "loopEndBeat" : {
+                "provenance" : "parsed",
+                "value" : 12
+              },
+              "loopStartBeat" : {
+                "provenance" : "parsed",
+                "value" : 4
+              },
+              "midiNoteCount" : {
+                "provenance" : "parsed",
+                "value" : 0
+              },
+              "name" : {
+                "note" : "Clip names can include parser fallbacks when the Set omits a clip label.",
+                "provenance" : "derived",
+                "value" : "Lead Vox"
+              },
+              "placement" : {
+                "provenance" : "parsed",
+                "value" : "arrangement"
+              },
+              "sampleReference" : {
+                "provenance" : "parsed",
+                "value" : {
+                  "absolutePath" : {
+                    "provenance" : "parsed",
+                    "value" : "\/Volumes\/Example Archive Drive\/Samples\/Lead Vox.wav"
+                  },
+                  "assetIdentity" : {
+                    "note" : "Content-asset identity is not available in the current Ableton parser output.",
+                    "provenance" : "unknown"
+                  },
+                  "relativePath" : {
+                    "provenance" : "parsed",
+                    "value" : "Samples\/Recorded\/Lead Vox.wav"
+                  }
+                }
+              },
+              "sourceIdentifier" : {
+                "provenance" : "parsed",
+                "value" : "101"
+              },
+              "startBeat" : {
+                "note" : "Clip starts can fall back to event-time evidence when no explicit start value is retained.",
+                "provenance" : "derived",
+                "value" : 4
+              },
+              "warp" : {
+                "provenance" : "parsed",
+                "value" : {
+                  "isWarped" : {
+                    "provenance" : "parsed",
+                    "value" : true
+                  },
+                  "markerCount" : {
+                    "provenance" : "parsed",
+                    "value" : 2
+                  },
+                  "mode" : {
+                    "provenance" : "parsed",
+                    "value" : 3
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "colorIndex" : {
+          "provenance" : "parsed",
+          "value" : 7
+        },
+        "devices" : {
+          "provenance" : "parsed",
+          "value" : [
+            {
+              "displayName" : {
+                "note" : "Display names can fall back to plug-in or element names when Live omits a custom label.",
+                "provenance" : "derived",
+                "value" : "Vocal Rack"
+              },
+              "id" : {
+                "note" : "Stable ID derived from the current parser's normalized device representation.",
+                "provenance" : "derived",
+                "value" : "device-rack-1"
+              },
+              "isEnabled" : {
+                "note" : "The current parser did not expose an enabled state for this device.",
+                "provenance" : "unknown"
+              },
+              "kind" : {
+                "provenance" : "parsed",
+                "value" : "rack"
+              },
+              "nestedDevices" : {
+                "provenance" : "parsed",
+                "value" : [
+                  {
+                    "displayName" : {
+                      "note" : "Display names can fall back to plug-in or element names when Live omits a custom label.",
+                      "provenance" : "derived",
+                      "value" : "Shaper"
+                    },
+                    "id" : {
+                      "note" : "Stable ID derived from the current parser's normalized device representation.",
+                      "provenance" : "derived",
+                      "value" : "device-plugin-1"
+                    },
+                    "isEnabled" : {
+                      "provenance" : "parsed",
+                      "value" : true
+                    },
+                    "kind" : {
+                      "provenance" : "parsed",
+                      "value" : "vst3"
+                    },
+                    "nestedDevices" : {
+                      "provenance" : "parsed",
+                      "value" : [
+
+                      ]
+                    },
+                    "plugin" : {
+                      "provenance" : "parsed",
+                      "value" : {
+                        "format" : {
+                          "provenance" : "parsed",
+                          "value" : "vst3"
+                        },
+                        "identifier" : {
+                          "provenance" : "parsed",
+                          "value" : "shaper.vst3"
+                        },
+                        "manufacturer" : {
+                          "provenance" : "parsed",
+                          "value" : "Acme Audio"
+                        },
+                        "name" : {
+                          "provenance" : "parsed",
+                          "value" : "Shaper"
+                        },
+                        "version" : {
+                          "note" : "The parser exposed plug-in hosting but not a version string.",
+                          "provenance" : "unknown"
+                        }
+                      }
+                    },
+                    "resourceReferences" : {
+                      "provenance" : "parsed",
+                      "value" : [
+
+                      ]
+                    },
+                    "sourceIdentifier" : {
+                      "note" : "This parsed device did not expose an Ableton XML identifier.",
+                      "provenance" : "unknown"
+                    },
+                    "stateDigest" : {
+                      "note" : "The digest is computed from the parsed device XML subtree.",
+                      "provenance" : "derived",
+                      "value" : "def456"
+                    },
+                    "typeName" : {
+                      "provenance" : "parsed",
+                      "value" : "PluginDevice"
+                    }
+                  }
+                ]
+              },
+              "plugin" : {
+                "note" : "This device did not expose third-party plug-in identity metadata.",
+                "provenance" : "unknown"
+              },
+              "resourceReferences" : {
+                "provenance" : "parsed",
+                "value" : [
+                  {
+                    "absolutePath" : {
+                      "note" : "The parser did not expose an absolute media path.",
+                      "provenance" : "unknown"
+                    },
+                    "assetIdentity" : {
+                      "note" : "Content-asset identity is not available in the current Ableton parser output.",
+                      "provenance" : "unknown"
+                    },
+                    "relativePath" : {
+                      "provenance" : "parsed",
+                      "value" : "Presets\/Nested Rack.adg"
+                    }
+                  }
+                ]
+              },
+              "sourceIdentifier" : {
+                "provenance" : "parsed",
+                "value" : "rack-1"
+              },
+              "stateDigest" : {
+                "note" : "The digest is computed from the parsed device XML subtree.",
+                "provenance" : "derived",
+                "value" : "abc123"
+              },
+              "typeName" : {
+                "provenance" : "parsed",
+                "value" : "AudioEffectGroupDevice"
+              }
+            }
+          ]
+        },
+        "hierarchy" : {
+          "provenance" : "parsed",
+          "value" : {
+            "parentTrackID" : {
+              "note" : "Resolved from the parsed group track XML identifier.",
+              "provenance" : "derived",
+              "value" : "track-group-1"
+            },
+            "sourceParentIdentifier" : {
+              "provenance" : "parsed",
+              "value" : "group-1"
+            }
+          }
+        },
+        "id" : {
+          "note" : "Stable ID derived from the current parser's normalized track representation.",
+          "provenance" : "derived",
+          "value" : "track-audio-1"
+        },
+        "isFolded" : {
+          "note" : "The current parser did not expose a fold-state for this track.",
+          "provenance" : "unknown"
+        },
+        "kind" : {
+          "provenance" : "parsed",
+          "value" : "audio"
+        },
+        "mixer" : {
+          "provenance" : "parsed",
+          "value" : {
+            "pan" : {
+              "provenance" : "parsed",
+              "value" : -0.1
+            },
+            "volume" : {
+              "provenance" : "parsed",
+              "value" : 0.75
+            }
+          }
+        },
+        "name" : {
+          "note" : "Track names can include parser fallbacks when the Set omits a user-visible name.",
+          "provenance" : "derived",
+          "value" : "Lead Vocal"
+        },
+        "routing" : {
+          "provenance" : "parsed",
+          "value" : {
+            "armEnabled" : {
+              "provenance" : "parsed",
+              "value" : true
+            },
+            "monitoringMode" : {
+              "provenance" : "parsed",
+              "value" : 2
+            },
+            "soloEnabled" : {
+              "note" : "The current parser did not expose a solo state for this track.",
+              "provenance" : "unknown"
+            },
+            "speakerEnabled" : {
+              "provenance" : "parsed",
+              "value" : true
+            }
+          }
+        },
+        "sourceIdentifier" : {
+          "provenance" : "parsed",
+          "value" : "audio-1"
+        }
+      }
+    ]
+  },
+  "version" : {
+    "major" : 1,
+    "minor" : 0
+  }
+}
