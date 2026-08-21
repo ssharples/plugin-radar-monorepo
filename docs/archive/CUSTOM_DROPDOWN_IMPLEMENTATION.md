@@ -131,7 +131,7 @@ apps/desktop/ui/src/components/Dropdown/
 - `resources/ui.zip` updated with new index.html
 
 ✅ **C++ Plugin Build:** Succeeded
-- VST3: Built and installed to `/Users/satti/Library/Audio/Plug-Ins/VST3/ProChain.vst3`
+- VST3: Built and installed to the local VST3 plug-in directory
 - AU: Built to `ProChain_artefacts/RelWithDebInfo/AU/ProChain.component`
 - New UI embedded in plugin binary
 

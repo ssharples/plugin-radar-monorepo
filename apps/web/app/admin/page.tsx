@@ -2,14 +2,19 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { Plugs, Factory, Plus, Question } from "@phosphor-icons/react";
 
 export default function AdminDashboardPage() {
+  const { sessionToken } = useAuth();
   const manufacturers = useQuery(api.manufacturers.list, { limit: 1 });
   const plugins = useQuery(api.plugins.list, { limit: 1 });
   const categories = useQuery(api.plugins.getCategories);
-  const unmatchedStats = useQuery(api.pluginDirectory.getUnmatchedStats);
+  const unmatchedStats = useQuery(
+    api.pluginDirectory.getUnmatchedStats,
+    sessionToken ? { sessionToken } : "skip",
+  );
 
   const pluginCount = categories
     ? categories.reduce((sum, c) => sum + c.count, 0)
@@ -67,7 +72,9 @@ export default function AdminDashboardPage() {
                 Manufacturers
               </p>
               <p className="text-2xl font-bold text-stone-100">
-                {mfgList ? mfgList.length : (
+                {mfgList ? (
+                  mfgList.length
+                ) : (
                   <span className="inline-block w-12 h-7 bg-white/[0.06] rounded animate-pulse" />
                 )}
               </p>
@@ -91,7 +98,9 @@ export default function AdminDashboardPage() {
                 Unmatched Plugins
               </p>
               <p className="text-2xl font-bold text-stone-100">
-                {unmatchedStats ? unmatchedStats.pending : (
+                {unmatchedStats ? (
+                  unmatchedStats.pending
+                ) : (
                   <span className="inline-block w-12 h-7 bg-white/[0.06] rounded animate-pulse" />
                 )}
               </p>
@@ -141,7 +150,9 @@ export default function AdminDashboardPage() {
                   className="flex items-center justify-between px-3 py-2 bg-white/[0.02] rounded-lg"
                 >
                   <span className="text-sm text-stone-300">
-                    {c.name.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                    {c.name
+                      .replace(/-/g, " ")
+                      .replace(/\b\w/g, (l) => l.toUpperCase())}
                   </span>
                   <span className="text-sm font-medium text-stone-500">
                     {c.count}

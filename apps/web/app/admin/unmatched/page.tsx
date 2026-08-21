@@ -27,15 +27,21 @@ export default function UnmatchedPluginsPage() {
     pluginName: string;
     manufacturer: string;
   } | null>(null);
-  const [dismissingId, setDismissingId] = useState<Id<"enrichmentQueue"> | null>(null);
+  const [dismissingId, setDismissingId] =
+    useState<Id<"enrichmentQueue"> | null>(null);
 
-  const queueItems = useQuery(api.adminEnrich.listEnrichmentQueue, {
-    status: statusFilter,
-    limit: 100,
-  });
+  const queueItems = useQuery(
+    api.adminEnrich.listEnrichmentQueue,
+    sessionToken ? { sessionToken, status: statusFilter, limit: 100 } : "skip",
+  );
 
-  const stats = useQuery(api.pluginDirectory.getUnmatchedStats);
-  const dismissMutation = useMutation(api.pluginDirectory.dismissUnmatchedPlugin);
+  const stats = useQuery(
+    api.pluginDirectory.getUnmatchedStats,
+    sessionToken ? { sessionToken } : "skip",
+  );
+  const dismissMutation = useMutation(
+    api.pluginDirectory.dismissUnmatchedPlugin,
+  );
 
   async function handleDismiss(queueItemId: Id<"enrichmentQueue">) {
     if (!sessionToken) return;
@@ -74,9 +80,7 @@ export default function UnmatchedPluginsPage() {
         </div>
         {stats && (
           <div className="text-right">
-            <p className="text-2xl font-bold text-[#deff0a]">
-              {stats.pending}
-            </p>
+            <p className="text-2xl font-bold text-[#deff0a]">{stats.pending}</p>
             <p className="text-xs text-stone-500">pending review</p>
           </div>
         )}

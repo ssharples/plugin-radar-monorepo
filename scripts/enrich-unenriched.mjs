@@ -21,7 +21,11 @@ import { homedir } from 'os';
 // =============================================================================
 
 const CONVEX_URL = process.env.CONVEX_URL || 'https://next-frog-231.convex.cloud';
-const API_KEY = 'pluginradar-enrich-2026';
+const API_KEY = process.env.ENRICHMENT_API_KEY?.trim();
+if (!API_KEY) {
+  console.error('ENRICHMENT_API_KEY environment variable is required; refusing to make network requests.');
+  process.exit(1);
+}
 const BATCH_SIZE = 5;
 const DELAY_MS = 2500;
 

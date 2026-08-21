@@ -16,7 +16,12 @@
  */
 
 const CONVEX_URL = process.env.CONVEX_URL || 'https://next-frog-231.convex.cloud';
-const DEPLOY_KEY = process.env.CONVEX_DEPLOY_KEY || 'eyJ2MiI6IjM4MjlhODk4ZTViMTQ2OGNiZjRjMGEyNTE5NTQ0YTQ5In0=';
+const DEPLOY_KEY = process.env.CONVEX_DEPLOY_KEY?.trim();
+
+if (!DEPLOY_KEY) {
+  console.error('CONVEX_DEPLOY_KEY environment variable is required; refusing to make network requests.');
+  process.exit(1);
+}
 
 const args = process.argv.slice(2);
 const DRY_RUN = !args.includes('--fix');
@@ -360,13 +365,17 @@ async function fixCategories(categoryFixes) {
   }
 
   let success = 0, failed = 0;
+  const enrichmentApiKey = process.env.ENRICHMENT_API_KEY?.trim();
+  if (!enrichmentApiKey) {
+    throw new Error('ENRICHMENT_API_KEY environment variable is required for --fix.');
+  }
 
   for (const fix of categoryFixes) {
     try {
       // Use the agentEnrich upsert (apiKey-based, doesn't need session token)
       // But it requires slug... Let me use direct mutation via deploy key
       await convexMutation('agentEnrich:upsertPluginEnrichment', {
-        apiKey: 'pluginradar-enrich-2026',
+        apiKey: enrichmentApiKey,
         slug: fix.slug || fix.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         name: fix.name,
         manufacturer: fix.manufacturerName || 'Unknown',

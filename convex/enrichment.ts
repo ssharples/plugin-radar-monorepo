@@ -139,7 +139,10 @@ export const batchEnrichByApiKey = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -222,7 +225,10 @@ export const recalculateManufacturerCounts = mutation({
     apiKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -264,7 +270,10 @@ export const fixPluginCategory = mutation({
     category: v.string(),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -301,7 +310,10 @@ export const clearPluginImages = mutation({
     slugs: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -333,7 +345,10 @@ export const deletePluginsBySlugs = mutation({
     slugs: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -366,7 +381,10 @@ export const updatePluginImage = mutation({
     imageUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -401,7 +419,10 @@ export const batchUpdatePluginImages = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -444,7 +465,10 @@ export const batchUpdateManufacturerLogos = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -483,7 +507,10 @@ export const deleteManufacturersBySlug = mutation({
     deleteOrphanedPlugins: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }

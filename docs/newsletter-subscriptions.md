@@ -1,6 +1,8 @@
 # Newsletter Subscriptions for PluginRadar
 
-Subscribe **pluginradarbot@gmail.com** to these newsletters.
+Subscribe the account configured for newsletter operations to these newsletters.
+Keep the account address and credentials in the provider or local secret manager,
+not in this repository.
 
 > **Why direct subscriptions?** Most manufacturers are on Plugin Boutique, but some offer exclusive deals only on their website. Direct subscriptions ensure we catch everything.
 

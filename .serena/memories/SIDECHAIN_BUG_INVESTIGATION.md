@@ -1,6 +1,6 @@
 # ProChain Sidechain Audio Silencing Bug Investigation
 
-**Working Directory**: `/Users/satti/Development-projects/plugin-radar-monorepo/apps/desktop/build`
+**Working Directory**: `apps/desktop/build`
 **Date**: 2026-02-11
 
 ## Problem Statement

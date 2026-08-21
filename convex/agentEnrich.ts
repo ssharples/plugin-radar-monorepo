@@ -60,7 +60,10 @@ export const upsertPluginEnrichment = mutation({
   },
   handler: async (ctx, args) => {
     // Verify API key
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -310,7 +313,10 @@ export const upsertComparison = mutation({
   },
   handler: async (ctx, args) => {
     // Verify API key
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }

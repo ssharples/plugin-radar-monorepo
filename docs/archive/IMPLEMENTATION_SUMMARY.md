@@ -58,7 +58,7 @@ cleanupCrashRecoveryFile()       // Deletes temp file on normal exit
 
 ```
 [100%] Built target ProChain_AU
--- Installing: /Users/satti/Library/Audio/Plug-Ins/Components/ProChain.component
+-- Installing: local AU plug-in component
 ```
 
 ✅ **Successfully compiled and installed**

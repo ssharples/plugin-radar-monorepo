@@ -120,7 +120,7 @@ const shouldShowLogo = manufacturerLogoUrl && !logoError;
 
 ### 1. **Deploy Convex Changes**
 ```bash
-cd /Users/satti/Development-projects/plugin-radar-monorepo
+cd /path/to/plugin-radar-monorepo
 pnpm deploy
 ```
 
