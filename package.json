@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "PluginRadar — Audio plugin database, price tracker, and chain manager",
+  "description": "Studio Time Machine — private, local-first macOS archive, search, inspection, and safe recovery for music projects; legacy Plugin Radar web and plugin surfaces remain secondary",
   "author": "Scott Sharples",
   "license": "MIT",
   "scripts": {
@@ -12,6 +12,9 @@
     "dev:web": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "build:web": "pnpm --filter web build",
+    "build:studio": "swift build --package-path apps/studio-macos",
+    "test:studio": "swift test --package-path apps/studio-macos",
+    "run:studio": "bash apps/studio-macos/script/build_and_run.sh --sample",
     "dev:desktop-ui": "pnpm --filter desktop-ui dev",
     "build:desktop-ui": "pnpm --filter desktop-ui build",
     "install:all": "pnpm install"

@@ -34,6 +34,9 @@ pnpm-debug.log*
 data/plugins.db
 data/enrichment/
 
+# Local planning and agent state
+.superpowers/
+
 # Desktop UI build artifacts (CMake output that leaked into ui/)
 apps/desktop/ui/CMakeCache.txt
 apps/desktop/ui/CMakeFiles/
