@@ -908,6 +908,8 @@ export default defineSchema({
     pluginSlug: v.string(),
     pluginName: v.string(),
 
+    // Keep legacy storage permissive until live data has been audited and a
+    // migration is available. Operation validators enforce the finite set.
     status: v.string(),
     priority: v.string(),
 
@@ -931,8 +933,10 @@ export default defineSchema({
     userCount: v.number(),
     firstSeenAt: v.number(),
     lastSeenAt: v.number(),
-    status: v.string(),              // "pending" | "processing" | "completed" | "failed"
-    priority: v.string(),            // "low" | "normal" | "high"
+    // Keep legacy storage permissive until live data has been audited and a
+    // migration is available. Operation validators enforce the finite set.
+    status: v.string(),
+    priority: v.string(),
     createdPluginId: v.optional(v.id("plugins")),
     processedAt: v.optional(v.number()),
     error: v.optional(v.string()),

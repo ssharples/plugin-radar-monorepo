@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { useAuth } from "./auth-provider";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { ArrowsClockwise, CheckCircle, XCircle, Spinner } from "@phosphor-icons/react";
-
-// Webhook URL for triggering enrichment (VPS endpoint)
-const WEBHOOK_URL = process.env.NEXT_PUBLIC_ENRICHMENT_WEBHOOK_URL || "http://localhost:3847";
-const API_KEY = process.env.NEXT_PUBLIC_ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+import {
+  ArrowsClockwise,
+  CheckCircle,
+  XCircle,
+  Spinner,
+} from "@phosphor-icons/react";
 
 interface AdminEnrichButtonProps {
   pluginId: Id<"plugins">;
@@ -18,9 +19,14 @@ interface AdminEnrichButtonProps {
   className?: string;
 }
 
-export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className }: AdminEnrichButtonProps) {
+export function AdminEnrichButton({
+  pluginId,
+  className,
+}: AdminEnrichButtonProps) {
   const { isAdmin, user, sessionToken } = useAuth();
-  const [status, setStatus] = useState<"idle" | "loading" | "running" | "success" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
   const [message, setMessage] = useState<string | null>(null);
 
   const queueEnrichment = useMutation(api.adminEnrich.queueEnrichment);
@@ -34,47 +40,15 @@ export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className 
     setMessage("Creating job...");
 
     try {
-      // 1. Create job in Convex
-      const result = await queueEnrichment({
+      // Queue the job in Convex; processing is handled by the server-side worker.
+      await queueEnrichment({
         pluginId,
         sessionToken: sessionToken!,
         priority: "high",
       });
 
-      setMessage("Triggering agent...");
-
-      // 2. Call webhook to trigger immediate processing
-      try {
-        const webhookResponse = await fetch(`${WEBHOOK_URL}/enrich`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            pluginSlug,
-            jobId: result.jobId,
-            apiKey: API_KEY,
-          }),
-        });
-
-        if (webhookResponse.ok) {
-          setStatus("running");
-          setMessage(`Agent enriching ${pluginName}...`);
-          
-          // Poll for completion (optional - could use Convex subscription instead)
-          setTimeout(() => {
-            setStatus("success");
-            setMessage("Enrichment complete! Refresh to see updates.");
-          }, 30000); // Assume 30s for enrichment
-        } else {
-          // Webhook failed but job is queued
-          setStatus("success");
-          setMessage(`Queued for enrichment (webhook unavailable)`);
-        }
-      } catch (webhookErr) {
-        // Webhook unreachable but job is queued
-        console.warn("Webhook unavailable:", webhookErr);
-        setStatus("success");
-        setMessage(`Queued for batch processing`);
-      }
+      setStatus("success");
+      setMessage("Enrichment queued. Refresh after processing to see updates.");
 
       // Reset after 10 seconds
       setTimeout(() => {
@@ -96,21 +70,20 @@ export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className 
     <div className={className}>
       <button
         onClick={handleClick}
-        disabled={status === "loading" || status === "running"}
+        disabled={status === "loading"}
         className={`
           inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
-          ${status === "idle" 
-            ? "bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white border border-stone-700" 
-            : status === "loading"
-            ? "bg-stone-800 text-stone-400 border border-stone-700 cursor-wait"
-            : status === "running"
-            ? "bg-amber-900/50 text-white border border-neutral-700 cursor-wait"
-            : status === "success"
-            ? "bg-green-900/50 text-green-400 border border-green-700"
-            : "bg-red-900/50 text-red-400 border border-red-700"
+          ${
+            status === "idle"
+              ? "bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white border border-stone-700"
+              : status === "loading"
+                ? "bg-stone-800 text-stone-400 border border-stone-700 cursor-wait"
+                : status === "success"
+                  ? "bg-green-900/50 text-green-400 border border-green-700"
+                  : "bg-red-900/50 text-red-400 border border-red-700"
           }
         `}
-        title="Refresh plugin data using AI agent"
+        title="Queue plugin data refresh"
       >
         {status === "idle" && (
           <>
@@ -124,16 +97,10 @@ export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className 
             <span>Queuing...</span>
           </>
         )}
-        {status === "running" && (
-          <>
-            <Spinner size={16} className="animate-spin" />
-            <span>Running...</span>
-          </>
-        )}
         {status === "success" && (
           <>
             <CheckCircle size={16} />
-            <span>Done!</span>
+            <span>Queued</span>
           </>
         )}
         {status === "error" && (
@@ -143,13 +110,13 @@ export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className 
           </>
         )}
       </button>
-      
+
       {message && (
-        <p className={`text-xs mt-1 ${
-          status === "error" ? "text-red-400" : 
-          status === "running" ? "text-white" : 
-          "text-green-400"
-        }`}>
+        <p
+          className={`text-xs mt-1 ${
+            status === "error" ? "text-red-400" : "text-green-400"
+          }`}
+        >
           {message}
         </p>
       )}

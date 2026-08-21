@@ -14,7 +14,7 @@ Follow these steps exactly:
 
 3. **Deploy Convex** (if convex/ files changed):
    ```
-   cd /Users/dev/plugin-radar-monorepo && npx convex deploy
+   cd /path/to/plugin-radar-monorepo && npx convex deploy
    ```
 
 4. **Deploy web app** (if apps/web/ files changed):

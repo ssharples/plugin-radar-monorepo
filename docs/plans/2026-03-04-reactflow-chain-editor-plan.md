@@ -22,7 +22,7 @@
 **Step 1: Create git worktree**
 
 ```bash
-cd /Users/satti/Development-projects/plugin-radar-monorepo
+cd /path/to/plugin-radar-monorepo
 git worktree add .claude/worktrees/reactflow-editor -b feat/reactflow-chain-editor
 cd .claude/worktrees/reactflow-editor
 ```

@@ -327,8 +327,8 @@ Session 6+: 5A-5D (large features, order based on priorities)
 
 | Repo | Path | Role |
 |------|------|------|
-| plugin-radar-ui | `/Users/dev/Downloads/plugin-radar-ui` | Web app (Next.js 16 + frontend) |
-| plugin-radar | `/Users/dev/Downloads/plugin-radar` | Backend scripts + additional Convex functions |
-| plugin-directory | `/Users/dev/plugin-directory` | JUCE C++ desktop app (separate team) |
+| plugin-radar-ui | `/path/to/plugin-radar-ui` | Web app (Next.js 16 + frontend) |
+| plugin-radar | `/path/to/plugin-radar` | Backend scripts + additional Convex functions |
+| plugin-directory | `/path/to/plugin-directory` | JUCE C++ desktop app (separate team) |
 
 *All share Convex backend: `https://next-frog-231.convex.cloud`*

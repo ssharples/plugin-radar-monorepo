@@ -9,7 +9,7 @@ Follow these steps exactly:
 2. **Run builds for each affected project** (skip if no files changed in that area):
    - Desktop UI (`apps/desktop/ui/`): `cd apps/desktop/ui && npx vite build`
    - Web app (`apps/web/`): `cd apps/web && npx next build`
-   - Convex (`convex/`): `cd /Users/dev/plugin-radar-monorepo && npx convex typecheck`
+   - Convex (`convex/`): `cd /path/to/plugin-radar-monorepo && npx convex typecheck`
    - If ANY build fails, fix the errors before continuing. Do NOT commit broken code.
 
 3. **Check for field name consistency** if Convex schema or mutations were changed:

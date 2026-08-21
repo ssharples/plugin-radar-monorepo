@@ -4,7 +4,11 @@ import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { checkRateLimit } from "./lib/rateLimit";
 import { USE_CASE_TO_GROUP } from "./lib/chainUseCases";
-import { getSessionUser } from "./lib/auth";
+import {
+  getAdminSessionUser,
+  getSessionUser,
+  requireWorkerApiKey,
+} from "./lib/auth";
 import { generateUniqueSlug, generateShareCode } from "./lib/slugUtils";
 import { verifyChainOwnership } from "./lib/chainHelpers";
 import {
@@ -2573,11 +2577,15 @@ export const resolveUnmatchedPlugin = mutation({
     pluginId: v.id("plugins"),
   },
   handler: async (ctx, args) => {
-    const { user } = await getSessionUser(ctx, args.sessionToken);
-    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+    await getAdminSessionUser(ctx, args.sessionToken);
 
     const queueItem = await ctx.db.get(args.queueItemId);
     if (!queueItem) throw new Error("Queue item not found");
+    if (queueItem.status !== "pending") {
+      throw new Error(
+        `Queue item cannot be resolved from status ${queueItem.status}`,
+      );
+    }
 
     const targetPlugin = await ctx.db.get(args.pluginId);
     if (!targetPlugin) throw new Error("Target plugin not found");
@@ -2662,11 +2670,15 @@ export const resolveUnmatchedByApiKey = mutation({
     pluginId: v.id("plugins"),
   },
   handler: async (ctx, args) => {
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
-    if (args.apiKey !== expectedKey) throw new Error("Invalid API key");
+    requireWorkerApiKey(args.apiKey);
 
     const queueItem = await ctx.db.get(args.queueItemId);
     if (!queueItem) throw new Error("Queue item not found");
+    if (queueItem.status !== "pending" && queueItem.status !== "processing") {
+      throw new Error(
+        `Queue item cannot be resolved from status ${queueItem.status}`,
+      );
+    }
 
     const targetPlugin = await ctx.db.get(args.pluginId);
     if (!targetPlugin) throw new Error("Target plugin not found");
@@ -2743,11 +2755,15 @@ export const dismissUnmatchedPlugin = mutation({
     queueItemId: v.id("enrichmentQueue"),
   },
   handler: async (ctx, args) => {
-    const { user } = await getSessionUser(ctx, args.sessionToken);
-    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+    await getAdminSessionUser(ctx, args.sessionToken);
 
     const queueItem = await ctx.db.get(args.queueItemId);
     if (!queueItem) throw new Error("Queue item not found");
+    if (queueItem.status !== "pending") {
+      throw new Error(
+        `Queue item cannot be dismissed from status ${queueItem.status}`,
+      );
+    }
 
     await ctx.db.patch(args.queueItemId, {
       status: "ignored",
@@ -2762,8 +2778,9 @@ export const dismissUnmatchedPlugin = mutation({
  * Get stats for the unmatched plugins queue (admin dashboard).
  */
 export const getUnmatchedStats = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { sessionToken: v.string() },
+  handler: async (ctx, args) => {
+    await getAdminSessionUser(ctx, args.sessionToken);
     const pending = await ctx.db
       .query("enrichmentQueue")
       .withIndex("by_status", (q) => q.eq("status", "pending"))

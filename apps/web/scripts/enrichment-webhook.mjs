@@ -18,7 +18,11 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.ENRICHMENT_PORT || 3847;
-const API_KEY = process.env.ENRICHMENT_API_KEY || 'pluginradar-enrich-2026';
+const API_KEY = process.env.ENRICHMENT_API_KEY?.trim();
+if (!API_KEY) {
+  console.error('ENRICHMENT_API_KEY environment variable is required; refusing to start the webhook server.');
+  process.exit(1);
+}
 
 // Track running jobs to prevent duplicates
 const runningJobs = new Set();
