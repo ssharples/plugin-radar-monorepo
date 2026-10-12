@@ -51,6 +51,9 @@ public:
     const Macro& getMacro(int index) const { return macros[static_cast<size_t>(juce::jlimit(0, kNumMacros - 1, index))]; }
     float getValue(int index) const;
     void setValue(int index, float normalised); // notifies the host and moves the linked parameters
+    // Wrap a whole UI drag in one host gesture, so automation touch mode sees one move.
+    void beginGesture(int index);
+    void endGesture(int index);
     bool addLink(int index, const MacroLink& link); // updates the range if the parameter is already linked
     bool removeLink(int index, int linkIndex);
     bool setLinkRange(int index, int linkIndex, float min, float max);
@@ -86,6 +89,7 @@ private:
     void resolveAgain();
 
     std::array<MacroParameter*, kNumMacros> parameters {}; // owned by the AudioProcessor
+    std::array<bool, kNumMacros> gestureOpen {}; // control thread only
     std::array<Macro, kNumMacros> macros;
     std::array<std::vector<bool>, kNumMacros> available;
     ChainProcessor* boundChain = nullptr;

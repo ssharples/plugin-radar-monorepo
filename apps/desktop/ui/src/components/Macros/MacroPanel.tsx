@@ -31,7 +31,7 @@ function RangeInput({ label, value, onCommit }: { label: string; value: number; 
 }
 
 export function MacroPanel({ onClose }: { onClose: () => void }) {
-  const { macros, selected, error, fetchMacros, select, setValue, applyValues, removeLink, setLinkRange, rename } = useMacroStore();
+  const { macros, selected, error, fetchMacros, select, setValue, setGesture, applyValues, removeLink, setLinkRange, rename } = useMacroStore();
   const [nameDraft, setNameDraft] = useState('');
 
   useEffect(() => {
@@ -80,6 +80,9 @@ export function MacroPanel({ onClose }: { onClose: () => void }) {
                 label={macro.name || `M${macro.index + 1}`}
                 color={macro.links.length ? '#8b7cff' : '#5d636e'}
                 onChange={(value) => setValue(macro.index, value)}
+                onDragStart={() => setGesture(macro.index, true)}
+                onDragEnd={() => setGesture(macro.index, false)}
+                parseValue={(text) => { const n = parseFloat(text.replace('%', '')); return Number.isFinite(n) ? n / 100 : null; }}
               />
               <span className={`text-[10px] ${macro.links.length ? 'text-plugin-accent-bright' : 'text-plugin-dim'}`}>
                 {macro.links.length ? `${macro.links.length} link${macro.links.length > 1 ? 's' : ''}` : 'empty'}

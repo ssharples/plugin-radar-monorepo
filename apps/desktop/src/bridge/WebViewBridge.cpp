@@ -470,6 +470,10 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                                                  juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             completion(args.size() >= 1 ? setMacroValue(args[0]) : juce::var());
         })
+        .withNativeFunction("setMacroGesture", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? setMacroGesture(args[0]) : juce::var());
+        })
         .withNativeFunction("addMacroLink", [this](const juce::Array<juce::var>& args,
                                                  juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             completion(args.size() >= 1 ? addMacroLink(args[0]) : juce::var());
@@ -1935,6 +1939,18 @@ juce::var WebViewBridge::setMacroValue(const juce::var& args)
     if (index < 0 || index >= MacroManager::kNumMacros) return macroFailure("Macro not found");
     macroManager->setValue(index, static_cast<float>(static_cast<double>(obj->getProperty("value"))));
     lastEmittedMacroValues[static_cast<size_t>(index)] = macroManager->getValue(index);
+    auto* result = new juce::DynamicObject(); result->setProperty("success", true);
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::setMacroGesture(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (macroManager == nullptr || obj == nullptr) return macroFailure("Invalid arguments");
+    const int index = static_cast<int>(obj->getProperty("index"));
+    if (index < 0 || index >= MacroManager::kNumMacros) return macroFailure("Macro not found");
+    if (static_cast<bool>(obj->getProperty("active"))) macroManager->beginGesture(index);
+    else macroManager->endGesture(index);
     auto* result = new juce::DynamicObject(); result->setProperty("success", true);
     return juce::var(result);
 }
