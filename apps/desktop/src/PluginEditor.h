@@ -22,5 +22,8 @@ private:
 
     void initializeWebView();
 
+    // Last window size, shared by all instances, so new ones open at the size you used last.
+    static juce::File sizeSettingsFile();
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginChainManagerEditor)
 };

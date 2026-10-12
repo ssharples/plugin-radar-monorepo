@@ -310,6 +310,12 @@ void PluginChainManagerProcessor::getStateInformation(juce::MemoryBlock& destDat
     {
         if (mirrorManager && mirrorManager->isMirrored())
             xml->createNewChildElement("MirrorGroup")->setAttribute("id", mirrorManager->getMirrorGroupId());
+        if (editorWidth.load() > 0 && editorHeight.load() > 0)
+        {
+            auto* size = xml->createNewChildElement("EditorSize");
+            size->setAttribute("width", editorWidth.load());
+            size->setAttribute("height", editorHeight.load());
+        }
         copyXmlToBinary(*xml, destData);
     }
 }
@@ -363,6 +369,12 @@ void PluginChainManagerProcessor::setStateInformation(const void* data, int size
         {
             savedMirrorGroupId = mirrorXml->getIntAttribute("id", -1);
 
+        }
+
+        if (auto* size = xml->getChildByName("EditorSize"))
+        {
+            editorWidth.store(size->getIntAttribute("width", 0));
+            editorHeight.store(size->getIntAttribute("height", 0));
         }
 
         if (xml->hasTagName("PluginChainManagerState"))

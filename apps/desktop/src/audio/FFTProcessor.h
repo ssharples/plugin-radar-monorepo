@@ -27,6 +27,7 @@ public:
     static constexpr int fftOrder = 11;                          // 2^11 = 2048
     static constexpr int fftSize = 1 << fftOrder;               // 2048 points
     static constexpr int numBins = fftSize / 2;                 // 1024 positive-frequency bins
+    static constexpr int hopSize = fftSize / 4;                 // 75% overlap: a new frame every 512 samples
 
     FFTProcessor();
     ~FFTProcessor();
@@ -56,9 +57,11 @@ private:
     juce::dsp::FFT forwardFFT;
     juce::dsp::WindowingFunction<float> windowFunction;
 
-    // FIFO for collecting samples on the audio thread
+    // Ring of the last fftSize samples, collected on the audio thread.
+    // A frame is taken every hopSize samples, so frames overlap.
     std::array<float, fftSize> fifo;
     int fifoIndex = 0;
+    int samplesSinceFrame = 0;
 
     // FFT working buffer (2x size for real-only forward transform)
     std::array<float, fftSize * 2> fftWorkBuffer;

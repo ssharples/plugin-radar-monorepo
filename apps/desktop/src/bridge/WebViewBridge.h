@@ -115,6 +115,7 @@ private:
     juce::var setCrossoverFrequency(const juce::var& args);
     juce::var getMacros();
     juce::var setMacroValue(const juce::var& args);
+    juce::var setMacroGesture(const juce::var& args);
     juce::var addMacroLink(const juce::var& args);
     juce::var removeMacroLink(const juce::var& args);
     juce::var setMacroLinkRange(const juce::var& args);

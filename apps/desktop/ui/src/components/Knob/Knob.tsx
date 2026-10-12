@@ -14,6 +14,23 @@ interface KnobProps {
   /** Arc colour (CSS colour). Defaults to the accent. */
   color?: string;
   onChange: (value: number) => void;
+  /** Called when a mouse drag starts and ends, so a drag can be one automation move */
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  /** Turns typed text into a value; return null to reject. Defaults to parseKnobText. */
+  parseValue?: (text: string) => number | null;
+}
+
+/** Reads a typed value: plain numbers, "1k" for thousands, or "50%" for a share of the range. */
+export function parseKnobText(text: string, min: number, max: number): number | null {
+  const t = text.trim().toLowerCase().replace(/db|hz|ms/g, '').trim();
+  if (t === '-inf' || t === 'inf') return min;
+  const pct = /^(-?\d*\.?\d+)\s*%$/.exec(t);
+  if (pct) return min + (parseFloat(pct[1]) / 100) * (max - min);
+  const kilo = /^(-?\d*\.?\d+)\s*k$/.exec(t);
+  if (kilo) return parseFloat(kilo[1]) * 1000;
+  const n = parseFloat(t.replace(/^\+/, ''));
+  return Number.isFinite(n) ? n : null;
 }
 
 export function Knob({
@@ -28,7 +45,12 @@ export function Knob({
   layout = 'stack',
   color = '#8b7cff',
   onChange,
+  onDragStart,
+  onDragEnd,
+  parseValue,
 }: KnobProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ y: 0, value: 0 });
   const shiftHeldRef = useRef(false);
@@ -49,7 +71,8 @@ export function Knob({
     setIsDragging(true);
     dragStartRef.current = { y: e.clientY, value };
     shiftHeldRef.current = e.shiftKey;
-  }, [value]);
+    onDragStart?.();
+  }, [value, onDragStart]);
 
   const handleDoubleClick = useCallback(() => {
     onChange(defaultValue);
@@ -86,6 +109,7 @@ export function Knob({
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      onDragEnd?.();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -95,7 +119,14 @@ export function Knob({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, min, max, onChange, step]);
+  }, [isDragging, min, max, onChange, step, onDragEnd]);
+
+  const commitDraft = () => {
+    setEditing(false);
+    const parsed = parseValue ? parseValue(draft) : parseKnobText(draft, min, max);
+    if (parsed == null || !Number.isFinite(parsed)) return;
+    onChange(Math.round(Math.max(min, Math.min(max, parsed)) / step) * step);
+  };
 
   // Format display value
   const formatValue = (dB: number): string => {
@@ -154,7 +185,7 @@ export function Knob({
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={Math.round(safeValue * 10) / 10}
-      title={label ? `${label}: ${valueText}. Drag or scroll; double-click to reset` : undefined}
+      title={label ? `${label}: ${valueText}. Drag or scroll (Shift for fine); double-click to reset; click the value to type one` : undefined}
     >
       <svg width={size} height={size} className="absolute inset-0 pointer-events-none">
         <defs>
@@ -201,6 +232,32 @@ export function Knob({
     </div>
   );
 
+  const valueNode = (className: string) => editing ? (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commitDraft}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') commitDraft();
+        if (e.key === 'Escape') setEditing(false);
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className={`num text-[11px] w-12 bg-transparent text-center text-plugin-accent outline-none border-b border-plugin-accent ${className}`}
+      aria-label={label ? `Type a value for ${label}` : 'Type a value'}
+    />
+  ) : (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); setDraft(valueText); setEditing(true); }}
+      title="Click to type a value"
+      className={`num text-[11px] transition-colors hover:text-plugin-accent ${isDragging ? 'text-plugin-accent' : 'text-plugin-text'} ${className}`}
+    >
+      {valueText}
+    </button>
+  );
+
   if (layout === 'side') {
     return (
       <div className="flex items-center gap-1.5">
@@ -209,9 +266,7 @@ export function Knob({
           {label && (
             <span className="text-[10px] font-semibold text-plugin-dim uppercase tracking-wider">{label}</span>
           )}
-          <span className={`num text-[11px] transition-colors ${isDragging ? 'text-plugin-accent' : 'text-plugin-text'}`}>
-            {valueText}
-          </span>
+          {valueNode('text-left')}
         </div>
       </div>
     );
@@ -220,9 +275,7 @@ export function Knob({
   return (
     <div className="flex flex-col items-center gap-0.5 relative">
       {dial}
-      <div className={`num text-[11px] transition-colors ${isDragging ? 'text-plugin-accent' : 'text-plugin-text'}`}>
-        {valueText}
-      </div>
+      {valueNode('')}
       {label && (
         <div className="text-[10px] text-plugin-muted uppercase tracking-wider font-semibold">
           {label}

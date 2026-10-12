@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "bridge/ResourceProvider.h"
+#include "utils/PlatformPaths.h"
 #include <iostream>
 
 PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& p)
@@ -11,11 +12,30 @@ PluginChainManagerEditor::PluginChainManagerEditor(PluginChainManagerProcessor& 
     // Set the size - this triggers resized() which sets WebView to full bounds
     setResizable(true, true);
     setResizeLimits(500, 800, 3840, 2160);
-    setSize(500, 1000);
+
+    // This instance's saved size first, then the size last used anywhere, then the default.
+    int width = processorRef.editorWidth.load(), height = processorRef.editorHeight.load();
+    if (width <= 0 || height <= 0)
+    {
+        juce::PropertiesFile settings(sizeSettingsFile(), {});
+        width = settings.getIntValue("editorWidth", 500);
+        height = settings.getIntValue("editorHeight", 1000);
+    }
+    setSize(juce::jlimit(500, 3840, width), juce::jlimit(800, 2160, height));
+}
+
+juce::File PluginChainManagerEditor::sizeSettingsFile()
+{
+    return PlatformPaths::getPluginCacheDirectory().getChildFile("ProChain.settings");
 }
 
 PluginChainManagerEditor::~PluginChainManagerEditor()
 {
+    juce::PropertiesFile settings(sizeSettingsFile(), {});
+    settings.setValue("editorWidth", getWidth());
+    settings.setValue("editorHeight", getHeight());
+    settings.saveIfNeeded();
+
     webBrowser.reset();
     webViewBridge.reset();
 }
@@ -76,6 +96,8 @@ void PluginChainManagerEditor::resized()
         // layout within 100vw/100vh. A small edge margin is no longer needed
         // since the JUCE corner resizer is brought to front below.
         webBrowser->setBounds(bounds);
+        processorRef.editorWidth.store(getWidth());
+        processorRef.editorHeight.store(getHeight());
 
         // Ensure the corner resizer (if present) stays on top of the WebView
         for (int i = getNumChildComponents() - 1; i >= 0; --i)

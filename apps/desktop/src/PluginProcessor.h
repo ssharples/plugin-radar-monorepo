@@ -69,6 +69,9 @@ public:
     void setGainMatchTargetDB(float db) { gainProcessor.setGainMatchTargetDB(db); }
     float getGainMatchTargetDB() const { return gainProcessor.getGainMatchTargetDB(); }
     std::unique_ptr<juce::XmlElement> captureWrapperState() const;
+
+    // Editor window size for this instance, saved in the song (not in presets). 0 = not set yet.
+    std::atomic<int> editorWidth{0}, editorHeight{0};
     bool applyWrapperSettings(const juce::XmlElement&, bool restoreAssignmentsExactly = true);
 
     // Instance awareness

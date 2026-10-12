@@ -9,6 +9,7 @@ interface MacroState {
   fetchMacros: () => Promise<void>;
   select: (index: number) => void;
   setValue: (index: number, value: number) => void;
+  setGesture: (index: number, active: boolean) => void;
   applyValues: (values: number[]) => void;
   addLink: (index: number, nodeId: number, parameterIndex: number) => Promise<boolean>;
   removeLink: (index: number, linkIndex: number) => Promise<void>;
@@ -33,6 +34,7 @@ export const useMacroStore = create<MacroState>((set, get) => {
       set({ macros: get().macros.map((m) => (m.index === index ? { ...m, value } : m)) });
       juceBridge.setMacroValue(index, value);
     },
+    setGesture: (index, active) => { juceBridge.setMacroGesture(index, active); },
     applyValues: (values) => set({ macros: get().macros.map((m) => ({ ...m, value: values[m.index] ?? m.value })) }),
     addLink: async (index, nodeId, parameterIndex) => take(await juceBridge.addMacroLink(index, nodeId, parameterIndex)),
     removeLink: async (index, linkIndex) => { take(await juceBridge.removeMacroLink(index, linkIndex)); },

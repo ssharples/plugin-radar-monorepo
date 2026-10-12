@@ -68,9 +68,26 @@ void MacroManager::setValue(int index, float normalised)
     auto* parameter = parameters[static_cast<size_t>(index)];
     const auto value = juce::jlimit(0.0f, 1.0f, normalised);
     if (parameter == nullptr) { apply(index, value); return; }
+    if (gestureOpen[static_cast<size_t>(index)]) { parameter->setValueNotifyingHost(value); return; }
     parameter->beginChangeGesture();
     parameter->setValueNotifyingHost(value);
     parameter->endChangeGesture();
+}
+
+void MacroManager::beginGesture(int index)
+{
+    if (!validIndex(index) || gestureOpen[static_cast<size_t>(index)]) return;
+    auto* parameter = parameters[static_cast<size_t>(index)];
+    if (parameter == nullptr) return;
+    gestureOpen[static_cast<size_t>(index)] = true;
+    parameter->beginChangeGesture();
+}
+
+void MacroManager::endGesture(int index)
+{
+    if (!validIndex(index) || !gestureOpen[static_cast<size_t>(index)]) return;
+    gestureOpen[static_cast<size_t>(index)] = false;
+    if (auto* parameter = parameters[static_cast<size_t>(index)]) parameter->endChangeGesture();
 }
 
 bool MacroManager::addLink(int index, const MacroLink& link)

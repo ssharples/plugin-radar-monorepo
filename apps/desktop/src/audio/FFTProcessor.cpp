@@ -57,21 +57,26 @@ void FFTProcessor::process(const juce::AudioBuffer<float>& buffer)
     if (audioResetRequested.exchange(false, std::memory_order_acq_rel))
     {
         fifoIndex = 0;
+        samplesSinceFrame = 0;
         fifo.fill(0.0f);
     }
     if (!analysisEnabled.load(std::memory_order_acquire) || buffer.getNumChannels() == 0 || buffer.getNumSamples() == 0) return;
     const auto* l = buffer.getReadPointer(0); const auto* r = buffer.getNumChannels() > 1 ? buffer.getReadPointer(1) : l;
     for (int i = 0; i < buffer.getNumSamples(); ++i)
     {
-        fifo[static_cast<size_t>(fifoIndex++)] = (l[i] + r[i]) * 0.5f;
-        if (fifoIndex == fftSize)
+        fifo[static_cast<size_t>(fifoIndex)] = (l[i] + r[i]) * 0.5f;
+        fifoIndex = (fifoIndex + 1) % fftSize;
+        if (++samplesSinceFrame >= hopSize)
         {
-            fifoIndex = 0;
+            samplesSinceFrame = 0;
             const unsigned write = queueWrite.load(std::memory_order_relaxed);
             const unsigned read = queueRead.load(std::memory_order_acquire);
             if (write - read < queueCapacity)
             {
-                frameQueue[write % queueCapacity].samples = fifo;
+                // Unwrap the ring, oldest sample first.
+                auto& frame = frameQueue[write % queueCapacity].samples;
+                const auto split = fifo.begin() + fifoIndex;
+                std::copy(fifo.begin(), split, std::copy(split, fifo.end(), frame.begin()));
                 queueWrite.store(write + 1, std::memory_order_release);
                 // Worker polls with a bounded wait; the audio callback never
                 // performs a blocking wakeup or takes a mutex.

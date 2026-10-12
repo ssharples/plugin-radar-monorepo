@@ -593,6 +593,10 @@ class JuceBridge {
     return this.callNative<ApiResponse>('setMacroValue', JSON.stringify({ index, value }));
   }
 
+  async setMacroGesture(index: number, active: boolean): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setMacroGesture', JSON.stringify({ index, active }));
+  }
+
   async addMacroLink(index: number, nodeId: number, parameterIndex: number): Promise<MacrosResponse> {
     return this.callNative<MacrosResponse>('addMacroLink', JSON.stringify({ index, nodeId, parameterIndex }));
   }
