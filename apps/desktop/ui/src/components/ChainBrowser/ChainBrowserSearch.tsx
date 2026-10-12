@@ -28,7 +28,7 @@ export function ChainBrowserSearch({ onSearch, debounceMs = 300 }: ChainBrowserS
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Search chains..."
-        className="w-full bg-black/40 border border-plugin-border rounded-propane font-mono pl-7 pr-7 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+        className="w-full bg-plugin-bg border border-plugin-border rounded-md  pl-7 pr-7 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
       />
       {value && (
         <button

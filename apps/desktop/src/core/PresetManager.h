@@ -3,6 +3,7 @@
 #include <juce_core/juce_core.h>
 #include "ChainProcessor.h"
 #include <functional>
+#include <atomic>
 
 struct PresetInfo
 {
@@ -26,11 +27,15 @@ class PresetManager
 {
 public:
     PresetManager(ChainProcessor& chainProcessor);
-    ~PresetManager() = default;
+    ~PresetManager();
 
     // Preset operations
     bool savePreset(const juce::String& name, const juce::String& category);
     bool loadPreset(const juce::File& presetFile);
+    using LoadCompletion = std::function<void(ChainProcessor::RestoreResult)>;
+    using LoadProgress = ChainProcessor::RestoreProgress;
+    uint64_t loadPresetAsync(const juce::File& presetFile, bool allowPartial,
+                             LoadCompletion completion, LoadProgress progress = {});
     bool deletePreset(const juce::File& presetFile);
 
     // Preset discovery
@@ -49,6 +54,8 @@ public:
     // Callbacks
     std::function<void()> onPresetListChanged;
     std::function<void(const PresetInfo*)> onPresetLoaded;
+    std::function<std::unique_ptr<juce::XmlElement>()> captureWrapperState;
+    std::function<bool(const juce::XmlElement&)> applyWrapperSettings;
 
     // Paths
     juce::File getPresetsDirectory() const;
@@ -64,6 +71,8 @@ private:
     ChainProcessor& chain;
     juce::Array<PresetInfo> presets;
     std::unique_ptr<PresetInfo> currentPreset;
+    struct FileLoadState;
+    std::shared_ptr<FileLoadState> fileLoads;
     bool dirty = false;
     juce::StringArray lastMissingPlugins;
 

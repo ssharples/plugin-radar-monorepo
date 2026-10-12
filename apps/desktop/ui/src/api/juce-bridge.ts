@@ -12,6 +12,9 @@ import type {
   BlacklistedPluginEvent,
   OtherInstanceInfo,
   MirrorState,
+  LoadProgress,
+  AutomationBindingsResponse,
+  MacrosResponse,
 } from './types';
 
 type EventHandler<T> = (data: T) => void;
@@ -107,6 +110,8 @@ class JuceBridge {
       'instancesChanged',
       'mirrorStateChanged',
       'mirrorUpdateApplied',
+      'loadProgress',
+      'macroValues',
     ];
 
     events.forEach((eventName) => {
@@ -289,8 +294,10 @@ class JuceBridge {
     return this.callNative<ApiResponse>('savePreset', name, category);
   }
 
-  async loadPreset(path: string): Promise<ApiResponse> {
-    return this.callNative<ApiResponse>('loadPreset', path);
+  async loadPreset(path: string, allowPartial = false, clientRequestId?: number): Promise<ApiResponse> {
+    return clientRequestId == null
+      ? this.callNative<ApiResponse>('loadPreset', path, allowPartial)
+      : this.callNative<ApiResponse>('loadPreset', path, allowPartial, clientRequestId);
   }
 
   async deletePreset(path: string): Promise<ApiResponse> {
@@ -309,6 +316,10 @@ class JuceBridge {
     return this.on('presetLoaded', handler);
   }
 
+  onLoadProgress(handler: EventHandler<LoadProgress>): () => void {
+    return this.on('loadProgress', handler);
+  }
+
   // Waveform streaming
   async startWaveformStream(): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('startWaveformStream');
@@ -316,6 +327,10 @@ class JuceBridge {
 
   async stopWaveformStream(): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('stopWaveformStream');
+  }
+
+  async setAnalysisSubscriptions(waveform: boolean, fft: boolean): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setAnalysisSubscriptions', JSON.stringify({ waveform, fft }));
   }
 
   onWaveformData(handler: EventHandler<WaveformData>): () => void {
@@ -448,6 +463,14 @@ class JuceBridge {
     return this.callNative('readPluginParameters', nodeId);
   }
 
+  async getPluginParameters(nodeId: number): Promise<{
+    success: boolean;
+    parameters?: Array<{ index: number; name: string; value: number }>;
+    error?: string;
+  }> {
+    return this.callNative('getPluginParameters', nodeId);
+  }
+
   /**
    * Apply translated parameters to a plugin instance.
    * @param nodeId - The chain node ID of the plugin
@@ -517,6 +540,10 @@ class JuceBridge {
     return this.callNative<ApiResponse>('setBranchMute', JSON.stringify({ nodeId, mute }));
   }
 
+  async setBranchPolarity(nodeId: number, inverted: boolean): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setBranchPolarity', JSON.stringify({ nodeId, inverted }));
+  }
+
   async moveNode(nodeId: number, newParentId: number, newIndex: number): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('moveNode', JSON.stringify({ nodeId, newParentId, newIndex }));
   }
@@ -531,6 +558,55 @@ class JuceBridge {
 
   async setNodeBypassed(nodeId: number, bypassed: boolean): Promise<ApiResponse> {
     return this.callNative<ApiResponse>('setNodeBypassed', JSON.stringify({ nodeId, bypassed }));
+  }
+
+  async setNodeSuspended(nodeId: number, suspended: boolean): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeSuspended', JSON.stringify({ nodeId, suspended }));
+  }
+
+  async setNodeRecallSafe(nodeId: number, recallSafe: boolean): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeRecallSafe', JSON.stringify({ nodeId, recallSafe }));
+  }
+
+  async setNodeIgnoreLatency(nodeId: number, ignoreLatency: boolean): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setNodeIgnoreLatency', JSON.stringify({ nodeId, ignoreLatency }));
+  }
+
+  async getAutomationBindings(nodeId: number): Promise<AutomationBindingsResponse> {
+    return this.callNative<AutomationBindingsResponse>('getAutomationBindings', JSON.stringify({ nodeId }));
+  }
+
+  async assignAutomation(nodeId: number, parameterIndex: number): Promise<{ success: boolean; proxyId?: string; error?: string }> {
+    return this.callNative('assignAutomation', JSON.stringify({ nodeId, parameterIndex }));
+  }
+
+  async unassignAutomation(proxyId: string): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('unassignAutomation', JSON.stringify({ proxyId }));
+  }
+
+  // Macros
+  async getMacros(): Promise<MacrosResponse> {
+    return this.callNative<MacrosResponse>('getMacros');
+  }
+
+  async setMacroValue(index: number, value: number): Promise<ApiResponse> {
+    return this.callNative<ApiResponse>('setMacroValue', JSON.stringify({ index, value }));
+  }
+
+  async addMacroLink(index: number, nodeId: number, parameterIndex: number): Promise<MacrosResponse> {
+    return this.callNative<MacrosResponse>('addMacroLink', JSON.stringify({ index, nodeId, parameterIndex }));
+  }
+
+  async removeMacroLink(index: number, linkIndex: number): Promise<MacrosResponse> {
+    return this.callNative<MacrosResponse>('removeMacroLink', JSON.stringify({ index, linkIndex }));
+  }
+
+  async setMacroLinkRange(index: number, linkIndex: number, min: number, max: number): Promise<MacrosResponse> {
+    return this.callNative<MacrosResponse>('setMacroLinkRange', JSON.stringify({ index, linkIndex, min, max }));
+  }
+
+  async renameMacro(index: number, name: string): Promise<MacrosResponse> {
+    return this.callNative<MacrosResponse>('renameMacro', JSON.stringify({ index, name }));
   }
 
   async duplicateNode(nodeId: number): Promise<ApiResponse> {

@@ -85,7 +85,7 @@ export function Slider({
       {/* Track */}
       <div
         ref={trackRef}
-        className="relative w-full h-[3px] bg-plugin-border rounded-full cursor-pointer"
+        className="relative w-full h-1 bg-plugin-border-bright/60 rounded-full cursor-pointer"
         onMouseDown={handleMouseDown}
       >
         {/* Filled portion */}
@@ -99,7 +99,7 @@ export function Slider({
           className={`
             absolute top-1/2 -translate-y-1/2 -translate-x-1/2
             w-[10px] h-[10px] rounded-full
-            bg-plugin-surface-alt border-2 ${colors.thumb}
+            bg-plugin-text border-2 ${colors.thumb}
             shadow-sm transition-transform
             ${isDragging ? 'scale-125' : 'group-hover:scale-110'}
           `}
@@ -110,7 +110,7 @@ export function Slider({
       {/* Value tooltip */}
       {showTooltip && (
         <div
-          className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded bg-plugin-bg border border-plugin-border text-[9px] font-mono text-plugin-text whitespace-nowrap pointer-events-none z-50"
+          className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded bg-plugin-bg border border-plugin-border text-[10px]  text-plugin-text whitespace-nowrap pointer-events-none z-50"
           style={{ left: `${fraction * 100}%` }}
         >
           {typeof value === 'number' ? (step >= 1 ? value.toFixed(0) : value.toFixed(step < 0.1 ? 2 : 1)) : value}

@@ -51,33 +51,15 @@ struct StudioSidebarView: View {
 
   private var topBar: some View {
     HStack(spacing: 10) {
-      Menu {
-        Button("Studio Library") { store.navigate(to: .library) }
-        Button("Samples") { store.navigate(to: .samples) }
-        Button("Locations") { store.navigate(to: .locations) }
-      } label: {
-        HStack(spacing: 8) {
-          VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 5) {
-              StudioBrandMark()
-                .frame(width: 38, height: 24)
-                .clipped()
-
-              Image(systemName: "chevron.down")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(.white.opacity(0.32))
-            }
-
-            Text("Private local archive")
-              .font(.system(size: 10.5, weight: .medium))
-              .foregroundStyle(.white.opacity(0.40))
-          }
-        }
+      VStack(alignment: .leading, spacing: 4) {
+        StudioBrandMark()
+          .frame(width: 38, height: 24)
+          .clipped()
+          .accessibilityLabel("Studio Time Machine")
+        Text("Your studio, remembered")
+          .font(.system(size: 10.5, weight: .medium))
+          .foregroundStyle(.white.opacity(0.54))
       }
-      .menuStyle(.borderlessButton)
-      .menuIndicator(.hidden)
-      .fixedSize()
-      .help("Open Studio navigation")
 
       Spacer(minLength: 4)
 
@@ -108,7 +90,7 @@ struct StudioSidebarView: View {
           .font(.system(size: 12, weight: .bold))
           .frame(width: 18)
 
-        Text("Add library folder")
+        Text("Add to Studio")
           .font(.system(size: 13.5, weight: .semibold, design: .rounded))
           .lineLimit(1)
 
@@ -289,11 +271,13 @@ struct StudioSidebarView: View {
   }
 
   private var syncTitle: String {
-    switch store.syncStatus {
-    case .monitoring: "Library watching"
+    if store.isSampleLibrary { return "Sample library" }
+    if !store.automaticUpdatesEnabled { return "Automatic updates paused" }
+    if store.registeredRoots.isEmpty { return "No folders added" }
+    return switch store.syncStatus {
+    case .monitoring: "Watching for saves"
     case .indexing: "Updating library"
-    case .idle: "Library ready"
-    case .stopped: "Watching paused"
+    case .idle, .stopped: "Updates not running"
     }
   }
 
@@ -302,10 +286,11 @@ struct StudioSidebarView: View {
   }
 
   private var syncColor: Color {
-    switch store.syncStatus {
-    case .monitoring, .idle: StudioShellPalette.signal
+    if store.isSampleLibrary || !store.automaticUpdatesEnabled { return .gray }
+    return switch store.syncStatus {
+    case .monitoring: StudioShellPalette.signal
     case .indexing: .orange
-    case .stopped: .secondary
+    case .idle, .stopped: .gray
     }
   }
 }
@@ -344,6 +329,7 @@ private struct SidebarSearchButton: View {
 }
 
 private struct SidebarPrimaryActionStyle: ButtonStyle {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .foregroundStyle(.white.opacity(configuration.isPressed ? 0.78 : 0.88))
@@ -353,8 +339,8 @@ private struct SidebarPrimaryActionStyle: ButtonStyle {
         Color.white.opacity(configuration.isPressed ? 0.13 : 0.085),
         in: RoundedRectangle(cornerRadius: 10, style: .continuous)
       )
-      .scaleEffect(configuration.isPressed ? 0.985 : 1)
-      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+      .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: configuration.isPressed)
       .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
   }
 }
@@ -388,7 +374,7 @@ private struct SidebarNavigationRow: View {
       .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
     .buttonStyle(.plain)
-    .focusEffectDisabled()
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
   }
 }
 
@@ -421,7 +407,7 @@ private struct RecentSongRow: View {
       .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
     .buttonStyle(.plain)
-    .focusEffectDisabled()
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
     .help("\(work.displayName) — \(work.artist.displayName)")
     .accessibilityLabel("Open \(work.displayName) by \(work.artist.displayName)")
   }

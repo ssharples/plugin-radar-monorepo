@@ -85,7 +85,7 @@ export function AddFriend() {
     <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center gap-2 mb-4">
         <UserPlus size={18} className="text-plugin-accent" />
-        <h3 className="text-white font-mono font-medium">Add Friend</h3>
+        <h3 className="text-plugin-text  font-medium">Add Friend</h3>
       </div>
 
       <div className="flex gap-2 mb-3">
@@ -95,12 +95,12 @@ export function AddFriend() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Search by username, email, phone, or @instagram"
-          className="flex-1 bg-black/30 border border-plugin-border rounded px-3 py-2 text-white text-sm"
+          className="flex-1 bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text text-sm"
         />
         <button
           onClick={handleSearch}
           disabled={searching || query.trim().length < 2}
-          className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-accent/50 text-white rounded px-3 py-2"
+          className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-accent/50 text-plugin-text rounded px-3 py-2"
         >
           <Search size={16} />
         </button>
@@ -121,7 +121,7 @@ export function AddFriend() {
       )}
 
       {searching && (
-        <div className="text-gray-400 text-sm">Searching...</div>
+        <div className="text-plugin-muted text-sm">Searching...</div>
       )}
 
       {results.length > 0 && (
@@ -132,8 +132,8 @@ export function AddFriend() {
               className="flex items-center justify-between bg-black/20 rounded p-3"
             >
               <div>
-                <div className="text-white text-sm font-medium">{user.username}</div>
-                <div className="text-gray-500 text-xs">
+                <div className="text-plugin-text text-sm font-medium">{user.username}</div>
+                <div className="text-plugin-dim text-xs">
                   Found by {user.matchedOn}
                 </div>
               </div>
@@ -143,7 +143,7 @@ export function AddFriend() {
                 className={`flex items-center gap-1 text-sm rounded px-3 py-1 ${
                   sending === user.userId
                     ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
+                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
                 }`}
               >
                 <UserPlus size={14} />

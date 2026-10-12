@@ -22,6 +22,15 @@ struct StudioInspectorView: View {
             previewDecision: store.selectedPreviewDecision,
             isScanningCompatibility: store.isScanningPluginInventory
           )
+        } else if let set = selectedWorkSet {
+          SetInspectorView(
+            set: set,
+            compatibilityReport: store.pluginInventory.map {
+              PluginCompatibilityEvaluator().evaluate(set: set, inventory: $0)
+            },
+            previewDecision: nil,
+            isScanningCompatibility: store.isScanningPluginInventory
+          )
         } else if let index = store.library {
           LibraryInspectorView(index: index)
         } else {
@@ -34,6 +43,18 @@ struct StudioInspectorView: View {
       }
       .padding(20)
     }
+  }
+
+  private var selectedWorkSet: AbletonSet? {
+    guard let work = store.selectedWork, let revisionID = store.selectedWorkRevisionID else {
+      return nil
+    }
+    for session in work.sessions {
+      if let revision = session.revisions.first(where: { $0.id == revisionID }) {
+        return revision.set
+      }
+    }
+    return nil
   }
 }
 
@@ -50,7 +71,7 @@ private struct SetInspectorView: View {
           .font(.title3.weight(.semibold))
           .fixedSize(horizontal: false, vertical: true)
         Label(
-          set.isBackup ? "Backup Set" : "Current Set",
+          set.isBackup ? "Backup Set" : "Set",
           systemImage: set.isBackup ? "clock.arrow.circlepath" : "doc"
         )
         .font(.callout)
@@ -409,7 +430,8 @@ private struct MasteringAnalysisEvidenceView: View {
 
   private var sampleRateText: String {
     let kilohertz = analysis.sampleRate / 1_000
-    return "\(kilohertz.formatted(.number.precision(.fractionLength(kilohertz.rounded() == kilohertz ? 0 : 1)))) kHz"
+    return
+      "\(kilohertz.formatted(.number.precision(.fractionLength(kilohertz.rounded() == kilohertz ? 0 : 1)))) kHz"
   }
 }
 

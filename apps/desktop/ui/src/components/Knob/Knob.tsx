@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import knobSvg from '../../assets/volume-knob.svg';
 
 interface KnobProps {
   value: number;           // Value in dB
@@ -8,6 +7,12 @@ interface KnobProps {
   defaultValue?: number;   // Default value for double-click reset
   size?: number;           // Size in pixels (default 48)
   label?: string;          // Label below knob
+  step?: number;           // Value rounding (default 0.1)
+  formatValue?: (value: number) => string; // Custom value text
+  /** 'stack' puts value and label under the knob; 'side' puts them to the right */
+  layout?: 'stack' | 'side';
+  /** Arc colour (CSS colour). Defaults to the accent. */
+  color?: string;
   onChange: (value: number) => void;
 }
 
@@ -18,6 +23,10 @@ export function Knob({
   defaultValue = 0,
   size = 48,
   label,
+  step = 0.1,
+  formatValue: customFormat,
+  layout = 'stack',
+  color = '#8b7cff',
   onChange,
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -53,8 +62,8 @@ export function Knob({
     const sensitivity = fine ? (max - min) / 2000 : (max - min) / 400;
     const delta = -e.deltaY * sensitivity;
     const newValue = Math.max(min, Math.min(max, value + delta));
-    onChange(Math.round(newValue * 10) / 10);
-  }, [value, min, max, onChange]);
+    onChange(Math.round(newValue / step) * step);
+  }, [value, min, max, onChange, step]);
 
   useEffect(() => {
     const el = knobRef.current;
@@ -72,7 +81,7 @@ export function Knob({
       const sensitivity = e.shiftKey ? (max - min) / 1000 : (max - min) / 200;
       const newValue = dragStartRef.current.value + deltaY * sensitivity;
       const clampedValue = Math.max(min, Math.min(max, newValue));
-      onChange(Math.round(clampedValue * 10) / 10);
+      onChange(Math.round(clampedValue / step) * step);
     };
 
     const handleMouseUp = () => {
@@ -86,7 +95,7 @@ export function Knob({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, min, max, onChange]);
+  }, [isDragging, min, max, onChange, step]);
 
   // Format display value
   const formatValue = (dB: number): string => {
@@ -122,83 +131,100 @@ export function Knob({
 
   const isAtZero = Math.abs(safeValue) < 0.05;
 
-  // Knob image size — slightly smaller than the container to leave room for the arc track
-  const knobImgSize = size * 0.82;
+  // Knob cap geometry
+  const capR = radius * 0.78;
+  const pointerAngle = (angle - 90) * (Math.PI / 180);
+  const pX1 = center + Math.cos(pointerAngle) * capR * 0.35;
+  const pY1 = center + Math.sin(pointerAngle) * capR * 0.35;
+  const pX2 = center + Math.cos(pointerAngle) * capR * 0.92;
+  const pY2 = center + Math.sin(pointerAngle) * capR * 0.92;
+  const gradId = `knob-cap-${size}`;
 
-  return (
-    <div className="flex flex-col items-center gap-0.5 relative">
-      <div
-        ref={knobRef}
-        className={`relative select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        style={{ width: size, height: size }}
-        onMouseDown={handleMouseDown}
-        onDoubleClick={handleDoubleClick}
-      >
-        {/* Track arc + tick behind the knob */}
-        <svg
-          width={size}
-          height={size}
-          className="absolute inset-0 pointer-events-none"
-        >
-          {/* Track arc (background) */}
+  const valueText = customFormat ? customFormat(safeValue) : formatValue(safeValue);
+
+  const dial = (
+    <div
+      ref={knobRef}
+      className={`relative select-none flex-shrink-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      style={{ width: size, height: size }}
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
+      role="slider"
+      aria-label={label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.round(safeValue * 10) / 10}
+      title={label ? `${label}: ${valueText}. Drag or scroll; double-click to reset` : undefined}
+    >
+      <svg width={size} height={size} className="absolute inset-0 pointer-events-none">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3a3f48" />
+            <stop offset="100%" stopColor="#1b1e23" />
+          </linearGradient>
+        </defs>
+        {/* Track arc */}
+        <path
+          d={createArc(-135, 135, radius * 1.12)}
+          fill="none"
+          stroke="#2a2e35"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
+        {/* Value arc */}
+        {safeValue > min && (
           <path
-            d={createArc(-135, 135, radius * 0.95)}
+            d={createArc(-135, angle, radius * 1.12)}
             fill="none"
-            stroke="#222"
+            stroke={color}
+            strokeOpacity={isDragging ? 1 : 0.85}
             strokeWidth={2.5}
             strokeLinecap="round"
           />
-
-          {/* Value arc (filled portion) */}
-          {safeValue > min && (
-            <path
-              d={createArc(-135, angle, radius * 0.95)}
-              fill="none"
-              stroke={isDragging ? '#a06830' : '#89572a'}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-            />
-          )}
-
-          {/* 0 dB tick mark */}
-          <line
-            x1={tickX1}
-            y1={tickY1}
-            x2={tickX2}
-            y2={tickY2}
-            stroke={isAtZero ? '#89572a' : '#444'}
-            strokeWidth={1}
-            strokeLinecap="round"
-          />
-        </svg>
-
-        {/* Rotatable knob image */}
-        <img
-          src={knobSvg}
-          alt=""
-          draggable={false}
-          className="absolute pointer-events-none"
-          style={{
-            width: knobImgSize,
-            height: knobImgSize,
-            top: (size - knobImgSize) / 2,
-            left: (size - knobImgSize) / 2,
-            transform: `rotate(${angle}deg)`,
-            transition: isDragging ? 'none' : 'transform 50ms ease-out',
-          }}
+        )}
+        {/* 0 dB tick */}
+        <line
+          x1={tickX1 + (tickX1 - center) * 0.12}
+          y1={tickY1 + (tickY1 - center) * 0.12}
+          x2={tickX2 + (tickX2 - center) * 0.12}
+          y2={tickY2 + (tickY2 - center) * 0.12}
+          stroke={isAtZero ? color : '#5d636e'}
+          strokeWidth={1}
+          strokeLinecap="round"
         />
-      </div>
+        {/* Cap */}
+        <circle cx={center} cy={center} r={capR} fill={`url(#${gradId})`} stroke="#0c0d10" strokeWidth={1} />
+        <circle cx={center} cy={center} r={capR - 1} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+        {/* Pointer */}
+        <line x1={pX1} y1={pY1} x2={pX2} y2={pY2} stroke="#eceef2" strokeWidth={1.75} strokeLinecap="round" />
+      </svg>
+    </div>
+  );
 
-      {/* Value display */}
-      <div className={`text-[10px] font-mono tabular-nums transition-colors ${
-        isDragging ? 'text-plugin-accent' : 'text-plugin-text'
-      }`}>
-        {formatValue(safeValue)}
+  if (layout === 'side') {
+    return (
+      <div className="flex items-center gap-1.5">
+        {dial}
+        <div className="flex flex-col leading-none gap-1">
+          {label && (
+            <span className="text-[10px] font-semibold text-plugin-dim uppercase tracking-wider">{label}</span>
+          )}
+          <span className={`num text-[11px] transition-colors ${isDragging ? 'text-plugin-accent' : 'text-plugin-text'}`}>
+            {valueText}
+          </span>
+        </div>
       </div>
+    );
+  }
 
-      {/* Label */}
+  return (
+    <div className="flex flex-col items-center gap-0.5 relative">
+      {dial}
+      <div className={`num text-[11px] transition-colors ${isDragging ? 'text-plugin-accent' : 'text-plugin-text'}`}>
+        {valueText}
+      </div>
       {label && (
-        <div className="text-[9px] font-mono text-plugin-muted uppercase tracking-widest font-medium">
+        <div className="text-[10px] text-plugin-muted uppercase tracking-wider font-semibold">
           {label}
         </div>
       )}

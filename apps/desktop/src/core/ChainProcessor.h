@@ -8,6 +8,10 @@
 #include <memory>
 #include <functional>
 #include <set>
+#include <map>
+#include <atomic>
+#include "ChainRenderGraph.h"
+#include "../audio/HostedPluginProcessor.h"
 
 struct WireResult
 {
@@ -15,7 +19,7 @@ struct WireResult
     juce::AudioProcessorGraph::NodeID midiOut;
 };
 
-class ChainProcessor : public juce::AudioProcessorGraph
+class ChainProcessor : public juce::AudioProcessorGraph, private juce::Timer
 {
 public:
     ChainProcessor(PluginManager& pluginManager);
@@ -38,15 +42,26 @@ public:
     ChainNodeId createGroup(const std::vector<ChainNodeId>& childIds, GroupMode mode, const juce::String& name);
     bool dissolveGroup(ChainNodeId groupId);
     bool setGroupMode(ChainNodeId groupId, GroupMode mode);
+    // Crossover groups: moves one split point, kept between its neighbours
+    bool setCrossoverFrequency(ChainNodeId groupId, int splitIndex, float frequencyHz);
     bool setGroupDryWet(ChainNodeId groupId, float mix);
 
     // Per-branch controls
     bool setBranchGain(ChainNodeId nodeId, float gainDb);
     bool setBranchSolo(ChainNodeId nodeId, bool solo);
     bool setBranchMute(ChainNodeId nodeId, bool mute);
+    bool setBranchPolarity(ChainNodeId nodeId, bool inverted);
 
     // Set bypass on a node (must be a plugin leaf)
     void setNodeBypassed(ChainNodeId nodeId, bool bypassed);
+    bool setNodeSuspended(ChainNodeId nodeId, bool suspended);
+    bool setNodeRecallSafe(ChainNodeId nodeId, bool recallSafe);
+    bool setNodeIgnoreLatency(ChainNodeId nodeId, bool ignore);
+    // Key a plugin from the wrapper's sidechain input (only plugins with a sidechain bus)
+    bool setNodeSidechain(ChainNodeId nodeId, bool useSidechain);
+    // Audio thread, before processBlock: the host's sidechain audio for this block.
+    // Cleared again when processBlock returns.
+    void setSidechainInput(const float* left, const float* right, int numSamples) noexcept;
 
     // Get the root node for read access
     const ChainNode& getRootNode() const { return rootNode; }
@@ -128,21 +143,43 @@ public:
     struct RestoreResult {
         bool success = false;
         juce::StringArray missingPlugins;
+        juce::String error;
+        juce::String status = "failed";
+        uint64_t requestId = 0;
+        juce::Array<juce::var> issues;
     };
     std::unique_ptr<juce::XmlElement> serializeChainToXml() const;
-    RestoreResult restoreChainFromXml(const juce::XmlElement& chainXml);
+    RestoreResult restoreChainFromXml(const juce::XmlElement& chainXml, bool allowPartial = false);
+    using RestoreCompletion = std::function<void(RestoreResult)>;
+    using RestoreProgress = std::function<void(uint64_t, const juce::String&, int, int, const juce::String&)>;
+    // respectRecallSafe: slots marked recall-safe keep their current plugin and settings
+    uint64_t requestRestore(const juce::XmlElement&, bool allowPartial, RestoreCompletion, RestoreProgress = {},
+                            bool respectRecallSafe = false);
+    void cancelPendingLoads();
+    void requestSlotPresetData(int slotIndex, const juce::String&, RestoreCompletion);
+    void duplicateNodeAsync(ChainNodeId, RestoreCompletion);
+    void replaceNodeAsync(ChainNodeId, const juce::PluginDescription&, const juce::var& translatedParams, RestoreCompletion);
+    void addPluginAsync(const juce::PluginDescription&, ChainNodeId parentId, int index,
+                        std::function<void(bool, juce::String)>);
     juce::MemoryBlock captureSnapshot() const;
     void restoreSnapshot(const juce::MemoryBlock& snapshot);
 
     // Cloud sharing
     juce::var exportChainWithPresets() const;
     bool importChainWithPresets(const juce::var& data);
+    uint64_t requestImportChainWithPresets(const juce::var&, RestoreCompletion, bool reuseUnchanged = false,
+                                           bool respectRecallSafe = false);
     juce::String getSlotPresetData(int slotIndex) const;
     bool setSlotPresetData(int slotIndex, const juce::String& base64Data);
 
     // Prepare/release
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void reset() override;
+    void setNonRealtime(bool) noexcept override;
+    void audioWorkgroupContextChanged(const juce::AudioWorkgroup&) override;
+    double getTailLengthSeconds() const override { return cachedTail.load(); }
 
     // Access child processor by flat slot index (backward compat)
     juce::AudioProcessor* getSlotProcessor(int slotIndex);
@@ -154,8 +191,37 @@ public:
     std::function<void()> onChainChanged;
     std::function<void(int)> onLatencyChanged;
     std::function<void()> onParameterBindingChanged;
+    std::function<void(const juce::String&)> onPluginRetiring;
+    std::function<bool()> canRetireTargets;
+    uint64_t getRenderRevision() const noexcept { return renderRevision; }
+    const juce::String& getLastError() const noexcept { return lastError; }
+
+public:
+    ChainNodeId getNodeIdByFlatIndex(int index) const;
 
 private:
+    struct PreparedRestore;
+    std::shared_ptr<PreparedRestore> prepareRestoreSkeleton(const juce::XmlElement&, bool, bool reuseUnchanged = false,
+                                                            bool respectRecallSafe = false);
+    void keepRecallSafeSlots(PreparedRestore&);
+    void prepareNextPlugin(const std::shared_ptr<PreparedRestore>&);
+    void finishLoad(const std::shared_ptr<PreparedRestore>&, RestoreResult);
+    void enqueueLoad(const std::shared_ptr<PreparedRestore>&);
+    RestoreResult commitRestore(const std::shared_ptr<PreparedRestore>&, RestoreCompletion = {});
+    std::unique_ptr<juce::XmlElement> importXml(const juce::var&) const;
+    std::unique_ptr<ChainNode> parseNode(const juce::XmlElement&, ChainNodeId&, std::set<int>&, std::set<juce::String>&);
+    Node::Ptr addHostedInstance(std::unique_ptr<juce::AudioPluginInstance>, bool bypassed, bool suspended, juce::String&);
+    bool addPreparedPlugin(const juce::PluginDescription&, std::unique_ptr<juce::AudioPluginInstance>, ChainNodeId, int, juce::String&);
+    HostedPluginProcessor* getHosted(const PluginLeaf&) const;
+    void retirePlugin(const PluginLeaf&);
+    void closeRetiredPluginWindows(const ChainNode&, const std::set<NodeID>&);
+    void timerCallback() override;
+    void publishRuntime(std::unique_ptr<ChainRenderGraph>);
+    NodeID utility(const juce::String&, std::unique_ptr<juce::AudioProcessor>);
+    void connectAudio(NodeID, NodeID, int destinationChannel = 0);
+    void connectMidi(NodeID, NodeID);
+    void updateBranchGates(ChainNode&);
+    double computeTail(const ChainNode&) const;
     void rebuildGraph();
     WireResult wireNode(ChainNode& node, NodeID audioIn, NodeID midiIn);
     WireResult wireSerialGroup(ChainNode& node, NodeID audioIn, NodeID midiIn);
@@ -169,15 +235,12 @@ private:
 
     // Serialization helpers
     void nodeToXml(const ChainNode& node, juce::XmlElement& parent) const;
-    std::unique_ptr<ChainNode> xmlToNode(const juce::XmlElement& xml);
     juce::var nodeToJson(const ChainNode& node) const;
     juce::var nodeToJsonWithPresets(const ChainNode& node) const;
-    std::unique_ptr<ChainNode> jsonToNode(const juce::var& json);
 
     // Flat index helpers (for backward compat)
     PluginLeaf* getPluginByFlatIndex(int index);
     const PluginLeaf* getPluginByFlatIndex(int index) const;
-    ChainNodeId getNodeIdByFlatIndex(int index) const;
 
     PluginManager& pluginManager;
 
@@ -187,6 +250,31 @@ private:
 
     // Utility nodes added during graph wiring (cleaned up on rebuild)
     std::set<NodeID> utilityNodes;
+    std::map<juce::String, NodeID> utilityByKey;
+    std::set<juce::String> usedUtilityKeys;
+    std::set<NodeID> preparedNodes;
+    std::vector<std::pair<juce::String, Node::Ptr>> retiredTargets;
+    std::atomic<ChainRenderGraph*> pendingRuntime { nullptr }, retiredRuntime { nullptr };
+    ChainRenderGraph* audioRuntime = nullptr; // exclusively audio-owned until host quiescence
+    std::atomic<uint64_t> activeRevision { 0 }, acknowledgedRevision { 0 };
+    std::atomic<int> activeLatency { 0 };
+    std::atomic<int64_t> lastAudioTime { 0 };
+    std::atomic<double> cachedTail { 0.0 };
+    std::atomic<bool> resetPending { false };
+    juce::SmoothedValue<float> transitionGain;
+    juce::MidiBuffer chunkMidi, collectedMidi;
+    class BlockPlayhead;
+    std::unique_ptr<BlockPlayhead> blockPlayhead;
+    std::shared_ptr<SidechainFeed> sidechainFeed = std::make_shared<SidechainFeed>();
+    uint64_t renderRevision = 0, notifiedRevision = 0, nextLoadRequest = 0;
+    std::atomic<uint64_t> latestLoadRequest { 0 };
+    std::shared_ptr<PreparedRestore> loadingRestore, queuedRestore;
+    std::map<uint64_t, std::function<void()>> commitCallbacks;
+    int primeRemaining = 0;
+    bool prepared = false;
+    bool bindingsDirty = false, notificationDirty = false;
+    juce::String lastError;
+    juce::AudioWorkgroup currentWorkgroup;
 
     // Cached flat plugin slots for backward compat getSlot() API
     mutable std::vector<std::unique_ptr<PluginSlot>> cachedSlots;

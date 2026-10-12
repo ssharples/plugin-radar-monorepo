@@ -150,7 +150,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
   // Success states
   if (localSaved) {
     return (
-      <div className="w-80 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl p-5 animate-slide-up">
+      <div className="w-80 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel p-5 animate-slide-up">
         <div className="text-center">
           <div className="text-3xl mb-2">✅</div>
           <p className="text-sm text-plugin-text font-medium">Saved locally!</p>
@@ -161,18 +161,18 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
 
   if (savedResult) {
     return (
-      <div className="w-80 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl p-5 animate-slide-up">
+      <div className="w-80 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel p-5 animate-slide-up">
         <div className="text-center">
           <div className="text-3xl mb-2">🎉</div>
           <p className="text-sm text-plugin-text font-medium mb-3">Chain saved!</p>
           <div className="bg-black/30 rounded-lg p-3 mb-3">
-            <div className="text-[10px] text-plugin-muted mb-1">Share Code</div>
-            <div className="text-xl font-mono font-bold text-plugin-accent tracking-widest">
+            <div className="text-[11px] text-plugin-muted mb-1">Share Code</div>
+            <div className="text-xl  font-bold text-plugin-accent tracking-widest">
               {savedResult.shareCode}
             </div>
           </div>
           {savedResult.isPublic && (
-            <p className="text-[10px] text-plugin-dim mb-3">
+            <p className="text-[11px] text-plugin-dim mb-3">
               Public at: plugin-radar.com/chains/{savedResult.slug}
             </p>
           )}
@@ -190,12 +190,12 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
   const hasPlugins = slots.length > 0;
 
   return (
-    <div className="w-80 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up">
+    <div className="w-80 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-plugin-border">
         <div className="flex items-center gap-2">
           <Save className="w-3.5 h-3.5 text-plugin-accent" />
-          <span className="text-xs font-mono uppercase font-semibold text-plugin-text">Save Chain</span>
+          <span className="text-xs  uppercase font-semibold text-plugin-text">Save Chain</span>
         </div>
         <button onClick={onClose} className="text-plugin-dim hover:text-plugin-text">
           <X className="w-3.5 h-3.5" />
@@ -209,38 +209,38 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
       ) : (
         <div className="p-4 space-y-3">
           {error && (
-            <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
+            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
               {error}
             </div>
           )}
 
           {/* Name */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-plugin-muted mb-1">Name</label>
+            <label className="block text-xs  uppercase text-plugin-muted mb-1">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My Vocal Chain"
-              className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-plugin-muted mb-1">Description</label>
+            <label className="block text-xs  uppercase text-plugin-muted mb-1">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this chain good for?"
               rows={2}
-              className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text resize-none focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2.5 py-1.5 text-xs text-plugin-text resize-none focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
 
           {/* Use Case */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-plugin-muted mb-1">Use Case</label>
+            <label className="block text-xs  uppercase text-plugin-muted mb-1">Use Case</label>
             <div className="flex gap-1.5">
               <select
                 value={useCaseGroup}
@@ -249,7 +249,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                   setUseCaseGroup(e.target.value);
                   if (group?.useCases[0]) setUseCase(group.useCases[0].value);
                 }}
-                className="flex-1 bg-black/40 border border-plugin-border rounded font-mono px-2 py-1.5 text-xs text-plugin-text focus:outline-none"
+                className="flex-1 bg-plugin-bg border border-plugin-border rounded  px-2 py-1.5 text-xs text-plugin-text focus:outline-none"
               >
                 {USE_CASE_GROUPS.map((g) => (
                   <option key={g.value} value={g.value}>{g.label}</option>
@@ -258,7 +258,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
               <select
                 value={useCase}
                 onChange={(e) => setUseCase(e.target.value)}
-                className="flex-1 bg-black/40 border border-plugin-border rounded font-mono px-2 py-1.5 text-xs text-plugin-text focus:outline-none"
+                className="flex-1 bg-plugin-bg border border-plugin-border rounded  px-2 py-1.5 text-xs text-plugin-text focus:outline-none"
               >
                 {USE_CASE_GROUPS.find((g) => g.value === useCaseGroup)?.useCases.map((uc) => (
                   <option key={uc.value} value={uc.value}>{uc.label}</option>
@@ -269,13 +269,13 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
 
           {/* Tags */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-plugin-muted mb-1">Tags</label>
+            <label className="block text-xs  uppercase text-plugin-muted mb-1">Tags</label>
             <div className="flex flex-wrap gap-1 mb-1.5">
               {tags.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => removeTag(tag)}
-                  className="flex items-center gap-0.5 px-1.5 py-0.5 bg-plugin-accent/20 text-plugin-accent rounded text-[10px] hover:bg-plugin-danger/20 hover:text-plugin-danger transition-colors"
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 bg-plugin-accent/20 text-plugin-accent rounded text-[11px] hover:bg-plugin-danger/20 hover:text-plugin-danger transition-colors"
                   title="Remove tag"
                 >
                   {tag}
@@ -294,7 +294,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                     }
                   }}
                   placeholder={tags.length === 0 ? 'Add tag...' : '+'}
-                  className="w-16 bg-transparent font-mono text-[10px] text-plugin-muted focus:outline-none placeholder:text-plugin-dim"
+                  className="w-16 bg-transparent  text-[11px] text-plugin-muted focus:outline-none placeholder:text-plugin-dim"
                 />
               </div>
             </div>
@@ -306,7 +306,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                   <button
                     key={t}
                     onClick={() => addTag(t)}
-                    className="px-1.5 py-0.5 bg-white/5 text-plugin-dim rounded text-[9px] hover:bg-white/10 hover:text-plugin-muted transition-colors"
+                    className="px-1.5 py-0.5 bg-white/5 text-plugin-dim rounded text-[10px] hover:bg-white/10 hover:text-plugin-muted transition-colors"
                   >
                     + {t}
                   </button>
@@ -316,7 +316,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
 
           {/* Target LUFS */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-plugin-muted mb-1">
+            <label className="block text-xs  uppercase text-plugin-muted mb-1">
               🎚️ Target Input LUFS
             </label>
             <div className="flex items-center gap-2">
@@ -327,30 +327,30 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                 min={-40}
                 max={0}
                 step={1}
-                className="w-14 bg-black/40 border border-plugin-border rounded px-2 py-1 font-mono text-xs text-plugin-text text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+                className="w-14 bg-plugin-bg border border-plugin-border rounded px-2 py-1  text-xs text-plugin-text text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent"
               />
-              <span className="text-[10px] text-plugin-dim">dB</span>
+              <span className="text-[11px] text-plugin-dim">dB</span>
               <select
                 value={lufsTarget}
                 onChange={(e) => setLufsTarget(Number(e.target.value))}
-                className="flex-1 bg-black/40 border border-plugin-border rounded px-2 py-1 font-mono text-[10px] text-plugin-muted focus:outline-none"
+                className="flex-1 bg-plugin-bg border border-plugin-border rounded px-2 py-1  text-[11px] text-plugin-muted focus:outline-none"
               >
                 {LUFS_PRESETS.map((p) => (
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
               </select>
             </div>
-            <p className="text-[9px] text-plugin-dim mt-0.5">
+            <p className="text-[10px] text-plugin-dim mt-0.5">
               Recommended input level for this chain to work as intended
             </p>
           </div>
 
           {/* Chain preview */}
           <div className="bg-black/20 rounded p-2">
-            <div className="text-[10px] text-plugin-dim mb-1">
+            <div className="text-[11px] text-plugin-dim mb-1">
               {slots.length} plugin{slots.length !== 1 ? 's' : ''}
             </div>
-            <div className="text-[10px] text-plugin-muted truncate">
+            <div className="text-[11px] text-plugin-muted truncate">
               {slots.map((s) => s.name).join(' → ')}
             </div>
           </div>
@@ -360,7 +360,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
             <button
               onClick={handleSaveLocal}
               disabled={saving || !name.trim()}
-              className="w-full flex items-center justify-center gap-1.5 border border-plugin-border text-plugin-muted hover:text-plugin-text hover:border-plugin-accent/40 rounded px-3 py-1.5 text-[11px] font-mono uppercase font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-1.5 border border-plugin-border text-plugin-muted hover:text-plugin-text hover:border-plugin-accent/40 rounded px-3 py-1.5 text-xs  uppercase font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Save className="w-3 h-3" />
               Save Local
@@ -370,7 +370,7 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                 <button
                   onClick={handleSaveGlobal}
                   disabled={saving || !name.trim()}
-                  className="w-full flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded px-3 py-1.5 text-[11px] font-mono uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded px-3 py-1.5 text-xs  uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Saving...' : (
                     <>
@@ -382,14 +382,14 @@ export function SaveDropdown({ onClose }: SaveDropdownProps) {
                 <button
                   onClick={handleSaveAndGetCode}
                   disabled={saving || !name.trim()}
-                  className="w-full flex items-center justify-center gap-1.5 border border-plugin-accent/40 text-plugin-accent hover:text-plugin-text hover:bg-plugin-accent/10 rounded px-3 py-1.5 text-[11px] font-mono uppercase font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-1.5 border border-plugin-accent/40 text-plugin-accent hover:text-plugin-text hover:bg-plugin-accent/10 rounded px-3 py-1.5 text-xs  uppercase font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Cloud className="w-3 h-3" />
                   Save & Get Code
                 </button>
               </>
             ) : (
-              <p className="text-[10px] text-plugin-dim text-center">Log in to save to cloud</p>
+              <p className="text-[11px] text-plugin-dim text-center">Log in to save to cloud</p>
             )}
           </div>
         </div>

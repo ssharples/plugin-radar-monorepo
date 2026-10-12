@@ -44,7 +44,8 @@ public actor StudioLibrarySyncService {
   private var status: StudioLibrarySyncStatus = .idle
   private var monitorTask: Task<Void, Never>?
   private var rescanTask: Task<Void, Never>?
-  private var pendingSetPaths: Set<String> = []
+  private var pendingSetVersions: [String: UInt64] = [:]
+  private var nextSetEventVersion: UInt64 = 0
   private var subscribers: [UUID: AsyncStream<StudioLibrarySyncEvent>.Continuation] = [:]
 
   public init(
@@ -166,7 +167,7 @@ public actor StudioLibrarySyncService {
     monitorTask = nil
     rescanTask?.cancel()
     rescanTask = nil
-    pendingSetPaths.removeAll()
+    pendingSetVersions.removeAll()
     monitor.stop()
     setStatus(.stopped)
   }
@@ -202,9 +203,12 @@ public actor StudioLibrarySyncService {
     guard batch.containsIndexableChanges else { return additions }
     for event in batch.events where !event.isDirectory {
       if event.fileURL.pathExtension.caseInsensitiveCompare("als") == .orderedSame,
-        event.kind != .removed
+        event.kind == .removed
       {
-        pendingSetPaths.insert(event.fileURL.standardizedFileURL.path)
+        pendingSetVersions.removeValue(forKey: event.fileURL.standardizedFileURL.path)
+      } else if event.fileURL.pathExtension.caseInsensitiveCompare("als") == .orderedSame {
+        nextSetEventVersion &+= 1
+        pendingSetVersions[event.fileURL.standardizedFileURL.path] = nextSetEventVersion
       }
     }
     scheduleRescan()
@@ -247,13 +251,31 @@ public actor StudioLibrarySyncService {
   }
 
   private func performPendingRescan() async {
-    let changedPaths = pendingSetPaths
-    pendingSetPaths.removeAll()
-    await waitForStableFiles(paths: changedPaths)
+    // Keep these entries until the corresponding scan completes. A newer
+    // event can cancel this task while it is probing a save; consuming paths
+    // before the await would lose the immutable snapshot opportunity.
+    let changedPathVersions = pendingSetVersions
+    let changedPaths = Set(changedPathVersions.keys)
+    let result = await waitForStableFiles(paths: changedPaths)
     guard !Task.isCancelled else { return }
+    for path in result.missing where pendingSetVersions[path] == changedPathVersions[path] {
+      pendingSetVersions.removeValue(forKey: path)
+    }
     do {
-      _ = try await scanAll(snapshotReason: .stableSave, changedSetPaths: changedPaths)
+      _ = try await scanAll(
+        snapshotReason: result.stable.isEmpty ? nil : .stableSave,
+        changedSetPaths: result.stable.isEmpty ? nil : result.stable)
+      // Remove only versions included in this completed scan. Events received
+      // during indexing remain pending for the next pass.
+      for path in result.stable
+      where pendingSetVersions[path] == changedPathVersions[path] {
+        pendingSetVersions.removeValue(forKey: path)
+      }
       if status != .stopped { setStatus(.monitoring) }
+      if !result.deferred.isEmpty { scheduleRescan() }
+    } catch is CancellationError {
+      // A newer event batch owns the next rescan, or monitoring was stopped.
+      // Cancellation is expected here and should not surface as a failure.
     } catch {
       emit(.failed(message: error.localizedDescription))
       if status != .stopped { setStatus(.monitoring) }
@@ -264,12 +286,16 @@ public actor StudioLibrarySyncService {
     snapshotReason: SnapshotReason?,
     changedSetPaths: Set<String>?
   ) async throws -> [RegisteredRootIndexingRun] {
+    try Task.checkCancellation()
     setStatus(.indexing)
     do {
+      try Task.checkCancellation()
       let runs = try await repository.scanRegisteredRoots { [weak self] rootID, progress in
         Task { await self?.emit(.progress(rootID: rootID, update: progress)) }
       }
+      try Task.checkCancellation()
       for result in runs {
+        try Task.checkCancellation()
         emit(
           .indexUpdated(
             rootID: result.root.id,
@@ -286,11 +312,20 @@ public actor StudioLibrarySyncService {
         }
       }
       emit(.rootsChanged(try await repository.registeredRoots()))
-      setStatus(monitorTask == nil ? .idle : .monitoring)
+      if status != .stopped {
+        setStatus(monitorTask == nil ? .idle : .monitoring)
+      }
       return runs
+    } catch is CancellationError {
+      if status != .stopped {
+        setStatus(monitorTask == nil ? .idle : .monitoring)
+      }
+      throw CancellationError()
     } catch {
       emit(.failed(message: error.localizedDescription))
-      setStatus(monitorTask == nil ? .idle : .monitoring)
+      if status != .stopped {
+        setStatus(monitorTask == nil ? .idle : .monitoring)
+      }
       throw error
     }
   }
@@ -302,6 +337,7 @@ public actor StudioLibrarySyncService {
   ) async throws {
     for project in index.projects {
       for set in project.sets {
+        try Task.checkCancellation()
         // Ableton's Backup directory is already a source-controlled history. Initial
         // capture protects each current Set without immediately duplicating every
         // historical backup; later stable-save events are captured by changed path.
@@ -321,26 +357,53 @@ public actor StudioLibrarySyncService {
     }
   }
 
-  private func waitForStableFiles(paths: Set<String>) async {
-    guard !paths.isEmpty else { return }
+  private struct StableFileWaitResult {
+    let stable: Set<String>
+    let deferred: Set<String>
+    let missing: Set<String>
+  }
+
+  private func waitForStableFiles(paths: Set<String>) async -> StableFileWaitResult {
+    guard !paths.isEmpty else { return StableFileWaitResult(stable: [], deferred: [], missing: []) }
     var previous = fingerprintMap(paths: paths)
+    var stablePaths: Set<String> = []
     for _ in 0..<6 {
       do {
         try await Task.sleep(nanoseconds: 350_000_000)
       } catch {
-        return
+        return StableFileWaitResult(stable: [], deferred: [], missing: [])
       }
       let current = fingerprintMap(paths: paths)
-      if current == previous { return }
+      stablePaths = Set(
+        paths.filter { path in
+          current[path] != .missing && current[path] == previous[path]
+        })
+      // An FSEvent can be delivered before Ableton has finished creating the
+      // file. Keep probing missing paths instead of treating an empty map as a
+      // stable save and indexing a transiently absent Set.
+      if stablePaths.count == paths.count {
+        return StableFileWaitResult(stable: paths, deferred: [], missing: [])
+      }
       previous = current
     }
+    let missing = Set(previous.compactMap { $0.value == .missing ? $0.key : nil })
+    let deferred = paths.subtracting(missing).subtracting(stablePaths)
+    return StableFileWaitResult(stable: stablePaths, deferred: deferred, missing: missing)
   }
 
-  private func fingerprintMap(paths: Set<String>) -> [String: FileFingerprint] {
+  private enum StableFileState: Equatable {
+    case present(FileFingerprint)
+    case missing
+  }
+
+  private func fingerprintMap(paths: Set<String>) -> [String: StableFileState] {
     Dictionary(
-      uniqueKeysWithValues: paths.compactMap { path in
+      uniqueKeysWithValues: paths.map { path in
         let url = URL(fileURLWithPath: path)
-        return (try? FileFingerprint.read(from: url, fileManager: .default)).map { (path, $0) }
+        if let fingerprint = try? FileFingerprint.read(from: url, fileManager: .default) {
+          return (path, .present(fingerprint))
+        }
+        return (path, .missing)
       })
   }
 

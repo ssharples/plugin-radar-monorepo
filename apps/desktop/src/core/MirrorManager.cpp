@@ -12,6 +12,7 @@ MirrorManager::MirrorManager(PluginChainManagerProcessor& proc, InstanceRegistry
 
 MirrorManager::~MirrorManager()
 {
+    *alive = false;
     registry.removeListener(this);
     stopTimer();
     leaveMirrorGroup();
@@ -36,7 +37,8 @@ int MirrorManager::startMirror(InstanceId partnerId)
     propagateChainToPartners();
 
     // Notify listeners
-    juce::MessageManager::callAsync([this]() {
+    juce::MessageManager::callAsync([this, token = alive]() {
+        if (!*token) return;
         listeners.call([](Listener& l) { l.mirrorStateChanged(); });
     });
 
@@ -53,7 +55,8 @@ void MirrorManager::leaveMirrorGroup()
     lastAppliedVersion = 0;
     previousParamSnapshot.clear();
 
-    juce::MessageManager::callAsync([this]() {
+    juce::MessageManager::callAsync([this, token = alive]() {
+        if (!*token) return;
         listeners.call([](Listener& l) { l.mirrorStateChanged(); });
     });
 }
@@ -67,7 +70,8 @@ void MirrorManager::rejoinMirror()
     startTimerHz(15);
     previousParamSnapshot = captureParameterSnapshot();
 
-    juce::MessageManager::callAsync([this]() {
+    juce::MessageManager::callAsync([this, token = alive]() {
+        if (!*token) return;
         listeners.call([](Listener& l) { l.mirrorStateChanged(); });
     });
 }
@@ -137,16 +141,15 @@ void MirrorManager::applyMirrorUpdate(const juce::var& chainData, uint64_t versi
     suppressLocalNotification.store(true, std::memory_order_release);
 
     auto& chainProcessor = processor.getChainProcessor();
-    chainProcessor.importChainWithPresets(chainData);
-
-    suppressLocalNotification.store(false, std::memory_order_release);
-
-    // Update parameter snapshot after structural change
-    previousParamSnapshot = captureParameterSnapshot();
-
-    juce::MessageManager::callAsync([this]() {
-        listeners.call([](Listener& l) { l.mirrorUpdateApplied(); });
-    });
+    chainProcessor.requestImportChainWithPresets(chainData, [this, token = alive, version](ChainProcessor::RestoreResult result) {
+        if (!*token) return;
+        if (version == lastAppliedVersion) suppressLocalNotification.store(false, std::memory_order_release);
+        if (result.success)
+        {
+            previousParamSnapshot = captureParameterSnapshot();
+            listeners.call([](Listener& listener) { listener.mirrorUpdateApplied(); });
+        }
+    }, true);
 }
 
 void MirrorManager::applyParameterDiffs(const std::vector<std::tuple<int, int, float>>& paramDiffs)
@@ -207,8 +210,9 @@ void MirrorManager::propagateChainToPartners()
 
     // Dispatch on message thread to safely access partner processors.
     // getInstanceInfo() returns the processor pointer (unlike getOtherInstances which strips it).
-    juce::MessageManager::callAsync([this, chainData, version]()
+    juce::MessageManager::callAsync([this, token = alive, chainData, version]()
     {
+        if (!*token) return;
         auto partners = getPartnerIds();
         for (auto partnerId : partners)
         {

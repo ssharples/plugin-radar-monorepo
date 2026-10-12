@@ -154,7 +154,7 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
   );
 
   const tabBtnClass = (t: BrowserTab) =>
-    `flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase font-medium rounded-t transition-colors ${
+    `flex items-center gap-1.5 px-3 py-1.5 text-[11px]  uppercase font-medium rounded-t transition-colors ${
       tab === t
         ? 'text-plugin-accent border-b-2 border-plugin-accent bg-white/5'
         : 'text-plugin-muted hover:text-plugin-text'
@@ -166,7 +166,7 @@ export function ChainBrowser({ onClose }: ChainBrowserProps) {
       <div className="flex items-center justify-between px-4 py-2 border-b border-plugin-border flex-shrink-0 bg-plugin-surface">
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-plugin-accent" />
-          <span className="text-xs font-mono uppercase font-bold text-plugin-text crt-text">
+          <span className="text-xs  uppercase font-bold text-plugin-text">
             Community Chains
           </span>
         </div>
@@ -294,7 +294,7 @@ function CollectionTab({
       <div className="flex-1 flex flex-col items-center justify-center gap-2">
         <Library className="w-8 h-8 text-plugin-dim/30" />
         <span className="text-xs text-plugin-muted">No saved chains yet</span>
-        <span className="text-[10px] text-plugin-dim">
+        <span className="text-[11px] text-plugin-dim">
           Bookmark chains from Browse to build your collection
         </span>
       </div>
@@ -317,17 +317,17 @@ function CollectionTab({
           return (
             <div
               key={item._id}
-              className="group bg-black/20 border border-plugin-border/50 rounded-propane p-3 hover:border-plugin-accent/30 hover:bg-black/30 transition-all cursor-pointer relative"
+              className="group bg-black/20 border border-plugin-border/50 rounded-md p-3 hover:border-plugin-accent/30 hover:bg-black/30 transition-all cursor-pointer relative"
               onClick={() => onPreview(chain)}
             >
               <h4 className="text-xs font-medium text-plugin-text truncate mb-1">
                 {chain.name}
               </h4>
               {chain.author?.name && (
-                <p className="text-[10px] text-plugin-dim mb-1">by @{chain.author.name}</p>
+                <p className="text-[11px] text-plugin-dim mb-1">by @{chain.author.name}</p>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-[9px] text-plugin-dim font-mono">
+                <span className="text-[10px] text-plugin-dim ">
                   {item.source === 'web' ? 'from web' : 'from desktop'}
                 </span>
                 <button
@@ -335,7 +335,7 @@ function CollectionTab({
                     e.stopPropagation();
                     onRemove(chain._id);
                   }}
-                  className="text-[9px] text-plugin-dim hover:text-red-400 font-mono uppercase transition-colors"
+                  className="text-[10px] text-plugin-dim hover:text-red-400  uppercase transition-colors"
                 >
                   Remove
                 </button>
@@ -396,7 +396,7 @@ function MyChainsTab({
       <div className="flex-1 flex flex-col items-center justify-center gap-2">
         <User className="w-8 h-8 text-plugin-dim/30" />
         <span className="text-xs text-plugin-muted">No chains yet</span>
-        <span className="text-[10px] text-plugin-dim">
+        <span className="text-[11px] text-plugin-dim">
           Save & share your chains to see them here
         </span>
       </div>
@@ -409,16 +409,16 @@ function MyChainsTab({
         {chains.map((chain) => (
           <div
             key={chain._id}
-            className="group bg-black/20 border border-plugin-border/50 rounded-propane p-3 hover:border-plugin-accent/30 hover:bg-black/30 transition-all cursor-pointer"
+            className="group bg-black/20 border border-plugin-border/50 rounded-md p-3 hover:border-plugin-accent/30 hover:bg-black/30 transition-all cursor-pointer"
             onClick={() => onPreview(chain)}
           >
             <h4 className="text-xs font-medium text-plugin-text truncate mb-1">
               {chain.name}
             </h4>
-            <p className="text-[10px] text-plugin-muted truncate mb-2">
+            <p className="text-[11px] text-plugin-muted truncate mb-2">
               {chain.slots?.slice(0, 3).map((s: any) => s.pluginName).join(' → ')}
             </p>
-            <div className="flex items-center gap-2.5 text-[9px] text-plugin-dim">
+            <div className="flex items-center gap-2.5 text-[10px] text-plugin-dim">
               <span>{chain.pluginCount}p</span>
               <span>{chain.downloads} downloads</span>
               <span>{chain.likes} likes</span>

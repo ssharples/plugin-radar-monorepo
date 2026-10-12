@@ -55,7 +55,10 @@ private:
     // Shared sample accumulator — driven by pushPostSamples (the "clock")
     float preAccumulator = 0.0f;
     float postAccumulator = 0.0f;
-    int sampleCount = 0;  // Single counter shared between pre and post
+    int sampleCount = 0;
+    int preSampleCount = 0;
+    std::array<float, NUM_PEAKS * 4> pendingPrePeaks{};
+    size_t pendingPreRead = 0, pendingPreWrite = 0;
 
     // Delay line for latency compensation (stores peaks, not samples)
     static constexpr size_t MAX_DELAY_PEAKS = MAX_DELAY_SAMPLES / SAMPLES_PER_PEAK + 1;

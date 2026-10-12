@@ -54,12 +54,14 @@ public struct LibraryFileEventBatch: Sendable, Equatable {
 public enum StudioLibraryMonitorError: Error, LocalizedError {
   case noRoots
   case couldNotCreateStream
+  case couldNotStartStream
   case alreadyRunning
 
   public var errorDescription: String? {
     switch self {
     case .noRoots: "At least one library root is required"
     case .couldNotCreateStream: "macOS could not create the library file-event stream"
+    case .couldNotStartStream: "macOS could not start the library file-event stream"
     case .alreadyRunning: "This library monitor is already running"
     }
   }
@@ -89,8 +91,10 @@ public final class StudioLibraryMonitor: @unchecked Sendable {
     guard !roots.isEmpty else { throw StudioLibraryMonitorError.noRoots }
 
     lock.lock()
-    defer { lock.unlock() }
-    guard streamRef == nil else { throw StudioLibraryMonitorError.alreadyRunning }
+    guard streamRef == nil else {
+      lock.unlock()
+      throw StudioLibraryMonitorError.alreadyRunning
+    }
 
     let stream = AsyncStream<LibraryFileEventBatch>.makeStream(
       bufferingPolicy: .bufferingNewest(32)
@@ -118,17 +122,27 @@ public final class StudioLibraryMonitor: @unchecked Sendable {
         flags
       )
     else {
+      lock.unlock()
       stream.continuation.finish()
       throw StudioLibraryMonitorError.couldNotCreateStream
     }
 
     continuation = stream.continuation
+    streamRef = eventStream
+    FSEventStreamSetDispatchQueue(eventStream, queue)
+    guard FSEventStreamStart(eventStream) else {
+      streamRef = nil
+      continuation = nil
+      lock.unlock()
+      FSEventStreamInvalidate(eventStream)
+      FSEventStreamRelease(eventStream)
+      stream.continuation.finish()
+      throw StudioLibraryMonitorError.couldNotStartStream
+    }
+    lock.unlock()
     stream.continuation.onTermination = { [weak self] _ in
       self?.stop()
     }
-    streamRef = eventStream
-    FSEventStreamSetDispatchQueue(eventStream, queue)
-    FSEventStreamStart(eventStream)
     return stream.stream
   }
 

@@ -41,6 +41,7 @@ public:
 
     // Thread-safe meter readings
     AudioMeter::Readings getReadings() const { return meter.getReadings(); }
+    void setAnalysisMode(AudioMeter::AnalysisMode mode) { meter.setAnalysisMode(mode); }
 
     // Associate with a chain node for identification
     void setAssociatedNodeId(ChainNodeId id) { associatedNodeId = id; }

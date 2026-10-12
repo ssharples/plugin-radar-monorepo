@@ -18,7 +18,12 @@ struct ScanPluginResult
 class PluginManager : public juce::ChangeListener, public juce::Timer
 {
 public:
-    PluginManager();
+    using InstanceFactory = std::function<std::unique_ptr<juce::AudioPluginInstance>(
+        const juce::PluginDescription&, double, int, juce::String&)>;
+    using CreationCallback = std::function<void(std::unique_ptr<juce::AudioPluginInstance>, const juce::String&)>;
+    using AsyncInstanceFactory = std::function<void(const juce::PluginDescription&, double, int, CreationCallback)>;
+    explicit PluginManager(InstanceFactory factory = {}, AsyncInstanceFactory asyncFactory = {});
+    void createPluginInstanceAsync(const juce::PluginDescription&, double, int, CreationCallback);
     ~PluginManager() override;
 
     // Scanning
@@ -62,6 +67,8 @@ public:
     void loadPluginList();
 
 private:
+    InstanceFactory instanceFactory;
+    AsyncInstanceFactory asyncInstanceFactory;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void timerCallback() override;
     void initializeScan();

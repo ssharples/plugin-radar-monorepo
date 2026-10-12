@@ -1,16 +1,37 @@
 #include "PluginProcessor.h"
+#include "core/HostRestoreAdapter.h"
 #include "PluginEditor.h"
 #include "core/MirrorManager.h"
+#include <cmath>
 
-PluginChainManagerProcessor::PluginChainManagerProcessor()
+namespace {
+bool validWrapperSettings(const juce::XmlElement& xml)
+{
+    if (!xml.hasTagName("PluginChainManagerState")) return false;
+    for (const auto* key : {"inputGainDb", "outputGainDb", "gainMatchTargetDb"})
+    {
+        const auto value = xml.getDoubleAttribute(key, 0.0);
+        if (!std::isfinite(value) || value < -100.0 || value > 24.0) return false;
+    }
+    return true;
+}
+}
+
+PluginChainManagerProcessor::PluginChainManagerProcessor(PluginManager::InstanceFactory factory)
     : AudioProcessor(BusesProperties()
                      .withInput("Input", juce::AudioChannelSet::stereo(), true)
-                     .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+                     .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+                     .withInput("Sidechain", juce::AudioChannelSet::stereo(), false)),
+      pluginManager(std::move(factory)),
       chainProcessor(pluginManager),
       presetManager(chainProcessor)
 {
     // Pre-allocate proxy parameters for DAW automation (must be in constructor)
     parameterPool.createAndRegister(*this);
+    parameterPool.bindings().beginNewSession();
+    // Macro parameters come after the proxies so existing parameter indices don't move
+    macroManager.createAndRegister(*this);
+    macroManager.rebind(chainProcessor);
 
     // Set up latency reporting callback
     chainProcessor.onLatencyChanged = [this](int latencySamples) {
@@ -22,7 +43,14 @@ PluginChainManagerProcessor::PluginChainManagerProcessor()
     // Rebind proxy parameters when plugins are added/removed/moved
     chainProcessor.onParameterBindingChanged = [this]() {
         parameterPool.rebindAll(chainProcessor);
+        macroManager.rebind(chainProcessor);
     };
+    chainProcessor.onPluginRetiring = [this](const juce::String& id)
+    { parameterPool.unbindAffected(id); macroManager.unbindAffected(id); };
+    chainProcessor.canRetireTargets = [this]() { return parameterPool.isQuiescent() && macroManager.isQuiescent(); };
+
+    presetManager.captureWrapperState = [this] { return captureWrapperState(); };
+    presetManager.applyWrapperSettings = [this](const juce::XmlElement& state) { return applyWrapperSettings(state, false); };
 
     // Register with the shared instance registry
     instanceId = instanceRegistry->registerInstance(this);
@@ -39,6 +67,14 @@ PluginChainManagerProcessor::PluginChainManagerProcessor()
 
 PluginChainManagerProcessor::~PluginChainManagerProcessor()
 {
+    lifetime->store(false);
+    chainProcessor.onChainChanged = {};
+    chainProcessor.onLatencyChanged = {};
+    chainProcessor.onParameterBindingChanged = {};
+    chainProcessor.onPluginRetiring = {};
+    chainProcessor.canRetireTargets = {};
+    parameterPool.shutdown();
+    macroManager.shutdown();
     // Leave mirror group before deregistering
     if (mirrorManager)
         mirrorManager->leaveMirrorGroup();
@@ -68,7 +104,7 @@ bool PluginChainManagerProcessor::isMidiEffect() const
 
 double PluginChainManagerProcessor::getTailLengthSeconds() const
 {
-    return 0.0;
+    return chainProcessor.getTailLengthSeconds();
 }
 
 int PluginChainManagerProcessor::getNumPrograms()
@@ -99,12 +135,11 @@ void PluginChainManagerProcessor::changeProgramName(int index, const juce::Strin
 
 void PluginChainManagerProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    chainProcessor.setPlayConfigDetails(
-        getTotalNumInputChannels(),
-        getTotalNumOutputChannels(),
-        sampleRate,
-        samplesPerBlock
-    );
+    chainProcessor.setPlayHead(getPlayHead());
+    // The chain always runs in stereo; mono tracks are converted at the edges
+    chainProcessor.setPlayConfigDetails(2, 2, sampleRate, samplesPerBlock);
+    monoWork.setSize(2, juce::jmax(1, samplesPerBlock), false, false, true);
+    sidechainWork.setSize(2, juce::jmax(1, samplesPerBlock), false, false, true);
     chainProcessor.prepareToPlay(sampleRate, samplesPerBlock);
     waveformCapture.reset();
 
@@ -113,6 +148,7 @@ void PluginChainManagerProcessor::prepareToPlay(double sampleRate, int samplesPe
     inputMeter.prepareToPlay(sampleRate, samplesPerBlock);
     outputMeter.prepareToPlay(sampleRate, samplesPerBlock);
     fftProcessor.prepareToPlay(sampleRate, samplesPerBlock);
+    fftProcessor.setAnalysisEnabled(fftSubscribed.load());
 
     // Report initial latency to host and sync waveform display
     int latency = chainProcessor.getTotalLatencySamples();
@@ -125,14 +161,42 @@ void PluginChainManagerProcessor::releaseResources()
     chainProcessor.releaseResources();
 }
 
+void PluginChainManagerProcessor::setNonRealtime(bool nonRealtime) noexcept
+{
+    AudioProcessor::setNonRealtime(nonRealtime);
+    chainProcessor.setNonRealtime(nonRealtime);
+}
+
+void PluginChainManagerProcessor::reset()
+{
+    AudioProcessor::reset();
+    gainProcessor.reset();
+    waveformCapture.reset();
+    inputMeter.reset(); outputMeter.reset(); fftProcessor.reset();
+    chainProcessor.reset();
+}
+
+void PluginChainManagerProcessor::audioWorkgroupContextChanged(const juce::AudioWorkgroup& group)
+{
+    chainProcessor.audioWorkgroupContextChanged(group);
+}
+
+void PluginChainManagerProcessor::setAnalysisSubscriptions(bool waveform, bool fft)
+{
+    waveformSubscribed.store(waveform, std::memory_order_release);
+    fftSubscribed.store(fft, std::memory_order_release);
+    fftProcessor.setAnalysisEnabled(fft);
+}
+
 bool PluginChainManagerProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
-
-    if (layouts.getMainInputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
-
+    // Mono or stereo on each side: mono, mono-to-stereo, stereo and stereo-to-mono tracks
+    const auto supported = [](const juce::AudioChannelSet& set)
+    { return set == juce::AudioChannelSet::mono() || set == juce::AudioChannelSet::stereo(); };
+    if (!supported(layouts.getMainInputChannelSet()) || !supported(layouts.getMainOutputChannelSet())) return false;
+    // Optional sidechain input: off, mono or stereo
+    for (int bus = 1; bus < layouts.inputBuses.size(); ++bus)
+        if (!layouts.inputBuses[bus].isDisabled() && !supported(layouts.inputBuses[bus])) return false;
     return true;
 }
 
@@ -141,31 +205,91 @@ void PluginChainManagerProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 {
     juce::ScopedNoDenormals noDenormals;
 
-    auto totalNumInputChannels = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    const auto numInputs = getMainBusNumInputChannels();
+    const auto numOutputs = getMainBusNumOutputChannels();
+    const auto numSamples = buffer.getNumSamples();
 
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear(i, 0, buffer.getNumSamples());
+    // Copy the sidechain out first: its channels share the buffer with the main audio
+    auto sidechain = getBusCount(true) > 1 ? getBusBuffer(buffer, true, 1) : juce::AudioBuffer<float>();
+    const bool hasSidechain = sidechain.getNumChannels() > 0;
+    if (hasSidechain)
+    {
+        sidechainWork.setSize(2, numSamples, false, false, true);
+        for (int c = 0; c < 2; ++c)
+            sidechainWork.copyFrom(c, 0, sidechain, juce::jmin(c, sidechain.getNumChannels() - 1), 0, numSamples);
+    }
+    const auto keyChain = [&](int samples)
+    {
+        if (hasSidechain)
+            chainProcessor.setSidechainInput(sidechainWork.getReadPointer(0), sidechainWork.getReadPointer(1), samples);
+    };
 
+    if (numInputs < 2 && numOutputs < 2)
+    {
+        // Mono track: run the stereo chain on a copy, then fold back down
+        monoWork.setSize(2, numSamples, false, false, true);
+        for (int c = 0; c < 2; ++c) monoWork.copyFrom(c, 0, buffer, 0, 0, numSamples);
+        keyChain(numSamples);
+        processStereo(monoWork, midiMessages);
+        buffer.copyFrom(0, 0, monoWork, 0, 0, numSamples);
+        buffer.addFrom(0, 0, monoWork, 1, 0, numSamples);
+        buffer.applyGain(0, 0, numSamples, 0.5f);
+        for (auto i = 1; i < buffer.getNumChannels(); ++i)
+            buffer.clear(i, 0, numSamples);
+        return;
+    }
+
+    if (numInputs == 1)
+        buffer.copyFrom(1, 0, buffer, 0, 0, numSamples); // mono in, stereo out
+    for (auto i = 2; i < buffer.getNumChannels(); ++i)
+        buffer.clear(i, 0, numSamples);
+
+    keyChain(numSamples);
+    processStereo(buffer, midiMessages);
+
+    if (numOutputs == 1)
+    {
+        // Stereo in, mono out
+        buffer.addFrom(0, 0, buffer, 1, 0, numSamples);
+        buffer.applyGain(0, 0, numSamples, 0.5f);
+    }
+}
+
+void PluginChainManagerProcessor::processStereo(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+{
     // Apply input gain
     gainProcessor.processInputGain(buffer);
+    chainProcessor.setPlayHead(getPlayHead());
+    const auto matching = gainMatchEnabled.load(std::memory_order_acquire);
+    double inputPower = 0.0;
+    if (matching) for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            inputPower += static_cast<double>(buffer.getReadPointer(ch)[i]) * buffer.getReadPointer(ch)[i];
+    const float inputRms = buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0
+        ? static_cast<float>(std::sqrt(inputPower / (buffer.getNumChannels() * buffer.getNumSamples()))) : 0.0f;
 
     // Capture pre-processing waveform and meter input
-    waveformCapture.pushPreSamples(buffer);
+    if (waveformSubscribed.load(std::memory_order_acquire)) waveformCapture.pushPreSamples(buffer);
     inputMeter.process(buffer);
 
     // Process through the plugin chain
     chainProcessor.processBlock(buffer, midiMessages);
+    double outputPower = 0.0;
+    if (matching) for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            outputPower += static_cast<double>(buffer.getReadPointer(ch)[i]) * buffer.getReadPointer(ch)[i];
+    const float rawOutputRms = buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0
+        ? static_cast<float>(std::sqrt(outputPower / (buffer.getNumChannels() * buffer.getNumSamples()))) : 0.0f;
+    gainProcessor.processGainMatch(buffer, inputRms, rawOutputRms);
 
     // Capture post-processing waveform and meter output
-    waveformCapture.pushPostSamples(buffer);
-    outputMeter.process(buffer);
+    if (waveformSubscribed.load(std::memory_order_acquire)) waveformCapture.pushPostSamples(buffer);
 
-    // FFT analysis on post-chain signal (before output gain to show chain effect)
-    fftProcessor.process(buffer);
-
-    // Apply output gain
+    // Apply output gain before publishing the output meter, so the reading
+    // describes the actual signal sent to the host.
     gainProcessor.processOutputGain(buffer);
+    outputMeter.process(buffer);
+    if (fftSubscribed.load(std::memory_order_acquire)) fftProcessor.process(buffer);
 }
 
 bool PluginChainManagerProcessor::hasEditor() const
@@ -180,30 +304,57 @@ juce::AudioProcessorEditor* PluginChainManagerProcessor::createEditor()
 
 void PluginChainManagerProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    // Get chain state as binary (ChainProcessor encodes XML via copyXmlToBinary)
-    juce::MemoryBlock chainData;
-    chainProcessor.getStateInformation(chainData);
-
-    // Parse the chain XML to add mirror group info
-    if (auto xml = getXmlFromBinary(chainData.getData(), static_cast<int>(chainData.getSize())))
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread())
+    { onHostControlThread([&] { getStateInformation(destData); }); return; }
+    if (auto xml = captureWrapperState())
     {
         if (mirrorManager && mirrorManager->isMirrored())
-        {
-            auto* mirrorXml = xml->createNewChildElement("MirrorGroup");
-            mirrorXml->setAttribute("id", mirrorManager->getMirrorGroupId());
-        }
-
+            xml->createNewChildElement("MirrorGroup")->setAttribute("id", mirrorManager->getMirrorGroupId());
         copyXmlToBinary(*xml, destData);
     }
-    else
+}
+
+std::unique_ptr<juce::XmlElement> PluginChainManagerProcessor::captureWrapperState() const
+{
+    auto wrapper = std::make_unique<juce::XmlElement>("PluginChainManagerState");
+    wrapper->setAttribute("version", 2);
+    wrapper->setAttribute("inputGainDb", gainProcessor.getInputGainDB());
+    wrapper->setAttribute("outputGainDb", gainProcessor.getOutputGainDB());
+    wrapper->setAttribute("gainMatchEnabled", gainMatchEnabled.load(std::memory_order_acquire));
+    wrapper->setAttribute("gainMatchTargetDb", gainProcessor.getGainMatchTargetDB());
+    if (!pendingRequestedState.isEmpty()) wrapper->setAttribute("pendingRequestedState", pendingRequestedState);
+    if (auto chain = chainProcessor.serializeChainToXml()) wrapper->addChildElement(chain.release());
+    auto bindings = parameterPool.serializeBindings();
+    wrapper->addChildElement(new juce::XmlElement(bindings));
+    wrapper->addChildElement(new juce::XmlElement(macroManager.toXml()));
+    return wrapper;
+}
+
+bool PluginChainManagerProcessor::applyWrapperSettings(const juce::XmlElement& xml, bool restoreAssignmentsExactly)
+{
+    if (!validWrapperSettings(xml)) return false;
+    gainProcessor.setInputGain(static_cast<float>(xml.getDoubleAttribute("inputGainDb", 0.0)));
+    gainProcessor.setOutputGain(static_cast<float>(xml.getDoubleAttribute("outputGainDb", 0.0)));
+    gainMatchEnabled.store(xml.getBoolAttribute("gainMatchEnabled", false), std::memory_order_release);
+    gainProcessor.setGainMatchTargetDB(static_cast<float>(xml.getDoubleAttribute("gainMatchTargetDb", 0.0)));
+    gainProcessor.setGainMatchEnabled(gainMatchEnabled.load());
+    if (auto* bindings = xml.getChildByName("AUTOMATION_BINDINGS"))
     {
-        destData = chainData;
+        parameterPool.restoreBindings(*bindings, restoreAssignmentsExactly ? AutomationBindingManager::RestoreMode::Replace
+                                                                           : AutomationBindingManager::RestoreMode::PreserveOccupied);
+        parameterPool.rebindAll(chainProcessor);
     }
+    if (auto* macros = xml.getChildByName("MACROS")) { if (!macroManager.restoreFromXml(*macros)) macroManager.clear(); }
+    else macroManager.clear();
+    return true;
 }
 
 void PluginChainManagerProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread())
+    { onHostControlThread([&] { setStateInformation(data, sizeInBytes); }); return; }
     int savedMirrorGroupId = -1;
+    bool restored = false;
 
     // Check for mirror group info in the state XML
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
@@ -211,25 +362,46 @@ void PluginChainManagerProcessor::setStateInformation(const void* data, int size
         if (auto* mirrorXml = xml->getChildByName("MirrorGroup"))
         {
             savedMirrorGroupId = mirrorXml->getIntAttribute("id", -1);
-            xml->removeChildElement(mirrorXml, true);
+
         }
 
-        // Re-encode without the MirrorGroup element and pass to chain processor
-        juce::MemoryBlock chainData;
-        copyXmlToBinary(*xml, chainData);
-        chainProcessor.setStateInformation(chainData.getData(), static_cast<int>(chainData.getSize()));
+        if (xml->hasTagName("PluginChainManagerState"))
+        {
+            if (auto* chain = xml->getChildByName("ChainTree"); chain && validWrapperSettings(*xml))
+            {
+                auto result = chainProcessor.restoreChainFromXml(*chain, false);
+                if (!result.success) pendingRequestedState = xml->toString();
+                else { restored = applyWrapperSettings(*xml); pendingRequestedState = xml->getStringAttribute("pendingRequestedState"); }
+            }
+            else pendingRequestedState = xml->toString();
+        }
+        else
+        {
+            const auto result = chainProcessor.restoreChainFromXml(*xml, false);
+            if (!result.success) pendingRequestedState = xml->toString();
+            else
+            {
+                restored = true;
+                pendingRequestedState.clear();
+                parameterPool.bindings() = AutomationBindingManager();
+                std::vector<juce::String> ids;
+                for (auto* leaf : chainProcessor.getFlatPluginList()) ids.push_back(leaf->persistentId);
+                parameterPool.bindings().migrateLegacy(ids);
+                parameterPool.rebindAll(chainProcessor);
+            }
+        }
     }
     else
     {
-        chainProcessor.setStateInformation(data, sizeInBytes);
+        pendingRequestedState = "base64:" + juce::MemoryBlock(data, static_cast<size_t>(juce::jmax(0, sizeInBytes))).toBase64Encoding();
     }
 
     // Attempt to reconnect mirror group from saved DAW session
-    if (savedMirrorGroupId > 0 && mirrorManager)
+    if (restored && savedMirrorGroupId > 0 && mirrorManager)
     {
         auto* mm = mirrorManager.get();
-        auto callback = [mm](int /*newGroupId*/) {
-            if (mm)
+        auto callback = [mm, token = lifetime](int /*newGroupId*/) {
+            if (token->load())
                 mm->rejoinMirror();
         };
 

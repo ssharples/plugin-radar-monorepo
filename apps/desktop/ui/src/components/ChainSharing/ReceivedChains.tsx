@@ -108,7 +108,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
   if (loading) {
     return (
       <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
-        <div className="text-gray-400 text-sm">Loading received chains...</div>
+        <div className="text-plugin-muted text-sm">Loading received chains...</div>
       </div>
     );
   }
@@ -118,16 +118,16 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Inbox size={18} className="text-plugin-accent" />
-          <h3 className="text-white font-mono font-medium">Received Chains</h3>
+          <h3 className="text-plugin-text  font-medium">Received Chains</h3>
           {chains.length > 0 && (
-            <span className="bg-plugin-accent text-white text-xs rounded-full px-2 py-0.5 animate-pulse">
+            <span className="bg-plugin-accent text-plugin-text text-xs rounded-full px-2 py-0.5 animate-pulse">
               {chains.length}
             </span>
           )}
         </div>
         <button
           onClick={loadChains}
-          className="text-gray-400 hover:text-white p-1"
+          className="text-plugin-muted hover:text-plugin-text p-1"
           title="Refresh"
         >
           <RefreshCw size={14} />
@@ -142,7 +142,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
       )}
 
       {chains.length === 0 ? (
-        <div className="text-gray-500 text-sm text-center py-4">
+        <div className="text-plugin-dim text-sm text-center py-4">
           No pending chains. When friends share chains with you, they'll appear here.
         </div>
       ) : (
@@ -154,8 +154,8 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
             >
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <div className="text-white text-sm font-medium">{chain.chainName}</div>
-                  <div className="text-gray-500 text-xs">
+                  <div className="text-plugin-text text-sm font-medium">{chain.chainName}</div>
+                  <div className="text-plugin-dim text-xs">
                     From <span className="text-plugin-accent">{chain.senderUsername}</span> • {formatTime(chain.sentAt)}
                   </div>
                 </div>
@@ -164,7 +164,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
                 <button
                   onClick={() => handleAccept(chain._id)}
                   disabled={processing === chain._id}
-                  className="flex-1 flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded px-3 py-1.5"
+                  className="flex-1 flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-plugin-text text-sm rounded px-3 py-1.5"
                 >
                   <Download size={14} />
                   Import

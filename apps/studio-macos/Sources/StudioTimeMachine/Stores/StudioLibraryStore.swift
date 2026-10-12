@@ -121,7 +121,13 @@ final class StudioLibraryStore {
   var liveExportMessage: String?
   var lastLiveExportEvidence: AbletonExportEvidence?
   var abletonExportEvidence: [AbletonExportEvidence] = []
-  var workCatalog: WorkCatalog?
+  var workCatalog: WorkCatalog? {
+    didSet { workCatalogGeneration &+= 1 }
+  }
+  private(set) var workCatalogGeneration = 0
+  private(set) var automaticUpdatesEnabled =
+    UserDefaults.standard.object(forKey: "studio.automaticLibraryUpdates") as? Bool ?? true
+  private(set) var isChangingAutomaticUpdates = false
   var recentWorkIDs: [String] =
     UserDefaults.standard.stringArray(forKey: "StudioTimeMachine.recentWorkIDs.v1") ?? []
   var organisationDirectory = StudioOrganisationDirectory()
@@ -153,7 +159,6 @@ final class StudioLibraryStore {
   @ObservationIgnored private let organisationStore: StudioOrganisationStore
   @ObservationIgnored private let organisationOverrideStore: OrganisationOverrideStore
   @ObservationIgnored private let reviewedActionService: SessionContentReviewedActionService
-  @ObservationIgnored private let isSessionReviewSample: Bool
   @ObservationIgnored private let sampleReviewStorageRoot: URL?
   @ObservationIgnored private let revisionExecutionAuthority = StudioRevisionExecutionAuthority()
   @ObservationIgnored private let sessionContentCalibration: AudioMatchingCalibration? = nil
@@ -191,10 +196,11 @@ final class StudioLibraryStore {
   init() {
     let arguments = ProcessInfo.processInfo.arguments
     let useSessionReviewSample = arguments.contains("--sample-session-review")
-    isSessionReviewSample = useSessionReviewSample
 
     let calibrationStore: CalibrationReviewStore
-    if useSessionReviewSample {
+    // Every visual fixture uses isolated services. Reviewing a sample Song must
+    // never add synthetic Artists, assignments or roots to the real library.
+    if arguments.contains(where: { $0.hasPrefix("--sample-") }) {
       let temporaryRoot = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent(
           "StudioTimeMachine-SessionReview-\(UUID().uuidString)",
@@ -298,10 +304,25 @@ final class StudioLibraryStore {
 
     if arguments.contains(where: { $0.hasPrefix("--sample-") }) {
       let dense = arguments.contains("--sample-dense")
-      let sample = dense ? SampleLibrary.makeDense() : SampleLibrary.make()
+      let sample =
+        arguments.contains("--sample-disclosures")
+        ? SampleLibrary.makeDisclosureReview()
+        : (dense ? SampleLibrary.makeDense() : SampleLibrary.make())
       phase = .ready(sample)
       isSampleLibrary = true
       isDenseSample = dense
+      lastStatistics = IndexingStatistics(
+        projectCount: sample.projects.count,
+        setCount: sample.projects.reduce(0) { $0 + $1.sets.count },
+        parsedSetCount: 0,
+        reusedSetCount: sample.projects.reduce(0) { $0 + $1.sets.count },
+        audioAssetCount: sample.projects.reduce(sample.unassignedAudioAssets.count) {
+          $0 + $1.previewAssets.count
+        },
+        issueCount: sample.issues.count,
+        startedAt: sample.scannedAt.addingTimeInterval(-2),
+        completedAt: sample.scannedAt
+      )
       registeredRoots = [
         RegisteredLibraryRoot(
           id: "sample-root",
@@ -906,9 +927,9 @@ final class StudioLibraryStore {
 
   func chooseLibraryFolder() {
     let panel = NSOpenPanel()
-    panel.title = "Choose your Ableton library"
+    panel.title = "Add to Studio"
     panel.message = "Studio Time Machine reads this folder without changing any projects or audio."
-    panel.prompt = "Index Folder"
+    panel.prompt = "Add to Studio"
     panel.canChooseFiles = false
     panel.canChooseDirectories = true
     panel.allowsMultipleSelection = false
@@ -942,7 +963,7 @@ final class StudioLibraryStore {
         activeRootID = root.id
         registeredRoots = try await syncService.registeredRoots()
 
-        try await syncService.startMonitoring()
+        if automaticUpdatesEnabled { try await syncService.startMonitoring() }
         _ = try await syncService.scanAll(snapshotReason: .initialIndex)
 
         guard scanToken == token else { return }
@@ -968,10 +989,7 @@ final class StudioLibraryStore {
   }
 
   func rescan() {
-    guard library != nil else {
-      chooseLibraryFolder()
-      return
-    }
+    guard canUpdateLibrary else { return }
     indexingProgress = IndexingProgress(phase: .discovering, completed: 0, total: 1)
     hasPendingLibraryChanges = false
     Task {
@@ -984,7 +1002,42 @@ final class StudioLibraryStore {
     }
   }
 
+  var canUpdateLibrary: Bool {
+    library != nil && !isSampleSession && syncStatus != .indexing
+      && indexingProgress == nil && !isChangingAutomaticUpdates
+      && registeredRoots.contains { $0.availability == .available }
+  }
+
+  /// Sample review arguments must never operate on the user's persisted library,
+  /// including the background-indexing fixture which intentionally looks live.
+  private var isSampleSession: Bool {
+    isSampleLibrary || ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("--sample-") }
+  }
+
+  func setAutomaticUpdatesEnabled(_ enabled: Bool) {
+    guard !isSampleSession, !isChangingAutomaticUpdates, syncStatus != .indexing,
+      automaticUpdatesEnabled != enabled || (enabled && syncStatus != .monitoring)
+    else { return }
+    isChangingAutomaticUpdates = true
+    Task {
+      defer { isChangingAutomaticUpdates = false }
+      do {
+        if enabled {
+          try await syncService.resumeMonitoring()
+        } else {
+          await syncService.stopMonitoring()
+        }
+        automaticUpdatesEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "studio.automaticLibraryUpdates")
+      } catch {
+        await syncService.stopMonitoring()
+        syncMessage = "Automatic updates could not start: \(error.localizedDescription)"
+      }
+    }
+  }
+
   func loadCachedRoot(_ root: RegisteredLibraryRoot) {
+    guard !isSampleSession else { return }
     Task {
       do {
         let cachedIndexes = try await syncService.cachedIndexes()
@@ -998,7 +1051,9 @@ final class StudioLibraryStore {
         await rebuildWorkCatalog(from: cachedIndexes)
         destination = .library
         clearSelection()
-        if registeredRoots.contains(where: { $0.availability == .available }) {
+        if automaticUpdatesEnabled,
+          registeredRoots.contains(where: { $0.availability == .available })
+        {
           try? await syncService.startMonitoring()
         }
         scanInstalledPlugins()
@@ -1330,6 +1385,7 @@ final class StudioLibraryStore {
     if recentWorkIDs.count > 8 {
       recentWorkIDs.removeLast(recentWorkIDs.count - 8)
     }
+    guard !isSampleSession else { return }
     UserDefaults.standard.set(
       recentWorkIDs,
       forKey: "StudioTimeMachine.recentWorkIDs.v1"
@@ -1437,6 +1493,7 @@ final class StudioLibraryStore {
         organisationMessage =
           "Assigned \(session.displayName) to \(artist.displayName) — \(work.displayName). No files were moved."
         selectedWorkID = work.id
+        rememberRecentWork(work.id)
       } catch {
         sessionReviewActionState = .failed(error.localizedDescription)
         organisationMessage = error.localizedDescription
@@ -1545,7 +1602,7 @@ final class StudioLibraryStore {
   private func refreshOrganisationTruth() async throws {
     let directory = try await organisationStore.load()
     organisationDirectory = directory
-    if isSessionReviewSample {
+    if isSampleSession {
       let indexes = searchableRootIndexes.values
         .map(\.index)
         .sorted { $0.rootURL.path < $1.rootURL.path }
@@ -2161,7 +2218,7 @@ final class StudioLibraryStore {
         snapshots = (try? await syncService.snapshots()) ?? []
         scanInstalledPlugins()
       }
-      if roots.contains(where: { $0.availability == .available }) {
+      if automaticUpdatesEnabled, roots.contains(where: { $0.availability == .available }) {
         try await syncService.resumeMonitoring()
         await refreshGlobalSearchIndex()
       }
@@ -2171,7 +2228,8 @@ final class StudioLibraryStore {
       }
       await refreshSampleUsage()
     } catch {
-      // A missing or unreadable cache should not block first run.
+      // Keep first run and cached browsing available, but never hide a failed watcher.
+      syncMessage = "Studio could not finish restoring the library: \(error.localizedDescription)"
     }
   }
 
@@ -2205,6 +2263,9 @@ final class StudioLibraryStore {
         && registeredRoots.allSatisfy { $0.availability == .available }
         && sampleLocations.allSatisfy { $0.availability == .available }
       try await sampleService.replaceUsage(indexes: indexes, coverageComplete: coverage)
+      if sampleMessage?.hasPrefix("Sample usage could not refresh") == true {
+        sampleMessage = nil
+      }
       scheduleSampleQuery()
     } catch {
       sampleMessage = "Sample usage could not refresh: \(error.localizedDescription)"

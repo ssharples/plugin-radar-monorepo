@@ -37,7 +37,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-4 bg-red-900 text-white">
+        <div className="p-4 bg-red-900 text-plugin-text">
           <h2 className="text-lg font-bold">Something went wrong</h2>
           <pre className="mt-2 text-sm overflow-auto">
             {this.state.error?.message}
@@ -76,37 +76,40 @@ function App() {
     initOnboarding().catch(console.error);
   }, [initOnboarding]);
 
-  // Show onboarding flow if not complete
-  if (!isOnboardingComplete) {
-    return (
-      <ErrorBoundary>
-        <OnboardingFlow />
-      </ErrorBoundary>
-    );
-  }
-
+  // All hooks must be called unconditionally (React Rules of Hooks)
   useEffect(() => {
+    if (!isOnboardingComplete) return;
     fetchPresets();
-  }, [fetchPresets]);
+  }, [fetchPresets, isOnboardingComplete]);
 
   useEffect(() => {
+    if (!isOnboardingComplete) return;
     initSync().catch(console.error);
-  }, [initSync]);
+  }, [initSync, isOnboardingComplete]);
 
   useEffect(() => {
+    if (!isOnboardingComplete) return;
     initOffline();
     startRetryLoop(executeQueuedWrite);
-  }, [initOffline]);
+  }, [initOffline, isOnboardingComplete]);
 
   useEffect(() => {
+    if (!isOnboardingComplete) return;
     juceBridge.startWaveformStream();
     return () => {
       juceBridge.stopWaveformStream();
     };
-  }, []);
+  }, [isOnboardingComplete]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    juceBridge.setAnalysisSubscriptions(analyzerView === 'waveform', analyzerView === 'spectrum');
+    return () => { juceBridge.setAnalysisSubscriptions(false, false); };
+  }, [analyzerView, isOnboardingComplete]);
 
   // Cmd+B to toggle browser
   useEffect(() => {
+    if (!isOnboardingComplete) return;
     const handleKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault();
@@ -115,18 +118,28 @@ function App() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+  }, [isOnboardingComplete]);
 
   // Listen for openPluginBrowser events from child components
   useEffect(() => {
+    if (!isOnboardingComplete) return;
     const handler = () => setBrowserOpen(true);
     window.addEventListener('openPluginBrowser', handler);
     return () => window.removeEventListener('openPluginBrowser', handler);
-  }, []);
+  }, [isOnboardingComplete]);
 
   const toggleBrowser = useCallback(() => {
     setBrowserOpen(prev => !prev);
   }, []);
+
+  // Show onboarding flow if not complete
+  if (!isOnboardingComplete) {
+    return (
+      <ErrorBoundary>
+        <OnboardingFlow />
+      </ErrorBoundary>
+    );
+  }
 
   const ANALYZER_HEIGHT = 134;
   const FOOTER_HEIGHT = 66;
@@ -185,8 +198,8 @@ function App() {
                 backgroundSize: '100% 100%',
               }}
             >
-              <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                analyzerView === 'waveform' ? 'text-white' : 'text-white/40'
+              <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
+                analyzerView === 'waveform' ? 'text-plugin-text' : 'text-plugin-text/40'
               }`}>
                 Waveform
               </span>
@@ -200,8 +213,8 @@ function App() {
                 backgroundSize: '100% 100%',
               }}
             >
-              <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                analyzerView === 'spectrum' ? 'text-white' : 'text-white/40'
+              <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
+                analyzerView === 'spectrum' ? 'text-plugin-text' : 'text-plugin-text/40'
               }`}>
                 Spectrum
               </span>
@@ -220,8 +233,8 @@ function App() {
                       backgroundSize: '100% 100%',
                     }}
                   >
-                    <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                      showInput ? 'text-white' : 'text-white/30'
+                    <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
+                      showInput ? 'text-plugin-text' : 'text-plugin-text/30'
                     }`}>
                       Input
                     </span>
@@ -235,8 +248,8 @@ function App() {
                       backgroundSize: '100% 100%',
                     }}
                   >
-                    <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                      showOutput ? 'text-plugin-accent' : 'text-white/30'
+                    <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
+                      showOutput ? 'text-plugin-accent' : 'text-plugin-text/30'
                     }`}>
                       Output
                     </span>
@@ -255,8 +268,8 @@ function App() {
                         backgroundSize: '100% 100%',
                       }}
                     >
-                      <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono uppercase transition-colors ${
-                        specMode === m ? 'text-plugin-accent' : 'text-white/30'
+                      <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
+                        specMode === m ? 'text-plugin-accent' : 'text-plugin-text/30'
                       }`}>
                         {m}
                       </span>
@@ -272,7 +285,7 @@ function App() {
                         backgroundSize: '100% 100%',
                       }}
                     >
-                      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-white/60">
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px]  text-plugin-text/60">
                         {octaveMode === 'third' ? '1/3' : '1/1'}
                       </span>
                     </button>

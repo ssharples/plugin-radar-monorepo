@@ -29,8 +29,8 @@ export function ScanStep() {
       handleScanProgress(data.progress, data.currentPlugin)
     })
 
-    const unsubPluginList = juceBridge.onPluginListChanged(() => {
-      handlePluginDiscovered()
+    const unsubPluginList = juceBridge.onPluginListChanged((plugins) => {
+      handlePluginDiscovered(Array.isArray(plugins) ? plugins.length : undefined)
     })
 
     const unsubBlacklisted = juceBridge.onPluginBlacklisted((data) => {
@@ -68,16 +68,16 @@ export function ScanStep() {
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
-      <h2 className="font-mono text-lg text-plugin-text crt-text uppercase tracking-wider mb-2">
+      <h2 className=" text-lg text-plugin-text uppercase tracking-wider mb-2">
         Scanning Your Plugins
       </h2>
-      <p className="text-plugin-dim text-xxs font-mono text-center mb-8 max-w-xs leading-relaxed">
+      <p className="text-plugin-dim text-xxs  text-center mb-8 max-w-xs leading-relaxed">
         Finding all AU & VST3 plugins on your system. Plugins that crash or need authorization will be noted.
       </p>
 
       {scanError ? (
         <div className="w-full">
-          <div className="text-red-400 text-xs font-mono bg-red-500/10 border border-red-500/20 rounded-propane px-4 py-3 mb-4">
+          <div className="text-red-400 text-xs  bg-red-500/10 border border-red-500/20 rounded-md px-4 py-3 mb-4">
             {scanError}
           </div>
           <button
@@ -85,7 +85,7 @@ export function ScanStep() {
               startScan()
               juceBridge.startScan(false).catch((err) => handleScanError(String(err)))
             }}
-            className="w-full py-2 bg-plugin-accent hover:bg-plugin-accent-bright text-black font-mono text-xs uppercase rounded-propane transition-colors"
+            className="w-full py-2 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent  text-xs uppercase rounded-md transition-colors"
           >
             Retry Scan
           </button>
@@ -101,19 +101,19 @@ export function ScanStep() {
           </div>
 
           {/* Percentage */}
-          <div className="text-2xl font-mono text-plugin-accent mb-2">
+          <div className="text-2xl  text-plugin-accent mb-2">
             {progressPercent}%
           </div>
 
           {/* Currently scanning */}
           {scanActive && truncatedName && (
-            <div className="text-plugin-dim font-mono text-xxs truncate max-w-full mb-4">
+            <div className="text-plugin-dim  text-xxs truncate max-w-full mb-4">
               {truncatedName}
             </div>
           )}
 
           {/* Discovered counter */}
-          <div className="text-plugin-muted font-mono text-xs mb-4">
+          <div className="text-plugin-muted  text-xs mb-4">
             {pluginsDiscovered} plugins found
           </div>
 
@@ -123,7 +123,7 @@ export function ScanStep() {
               {blacklistedPlugins.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 text-xxs font-mono text-plugin-warning bg-plugin-warning/10 border border-plugin-warning/20 rounded-propane px-3 py-1.5 mb-1"
+                  className="flex items-center gap-2 text-xxs  text-plugin-warning bg-plugin-warning/10 border border-plugin-warning/20 rounded-md px-3 py-1.5 mb-1"
                 >
                   <span className="shrink-0">!</span>
                   <span className="truncate">{p.name}</span>
@@ -135,7 +135,7 @@ export function ScanStep() {
           {/* Skip link */}
           <button
             onClick={skipScan}
-            className="text-plugin-dim text-xxs font-mono hover:text-plugin-muted transition-colors mt-2"
+            className="text-plugin-dim text-xxs  hover:text-plugin-muted transition-colors mt-2"
           >
             Skip for now
           </button>

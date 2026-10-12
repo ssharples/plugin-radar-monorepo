@@ -82,7 +82,7 @@ export function FriendRequests() {
   if (loading) {
     return (
       <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
-        <div className="text-gray-400 text-sm">Loading requests...</div>
+        <div className="text-plugin-muted text-sm">Loading requests...</div>
       </div>
     );
   }
@@ -92,16 +92,16 @@ export function FriendRequests() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Bell size={18} className="text-plugin-accent" />
-          <h3 className="text-white font-mono font-medium">Friend Requests</h3>
+          <h3 className="text-plugin-text  font-medium">Friend Requests</h3>
           {requests.length > 0 && (
-            <span className="bg-plugin-accent text-white text-xs rounded-full px-2 py-0.5">
+            <span className="bg-plugin-accent text-plugin-text text-xs rounded-full px-2 py-0.5">
               {requests.length}
             </span>
           )}
         </div>
         <button
           onClick={loadRequests}
-          className="text-gray-400 hover:text-white p-1"
+          className="text-plugin-muted hover:text-plugin-text p-1"
           title="Refresh"
         >
           <RefreshCw size={14} />
@@ -109,7 +109,7 @@ export function FriendRequests() {
       </div>
 
       {requests.length === 0 ? (
-        <div className="text-gray-500 text-sm text-center py-4">
+        <div className="text-plugin-dim text-sm text-center py-4">
           No pending requests
         </div>
       ) : (
@@ -120,14 +120,14 @@ export function FriendRequests() {
               className="flex items-center justify-between bg-black/20 rounded p-3"
             >
               <div>
-                <div className="text-white text-sm font-medium">{req.username}</div>
-                <div className="text-gray-500 text-xs">{formatTime(req.sentAt)}</div>
+                <div className="text-plugin-text text-sm font-medium">{req.username}</div>
+                <div className="text-plugin-dim text-xs">{formatTime(req.sentAt)}</div>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleAccept(req.requestId)}
                   disabled={processing === req.requestId}
-                  className="flex items-center gap-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded px-2 py-1"
+                  className="flex items-center gap-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-plugin-text text-sm rounded px-2 py-1"
                   title="Accept"
                 >
                   <Check size={14} />

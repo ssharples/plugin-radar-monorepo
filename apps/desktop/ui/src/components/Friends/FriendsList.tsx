@@ -59,7 +59,7 @@ export function FriendsList() {
   if (loading) {
     return (
       <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
-        <div className="text-gray-400 text-sm">Loading friends...</div>
+        <div className="text-plugin-muted text-sm">Loading friends...</div>
       </div>
     );
   }
@@ -69,12 +69,12 @@ export function FriendsList() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Users size={18} className="text-plugin-accent" />
-          <h3 className="text-white font-mono font-medium">Friends</h3>
-          <span className="text-gray-500 text-xs">({friends.length})</span>
+          <h3 className="text-plugin-text  font-medium">Friends</h3>
+          <span className="text-plugin-dim text-xs">({friends.length})</span>
         </div>
         <button
           onClick={loadFriends}
-          className="text-gray-400 hover:text-white p-1"
+          className="text-plugin-muted hover:text-plugin-text p-1"
           title="Refresh"
         >
           <RefreshCw size={14} />
@@ -82,7 +82,7 @@ export function FriendsList() {
       </div>
 
       {friends.length === 0 ? (
-        <div className="text-gray-500 text-sm text-center py-4">
+        <div className="text-plugin-dim text-sm text-center py-4">
           No friends yet. Search for users to add!
         </div>
       ) : (
@@ -92,11 +92,11 @@ export function FriendsList() {
               key={friend.userId}
               className="flex items-center justify-between bg-black/20 rounded p-3"
             >
-              <div className="text-white text-sm font-medium">{friend.username}</div>
+              <div className="text-plugin-text text-sm font-medium">{friend.username}</div>
               <button
                 onClick={() => handleRemove(friend.userId, friend.username)}
                 disabled={removing === friend.userId}
-                className="text-gray-500 hover:text-red-400 disabled:opacity-50 p-1"
+                className="text-plugin-dim hover:text-red-400 disabled:opacity-50 p-1"
                 title="Remove friend"
               >
                 <UserMinus size={14} />

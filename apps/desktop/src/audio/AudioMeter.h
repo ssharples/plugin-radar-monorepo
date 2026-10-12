@@ -18,6 +18,7 @@
 class AudioMeter
 {
 public:
+    enum class AnalysisMode { full, peakOnly };
     struct Readings
     {
         float peakL = 0.0f;         // Current peak (linear 0-1+)
@@ -35,6 +36,8 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock);
     void process(const juce::AudioBuffer<float>& buffer);
     void reset();
+    void setAnalysisMode(AnalysisMode mode);
+    AnalysisMode getAnalysisMode() const { return analysisMode; }
 
     // Thread-safe getters
     Readings getReadings() const;
@@ -65,8 +68,8 @@ private:
     float peakHoldCounterR = 0.0f;
 
     // RMS state (exponential moving average)
-    float rmsAccumL = 0.0f;
-    float rmsAccumR = 0.0f;
+    double rmsAccumL = 0.0;
+    double rmsAccumR = 0.0;
     float rmsCoeff = 0.0f;  // EMA coefficient
 
     // LUFS integration buffer (3s short-term per ITU-R BS.1770)
@@ -75,6 +78,8 @@ private:
     std::vector<float> lufsBufferR;
     int lufsBufferSize = 0;
     int lufsWritePos = 0;
+    double lufsSumL = 0.0;
+    double lufsSumR = 0.0;
 
     // K-weighting filter state (biquad coefficients)
     // Stage 1: High shelf (+4dB at high frequencies)
@@ -102,6 +107,7 @@ private:
     std::vector<float> kWeightScratchL;
     std::vector<float> kWeightScratchR;
     int kWeightScratchSize = 0;
+    AnalysisMode analysisMode = AnalysisMode::full;
 
     void updateKWeightingCoeffs();
 

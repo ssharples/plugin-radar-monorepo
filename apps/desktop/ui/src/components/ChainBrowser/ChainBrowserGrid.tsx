@@ -87,17 +87,17 @@ export function ChainBrowserGrid({
           <button
             onClick={onPrevPage}
             disabled={offset === 0}
-            className="flex items-center gap-1 text-[10px] text-plugin-muted hover:text-plugin-text disabled:text-plugin-dim disabled:cursor-not-allowed font-mono"
+            className="flex items-center gap-1 text-[11px] text-plugin-muted hover:text-plugin-text disabled:text-plugin-dim disabled:cursor-not-allowed "
           >
             <ChevronLeft className="w-3 h-3" /> Prev
           </button>
-          <span className="text-[9px] text-plugin-dim font-mono">
+          <span className="text-[10px] text-plugin-dim ">
             {currentPage} / {totalPages} ({total} total)
           </span>
           <button
             onClick={onNextPage}
             disabled={!hasMore}
-            className="flex items-center gap-1 text-[10px] text-plugin-muted hover:text-plugin-text disabled:text-plugin-dim disabled:cursor-not-allowed font-mono"
+            className="flex items-center gap-1 text-[11px] text-plugin-muted hover:text-plugin-text disabled:text-plugin-dim disabled:cursor-not-allowed "
           >
             Next <ChevronRight className="w-3 h-3" />
           </button>

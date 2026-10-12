@@ -1,0 +1,126 @@
+[ 68%] Built target Catch2
+[ 70%] Built target Catch2WithMain
+[ 70%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/tests/ChainPerformanceBenchmark.cpp.o
+[ 70%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/tests/ChainIntegrationTests.cpp.o
+[ 72%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/src/core/ChainRenderGraph.cpp.o
+[ 72%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/src/core/ChainProcessor.cpp.o
+[ 72%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/src/audio/HostedPluginProcessor.cpp.o
+[ 72%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/src/core/ChainTransactions.cpp.o
+[ 72%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/src/automation/ParameterProxyPool.cpp.o
+[ 74%] Linking CXX executable PluginChainManager_Tests
+[100%] Built target PluginChainManager_Tests
+[  1%] Built target PluginChainManagerData
+[ 61%] Built target Catch2
+[ 61%] Building CXX object CMakeFiles/PluginChainManager.dir/src/PluginProcessor.cpp.o
+[ 62%] Building CXX object CMakeFiles/PluginChainManager.dir/src/PluginEditor.cpp.o
+[ 62%] Building CXX object CMakeFiles/PluginChainManager.dir/src/core/ChainProcessor.cpp.o
+[ 64%] Building CXX object CMakeFiles/PluginChainManager.dir/src/core/ChainRenderGraph.cpp.o
+[ 64%] Building CXX object CMakeFiles/PluginChainManager.dir/src/core/ChainTransactions.cpp.o
+[ 66%] Built target Catch2WithMain
+[ 66%] Building CXX object CMakeFiles/PluginChainManager.dir/src/audio/HostedPluginProcessor.cpp.o
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/audio/HostedPluginProcessor.cpp:36:26: warning: comparing floating point with == or != is unsafe [-Wfloat-equal]
+   36 |     if (prepared && rate == preparedRate && block == preparedBlock) return;
+      |                     ~~~~ ^  ~~~~~~~~~~~~
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/ChainTransactions.cpp:174:58: warning: declaration shadows a local variable [-Wshadow-uncaptured-local]
+  174 |         commitCallbacks.emplace(version, [this, version, completion = std::move(completion), result]() mutable {
+      |                                                          ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/ChainTransactions.cpp:129:79: note: previous declaration is here
+  129 |                                                             RestoreCompletion completion)
+      |                                                                               ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/ChainTransactions.cpp:264:23: warning: declaration shadows a local variable [-Wshadow-uncaptured-local]
+  264 |                 auto& leaf = *candidate->leaves[index];
+      |                       ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/ChainTransactions.cpp:253:11: note: previous declaration is here
+  253 |     auto& leaf = *candidate->leaves[index];
+      |           ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/ChainTransactions.cpp:337:30: warning: declaration shadows a local variable [-Wshadow-uncaptured-local]
+  337 |     candidate->completion = [completion = std::move(completion)](RestoreResult result) { completion(result.success, result.error); };
+      |                              ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/ChainTransactions.cpp:331:76: note: previous declaration is here
+  331 |                                    std::function<void(bool, juce::String)> completion)
+      |                                                                            ^
+1 warning generated.
+[ 66%] Building CXX object CMakeFiles/PluginChainManager.dir/src/core/PresetManager.cpp.o
+[ 66%] Building CXX object CMakeFiles/PluginChainManager.dir/src/core/MirrorManager.cpp.o
+[ 66%] Building CXX object CMakeFiles/PluginChainManager.dir/src/bridge/WebViewBridge.cpp.o
+[ 66%] Building CXX object CMakeFiles/PluginChainManager.dir/src/ui/PluginEditorHost.cpp.o
+3 warnings generated.
+[ 66%] Building CXX object CMakeFiles/PluginChainManager.dir/src/ui/PluginCanvas.cpp.o
+[ 66%] Building CXX object CMakeFiles/PluginChainManager.dir/src/automation/ParameterProxyPool.cpp.o
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/PresetManager.cpp:33:20: warning: declaration shadows a local variable [-Wshadow]
+   33 |     else if (auto* wrapper = xml.getChildByName("WrapperState"))
+      |                    ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/core/PresetManager.cpp:32:15: note: previous declaration is here
+   32 |     if (auto* wrapper = xml.getChildByName("PluginChainManagerState")) parsed.wrapper = std::make_unique<juce::XmlElement>(*wrapper);
+      |               ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/bridge/WebViewBridge.cpp:625:45: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  625 |                             if (flatPlugins[i] == targetLeaf)
+      |                                 ~~~~~~~~~~~ ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/bridge/WebViewBridge.cpp:794:17: warning: enumeration value 'None' not explicitly handled in switch [-Wswitch-enum]
+  794 |         switch (reason)
+      |                 ^~~~~~
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/bridge/WebViewBridge.cpp:794:17: note: add missing switch cases
+  794 |         switch (reason)
+      |                 ^
+  795 |         {
+  796 |             case ScanFailureReason::Crash:       reasonStr = "crash"; break;
+1 warning generated.
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/ui/PluginCanvas.cpp:221:50: warning: unused parameter 'e' [-Wunused-parameter]
+  221 | void PluginCard::mouseUp(const juce::MouseEvent& e)
+      |                                                  ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/ui/PluginCanvas.cpp:244:52: warning: unused parameter 'e' [-Wunused-parameter]
+  244 | void PluginCard::mouseExit(const juce::MouseEvent& e)
+      |                                                    ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/ui/PluginCanvas.cpp:414:38: warning: unused parameter 'slotIndex' [-Wunused-parameter]
+  414 | void PluginCanvas::onPluginAdded(int slotIndex)
+      |                                      ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/ui/PluginCanvas.cpp:419:40: warning: unused parameter 'slotIndex' [-Wunused-parameter]
+  419 | void PluginCanvas::onPluginRemoved(int slotIndex)
+      |                                        ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/ui/PluginCanvas.cpp:429:61: warning: unused parameter 'component' [-Wunused-parameter]
+  429 | void PluginCanvas::componentMovedOrResized(juce::Component& component, bool wasMoved, bool wasResized)
+      |                                                             ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/ui/PluginCanvas.cpp:463:52: warning: unused parameter 'e' [-Wunused-parameter]
+  463 | void PluginCanvas::mouseUp(const juce::MouseEvent& e)
+      |                                                    ^
+/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/src/ui/PluginCanvas.cpp:469:59: warning: unused parameter 'e' [-Wunused-parameter]
+  469 | void PluginCanvas::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+      |                                                           ^
+7 warnings generated.
+2 warnings generated.
+[ 66%] Linking CXX static library "PluginChainManager_artefacts/Release/libPlugin Chain Manager_SharedCode.a"
+[ 88%] Built target PluginChainManager
+[ 90%] Building CXX object CMakeFiles/PluginChainManager_WrapperTests.dir/tests/WrapperStateTests.cpp.o
+[ 90%] Building CXX object CMakeFiles/PluginChainManager_WrapperTests.dir/tests/ChainPerformanceBenchmark.cpp.o
+[ 90%] Linking CXX executable PluginChainManager_WrapperTests
+[100%] Built target PluginChainManager_WrapperTests
+[  3%] Built target PluginChainManagerData
+[ 27%] Built target PluginScannerHelper
+[ 82%] Built target PluginChainManager
+[ 82%] Linking CXX CFBundle shared module "PluginChainManager_artefacts/Release/AU/Plugin Chain Manager.component/Contents/MacOS/Plugin Chain Manager"
+Embedding scanner and signing AU development bundle
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/AU/Plugin Chain Manager.component/Contents/Resources/PluginScannerHelper: replacing existing signature
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/AU/Plugin Chain Manager.component: replacing existing signature
+[100%] Built target PluginChainManager_AU
+[  3%] Built target PluginChainManagerData
+[  6%] Built target juce_vst3_helper
+[ 31%] Built target PluginScannerHelper
+[ 86%] Built target PluginChainManager
+[ 86%] Linking CXX CFBundle shared module "PluginChainManager_artefacts/Release/VST3/Plugin Chain Manager.vst3/Contents/MacOS/Plugin Chain Manager"
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/VST3/Plugin Chain Manager.vst3: code has no resources but signature indicates they must be present
+-- Replacing invalid signature with ad-hoc signature
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/VST3/Plugin Chain Manager.vst3: replacing existing signature
+removing moduleinfo.json
+creating /tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/VST3/Plugin Chain Manager.vst3/Contents/Resources/moduleinfo.json
+Embedding scanner and signing VST3 development bundle
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/VST3/Plugin Chain Manager.vst3/Contents/Resources/PluginScannerHelper: replacing existing signature
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/VST3/Plugin Chain Manager.vst3: replacing existing signature
+[100%] Built target PluginChainManager_VST3
+[  3%] Built target PluginChainManagerData
+[ 27%] Built target PluginScannerHelper
+[ 82%] Built target PluginChainManager
+[ 86%] Linking CXX executable "PluginChainManager_artefacts/Release/Standalone/Plugin Chain Manager.app/Contents/MacOS/Plugin Chain Manager"
+Embedding scanner and signing Standalone development bundle
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/Standalone/Plugin Chain Manager.app/Contents/Resources/PluginScannerHelper: replacing existing signature
+/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/Standalone/Plugin Chain Manager.app: replacing existing signature
+[100%] Built target PluginChainManager_Standalone

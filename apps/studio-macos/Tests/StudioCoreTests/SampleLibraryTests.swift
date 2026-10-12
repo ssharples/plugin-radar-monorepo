@@ -110,10 +110,13 @@ struct SampleLibraryTests {
     let index = StudioLibraryIndex(
       rootURL: root, scannedAt: Date(), projects: [project],
       unassignedAudioAssets: [], issues: [])
+    // Overlapping registered library roots can return the same physical Set twice.
+    // The usage batch must remain insertable when that happens.
     let aggregation = SampleUsageAggregator().aggregate(
-      indexes: [index], sampleIDsByPath: [sampleURL.standardizedFileURL.path: sampleID],
+      indexes: [index, index], sampleIDsByPath: [sampleURL.standardizedFileURL.path: sampleID],
       worksBySessionID: ["session": LogicalWorkIdentity(id: "work", displayName: "Song")])
 
+    #expect(aggregation.occurrences.count == 1)
     try database.replaceUsage(aggregation, coverageComplete: true)
     let row = try #require(database.querySamples().rows.first)
     let occurrence = try #require(database.occurrences(for: sampleID).first)

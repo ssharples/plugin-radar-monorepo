@@ -1,0 +1,167 @@
+name: Plugin quality gates
+
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/src/**'
+      - 'apps/desktop/ui/src/**'
+      - 'apps/desktop/tests/**'
+      - 'tools/quality/**'
+      - '.github/workflows/plugin-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop/src/**'
+      - 'apps/desktop/ui/src/**'
+      - 'apps/desktop/tests/**'
+      - 'tools/quality/**'
+      - '.github/workflows/plugin-quality.yml'
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'Git base ref for changed plugin modules'
+        required: true
+        default: 'main'
+      mutate_ui:
+        description: 'Run scoped Stryker after CRAP (maximum 20 minutes)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.scope.outputs.matrix }}
+      changed: ${{ steps.scope.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          from tools.quality.scope import select
+          base = os.environ['BASE']
+          # An initial push has no previous commit: audit the available surface.
+          initial = not base or set(base) == {'0'}
+          rows = []
+          for surface, runner in [('cpp', 'macos-latest'), ('desktop-ui', 'ubuntu-latest')]:
+              files = select(Path.cwd(), [], None if initial else base, initial, surface)
+              if files:
+                  rows.append({'surface': surface, 'runner': runner})
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('matrix=' + json.dumps({'include': rows}) + '\n')
+              output.write('changed=' + str(bool(rows)).lower() + '\n')
+          PY
+
+  adapters:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile --filter desktop-ui
+      - run: npm run quality:setup
+      - run: npm run quality:test
+
+  crap:
+    needs: scope
+    if: needs.scope.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.scope.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - if: matrix.surface == 'desktop-ui'
+        run: pnpm install --frozen-lockfile --filter desktop-ui
+      - run: npm run quality:setup
+      - name: Tests and CRAP for every changed production module
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base }}
+          SURFACE: ${{ matrix.surface }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          command = ['python3', 'tools/quality/run.py', 'crap', '--surface', os.environ['SURFACE']]
+          base = os.environ['BASE']
+          command += ['--all'] if not base or set(base) == {'0'} else ['--base', base]
+          raise SystemExit(subprocess.call(command))
+          PY
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-crap-${{ matrix.surface }}
+          path: |
+            reports/quality/crap.*
+            reports/quality/coverage/**/adapter-result.json
+            reports/quality/coverage/**/baseline.*.log
+            reports/quality/coverage/**/command-*.log
+          retention-days: 7
+
+  mutation-ui:
+    needs: [scope, adapters, crap]
+    if: github.event_name == 'workflow_dispatch' && inputs.mutate_ui && contains(needs.scope.outputs.matrix, 'desktop-ui')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile --filter desktop-ui
+      - run: npm run quality:setup
+      - name: Refresh tests and CRAP, then mutate changed UI modules
+        env:
+          BASE: ${{ inputs.base }}
+        run: npm run mutate -- --surface desktop-ui --base "$BASE"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-ui-mutation
+          path: |
+            reports/quality/crap.*
+            reports/quality/mutation.json
+            reports/quality/mutation/desktop-ui/*.json
+            reports/quality/mutation/desktop-ui/*.html
+            reports/quality/mutation/desktop-ui/*.log
+          retention-days: 7

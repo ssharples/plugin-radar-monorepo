@@ -95,6 +95,7 @@ private:
     // State
     std::atomic<bool> suppressLocalNotification { false };
     uint64_t lastAppliedVersion = 0;
+    std::shared_ptr<bool> alive = std::make_shared<bool>(true);
 
     // Parameter diff state
     std::vector<ParamSnapshot> previousParamSnapshot;

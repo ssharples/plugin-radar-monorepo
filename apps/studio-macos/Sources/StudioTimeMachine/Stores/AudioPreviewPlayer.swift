@@ -11,6 +11,12 @@ enum AudioWaveformState: Equatable {
   case failed(String)
 }
 
+struct AudioClipSelection: Equatable {
+  let start: TimeInterval
+  let end: TimeInterval
+  var duration: TimeInterval { end - start }
+}
+
 @MainActor
 @Observable
 final class AudioPreviewPlayer {
@@ -23,6 +29,14 @@ final class AudioPreviewPlayer {
   var duration: TimeInterval = 0
   var waveformState: AudioWaveformState = .idle
   var errorMessage: String?
+  private(set) var clipSelection: AudioClipSelection?
+  var loopsSelection = true
+  private(set) var waveformRange: ClosedRange<Double>?
+  let clipClipboard = AudioClipClipboardController()
+
+  @ObservationIgnored private var requestedWaveformRange: ClosedRange<Double>?
+  @ObservationIgnored private var playbackGeneration = UUID()
+  @ObservationIgnored private var isHandlingEnd = false
 
   @ObservationIgnored private var player: AVPlayer?
   @ObservationIgnored private var timeObserver: Any?
@@ -39,12 +53,18 @@ final class AudioPreviewPlayer {
     return min(max(currentTime / duration, 0), 1)
   }
 
+  private var waveformProgress: Double {
+    guard let range = waveformRange else { return progress }
+    return min(
+      max((currentTime - range.lowerBound) / max(range.upperBound - range.lowerBound, 0.001), 0), 1)
+  }
+
   var currentAmplitude: Double {
     guard isPlaying, case .ready(let samples) = waveformState, !samples.isEmpty else {
       return 0
     }
     let center = min(
-      max(Int(progress * Double(samples.count - 1)), 0),
+      max(Int(waveformProgress * Double(samples.count - 1)), 0),
       samples.count - 1
     )
     let lower = max(0, center - 1)
@@ -64,6 +84,7 @@ final class AudioPreviewPlayer {
 
     if selectedFileChanged {
       resetPlayback()
+      endClipping()
       waveformTask?.cancel()
       waveformTask = nil
       requestedWaveformSampleCount = nil
@@ -75,12 +96,18 @@ final class AudioPreviewPlayer {
       waveformRequestToken = UUID()
     }
 
+    let fidelityChanged = currentFidelity != fidelity
     currentAsset = asset
     currentFidelity = fidelity
     currentLabel = label
+    if fidelityChanged, let clipSelection {
+      clipClipboard.configure(
+        source: asset.fileURL, selection: clipSelection, approximate: fidelity == .approximate)
+    }
   }
 
-  func requestWaveform(for asset: PreviewAsset, sampleCount: Int) {
+  func requestWaveform(for asset: PreviewAsset, sampleCount: Int, range: ClosedRange<Double>? = nil)
+  {
     guard isCurrent(asset) else { return }
     guard asset.isAvailableOnDisk else {
       waveformState = .unavailable
@@ -88,7 +115,7 @@ final class AudioPreviewPlayer {
     }
 
     let boundedCount = Self.boundedWaveformSampleCount(sampleCount)
-    if requestedWaveformSampleCount == boundedCount {
+    if requestedWaveformSampleCount == boundedCount, requestedWaveformRange == range {
       switch waveformState {
       case .loading, .ready:
         return
@@ -99,6 +126,7 @@ final class AudioPreviewPlayer {
 
     waveformTask?.cancel()
     requestedWaveformSampleCount = boundedCount
+    requestedWaveformRange = range
     waveformState = .loading
     let token = assetToken
     let requestToken = UUID()
@@ -108,10 +136,13 @@ final class AudioPreviewPlayer {
       do {
         let waveform = try await AudioWaveformRepository.shared.waveform(
           for: asset.fileURL,
-          sampleCount: boundedCount
+          sampleCount: boundedCount, range: range
         )
         try Task.checkCancellation()
-        guard let self, self.assetToken == token, self.isCurrent(asset) else { return }
+        guard let self, self.assetToken == token, self.waveformRequestToken == requestToken,
+          self.isCurrent(asset)
+        else { return }
+        self.waveformRange = range
         self.duration = waveform.duration
         self.waveformState = .ready(waveform.samples)
       } catch is CancellationError {
@@ -122,7 +153,9 @@ final class AudioPreviewPlayer {
         self.waveformState = asset.isAvailableOnDisk ? .idle : .unavailable
         return
       } catch {
-        guard let self, self.assetToken == token, self.isCurrent(asset) else { return }
+        guard let self, self.assetToken == token, self.waveformRequestToken == requestToken,
+          self.isCurrent(asset)
+        else { return }
         self.waveformState = .failed(error.localizedDescription)
       }
     }
@@ -140,11 +173,20 @@ final class AudioPreviewPlayer {
 
     if let player {
       if isPlaying {
+        playbackGeneration = UUID()
         player.pause()
         isPlaying = false
       } else {
-        player.play()
         isPlaying = true
+        if let clipSelection,
+          currentTime < clipSelection.start || currentTime >= clipSelection.end - 0.001
+        {
+          seek(to: clipSelection.start)
+        } else if currentTime >= duration - 0.001 {
+          seek(to: clipSelection?.start ?? 0)
+        } else {
+          player.play()
+        }
       }
       errorMessage = nil
       return
@@ -166,6 +208,7 @@ final class AudioPreviewPlayer {
 
   func stop() {
     resetPlayback()
+    endClipping()
     waveformTask?.cancel()
     waveformTask = nil
     requestedWaveformSampleCount = nil
@@ -213,6 +256,15 @@ final class AudioPreviewPlayer {
             toleranceAfter: .zero
           )
         }
+        try Task.checkCancellation()
+        guard self.assetToken == token else { return }
+        if let selection = self.clipSelection {
+          await player.seek(
+            to: CMTime(seconds: selection.start, preferredTimescale: 60_000),
+            toleranceBefore: .zero, toleranceAfter: .zero)
+          try Task.checkCancellation()
+          guard self.assetToken == token else { return }
+        }
         player.play()
         self.isPlaying = true
         self.isLoadingPlayback = false
@@ -227,20 +279,100 @@ final class AudioPreviewPlayer {
     }
   }
 
-  private func seek(to requestedTime: TimeInterval) {
-    let targetTime = min(max(requestedTime, 0), duration)
+  func beginClipping() {
+    guard duration > 0 else { return }
+    let start = min(currentTime, max(0, duration - 2))
+    setClipSelection(start: start, end: min(duration, start + 2))
+  }
+
+  func setClipSelection(start: Double, end: Double) {
+    guard start.isFinite, end.isFinite, duration > 0 else { return }
+    let minimum = min(0.001, duration)
+    let lower = min(max(start, 0), duration - minimum)
+    let upper = min(max(end, lower + minimum), duration)
+    let selection = AudioClipSelection(start: lower, end: upper)
+    guard selection != clipSelection else { return }
+    clipSelection = selection
+    if let asset = currentAsset {
+      clipClipboard.configure(
+        source: asset.fileURL, selection: selection, approximate: currentFidelity == .approximate)
+    }
+    updatePlaybackEnd()
+    seek(to: selection.start)
+  }
+
+  func endClipping() {
+    clipSelection = nil
+    waveformRange = nil
+    requestedWaveformRange = nil
+    requestedWaveformSampleCount = nil
+    clipClipboard.invalidate()
+    updatePlaybackEnd()
+  }
+
+  func seek(to requestedTime: TimeInterval) {
+    guard requestedTime.isFinite else { return }
+    let targetTime = min(
+      max(requestedTime, clipSelection?.start ?? 0), clipSelection?.end ?? duration)
     currentTime = targetTime
     pendingSeekTime = targetTime
-
+    playbackGeneration = UUID()
+    isHandlingEnd = false
+    let generation = playbackGeneration
+    let token = assetToken
     guard let player else { return }
     let shouldContinuePlaying = isPlaying
     player.seek(
       to: CMTime(seconds: targetTime, preferredTimescale: 60_000),
       toleranceBefore: .zero,
       toleranceAfter: .zero
-    )
-    if shouldContinuePlaying {
-      player.play()
+    ) { [weak self, weak player] finished in
+      Task { @MainActor in
+        guard finished, let self, self.assetToken == token, self.playbackGeneration == generation
+        else { return }
+        if shouldContinuePlaying, self.isPlaying { player?.play() }
+      }
+    }
+  }
+
+  private func handlePlaybackEnd() {
+    guard isPlaying, !isHandlingEnd else { return }
+    // Ignore a boundary callback queued before a newer seek.
+    guard (player?.currentTime().seconds ?? 0) >= (clipSelection?.end ?? duration) - 0.005 else {
+      return
+    }
+    isHandlingEnd = true
+    player?.pause()
+    if let selection = clipSelection, loopsSelection {
+      seek(to: selection.start)
+    } else {
+      currentTime = clipSelection?.end ?? duration
+      pendingSeekTime = currentTime
+      isPlaying = false
+      isHandlingEnd = false
+    }
+  }
+
+  private func updatePlaybackEnd() {
+    playbackGeneration = UUID()
+    isHandlingEnd = false
+    guard let player else { return }
+    if let endObserver {
+      player.removeTimeObserver(endObserver)
+      self.endObserver = nil
+    }
+    let end = clipSelection?.end ?? duration
+    player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: end, preferredTimescale: 60_000)
+    guard end > 0 else { return }
+    let token = assetToken
+    let selection = clipSelection
+    endObserver = player.addBoundaryTimeObserver(
+      forTimes: [NSValue(time: CMTime(seconds: end, preferredTimescale: 60_000))], queue: .main
+    ) { [weak self] in
+      Task { @MainActor in
+        guard let self, self.assetToken == token, self.clipSelection == selection else { return }
+        self.handlePlaybackEnd()
+      }
     }
   }
 
@@ -263,31 +395,19 @@ final class AudioPreviewPlayer {
           self.errorMessage =
             "Playback stopped: \(player.currentItem?.error?.localizedDescription ?? "unknown audio error")"
         } else if self.duration > 0,
-          self.currentTime >= self.duration - 0.05,
+          self.currentTime >= (self.clipSelection?.end ?? self.duration) - 0.002,
           player.timeControlStatus != .playing
         {
-          self.currentTime = self.duration
-          self.isPlaying = false
+          self.handlePlaybackEnd()
         }
       }
     }
 
-    guard duration > 0 else { return }
-    let endTime = CMTime(seconds: duration, preferredTimescale: 60_000)
-    endObserver = player.addBoundaryTimeObserver(
-      forTimes: [NSValue(time: endTime)],
-      queue: .main
-    ) { [weak self] in
-      Task { @MainActor in
-        guard let self, self.assetToken == token else { return }
-        self.currentTime = self.duration
-        self.pendingSeekTime = self.duration
-        self.isPlaying = false
-      }
-    }
+    updatePlaybackEnd()
   }
 
   private func resetPlayback() {
+    playbackGeneration = UUID()
     playbackTask?.cancel()
     playbackTask = nil
     player?.pause()
@@ -337,11 +457,6 @@ private enum AudioPreviewError: LocalizedError {
   }
 }
 
-private struct AudioWaveform: Sendable {
-  let samples: [Float]
-  let duration: TimeInterval
-}
-
 private struct AudioWaveformFileIdentity: Hashable, Sendable {
   let path: String
   let resourceIdentifier: String
@@ -352,17 +467,20 @@ private struct AudioWaveformFileIdentity: Hashable, Sendable {
 private struct AudioWaveformCacheKey: Hashable, Sendable {
   let file: AudioWaveformFileIdentity
   let sampleCount: Int
+  let range: ClosedRange<Double>?
 }
 
 private actor AudioWaveformRepository {
   static let shared = AudioWaveformRepository()
 
-  private var cache: [AudioWaveformCacheKey: AudioWaveform] = [:]
+  private var cache: [AudioWaveformCacheKey: AudioWaveformReadResult] = [:]
   private var insertionOrder: [AudioWaveformCacheKey] = []
   private let maximumCachedSampleCount = 32_768
   private var cachedSampleCount = 0
 
-  func waveform(for url: URL, sampleCount: Int) async throws -> AudioWaveform {
+  func waveform(for url: URL, sampleCount: Int, range: ClosedRange<Double>?) async throws
+    -> AudioWaveformReadResult
+  {
     let identityTask = Task.detached(priority: .utility) {
       try AudioWaveformDecoder.fileIdentity(for: url)
     }
@@ -371,11 +489,13 @@ private actor AudioWaveformRepository {
     } onCancel: {
       identityTask.cancel()
     }
-    let key = AudioWaveformCacheKey(file: identity, sampleCount: sampleCount)
+    let key = AudioWaveformCacheKey(file: identity, sampleCount: sampleCount, range: range)
     if let cached = cache[key] { return cached }
 
     let decodeTask = Task.detached(priority: .utility) {
-      try AudioWaveformDecoder.decode(url: url, sampleCount: sampleCount)
+      try AudioWaveformReader.read(
+        url: url, sampleCount: sampleCount, startTime: range?.lowerBound, endTime: range?.upperBound
+      )
     }
     let waveform = try await withTaskCancellationHandler {
       try await decodeTask.value
@@ -387,7 +507,7 @@ private actor AudioWaveformRepository {
     return waveform
   }
 
-  private func insert(_ waveform: AudioWaveform, for key: AudioWaveformCacheKey) {
+  private func insert(_ waveform: AudioWaveformReadResult, for key: AudioWaveformCacheKey) {
     if let replaced = cache.updateValue(waveform, forKey: key) {
       cachedSampleCount -= replaced.samples.count
       insertionOrder.removeAll { $0 == key }
@@ -417,75 +537,4 @@ private enum AudioWaveformDecoder {
     )
   }
 
-  static func decode(url: URL, sampleCount: Int) throws -> AudioWaveform {
-    let file = try AVAudioFile(forReading: url)
-    let frameCount = file.length
-    guard frameCount > 0 else { throw AudioPreviewError.emptyAudio }
-
-    let format = file.processingFormat
-    guard format.channelCount > 0, format.sampleRate > 0 else {
-      throw AudioPreviewError.unsupportedPCM
-    }
-
-    let readCapacity = AVAudioFrameCount(min(Int64(65_536), frameCount))
-    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: readCapacity) else {
-      throw AudioPreviewError.unsupportedPCM
-    }
-
-    var bucketEnergy = [Double](repeating: 0, count: sampleCount)
-    var bucketFrameCounts = [Int](repeating: 0, count: sampleCount)
-    var frameOffset: AVAudioFramePosition = 0
-
-    while frameOffset < frameCount {
-      try Task.checkCancellation()
-      let framesToRead = AVAudioFrameCount(min(Int64(readCapacity), frameCount - frameOffset))
-      try file.read(into: buffer, frameCount: framesToRead)
-      let framesRead = Int(buffer.frameLength)
-      guard framesRead > 0 else { break }
-
-      if let channels = buffer.floatChannelData {
-        for localFrame in 0..<framesRead {
-          let absoluteFrame = frameOffset + AVAudioFramePosition(localFrame)
-          let bucket = min(
-            Int(Double(absoluteFrame) / Double(frameCount) * Double(sampleCount)),
-            sampleCount - 1
-          )
-          var frameEnergy = 0.0
-          for channel in 0..<Int(format.channelCount) {
-            let candidate = Double(channels[channel][localFrame])
-            frameEnergy += candidate * candidate
-          }
-          bucketEnergy[bucket] += frameEnergy / Double(format.channelCount)
-          bucketFrameCounts[bucket] += 1
-        }
-      } else {
-        throw AudioPreviewError.unsupportedPCM
-      }
-
-      frameOffset += AVAudioFramePosition(framesRead)
-    }
-
-    var samples = zip(bucketEnergy, bucketFrameCounts).map { energy, count in
-      count > 0 ? Float(sqrt(energy / Double(count))) : 0
-    }
-    let maximum = samples.max() ?? 0
-    if maximum > 0 {
-      samples = samples.map { sample in
-        sqrt(min(sample / maximum, 1))
-      }
-    }
-
-    if samples.count > 2 {
-      var smoothed = samples
-      for index in 1..<(samples.count - 1) {
-        smoothed[index] = (samples[index - 1] + samples[index] * 2 + samples[index + 1]) / 4
-      }
-      samples = smoothed
-    }
-
-    return AudioWaveform(
-      samples: samples,
-      duration: Double(frameCount) / format.sampleRate
-    )
-  }
 }

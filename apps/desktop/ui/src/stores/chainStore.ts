@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings } from '../api/types';
+import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings, AutomationBinding } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
 import { usePluginStore } from './pluginStore';
@@ -53,6 +53,7 @@ interface ChainStoreState {
 
   // Per-node meter data (keyed by ChainNodeId as string)
   nodeMeterData: Record<string, NodeMeterReadings>;
+  automationByNode: Record<string, AutomationBinding[]>;
 }
 
 interface ChainActions {
@@ -69,6 +70,12 @@ interface ChainActions {
   removeNode: (nodeId: number) => Promise<boolean>;
   moveNode: (nodeId: number, newParentId: number, newIndex: number) => Promise<boolean>;
   toggleNodeBypass: (nodeId: number) => Promise<void>;
+  setNodeSuspended: (nodeId: number, suspended: boolean) => Promise<void>;
+  setNodeRecallSafe: (nodeId: number, recallSafe: boolean) => Promise<void>;
+  setNodeIgnoreLatency: (nodeId: number, ignoreLatency: boolean) => Promise<void>;
+  fetchAutomationBindings: (nodeId: number) => Promise<void>;
+  assignAutomation: (nodeId: number, parameterIndex: number) => Promise<boolean>;
+  unassignAutomation: (nodeId: number, proxyId: string) => Promise<boolean>;
   duplicateNode: (nodeId: number) => Promise<boolean>;
 
   // Group operations
@@ -81,6 +88,7 @@ interface ChainActions {
   setBranchGain: (nodeId: number, gainDb: number) => Promise<void>;
   setBranchSolo: (nodeId: number, solo: boolean) => Promise<void>;
   setBranchMute: (nodeId: number, mute: boolean) => Promise<void>;
+  setBranchPolarity: (nodeId: number, inverted: boolean) => Promise<void>;
 
   // Editor management
   openPluginEditor: (nodeId: number) => Promise<void>;
@@ -209,6 +217,7 @@ const initialState: ChainStoreState = {
   snapshots: [null, null, null],
   activeSnapshot: null,
   nodeMeterData: {},
+  automationByNode: {},
 };
 
 export const useChainStore = create<ChainStoreState & ChainActions>((set, get) => ({
@@ -570,6 +579,50 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
+  setNodeSuspended: async (nodeId: number, suspended: boolean) => {
+    const result = await juceBridge.setNodeSuspended(nodeId, suspended);
+    if (result.chainState) set(applyState(result.chainState));
+    else if (!result.success) set({ error: result.error || 'Failed to update suspend state' });
+  },
+
+  setNodeRecallSafe: async (nodeId: number, recallSafe: boolean) => {
+    const result = await juceBridge.setNodeRecallSafe(nodeId, recallSafe);
+    if (result.chainState) set(applyState(result.chainState));
+    else if (!result.success) set({ error: result.error || 'Failed to update recall-safe lock' });
+  },
+
+  setNodeIgnoreLatency: async (nodeId: number, ignoreLatency: boolean) => {
+    const result = await juceBridge.setNodeIgnoreLatency(nodeId, ignoreLatency);
+    if (result.chainState) set(applyState(result.chainState));
+    else if (!result.success) set({ error: result.error || 'Failed to update latency setting' });
+  },
+
+  fetchAutomationBindings: async (nodeId: number) => {
+    try {
+      const result = await juceBridge.getAutomationBindings(nodeId);
+      if (result.success) set((state) => ({ automationByNode: { ...state.automationByNode, [nodeId]: result.bindings || [] } }));
+      else set({ error: result.error || 'Failed to read automation bindings' });
+    } catch (err) { set({ error: String(err) }); }
+  },
+
+  assignAutomation: async (nodeId: number, parameterIndex: number) => {
+    try {
+      const result = await juceBridge.assignAutomation(nodeId, parameterIndex);
+      if (!result.success) { set({ error: result.error || 'Failed to expose parameter' }); return false; }
+      await get().fetchAutomationBindings(nodeId);
+      return true;
+    } catch (err) { set({ error: String(err) }); return false; }
+  },
+
+  unassignAutomation: async (nodeId: number, proxyId: string) => {
+    try {
+      const result = await juceBridge.unassignAutomation(proxyId);
+      if (!result.success) { set({ error: result.error || 'Failed to remove automation' }); return false; }
+      await get().fetchAutomationBindings(nodeId);
+      return true;
+    } catch (err) { set({ error: String(err) }); return false; }
+  },
+
   // =============================================
   // Group operations
   // =============================================
@@ -688,6 +741,19 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     get()._pushHistory();
     try {
       const result = await juceBridge.setBranchMute(nodeId, mute);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  setBranchPolarity: async (nodeId: number, inverted: boolean) => {
+    get()._pushHistory();
+    try {
+      const result = await juceBridge.setBranchPolarity(nodeId, inverted);
       if (result.success && result.chainState) {
         const chainState = result.chainState as ChainStateV2;
         set(applyState(chainState));

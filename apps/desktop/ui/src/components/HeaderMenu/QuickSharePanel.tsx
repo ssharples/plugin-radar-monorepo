@@ -21,7 +21,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
 
   if (!isLoggedIn) {
     return (
-      <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up p-4">
+      <div className="w-72 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up p-4">
         <div className="text-center">
           <AlertCircle className="w-5 h-5 text-plugin-dim mx-auto mb-2" />
           <p className="text-xs text-plugin-muted">Log in to share chains</p>
@@ -32,7 +32,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
 
   if (slots.length === 0) {
     return (
-      <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up p-4">
+      <div className="w-72 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up p-4">
         <div className="text-center">
           <AlertCircle className="w-5 h-5 text-plugin-dim mx-auto mb-2" />
           <p className="text-xs text-plugin-muted">Add plugins before sharing</p>
@@ -136,12 +136,12 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
   const isBusy = status === 'saving' || status === 'sending';
 
   return (
-    <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up">
+    <div className="w-72 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-plugin-border">
         <div className="flex items-center gap-2">
           <Send className="w-3.5 h-3.5 text-plugin-accent" />
-          <span className="text-xs font-mono uppercase font-semibold text-plugin-text">Share Chain</span>
+          <span className="text-xs  uppercase font-semibold text-plugin-text">Share Chain</span>
         </div>
         <button onClick={onClose} className="text-plugin-dim hover:text-plugin-text">
           <X className="w-3.5 h-3.5" />
@@ -151,7 +151,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
       <div className="p-4 space-y-3">
         {/* Recipient input */}
         <div>
-          <label className="block text-[10px] font-mono text-plugin-dim mb-1">Send to</label>
+          <label className="block text-[11px]  text-plugin-dim mb-1">Send to</label>
           <input
             type="text"
             value={recipient}
@@ -159,39 +159,39 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
             onKeyDown={handleKeyDown}
             placeholder="Username, email, phone, or @instagram"
             disabled={isBusy}
-            className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent disabled:opacity-50"
+            className="w-full bg-plugin-bg border border-plugin-border rounded  px-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent disabled:opacity-50"
             autoFocus
           />
         </div>
 
         {/* Chain preview */}
         <div className="bg-black/20 rounded px-2.5 py-1.5">
-          <div className="text-[10px] text-plugin-dim">
+          <div className="text-[11px] text-plugin-dim">
             {chainName} ({slots.length} plugin{slots.length !== 1 ? 's' : ''})
           </div>
         </div>
 
         {/* Status messages */}
         {status === 'saving' && (
-          <div className="flex items-center gap-1.5 text-[10px] text-plugin-muted">
+          <div className="flex items-center gap-1.5 text-[11px] text-plugin-muted">
             <Loader2 className="w-3 h-3 animate-spin" />
             Saving chain to cloud...
           </div>
         )}
         {status === 'sending' && (
-          <div className="flex items-center gap-1.5 text-[10px] text-plugin-muted">
+          <div className="flex items-center gap-1.5 text-[11px] text-plugin-muted">
             <Loader2 className="w-3 h-3 animate-spin" />
             Sending to {recipient}...
           </div>
         )}
         {status === 'success' && (
-          <div className="flex items-center gap-1.5 text-[10px] text-green-400">
+          <div className="flex items-center gap-1.5 text-[11px] text-green-400">
             <Check className="w-3 h-3" />
             Chain sent!
           </div>
         )}
         {status === 'error' && (
-          <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
+          <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
             {errorMsg}
           </div>
         )}
@@ -200,7 +200,7 @@ export function QuickSharePanel({ onClose }: QuickSharePanelProps) {
         <button
           onClick={handleShare}
           disabled={isBusy || !recipient.trim()}
-          className="w-full flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded px-3 py-1.5 text-[11px] font-mono uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded px-3 py-1.5 text-xs  uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Send className="w-3 h-3" />
           Send

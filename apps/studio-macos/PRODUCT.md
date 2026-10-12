@@ -57,6 +57,16 @@ Studio Time Machine turns a producer's existing Ableton archive into a navigable
 - Copy/source matching is staged and on demand: same-name/size candidates receive bounded quick digests, and full SHA-256 runs only after quick agreement. Exact duplicates may support a collected-copy classification; lower-confidence source suggestions remain reviewable, and user decisions are durable overrides.
 - Zero usage is worded as “no indexed use” whenever project or sample coverage is incomplete. Duplicate/storage insights are read-only and expose no delete, move, or rewrite actions.
 
+### Find and reuse project contents
+
+- Opening a Song should answer what is in the project and what the producer can use next. Show tracks, referenced source audio and ordered devices before archive history.
+- Versions chooses the exact source Set. Audio files covers the selected physical Session folder across its saved versions; it must not imply that every file belongs to the selected revision.
+- Auditioning and dragging source audio transfers the existing file. Clip offsets, edits, fades, warping, automation, routing and devices are not rendered into that file by Studio Time Machine.
+- The floating player can select an excerpt of its current audio file, audition or loop it, zoom its waveform, and create a separate clip. Copy Clip reviews the source and In/Out range inline, exposes the full local destination through Location, and creates a verified, frame-aligned 32-bit float WAV without overwriting any existing file. Clips preserve source sample rate and mono/stereo channels, with no automatic normalisation or fades. Approximate source previews retain that label in clip filenames.
+- Copied clips remain in the local Studio Clips folder because another app may reference the file. The clipboard contains a file URL and Drag Clip exposes the same WAV. External Command-V insertion into Ableton Live is unverified; file dragging is the documented Live transfer route. No implicit upload or source-project rewrite occurs.
+- Track and device-chain reuse can guide the user through Ableton Live's Browser using the exact Set and track name. Keep the destination Set open. This is a user-completed Live workflow, not native chain insertion or a generated rack export.
+- Take-lane-only recordings, individual clip evidence, device resource files and detailed history should expand near their context. Search must work on track, clip, sample-file and device names.
+
 ### Project and version history
 
 - A `SetTimeline` groups a current Set with timestamped files from Ableton's `Backup` directory. Versions are newest first.

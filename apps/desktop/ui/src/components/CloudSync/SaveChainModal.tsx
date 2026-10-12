@@ -64,14 +64,14 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-        <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
-          <h2 className="text-xl font-bold text-white mb-4">Sign In Required</h2>
-          <p className="text-gray-400 mb-4">
+        <div className="bg-plugin-surface rounded-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <h2 className="text-xl font-bold text-plugin-text mb-4">Sign In Required</h2>
+          <p className="text-plugin-muted mb-4">
             Connect to PluginRadar to save and share your chains.
           </p>
           <button
             onClick={onClose}
-            className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-2"
+            className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text rounded px-4 py-2"
           >
             Close
           </button>
@@ -83,30 +83,30 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
   if (savedResult) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-        <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-plugin-surface rounded-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
           <div className="text-center">
             <div className="text-4xl mb-4">🎉</div>
-            <h2 className="text-xl font-bold text-white mb-2">Chain Saved!</h2>
-            <p className="text-gray-400 mb-4">
+            <h2 className="text-xl font-bold text-plugin-text mb-2">Chain Saved!</h2>
+            <p className="text-plugin-muted mb-4">
               Your chain has been saved to PluginRadar.
             </p>
             
             <div className="bg-black/30 rounded-lg p-4 mb-4">
-              <div className="text-sm text-gray-400 mb-1">Share Code</div>
-              <div className="text-2xl font-mono font-bold text-plugin-accent">
+              <div className="text-sm text-plugin-muted mb-1">Share Code</div>
+              <div className="text-2xl  font-bold text-plugin-accent">
                 {savedResult.shareCode}
               </div>
             </div>
             
             {isPublic && (
-              <div className="text-sm text-gray-400 mb-4">
+              <div className="text-sm text-plugin-muted mb-4">
                 View at: <span className="text-plugin-accent">plugin-radar.com/chains/{savedResult.slug}</span>
               </div>
             )}
             
             <button
               onClick={onClose}
-              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-white rounded px-4 py-2"
+              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text rounded px-4 py-2"
             >
               Done
             </button>
@@ -118,8 +118,8 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-      <div className="bg-plugin-surface rounded-propane-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold text-white mb-4">Save Chain to Cloud</h2>
+      <div className="bg-plugin-surface rounded-lg p-6 max-w-md w-full mx-4 border border-plugin-accent animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-bold text-plugin-text mb-4">Save Chain to Cloud</h2>
         
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 rounded p-3 mb-4 text-red-400 text-sm">
@@ -129,34 +129,34 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Chain Name *</label>
+            <label className="block text-sm text-plugin-muted mb-1">Chain Name *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My Vocal Chain"
               required
-              className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white"
+              className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text"
             />
           </div>
           
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Description</label>
+            <label className="block text-sm text-plugin-muted mb-1">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this chain good for?"
               rows={2}
-              className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white resize-none"
+              className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text resize-none"
             />
           </div>
           
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Category</label>
+            <label className="block text-sm text-plugin-muted mb-1">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white"
+              className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text"
             >
               {CATEGORIES.map(cat => (
                 <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -165,13 +165,13 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
           </div>
           
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Tags (comma separated)</label>
+            <label className="block text-sm text-plugin-muted mb-1">Tags (comma separated)</label>
             <input
               type="text"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="warm, punchy, vintage"
-              className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white"
+              className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text"
             />
           </div>
           
@@ -189,10 +189,10 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
           </div>
           
           <div className="bg-black/20 rounded p-3">
-            <div className="text-sm text-gray-400 mb-2">Chain Preview</div>
-            <div className="text-sm text-white">
+            <div className="text-sm text-plugin-muted mb-2">Chain Preview</div>
+            <div className="text-sm text-plugin-text">
               {slots.length} plugin{slots.length !== 1 ? 's' : ''}:{' '}
-              <span className="text-gray-400">
+              <span className="text-plugin-muted">
                 {slots.map(s => s.name).join(' → ')}
               </span>
             </div>
@@ -202,7 +202,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-plugin-border text-gray-400 hover:text-white rounded px-4 py-2"
+              className="flex-1 border border-plugin-border text-plugin-muted hover:text-plugin-text rounded px-4 py-2"
             >
               Cancel
             </button>
@@ -212,7 +212,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
               className={`flex-1 rounded px-4 py-2 font-medium ${
                 saving
                   ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-                  : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
+                  : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
               }`}
             >
               {saving ? 'Saving...' : 'Save Chain'}

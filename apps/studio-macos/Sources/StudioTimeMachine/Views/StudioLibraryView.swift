@@ -7,6 +7,8 @@ struct StudioLibraryView: View {
   @AppStorage("studio.libraryDensity") private var density = LibraryDensity.spacious.rawValue
   @AppStorage("studio.libraryPresentation") private var presentation =
     LibraryPresentation.list.rawValue
+  @State private var focus: LibraryFocus = .all
+  @State private var sort: LibrarySort = .lastSaved
 
   private var columns: [GridItem] {
     let compact = store.isDenseSample || density == LibraryDensity.compact.rawValue
@@ -18,37 +20,38 @@ struct StudioLibraryView: View {
   }
 
   var body: some View {
+    let works = filteredWorks
     ScrollView {
-      VStack(alignment: .leading, spacing: 34) {
+      VStack(alignment: .leading, spacing: 24) {
         libraryHeader
+        browseControls
 
         if !store.isSampleLibrary, store.isRebuildingOrganisation, store.visibleWorks.isEmpty {
           ProgressView("Organising Songs from your studio evidence…")
             .frame(maxWidth: .infinity, minHeight: 380)
-        } else if store.isSampleLibrary ? store.visibleProjects.isEmpty : store.visibleWorks.isEmpty
-        {
+        } else if store.visibleWorks.isEmpty {
           ContentUnavailableView(
             "No Songs found",
             systemImage: "square.stack.3d.up.slash",
             description: Text("Choose another Ableton folder or rescan this location.")
           )
           .frame(maxWidth: .infinity, minHeight: 380)
-        } else if !store.isSampleLibrary, currentPresentation == .list {
-          StudioLibraryProjectListView(works: store.visibleWorks, store: store)
+        } else if works.isEmpty {
+          ContentUnavailableView {
+            Label(focus.emptyTitle, systemImage: focus.symbol)
+          } description: {
+            Text(focus.emptyDescription)
+          } actions: {
+            Button("Show all Songs") { focus = .all }
+              .buttonStyle(StudioCanvasButtonStyle(kind: .secondary))
+          }
+          .frame(maxWidth: .infinity, minHeight: 300)
+        } else if currentPresentation == .list {
+          StudioLibraryProjectListView(works: works, store: store)
         } else {
           LazyVGrid(columns: columns, alignment: .leading, spacing: 34) {
-            if store.isSampleLibrary {
-              ForEach(store.visibleProjects) { project in
-                ProjectTile(
-                  project: project,
-                  open: { store.selectProject(project) },
-                  reveal: { store.revealInFinder(project.rootURL) }
-                )
-              }
-            } else {
-              ForEach(store.visibleWorks) { work in
-                WorkTile(work: work, open: { store.selectWork(work) })
-              }
+            ForEach(works) { work in
+              WorkTile(work: work, open: { store.selectWork(work) })
             }
           }
         }
@@ -93,11 +96,8 @@ struct StudioLibraryView: View {
           .accessibilityLabel(updateStatusText)
         }
 
-        if !store.isSampleLibrary {
-          LibraryPresentationControl(selection: $presentation)
-        }
-
-        if store.isSampleLibrary || currentPresentation == .grid {
+        LibraryPresentationControl(selection: $presentation)
+        if currentPresentation == .grid {
           Menu {
             Picker("Library density", selection: $density) {
               ForEach(LibraryDensity.allCases) { density in
@@ -111,6 +111,77 @@ struct StudioLibraryView: View {
           .fixedSize()
         }
       }
+    }
+  }
+
+  private var browseControls: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 16) {
+        focusControl
+        Spacer(minLength: 12)
+        sortControl
+      }
+      .frame(height: 28)
+      Text(
+        focus == .organise
+          ? "Review suggested groupings and assign an Artist. Your files stay where they are."
+          : "Open a Song to continue. Expand its Set files when you need the details."
+      )
+      .font(.callout)
+      .foregroundStyle(StudioShellPalette.mutedInk)
+    }
+  }
+
+  private var focusControl: some View {
+    Picker("Show Songs", selection: $focus) {
+      ForEach(LibraryFocus.allCases) { option in
+        Text(option.title).tag(option)
+      }
+    }
+    .pickerStyle(.segmented)
+    .frame(width: 326)
+  }
+
+  private var sortControl: some View {
+    Menu {
+      Picker("Sort Songs", selection: $sort) {
+        ForEach(LibrarySort.allCases) { option in
+          Text(option.title).tag(option)
+        }
+      }
+    } label: {
+      Label(sort.title, systemImage: "arrow.up.arrow.down")
+        .font(.callout)
+    }
+    .menuStyle(.borderlessButton)
+    .fixedSize()
+    .accessibilityLabel("Sort Songs: \(sort.title)")
+  }
+
+  private var filteredWorks: [StudioWork] {
+    let recentIDs = Set(store.recentWorkIDs)
+    let dates = Dictionary(
+      uniqueKeysWithValues: store.visibleWorks.map { work in
+        (
+          work.id,
+          work.sessions.flatMap(\.revisions)
+            .compactMap { $0.timestamp.value ?? $0.set.modifiedAt }.max() ?? .distantPast
+        )
+      })
+    return store.visibleWorks.filter { work in
+      switch focus {
+      case .all: true
+      case .recent: recentIDs.contains(work.id)
+      case .organise:
+        work.artist.displayName == "Unknown"
+          || work.confidence == .suggested || work.confidence == .unresolved
+      }
+    }.sorted { left, right in
+      if sort == .lastSaved, dates[left.id] != dates[right.id] {
+        return (dates[left.id] ?? .distantPast) > (dates[right.id] ?? .distantPast)
+      }
+      let comparison = left.displayName.localizedStandardCompare(right.displayName)
+      return comparison == .orderedSame ? left.id < right.id : comparison == .orderedAscending
     }
   }
 
@@ -130,13 +201,13 @@ struct StudioLibraryView: View {
   }
 
   private var summaryText: String {
-    if !store.isSampleLibrary, let catalog = store.workCatalog {
+    if let catalog = store.workCatalog {
       let sessionCount = catalog.works.reduce(0) { $0 + $1.sessions.count }
       let revisionCount = catalog.works.reduce(0) {
         $0 + $1.sessions.reduce(0) { $0 + $1.revisions.count }
       }
       return
-        "\(catalog.works.count) Songs · \(sessionCount) Sessions · \(revisionCount) Set Revisions"
+        "\(catalog.works.count) Song\(catalog.works.count == 1 ? "" : "s") · \(sessionCount) Session\(sessionCount == 1 ? "" : "s") · \(revisionCount) Set Revisions"
     }
     let timelineCount = index.projects.reduce(0) { $0 + $1.timelines.count }
     let setCount = index.projects.reduce(0) { $0 + $1.sets.count }
@@ -211,9 +282,11 @@ private struct WorkTile: View {
           Text(work.artist.displayName == "Unknown" ? "Unassigned Artist" : work.artist.displayName)
             .font(.callout.weight(.medium))
             .foregroundStyle(work.artist.displayName == "Unknown" ? .orange : .secondary)
-          Text("\(work.sessions.count) Sessions · \(revisionCount) Set Revisions")
-            .font(.callout)
-            .foregroundStyle(.secondary)
+          Text(
+            "\(work.sessions.count) Session\(work.sessions.count == 1 ? "" : "s") · \(revisionCount) Set Revisions"
+          )
+          .font(.callout)
+          .foregroundStyle(.secondary)
           if let latestDate {
             Text("Latest \(latestDate.formatted(date: .abbreviated, time: .omitted))")
               .font(.caption)
@@ -226,51 +299,35 @@ private struct WorkTile: View {
     .buttonStyle(.plain)
     .onHover { isHovered = $0 }
     .accessibilityLabel(
-      "\(work.displayName), \(work.artist.displayName), \(work.sessions.count) Sessions"
+      "\(work.displayName), \(work.artist.displayName == "Unknown" ? "Unassigned Artist" : work.artist.displayName), \(work.sessions.count) Session\(work.sessions.count == 1 ? "" : "s")"
     )
     .accessibilityHint("Open Song and related Sessions")
   }
 }
 
-private struct ProjectTile: View {
-  let project: StudioProject
-  let open: () -> Void
-  let reveal: () -> Void
-  @State private var isHovered = false
-
-  var body: some View {
-    Button(action: open) {
-      VStack(alignment: .leading, spacing: 12) {
-        ProjectObjectView(
-          identity: project.displayName,
-          size: 170,
-          showsDisc: true,
-          isHovered: isHovered
-        )
-        .frame(maxWidth: .infinity, alignment: .center)
-
-        VStack(alignment: .leading, spacing: 4) {
-          Text(project.displayName)
-            .font(.headline)
-            .foregroundStyle(.primary)
-            .lineLimit(1)
-          Text("\(project.timelines.count) timelines · \(project.setCount) Sets")
-            .font(.callout)
-            .foregroundStyle(.secondary)
-          Text(project.latestModifiedText)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .onHover { isHovered = $0 }
-    .accessibilityLabel("\(project.displayName), \(project.setCount) Sets")
-    .accessibilityHint("Open project timeline")
-    .contextMenu {
-      Button("Open Project", action: open)
-      Button("Reveal in Finder", action: reveal)
+private enum LibraryFocus: String, CaseIterable, Identifiable {
+  case all, recent, organise
+  var id: String { rawValue }
+  var title: String {
+    switch self {
+    case .all: "All Songs"
+    case .recent: "Recently opened"
+    case .organise: "Needs organising"
     }
   }
+  var symbol: String { self == .organise ? "checkmark.circle" : "clock" }
+  var emptyTitle: String {
+    self == .organise ? "No organisation reviews needed" : "Your next session starts here"
+  }
+  var emptyDescription: String {
+    self == .organise
+      ? "No unassigned Artists or suggested groupings in this indexed library."
+      : "Open a Song from your library and find it here next time."
+  }
+}
+
+private enum LibrarySort: String, CaseIterable, Identifiable {
+  case lastSaved, name
+  var id: String { rawValue }
+  var title: String { self == .lastSaved ? "Last saved" : "Song name" }
 }

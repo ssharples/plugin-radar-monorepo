@@ -15,15 +15,18 @@ void AudioMeter::prepareToPlay(double newSampleRate, int newSamplesPerBlock)
     float rmsTimeConstant = 0.3f;
     rmsCoeff = 1.0f - std::exp(-1.0f / (static_cast<float>(sampleRate) * rmsTimeConstant));
 
-    // LUFS buffer for 3s short-term window (per ITU-R BS.1770-4)
-    lufsBufferSize = static_cast<int>(sampleRate * LufsWindowMs / 1000.0);
-    lufsBufferL.resize(lufsBufferSize, 0.0f);
-    lufsBufferR.resize(lufsBufferSize, 0.0f);
+    // Peak-only meters do not retain a loudness history.
+    lufsBufferSize = analysisMode == AnalysisMode::full
+        ? static_cast<int>(sampleRate * LufsWindowMs / 1000.0) : 0;
+    lufsBufferL.resize(static_cast<size_t>(lufsBufferSize), 0.0f);
+    lufsBufferR.resize(static_cast<size_t>(lufsBufferSize), 0.0f);
     lufsWritePos = 0;
+    lufsSumL = 0.0;
+    lufsSumR = 0.0;
 
     // Pre-allocate scratch buffers for K-weighting (used on audio thread)
     // Over-allocate 2x to handle hosts that occasionally exceed samplesPerBlock
-    kWeightScratchSize = newSamplesPerBlock * 2;
+    kWeightScratchSize = std::max(1, newSamplesPerBlock * 2);
     kWeightScratchL.resize(kWeightScratchSize, 0.0f);
     kWeightScratchR.resize(kWeightScratchSize, 0.0f);
 
@@ -74,8 +77,6 @@ void AudioMeter::process(const juce::AudioBuffer<float>& buffer)
     // Find peaks and calculate RMS
     float blockPeakL = 0.0f;
     float blockPeakR = 0.0f;
-    float sumSquaresL = 0.0f;
-    float sumSquaresR = 0.0f;
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -85,8 +86,6 @@ void AudioMeter::process(const juce::AudioBuffer<float>& buffer)
         blockPeakL = std::max(blockPeakL, absL);
         blockPeakR = std::max(blockPeakR, absR);
 
-        sumSquaresL += leftChannel[i] * leftChannel[i];
-        sumSquaresR += rightChannel[i] * rightChannel[i];
     }
 
     // Update peak with instant attack
@@ -133,52 +132,78 @@ void AudioMeter::process(const juce::AudioBuffer<float>& buffer)
     peakHoldL.store(currentHoldL, std::memory_order_relaxed);
     peakHoldR.store(currentHoldR, std::memory_order_relaxed);
 
-    // Update RMS (exponential moving average)
-    float blockRmsL = std::sqrt(sumSquaresL / static_cast<float>(numSamples));
-    float blockRmsR = std::sqrt(sumSquaresR / static_cast<float>(numSamples));
+    if (analysisMode == AnalysisMode::peakOnly) return;
 
-    rmsAccumL += rmsCoeff * (blockRmsL - rmsAccumL);
-    rmsAccumR += rmsCoeff * (blockRmsR - rmsAccumR);
+    // Update RMS (exponential moving average)
+    // Integrate power per sample. This makes the response independent of host
+    // callback boundaries (the old block EMA changed with block size).
+    const double sampleAlpha = 1.0 - std::exp(-1.0 / (sampleRate * 0.3));
+    for (int i = 0; i < numSamples; ++i)
+    {
+        rmsAccumL += sampleAlpha * (static_cast<double>(leftChannel[i]) * leftChannel[i] - rmsAccumL);
+        rmsAccumR += sampleAlpha * (static_cast<double>(rightChannel[i]) * rightChannel[i] - rmsAccumR);
+    }
 
     rmsL.store(rmsAccumL, std::memory_order_relaxed);
     rmsR.store(rmsAccumR, std::memory_order_relaxed);
 
-    // K-weighted LUFS calculation
-    // Use pre-allocated scratch buffers (sized in prepareToPlay)
-    // If block is larger than expected, clamp to scratch size to stay lock-free
-    const int kWeightSamples = std::min(numSamples, kWeightScratchSize);
+    if (analysisMode == AnalysisMode::peakOnly || lufsBufferSize <= 0)
+        return;
 
-    processKWeighting(leftChannel, kWeightScratchL.data(), kWeightSamples, 0);
-    processKWeighting(rightChannel, kWeightScratchR.data(), kWeightSamples, 1);
-
-    // Add K-weighted squared samples to ring buffer
-    for (int i = 0; i < kWeightSamples; ++i)
+    // Process in bounded chunks, retaining every sample even when the host
+    // supplies a block larger than the prepared size.
+    int offset = 0;
+    while (offset < numSamples)
     {
-        lufsBufferL[lufsWritePos] = kWeightScratchL[i] * kWeightScratchL[i];
-        lufsBufferR[lufsWritePos] = kWeightScratchR[i] * kWeightScratchR[i];
-        lufsWritePos = (lufsWritePos + 1) % lufsBufferSize;
-    }
-
-    // Calculate mean square over the window
-    float sumL = 0.0f;
-    float sumR = 0.0f;
-    for (int i = 0; i < lufsBufferSize; ++i)
-    {
-        sumL += lufsBufferL[i];
-        sumR += lufsBufferR[i];
+        const int count = std::min(numSamples - offset, kWeightScratchSize);
+        processKWeighting(leftChannel + offset, kWeightScratchL.data(), count, 0);
+        processKWeighting(rightChannel + offset, kWeightScratchR.data(), count, 1);
+        for (int i = 0; i < count; ++i)
+        {
+            const float l = kWeightScratchL[static_cast<size_t>(i)];
+            const float r = kWeightScratchR[static_cast<size_t>(i)];
+            lufsSumL -= lufsBufferL[static_cast<size_t>(lufsWritePos)];
+            lufsSumR -= lufsBufferR[static_cast<size_t>(lufsWritePos)];
+            const float powerL = l * l, powerR = r * r;
+            lufsBufferL[static_cast<size_t>(lufsWritePos)] = powerL;
+            lufsBufferR[static_cast<size_t>(lufsWritePos)] = powerR;
+            // Add exactly the stored value that will later expire. Mixing a
+            // double product with rounded float history introduces long-run drift.
+            lufsSumL += static_cast<double>(powerL);
+            lufsSumR += static_cast<double>(powerR);
+            lufsWritePos = (lufsWritePos + 1) % lufsBufferSize;
+        }
+        offset += count;
     }
 
     // LUFS = -0.691 + 10 * log10(sum of weighted channel powers)
     // For stereo: L and R have equal weight (1.0)
-    float meanSquare = (sumL + sumR) / (2.0f * static_cast<float>(lufsBufferSize));
+    // BS.1770 sums the equally weighted stereo channel powers; do not divide
+    // by two a second time.
+    double meanSquare = (lufsSumL + lufsSumR) / static_cast<double>(lufsBufferSize);
 
     float lufs = -100.0f;
     if (meanSquare > 1e-10f)
     {
-        lufs = -0.691f + 10.0f * std::log10(meanSquare);
+        lufs = -0.691f + 10.0f * static_cast<float>(std::log10(meanSquare));
     }
 
     lufsShort.store(lufs, std::memory_order_relaxed);
+}
+
+void AudioMeter::setAnalysisMode(AnalysisMode mode)
+{
+    if (analysisMode == mode)
+        return;
+    analysisMode = mode;
+    if (lufsBufferSize > 0 || mode == AnalysisMode::full)
+    {
+        lufsBufferSize = mode == AnalysisMode::full
+            ? static_cast<int>(sampleRate * LufsWindowMs / 1000.0) : 0;
+        lufsBufferL.resize(static_cast<size_t>(lufsBufferSize));
+        lufsBufferR.resize(static_cast<size_t>(lufsBufferSize));
+        reset();
+    }
 }
 
 void AudioMeter::processKWeighting(const float* input, float* output, int numSamples, int channel)

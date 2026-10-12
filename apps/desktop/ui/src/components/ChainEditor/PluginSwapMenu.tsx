@@ -49,29 +49,29 @@ function MapSourceIndicator({
   switch (source) {
     case 'manual':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-green-400">
+        <div className="flex items-center gap-1.5 text-[11px] text-green-400">
           <span className="w-2 h-2 rounded-full bg-green-500" />
           Manual map{confidence ? ` (${confidence}%)` : ''}
         </div>
       );
     case 'juce-scanned':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-yellow-400">
+        <div className="flex items-center gap-1.5 text-[11px] text-yellow-400">
           <span className="w-2 h-2 rounded-full bg-yellow-500" />
           Auto-discovered{confidence ? ` (${confidence}%)` : ''}
         </div>
       );
     case 'ai-analyzed':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-plugin-accent">
+        <div className="flex items-center gap-1.5 text-[11px] text-plugin-accent">
           <span className="w-2 h-2 rounded-full bg-plugin-accent" />
           AI-analyzed{confidence ? ` (${confidence}%)` : ''}
         </div>
       );
     case 'none':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-plugin-muted">
-          <span className="w-2 h-2 rounded-full bg-neutral-600" />
+        <div className="flex items-center gap-1.5 text-[11px] text-plugin-muted">
+          <span className="w-2 h-2 rounded-full bg-plugin-border-bright" />
           No map yet
           {onScan && (
             <button
@@ -358,7 +358,7 @@ export function PluginSwapMenu({
       {/* Footer */}
       {swaps.length > 0 && (
         <div className="px-3 py-1.5 border-t border-plugin-border bg-plugin-bg/50">
-          <p className="text-[10px] text-plugin-muted/50">
+          <p className="text-[11px] text-plugin-muted/50">
             🟢 &gt;80% • 🟡 50-80% • 🔴 &lt;50% match confidence
           </p>
         </div>

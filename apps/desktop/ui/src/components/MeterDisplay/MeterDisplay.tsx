@@ -44,7 +44,7 @@ function MeterBar({
   return (
     <div
       className="relative rounded-sm overflow-hidden shadow-meter"
-      style={{ width, height, background: '#000000' }}
+      style={{ width, height, background: '#0c0d10' }}
     >
       {/* Segment lines for pro look */}
       <div
@@ -124,11 +124,11 @@ export function MeterDisplay({
     <div className="flex" style={{ height }}>
       {/* Scale markings */}
       {showScale && (
-        <div className="relative font-mono pr-1" style={{ width: 16, height }}>
+        <div className="relative  pr-1" style={{ width: 16, height }}>
           {scaleMarks.map((db) => (
             <div
               key={db}
-              className="absolute right-1 transform -translate-y-1/2 text-[9px] text-plugin-dim"
+              className="absolute right-1 transform -translate-y-1/2 text-[10px] text-plugin-dim"
               style={{ bottom: `${dbToPercent(db)}%` }}
             >
               {db}

@@ -1,6 +1,8 @@
 #include "ParameterProxyPool.h"
 #include "ProxyParameter.h"
 #include "../core/ChainProcessor.h"
+#include "../core/ChainNode.h"
+#include <thread>
 
 void ParameterProxyPool::createAndRegister(juce::AudioProcessor& processor)
 {
@@ -15,6 +17,12 @@ void ParameterProxyPool::createAndRegister(juce::AudioProcessor& processor)
             processor.addParameter(proxy); // processor takes ownership
         }
     }
+}
+
+ProxyParameter* ParameterProxyPool::getProxy(int hostParameter) noexcept
+{
+    if (hostParameter < 0 || hostParameter >= kMaxSlots * kMaxParamsPerSlot) return nullptr;
+    return proxies[static_cast<size_t>(hostParameter)];
 }
 
 void ParameterProxyPool::bindSlot(int slotIndex, juce::AudioProcessor* childProcessor)
@@ -45,23 +53,88 @@ void ParameterProxyPool::unbindSlot(int slotIndex)
 
 void ParameterProxyPool::rebindAll(ChainProcessor& chain)
 {
-    // Use DFS-flattened plugin list from tree model
     auto plugins = chain.getFlatPluginList();
-    int numPlugins = static_cast<int>(plugins.size());
+    rebindBindings(plugins, [&chain](int index) { return chain.getSlotProcessor(index); });
+}
+
+void ParameterProxyPool::rebindBindings(const std::vector<PluginLeaf*>& plugins,
+                                        const std::function<juce::AudioProcessor*(int)>& resolveProcessor)
+{
+    std::vector<juce::String> ids;
+    ids.reserve(plugins.size());
+    for (auto* leaf : plugins) ids.push_back(leaf != nullptr ? leaf->persistentId : juce::String());
+    bindingManager.migrateLegacy(ids);
+
+    // A missing instance is a lost target, not permission to retarget the host ID.
+    // Keep its assignment as a tombstone until the user explicitly unassigns it.
+    for (int hostParameter = 0; hostParameter < kMaxSlots * kMaxParamsPerSlot; ++hostParameter)
+    {
+        const auto& binding = bindingManager.getBinding(hostParameter);
+        if (!binding.isAssigned()) continue;
+        bool present = false;
+        for (const auto& id : ids)
+            if (id == binding.pluginPersistentId) { present = true; break; }
+        if (!present) bindingManager.markTargetUnavailable(binding.pluginPersistentId);
+    }
 
     for (int i = 0; i < kMaxSlots; ++i)
     {
-        if (i < numPlugins)
+        for (int parameterIndex = 0; parameterIndex < kMaxParamsPerSlot; ++parameterIndex)
         {
-            auto& leaf = *plugins[static_cast<size_t>(i)];
-            if (auto node = chain.getNodeForId(leaf.graphNodeId))
-                bindSlot(i, node->getProcessor());
-            else
-                unbindSlot(i);
-        }
-        else
-        {
-            unbindSlot(i);
+            const int bindingIndex = i * kMaxParamsPerSlot + parameterIndex;
+            const auto& binding = bindingManager.getBinding(bindingIndex);
+            juce::AudioProcessorParameter* selected = nullptr;
+            if (binding.isAssigned())
+            {
+                for (int flatIndex = 0; flatIndex < static_cast<int>(plugins.size()); ++flatIndex)
+                {
+                    auto* leaf = plugins[static_cast<size_t>(flatIndex)];
+                    if (leaf == nullptr || leaf->persistentId != binding.pluginPersistentId) continue;
+                    auto* processor = resolveProcessor(flatIndex);
+                    if (processor == nullptr) break;
+                    bindingManager.markTargetAvailable(binding.pluginPersistentId);
+                    auto& params = processor->getParameters();
+                    if (!binding.parameterId.isEmpty())
+                        for (auto* parameter : params)
+                            if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*>(parameter))
+                                if (hosted->getParameterID() == binding.parameterId)
+                                { selected = parameter; break; }
+                    // An index is only a compatibility fallback for records that
+                    // were saved without a stable child parameter ID. Never let
+                    // a stale ID silently retarget another control.
+                    if (selected == nullptr && binding.parameterId.isEmpty()
+                        && binding.fallbackParameterIndex >= 0
+                        && binding.fallbackParameterIndex < params.size())
+                        selected = params[binding.fallbackParameterIndex];
+                    break;
+                }
+            }
+            auto* proxy = proxies[static_cast<size_t>(bindingIndex)];
+            proxy->bind(selected);
         }
     }
+}
+
+void ParameterProxyPool::unbindAffected(const juce::String& pluginPersistentId)
+{
+    bindingManager.markTargetUnavailable(pluginPersistentId);
+    for (int i = 0; i < kMaxSlots * kMaxParamsPerSlot; ++i)
+        if (bindingManager.getBinding(i).pluginPersistentId == pluginPersistentId)
+            proxies[static_cast<size_t>(i)]->unbind();
+}
+
+bool ParameterProxyPool::isQuiescent() const noexcept
+{
+    for (auto* proxy : proxies) if (proxy != nullptr && !proxy->isQuiescent()) return false;
+    return true;
+}
+
+void ParameterProxyPool::shutdown()
+{
+    for (int i = 0; i < kMaxSlots; ++i) unbindSlot(i);
+    // Shutdown is a control-thread operation. Retiring owners must not be
+    // destroyed until every audio/host reader that entered before unbind has
+    // left its guard. This loop never runs from a proxy callback.
+    while (!isQuiescent())
+        std::this_thread::yield();
 }

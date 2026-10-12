@@ -33,3 +33,12 @@ pnpm-debug.log*
 # Data files (large)
 data/plugins.db
 data/enrichment/
+
+# Plugin quality tooling (dependencies and generated evidence)
+.quality-venv/
+.quality-cache/
+reports/quality/
+**/.stryker-tmp/
+apps/desktop/ui/reports/
+tools/quality/**/__pycache__/
+tools/quality/js/out/

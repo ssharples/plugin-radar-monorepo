@@ -57,14 +57,14 @@ export function LufsDisplay({
     return (
       <div className="flex flex-col items-center min-w-[32px]">
         <div className="flex items-center gap-0.5">
-          <span className={`font-mono text-xxs tabular-nums leading-tight ${getColor(lufs)}`}>
+          <span className={`num text-[11px] leading-tight ${getColor(lufs)}`}>
             {formatLufs(lufs)}
           </span>
           {getDirectionArrow()}
         </div>
-        <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-mono font-medium">LUFS</span>
+        <span className="text-[10px] text-plugin-dim uppercase tracking-wider  font-medium">LUFS</span>
         {target != null && (
-          <span className="text-[9px] text-plugin-dim font-mono leading-none mt-px">
+          <span className="text-[10px] text-plugin-dim  leading-none mt-px">
             ⊕{target}
           </span>
         )}
@@ -75,20 +75,20 @@ export function LufsDisplay({
   return (
     <div className="flex flex-col items-center gap-0.5">
       {label && (
-        <span className="text-[9px] text-plugin-dim uppercase tracking-widest font-mono font-medium">
+        <span className="text-[10px] text-plugin-dim uppercase tracking-widest  font-medium">
           {label}
         </span>
       )}
       <div className="flex items-baseline gap-0.5">
-        <span className={`font-mono text-sm font-medium tabular-nums ${getColor(lufs)}`}>
+        <span className={`num text-sm font-medium ${getColor(lufs)}`}>
           {formatLufs(lufs)}
         </span>
-        <span className="text-[9px] text-plugin-dim font-mono uppercase">LUFS</span>
+        <span className="text-[10px] text-plugin-dim  uppercase">LUFS</span>
         {getDirectionArrow()}
       </div>
       {target != null && (
         <div className="flex items-center gap-1">
-          <span className="text-[9px] text-plugin-dim font-mono uppercase">
+          <span className="text-[10px] text-plugin-dim  uppercase">
             Target: {target}
           </span>
         </div>

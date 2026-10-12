@@ -42,16 +42,16 @@ export function AvatarDropdown({ isOpen, onToggle, onClose }: AvatarDropdownProp
   }, [isLoggedIn]);
 
   return (
-    <div className="relative flex items-center gap-1.5 mr-1">
+    <div className="relative flex items-center">
       <button
         onClick={onToggle}
-        className="relative w-6 h-6 rounded-full flex items-center justify-center transition-all"
+        className="relative w-7 h-7 rounded-full flex items-center justify-center transition-all hover:ring-2 hover:ring-plugin-border-bright"
         title={isLoggedIn ? 'Profile & Notifications' : 'Log in'}
       >
         {isLoggedIn ? (
           <LoggedInAvatar />
         ) : (
-          <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-plugin-raised border border-plugin-border flex items-center justify-center">
             <User className="w-3 h-3 text-plugin-muted" />
           </div>
         )}
@@ -61,7 +61,7 @@ export function AvatarDropdown({ isOpen, onToggle, onClose }: AvatarDropdownProp
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1.5">
+        <div className="absolute right-0 top-full z-50 mt-1.5">
           {isLoggedIn ? (
             <LoggedInPanel onClose={onClose} onBadgeUpdate={setBadgeCount} />
           ) : (
@@ -94,8 +94,8 @@ function LoggedInAvatar() {
   };
 
   return (
-    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-plugin-accent to-plugin-accent-dim flex items-center justify-center">
-      <span className="text-[10px] font-bold text-white leading-none">{initial}</span>
+    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-plugin-accent-bright to-plugin-accent-dim flex items-center justify-center">
+      <span className="text-xs font-bold text-plugin-on-accent leading-none">{initial}</span>
     </div>
   );
 }
@@ -138,12 +138,12 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
   const displayError = localError || error;
 
   return (
-    <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up">
+    <div className="w-72 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up">
       <div className="px-4 py-3 border-b border-plugin-border">
         <div className="flex gap-2">
           <button
             onClick={() => setMode('login')}
-            className={`text-[11px] font-mono uppercase font-semibold px-2 py-0.5 rounded transition-colors ${
+            className={`text-xs  uppercase font-semibold px-2 py-0.5 rounded transition-colors ${
               mode === 'login' ? 'text-plugin-text bg-white/10' : 'text-plugin-dim hover:text-plugin-muted'
             }`}
           >
@@ -151,7 +151,7 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
           </button>
           <button
             onClick={() => setMode('register')}
-            className={`text-[11px] font-mono uppercase font-semibold px-2 py-0.5 rounded transition-colors ${
+            className={`text-xs  uppercase font-semibold px-2 py-0.5 rounded transition-colors ${
               mode === 'register' ? 'text-plugin-text bg-white/10' : 'text-plugin-dim hover:text-plugin-muted'
             }`}
           >
@@ -162,7 +162,7 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
 
       <form onSubmit={handleSubmit} className="p-4 space-y-2.5">
         {displayError && (
-          <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
+          <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
             {displayError}
           </div>
         )}
@@ -173,7 +173,7 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"
-            className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+            className="w-full bg-plugin-bg border border-plugin-border rounded  px-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
           />
         )}
 
@@ -185,7 +185,7 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             required
-            className="w-full bg-black/40 border border-plugin-border rounded font-mono pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+            className="w-full bg-plugin-bg border border-plugin-border rounded  pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
           />
         </div>
 
@@ -197,14 +197,14 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             required
-            className="w-full bg-black/40 border border-plugin-border rounded font-mono pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+            className="w-full bg-plugin-bg border border-plugin-border rounded  pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
           />
         </div>
 
         <button
           type="submit"
           disabled={submitting || !email || !password}
-          className="w-full bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded px-3 py-1.5 text-[11px] font-mono uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded px-3 py-1.5 text-xs  uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Please wait...' : mode === 'login' ? 'Log In' : 'Create Account'}
         </button>
@@ -245,12 +245,12 @@ function LoggedInPanel({ onClose, onBadgeUpdate }: { onClose: () => void; onBadg
   };
 
   return (
-    <div className="w-80 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up max-h-[70vh] flex flex-col">
+    <div className="w-80 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up max-h-[70vh] flex flex-col">
       {/* Tab bar */}
       <div className="flex border-b border-plugin-border flex-shrink-0">
         <button
           onClick={() => setTab('account')}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-mono uppercase font-semibold transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs  uppercase font-semibold transition-colors ${
             tab === 'account' ? 'text-plugin-text border-b-2 border-plugin-accent' : 'text-plugin-dim hover:text-plugin-muted'
           }`}
         >
@@ -259,14 +259,14 @@ function LoggedInPanel({ onClose, onBadgeUpdate }: { onClose: () => void; onBadg
         </button>
         <button
           onClick={() => setTab('inbox')}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-mono uppercase font-semibold transition-colors relative ${
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs  uppercase font-semibold transition-colors relative ${
             tab === 'inbox' ? 'text-plugin-text border-b-2 border-plugin-accent' : 'text-plugin-dim hover:text-plugin-muted'
           }`}
         >
           <Inbox className="w-3 h-3" />
           Inbox
           {inboxCount > 0 && (
-            <span className="bg-red-500 text-white text-[9px] rounded-full px-1 min-w-[14px] h-[14px] flex items-center justify-center leading-none">
+            <span className="bg-red-500 text-plugin-text text-[10px] rounded-full px-1 min-w-[14px] h-[14px] flex items-center justify-center leading-none">
               {inboxCount}
             </span>
           )}
@@ -363,17 +363,17 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
       {/* Username display */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs font-mono text-plugin-text font-medium">
+          <div className="text-xs  text-plugin-text font-medium">
             {loading ? '...' : username || 'No username set'}
           </div>
-          <div className="text-[10px] text-plugin-dim">{email}</div>
+          <div className="text-[11px] text-plugin-dim">{email}</div>
         </div>
       </div>
 
       {/* Edit profile toggle */}
       <button
         onClick={() => setShowProfile(!showProfile)}
-        className="w-full flex items-center justify-between text-[11px] font-mono text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2.5 py-1.5 transition-colors"
+        className="w-full flex items-center justify-between text-xs  text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2.5 py-1.5 transition-colors"
       >
         <span className="flex items-center gap-1.5">
           <Settings className="w-3 h-3" />
@@ -385,49 +385,49 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
       {showProfile && (
         <div className="space-y-2 pl-1">
           {error && (
-            <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
+            <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
               {error}
             </div>
           )}
           {success && (
-            <div className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1">
+            <div className="text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1">
               Profile saved!
             </div>
           )}
           <div>
-            <label className="block text-[10px] font-mono text-plugin-dim mb-0.5">Username</label>
+            <label className="block text-[11px]  text-plugin-dim mb-0.5">Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="your_username"
-              className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
           <div>
-            <label className="block text-[10px] font-mono text-plugin-dim mb-0.5">Phone</label>
+            <label className="block text-[11px]  text-plugin-dim mb-0.5">Phone</label>
             <input
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="+1 555-0123"
-              className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
           <div>
-            <label className="block text-[10px] font-mono text-plugin-dim mb-0.5">Instagram</label>
+            <label className="block text-[11px]  text-plugin-dim mb-0.5">Instagram</label>
             <input
               type="text"
               value={instagramHandle}
               onChange={(e) => setInstagramHandle(e.target.value)}
               placeholder="@yourhandle"
-              className="w-full bg-black/40 border border-plugin-border rounded font-mono px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
           <button
             onClick={handleSave}
             disabled={saving || !username.trim()}
-            className="w-full bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded px-2 py-1 text-[10px] font-mono uppercase font-bold transition-colors disabled:opacity-40"
+            className="w-full bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded px-2 py-1 text-[11px]  uppercase font-bold transition-colors disabled:opacity-40"
           >
             {saving ? 'Saving...' : 'Save Profile'}
           </button>
@@ -437,7 +437,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
       {/* Logout */}
       <button
         onClick={onLogout}
-        className="w-full flex items-center justify-center gap-1.5 text-[11px] font-mono text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded px-2.5 py-1.5 transition-colors"
+        className="w-full flex items-center justify-center gap-1.5 text-xs  text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded px-2.5 py-1.5 transition-colors"
       >
         <LogOut className="w-3 h-3" />
         Log Out
@@ -473,7 +473,7 @@ function InboxTab({
       <div>
         <button
           onClick={onToggleAddFriend}
-          className="w-full flex items-center justify-between text-[11px] font-mono text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2.5 py-1.5 transition-colors"
+          className="w-full flex items-center justify-between text-xs  text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2.5 py-1.5 transition-colors"
         >
           <span className="flex items-center gap-1.5">
             <UserPlus className="w-3 h-3" />

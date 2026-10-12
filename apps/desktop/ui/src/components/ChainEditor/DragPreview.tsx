@@ -1,39 +1,21 @@
+import { GripVertical, Layers, GitBranch } from 'lucide-react';
 import type { ChainNodeUI } from '../../api/types';
-import rackBg from '../../assets/individual-plugin-rack.png';
 
 interface DragPreviewProps {
   node: ChainNodeUI;
 }
 
 /**
- * Drag overlay preview rendered at cursor position during drag.
- * Uses the rack PNG at reduced scale.
+ * Drag overlay preview rendered at the cursor during a drag.
  */
 export function DragPreview({ node }: DragPreviewProps) {
   if (node.type === 'plugin') {
     return (
-      <div
-        className="
-          rounded-sm overflow-hidden animate-scale-in
-          shadow-[0_4px_24px_rgba(137,87,42,0.3),0_0_0_1px_rgba(255,255,255,0.05)]
-          w-[300px] pointer-events-none
-        "
-        style={{
-          height: 46,
-          backgroundImage: `url(${rackBg})`,
-          backgroundSize: '100% 100%',
-          backgroundRepeat: 'no-repeat',
-        }}
-      >
-        <div className="flex items-center gap-2 px-5 py-1.5">
-          <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-mono uppercase truncate text-white font-medium">
-              {node.name}
-            </p>
-            <p className="text-[10px] font-mono text-white/60 truncate">
-              {node.manufacturer}
-            </p>
-          </div>
+      <div className="w-[300px] h-11 flex items-center gap-2 pl-1.5 pr-3 rounded-lg bg-plugin-raised border border-plugin-accent/60 shadow-panel animate-scale-in pointer-events-none">
+        <GripVertical className="w-3.5 h-3.5 text-plugin-dim" />
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold truncate text-plugin-text leading-tight">{node.name}</p>
+          <p className="text-[11px] text-plugin-muted truncate leading-tight">{node.manufacturer}</p>
         </div>
       </div>
     );
@@ -41,26 +23,20 @@ export function DragPreview({ node }: DragPreviewProps) {
 
   if (node.type === 'group') {
     const isParallel = node.mode === 'parallel';
-    const accentColor = isParallel ? 'border-plugin-parallel/60' : 'border-plugin-serial/60';
-    const bgColor = isParallel ? 'bg-plugin-parallel/5' : 'bg-plugin-serial/5';
     const childCount = countPlugins(node.children);
+    const Icon = isParallel ? GitBranch : Layers;
 
     return (
       <div
-        className={`
-          rounded-lg border ${accentColor} ${bgColor} animate-scale-in
-          shadow-[0_4px_24px_rgba(137,87,42,0.3),0_0_0_1px_rgba(255,255,255,0.05)]
-          w-[220px] pointer-events-none
-        `}
+        className={`w-[240px] h-10 flex items-center gap-2 px-3 rounded-lg bg-plugin-raised border shadow-panel animate-scale-in pointer-events-none ${
+          isParallel ? 'border-plugin-parallel/60' : 'border-plugin-serial/60'
+        }`}
       >
-        <div className="flex items-center gap-2 px-2.5 py-1.5">
-          <span className={`text-[11px] font-medium ${isParallel ? 'text-plugin-parallel' : 'text-plugin-serial'}`}>
-            {isParallel ? '||' : '>'} {node.name}
-          </span>
-          <span className="text-[11px] text-plugin-muted ml-auto">
-            {childCount} plugin{childCount !== 1 ? 's' : ''}
-          </span>
-        </div>
+        <Icon className={`w-3.5 h-3.5 ${isParallel ? 'text-plugin-parallel' : 'text-plugin-serial'}`} />
+        <span className="text-[13px] font-semibold text-plugin-text truncate">{node.name}</span>
+        <span className="text-[11px] text-plugin-muted ml-auto whitespace-nowrap">
+          {childCount} plugin{childCount !== 1 ? 's' : ''}
+        </span>
       </div>
     );
   }

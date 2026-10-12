@@ -27,6 +27,7 @@ vi.mock('../../api/juce-bridge', () => ({
   juceBridge: {
     startWaveformStream: vi.fn().mockResolvedValue({}),
     stopWaveformStream: vi.fn().mockResolvedValue({}),
+    setAnalysisSubscriptions: vi.fn().mockResolvedValue({}),
   },
 }))
 // Mock image imports

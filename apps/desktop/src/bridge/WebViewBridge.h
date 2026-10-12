@@ -7,12 +7,15 @@
 #include "../core/ParameterDiscovery.h"
 #include "../core/InstanceRegistry.h"
 #include "../core/MirrorManager.h"
+#include "../automation/MacroManager.h"
 #include <atomic>
 
 class WaveformCapture;
 class GainProcessor;
 class AudioMeter;
 class FFTProcessor;
+class ParameterProxyPool;
+class PluginChainManagerProcessor;
 
 class WebViewBridge : private juce::Timer,
                       private InstanceRegistry::Listener,
@@ -40,6 +43,9 @@ public:
 
     // Set FFT processor reference (for streaming spectrum data)
     void setFFTProcessor(FFTProcessor* processor) { fftProcessor = processor; }
+    void setParameterPool(ParameterProxyPool* pool) { parameterPool = pool; }
+    void setMacroManager(MacroManager* manager) { macroManager = manager; }
+    void setOwnerProcessor(PluginChainManagerProcessor* processor) { ownerProcessor = processor; }
 
     // Set instance registry and mirror manager references
     void setInstanceRegistry(InstanceRegistry* reg, InstanceId id) {
@@ -96,10 +102,27 @@ private:
     juce::var setBranchGain(const juce::var& args);
     juce::var setBranchSolo(const juce::var& args);
     juce::var setBranchMute(const juce::var& args);
+    juce::var setBranchPolarity(const juce::var& args);
+    juce::var setNodeRecallSafe(const juce::var& args);
+    juce::var setNodeIgnoreLatency(const juce::var& args);
+    juce::var setNodeSidechain(const juce::var& args);
     juce::var moveNodeOp(const juce::var& args);
     juce::var removeNodeOp(const juce::var& args);
     juce::var addPluginToGroup(const juce::var& args);
     juce::var setNodeBypassed(const juce::var& args);
+    juce::var setNodeSuspended(const juce::var& args);
+    juce::var getAutomationBindings(const juce::var& args);
+    juce::var setCrossoverFrequency(const juce::var& args);
+    juce::var getMacros();
+    juce::var setMacroValue(const juce::var& args);
+    juce::var addMacroLink(const juce::var& args);
+    juce::var removeMacroLink(const juce::var& args);
+    juce::var setMacroLinkRange(const juce::var& args);
+    juce::var setMacroLinkCurve(const juce::var& args);
+    juce::var renameMacro(const juce::var& args);
+    void emitMacroValuesIfChanged();
+    juce::var assignAutomation(const juce::var& args);
+    juce::var unassignAutomation(const juce::var& args);
 
     // Chain-level toggle controls
     juce::var toggleAllBypass();
@@ -116,6 +139,7 @@ private:
     // Waveform streaming
     juce::var startWaveformStream();
     juce::var stopWaveformStream();
+    juce::var setAnalysisSubscriptions(const juce::var& args);
 
     // Gain control
     juce::var setInputGain(float dB);
@@ -146,10 +170,20 @@ private:
     AudioMeter* inputMeter = nullptr;
     AudioMeter* outputMeter = nullptr;
     FFTProcessor* fftProcessor = nullptr;
+    ParameterProxyPool* parameterPool = nullptr;
+    MacroManager* macroManager = nullptr;
+    std::array<float, MacroManager::kNumMacros> lastEmittedMacroValues {};
+    PluginChainManagerProcessor* ownerProcessor = nullptr;
+    std::shared_ptr<std::atomic<bool>> lifetime = std::make_shared<std::atomic<bool>>(true);
     InstanceRegistry* instanceRegistry = nullptr;
     InstanceId instanceId = -1;
     MirrorManager* mirrorManager = nullptr;
     bool waveformStreamActive = false;
+    double lastScanNotificationMs = -1000.0;
+    std::function<void()> previousScanComplete, previousChainChanged, previousPresetListChanged;
+    std::function<void(float, const juce::String&)> previousScanProgress;
+    std::function<void(const juce::String&, ScanFailureReason)> previousBlacklisted;
+    std::function<void(const PresetInfo*)> previousPresetLoaded;
     std::atomic<bool> matchLockEnabled{false};
     std::atomic<float> matchLockReferenceOffset{0.0f};  // Target offset in dB, captured on enable
     std::atomic<int> matchLockStuckCounter{0};           // Frames at gain limit

@@ -1,4 +1,70 @@
 #include "ParameterDiscovery.h"
+#include <mutex>
+#include <map>
+#include <typeinfo>
+
+namespace
+{
+const std::map<std::string, std::regex>& compiledPatterns()
+{
+    static const std::map<std::string, std::regex> patterns = []
+    {
+        const char* values[] = {
+            R"(\bbypass\b)", R"(\b(freq|frequency)\b)",
+            R"(\b(gain|boost|cut)\b)", R"(\b(input|output|makeup|make.?up|volume|level|drive)\b)",
+            R"(\b(q|bandwidth|width|resonance)\b)", R"(\b(freq|frequency|equal)\b)",
+            R"(\b(type|shape|mode|filter)\b)", R"(\b(freq|frequency|gain|comp|attack|release|ratio|thresh)\b)",
+            R"(\b(thresh|threshold)\b)", R"(\bratio\b)", R"(\battack\b)", R"(\brelease\b)",
+            R"(\bknee\b)", R"(\b(makeup|make.?up)\b)", R"(\b(mix|dry.?wet|blend|parallel)\b)",
+            R"(\b(comp|dyn|limit)\b)", R"(\b(input|drive)\b)", R"(\b(freq|frequency|type|mode)\b)",
+            R"(\b(output|volume|level)\b)", R"(\b(freq|frequency|type|mode|meter)\b)",
+            R"(\b(mix|dry.?wet)\b)", R"(\b(low|lf|sub)\b)", R"(\b(low.?mid|lmf)\b)",
+            R"(\b(mid|mf)\b)", R"(\b(high.?mid|hmf)\b)", R"(\b(high|hf|air)\b)"
+        };
+        std::map<std::string, std::regex> result;
+        for (const auto* value : values) result.emplace(value, std::regex(value, std::regex_constants::icase));
+        return result;
+    }();
+    return patterns;
+}
+
+std::string makeDiscoveryKey(const juce::AudioProcessor& processor,
+                             const juce::String& pluginName,
+                             const juce::String& manufacturer)
+{
+    std::string key = pluginName.toStdString() + "\n" + manufacturer.toStdString();
+    const auto& params = processor.getParameters();
+    key += "\ncount=" + std::to_string(params.size());
+    for (auto* parameter : params)
+    {
+        key += "\n" + std::string(typeid(*parameter).name());
+        key += "|name=" + parameter->getName(256).toStdString();
+        key += "|label=" + parameter->getLabel().toStdString();
+        key += "|steps=" + std::to_string(parameter->getNumSteps());
+        key += "|default=" + std::to_string(parameter->getDefaultValue());
+        if (auto* ranged = dynamic_cast<const juce::RangedAudioParameter*>(parameter))
+        {
+            const auto& range = ranged->getNormalisableRange();
+            key += "|range=" + std::to_string(range.start) + "," + std::to_string(range.end)
+                + "," + std::to_string(range.interval) + "," + std::to_string(range.skew)
+                + "," + std::to_string(range.symmetricSkew);
+        }
+    }
+    return key;
+}
+
+std::map<std::string, ParameterDiscovery::DiscoveredMap>& discoveryCache()
+{
+    static std::map<std::string, ParameterDiscovery::DiscoveredMap> cache;
+    return cache;
+}
+
+std::mutex& discoveryCacheMutex()
+{
+    static std::mutex mutex;
+    return mutex;
+}
+}
 
 // ============================================
 // Helper: Parse float from text string
@@ -38,8 +104,12 @@ bool ParameterDiscovery::matchesPattern(const juce::String& input, const std::st
 {
     try
     {
-        std::regex re(pattern, std::regex_constants::icase);
-        return std::regex_search(input.toStdString(), re);
+        const auto& patterns = compiledPatterns();
+        if (const auto found = patterns.find(pattern); found != patterns.end())
+            return std::regex_search(input.toStdString(), found->second);
+        // Keep the public helper useful for callers with custom patterns.
+        const std::regex custom(pattern, std::regex_constants::icase);
+        return std::regex_search(input.toStdString(), custom);
     }
     catch (...)
     {
@@ -77,7 +147,7 @@ int ParameterDiscovery::extractBandNumber(const juce::String& name)
     try
     {
         // Try patterns: "Band 3", "Band3", "B3", "3", "#3"
-        std::regex bandRegex(R"((?:band|b)\s*(\d+))", std::regex_constants::icase);
+        static const std::regex bandRegex(R"((?:band|b)\s*(\d+))", std::regex_constants::icase);
         std::smatch match;
         auto nameStr = name.toStdString();
 
@@ -85,7 +155,7 @@ int ParameterDiscovery::extractBandNumber(const juce::String& name)
             return std::stoi(match[1].str());
 
         // Try bare number at end: "LF 1", "HF 2"
-        std::regex trailingNum(R"(\s+(\d+)\s*$)");
+        static const std::regex trailingNum(R"(\s+(\d+)\s*$)");
         if (std::regex_search(nameStr, match, trailingNum) && match.size() > 1)
             return std::stoi(match[1].str());
 
@@ -425,6 +495,19 @@ ParameterDiscovery::DiscoveredMap ParameterDiscovery::discoverParameterMap(
     const juce::String& pluginName,
     const juce::String& manufacturer)
 {
+    if (processor == nullptr)
+        return {};
+
+    // The fingerprint includes parameter count, concrete type, names, labels,
+    // ranges, steps and defaults. A plugin topology or metadata change therefore
+    // naturally selects a new entry without an explicit invalidation callback.
+    const auto cacheKey = makeDiscoveryKey(*processor, pluginName, manufacturer);
+    {
+        const std::lock_guard<std::mutex> lock(discoveryCacheMutex());
+        if (const auto found = discoveryCache().find(cacheKey); found != discoveryCache().end())
+            return found->second;
+    }
+
     DiscoveredMap map;
     map.pluginName = pluginName.isNotEmpty() ? pluginName : processor->getName();
     map.manufacturer = manufacturer;
@@ -544,6 +627,13 @@ ParameterDiscovery::DiscoveredMap ParameterDiscovery::discoverParameterMap(
 
     // Calculate confidence
     map.confidence = calculateConfidence(map);
+
+    {
+        const std::lock_guard<std::mutex> lock(discoveryCacheMutex());
+        // Bound process-wide metadata retention across vendor versions and dynamic layouts.
+        if (discoveryCache().size() >= 256) discoveryCache().erase(discoveryCache().begin());
+        discoveryCache()[cacheKey] = map;
+    }
 
     return map;
 }

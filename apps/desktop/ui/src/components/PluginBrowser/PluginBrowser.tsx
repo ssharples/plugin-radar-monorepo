@@ -178,13 +178,13 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
         </button>
         <div className="flex-1 flex items-center justify-center">
           <span
-            className="text-[10px] font-mono font-semibold text-plugin-muted uppercase tracking-[0.15em] select-none"
+            className="text-[11px]  font-semibold text-plugin-muted uppercase tracking-[0.15em] select-none"
             style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
           >
             Plugins
           </span>
         </div>
-        <div className="text-[9px] font-mono text-plugin-dim">
+        <div className="text-[10px]  text-plugin-dim">
           {filteredPlugins.length}
         </div>
       </div>
@@ -203,9 +203,9 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
           >
             {onClose ? <X className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5 rotate-180" />}
           </button>
-          <h2 className="text-xs font-mono font-semibold text-plugin-text uppercase tracking-wider">Plugins</h2>
+          <h2 className="text-xs  font-semibold text-plugin-text uppercase tracking-wider">Plugins</h2>
           {enrichmentLoading && (
-            <span className="text-[9px] text-plugin-accent animate-pulse">syncing catalog...</span>
+            <span className="text-[10px] text-plugin-accent animate-pulse">syncing catalog...</span>
           )}
           {enrichmentLoaded && !enrichmentLoading && (
             <span className="w-1.5 h-1.5 rounded-full bg-green-500/60" title="Catalog synced" />
@@ -234,7 +234,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
             onKeyDown={handleSearchKeyDown}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
-            className={`w-full pl-7 pr-3 py-1 bg-plugin-bg rounded-propane font-mono text-xs text-plugin-text placeholder:text-plugin-dim border transition-colors focus:outline-none ${
+            className={`w-full pl-7 pr-3 py-1 bg-plugin-bg rounded-md  text-xs text-plugin-text placeholder:text-plugin-dim border transition-colors focus:outline-none ${
               isSearchFocused
                 ? 'border-plugin-accent/60 shadow-glow-accent'
                 : 'border-plugin-border focus:border-plugin-accent/50'
@@ -248,9 +248,9 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
             <div className="flex gap-0.5">
               <button
                 onClick={() => setFormatFilter(null)}
-                className={`px-2 py-0.5 text-xxs font-mono uppercase rounded transition-all ${
+                className={`px-2 py-0.5 text-xxs  uppercase rounded transition-all ${
                   formatFilter === null
-                    ? 'bg-plugin-accent text-black font-semibold'
+                    ? 'bg-plugin-accent text-plugin-on-accent font-semibold'
                     : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text border border-plugin-border'
                 }`}
               >
@@ -260,9 +260,9 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
                 <button
                   key={format}
                   onClick={() => setFormatFilter(format)}
-                  className={`px-2 py-0.5 text-xxs font-mono uppercase rounded transition-all ${
+                  className={`px-2 py-0.5 text-xxs  uppercase rounded transition-all ${
                     formatFilter === format
-                      ? 'bg-plugin-accent text-black font-semibold'
+                      ? 'bg-plugin-accent text-plugin-on-accent font-semibold'
                       : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text border border-plugin-border'
                   }`}
                 >
@@ -277,10 +277,10 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
         {/* Active filters indicator */}
         {activeFilters && (
           <div className="flex items-center gap-1">
-            <span className="text-[9px] text-plugin-accent">Filtered</span>
+            <span className="text-[10px] text-plugin-accent">Filtered</span>
             <button
               onClick={clearAllFilters}
-              className="flex items-center gap-0.5 text-[9px] text-plugin-muted hover:text-plugin-accent"
+              className="flex items-center gap-0.5 text-[10px] text-plugin-muted hover:text-plugin-accent"
             >
               <X className="w-2.5 h-2.5" />
               Clear
@@ -294,7 +294,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
         <div className="px-2.5 py-1.5 bg-plugin-bg border-b border-plugin-border">
           <div className="flex items-center justify-between text-xxs text-plugin-muted mb-1">
             <span className="text-plugin-accent font-medium">Scanning...</span>
-            <span className="font-mono">{Math.round(scanProgress * 100)}%</span>
+            <span className="">{Math.round(scanProgress * 100)}%</span>
           </div>
           <div className="h-0.5 bg-plugin-border rounded overflow-hidden">
             <div
@@ -303,7 +303,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
             />
           </div>
           {currentlyScanning && (
-            <p className="text-[9px] text-plugin-dim mt-0.5 truncate font-mono">
+            <p className="text-[10px] text-plugin-dim mt-0.5 truncate ">
               {currentlyScanning}
             </p>
           )}
@@ -353,7 +353,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
       </div>
 
       {/* Footer count */}
-      <div className="px-3 py-1 border-t border-plugin-border text-xxs text-plugin-dim font-mono">
+      <div className="px-3 py-1 border-t border-plugin-border text-xxs text-plugin-dim ">
         {filteredPlugins.length} plugin{filteredPlugins.length !== 1 ? 's' : ''}
         {highlightedIndex >= 0 && isSearchFocused && (
           <span className="text-plugin-muted ml-1">
@@ -365,7 +365,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
       {/* Toast notification */}
       {toast && (
         <div className="fixed z-[200] bottom-6 left-1/2 -translate-x-1/2 animate-slide-up">
-          <div className="px-4 py-2 bg-plugin-accent/90 text-black text-sm font-medium rounded-lg shadow-lg">
+          <div className="px-4 py-2 bg-plugin-accent/90 text-plugin-on-accent text-sm font-medium rounded-lg shadow-lg">
             {toast}
           </div>
         </div>

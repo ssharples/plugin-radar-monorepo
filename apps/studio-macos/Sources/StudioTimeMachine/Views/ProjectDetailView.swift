@@ -4,23 +4,17 @@ import SwiftUI
 struct ProjectDetailView: View {
   let project: StudioProject
   @Bindable var store: StudioLibraryStore
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var showsAllVersions = false
+  @State private var showsAllAudio = false
+
+  private let collapsedVersionCount = 12
+  private let collapsedAudioCount = 24
 
   var body: some View {
     ScrollViewReader { proxy in
       ScrollView {
         VStack(alignment: .leading, spacing: 40) {
-          Button {
-            if store.selectedWork != nil {
-              store.returnToSelectedWork()
-            } else {
-              store.showLibrary()
-            }
-          } label: {
-            Label(store.selectedWork?.displayName ?? "Studio Library", systemImage: "chevron.left")
-          }
-          .buttonStyle(.plain)
-          .foregroundStyle(.secondary)
-
           projectHeader
 
           if project.timelines.isEmpty {
@@ -55,6 +49,7 @@ struct ProjectDetailView: View {
         .frame(maxWidth: .infinity, alignment: .center)
       }
       .onAppear {
+        revealSelectedVersionIfNeeded()
         guard
           ProcessInfo.processInfo.arguments.contains(where: {
             $0.hasPrefix("--sample-project-")
@@ -65,6 +60,26 @@ struct ProjectDetailView: View {
           proxy.scrollTo("set-content", anchor: .top)
         }
       }
+      .onChange(of: project.id) { _, _ in
+        showsAllVersions = false
+        showsAllAudio = false
+      }
+      .onChange(of: store.selectedTimeline?.id) { _, _ in
+        showsAllVersions = false
+        revealSelectedVersionIfNeeded()
+      }
+      .onChange(of: store.selectedSet?.id) { _, _ in
+        revealSelectedVersionIfNeeded()
+      }
+    }
+  }
+
+  private func revealSelectedVersionIfNeeded() {
+    if let selectedID = store.selectedSet?.id,
+      let index = store.selectedTimeline?.versions.firstIndex(where: { $0.id == selectedID }),
+      index >= collapsedVersionCount
+    {
+      showsAllVersions = true
     }
   }
 
@@ -129,19 +144,38 @@ struct ProjectDetailView: View {
       }
 
       if let timeline = store.selectedTimeline {
-        VStack(spacing: 0) {
-          ForEach(Array(timeline.versions.enumerated()), id: \.element.id) { index, set in
+        LazyVStack(spacing: 0) {
+          let versions =
+            showsAllVersions
+            ? timeline.versions : Array(timeline.versions.prefix(collapsedVersionCount))
+          ForEach(Array(versions.enumerated()), id: \.element.id) { index, set in
             VersionRow(
               set: set,
               lineageIdentity: timeline.displayName,
               isSelected: store.selectedSet?.id == set.id,
-              isLast: index == timeline.versions.count - 1
+              isLast: index == versions.count - 1
             ) {
               store.selectSet(set)
             } reveal: {
               store.revealInFinder(set.fileURL)
             }
           }
+        }
+        if timeline.versions.count > collapsedVersionCount {
+          Button {
+            if reduceMotion {
+              showsAllVersions.toggle()
+            } else {
+              withAnimation(.easeOut(duration: 0.18)) { showsAllVersions.toggle() }
+            }
+          } label: {
+            Label(
+              showsAllVersions
+                ? "Show recent versions only" : "Show all \(timeline.versions.count) versions",
+              systemImage: showsAllVersions ? "chevron.up" : "chevron.down")
+          }
+          .buttonStyle(.bordered)
+          .frame(maxWidth: .infinity, alignment: .center)
         }
       }
     }
@@ -163,8 +197,11 @@ struct ProjectDetailView: View {
           .foregroundStyle(.secondary)
           .padding(.vertical, 18)
       } else {
-        VStack(spacing: 0) {
-          ForEach(project.previewAssets.prefix(24)) { asset in
+        LazyVStack(spacing: 0) {
+          let assets =
+            showsAllAudio
+            ? project.previewAssets : Array(project.previewAssets.prefix(collapsedAudioCount))
+          ForEach(assets) { asset in
             AudioAssetRow(
               asset: asset,
               isSelected: store.selectedAsset?.id == asset.id,
@@ -173,6 +210,23 @@ struct ProjectDetailView: View {
               reveal: { store.revealInFinder(asset.fileURL) }
             )
           }
+        }
+        if project.previewAssets.count > collapsedAudioCount {
+          Button {
+            if reduceMotion {
+              showsAllAudio.toggle()
+            } else {
+              withAnimation(.easeOut(duration: 0.18)) { showsAllAudio.toggle() }
+            }
+          } label: {
+            Label(
+              showsAllAudio
+                ? "Show fewer audio artifacts"
+                : "Show all \(project.previewAssets.count) audio artifacts",
+              systemImage: showsAllAudio ? "chevron.up" : "chevron.down")
+          }
+          .buttonStyle(.bordered)
+          .frame(maxWidth: .infinity, alignment: .center)
         }
       }
     }

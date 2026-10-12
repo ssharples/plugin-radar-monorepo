@@ -47,6 +47,9 @@ struct AbletonExportReviewView: View {
         }
         Text("Nothing runs until the active Set and every setting below are confirmed again.")
           .foregroundStyle(.secondary)
+        Text("Supported automation adapter: Ableton Live 12.4.2")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
     }
   }
@@ -57,13 +60,16 @@ struct AbletonExportReviewView: View {
         LabeledContent("Source", value: currentPlan.source.title)
         LabeledContent(
           "Arrangement beats",
-          value: "\(beat(currentPlan.arrangementRange.startBeat))–\(beat(currentPlan.arrangementRange.endBeat))")
+          value:
+            "\(beat(currentPlan.arrangementRange.startBeat))–\(beat(currentPlan.arrangementRange.endBeat))"
+        )
         LabeledContent("PCM", value: currentPlan.pcmFormat.displayName)
         LabeledContent("Sample rate", value: "\(currentPlan.sampleRate.rawValue.formatted()) Hz")
         LabeledContent("Bit depth", value: "\(currentPlan.bitDepth.rawValue)-bit")
         LabeledContent("Normalize", value: currentPlan.normalize ? "On" : "Off")
         LabeledContent(
-          "Return + Main effects", value: currentPlan.includeReturnAndMainEffects ? "Included" : "Off")
+          "Return + Main effects",
+          value: currentPlan.includeReturnAndMainEffects ? "Included" : "Off")
       }
       .padding(4)
     }
@@ -73,7 +79,16 @@ struct AbletonExportReviewView: View {
   private var destination: some View {
     GroupBox("Destination and safety") {
       VStack(alignment: .leading, spacing: 8) {
-        LabeledContent("Filename", value: currentPlan.primaryOutputURL.lastPathComponent)
+        if currentPlan.source == .main {
+          LabeledContent("Filename", value: currentPlan.primaryOutputURL.lastPathComponent)
+        } else {
+          LabeledContent(
+            "Output folder", value: currentPlan.destination.directoryURL.lastPathComponent)
+          LabeledContent("Filename prefix", value: currentPlan.destination.baseName)
+          Text("Ableton Live will create one output per selected track in this folder.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
         Label("Never overwrite", systemImage: "lock.shield")
           .font(.body.weight(.medium))
         Text("A collision stops the run before Live is instructed to save.")

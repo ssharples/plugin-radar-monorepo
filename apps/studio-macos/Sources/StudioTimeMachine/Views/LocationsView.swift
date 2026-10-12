@@ -10,33 +10,142 @@ struct LocationsView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 30) {
-        VStack(alignment: .leading, spacing: 8) {
-          Text("Locations")
-            .font(.custom("Helvetica Neue", size: 30).weight(.bold))
-          Text(
-            "Registered roots persist between launches. Their cached library remains inspectable when a drive is disconnected."
-          )
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: 680, alignment: .leading)
-        }
+        header
+        locations
+        actions
+        syncSummary
+      }
+      .padding(38)
+      .frame(maxWidth: 920, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .center)
+    }
+    .background(StudioShellPalette.canvas)
+  }
 
+  private var header: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("Locations")
+        .font(.custom("Helvetica Neue", size: 30).weight(.bold))
+        .foregroundStyle(StudioShellPalette.ink)
+      Text("Add folders to keep your Studio Library current on this Mac.")
+        .foregroundStyle(StudioShellPalette.mutedInk)
+      Text(
+        "Studio Time Machine reads projects and audio in place. Enable automatic updates to follow changes, while cached evidence stays available when a drive is offline."
+      )
+      .font(.callout)
+      .foregroundStyle(StudioShellPalette.mutedInk)
+      .frame(maxWidth: 700, alignment: .leading)
+    }
+  }
+
+  private var locations: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Your folders")
+        .font(.headline)
+        .foregroundStyle(StudioShellPalette.ink)
+      if store.registeredRoots.isEmpty {
+        Text("No folders have been added yet.")
+          .foregroundStyle(StudioShellPalette.mutedInk)
+          .padding(.vertical, 14)
+      } else {
         VStack(spacing: 0) {
           ForEach(store.registeredRoots) { root in
-            RegisteredRootRow(
-              root: root,
-              isActive: root.fileURL.standardizedFileURL.path
-                == index.rootURL.standardizedFileURL.path,
-              isSampleRoot: root.id == "sample-root",
-              open: { store.loadCachedRoot(root) }
-            )
-            Divider().padding(.leading, 48)
+            LocationRow(
+              root: root, isActive: isActive(root), isSampleRoot: root.id == "sample-root",
+              open: { store.loadCachedRoot(root) })
+            if root.id != store.registeredRoots.last?.id {
+              Divider().overlay(StudioShellPalette.canvasStroke)
+            }
           }
         }
+        .padding(.horizontal, 16)
+        .background(
+          StudioShellPalette.canvasRaised,
+          in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay {
+          RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(
+            StudioShellPalette.canvasStroke, lineWidth: 1)
+        }
+      }
+    }
+  }
 
-        if let statistics = store.lastStatistics {
+  private var actions: some View {
+    ViewThatFits(in: .horizontal) {
+      actionButtons(stacked: false)
+      actionButtons(stacked: true)
+    }
+    .fixedSize(horizontal: false, vertical: true)
+  }
+
+  @ViewBuilder
+  private func actionButtons(stacked: Bool) -> some View {
+    Group {
+      if stacked {
+        VStack(alignment: .leading, spacing: 8) { actionControls }
+      } else {
+        HStack(spacing: 10) { actionControls }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var actionControls: some View {
+    Button {
+      store.chooseLibraryFolder()
+    } label: {
+      Label("Add to Studio", systemImage: "plus")
+    }
+    .buttonStyle(StudioCanvasButtonStyle(kind: .primary))
+    if !isSample {
+      Button {
+        store.rescan()
+      } label: {
+        Label(
+          syncStatus == .indexing ? "Updating…" : "Update Library", systemImage: "arrow.clockwise")
+      }
+      .buttonStyle(StudioCanvasButtonStyle(kind: .secondary))
+      .disabled(!store.canUpdateLibrary)
+      Button {
+        store.setAutomaticUpdatesEnabled(syncStatus != .monitoring)
+      } label: {
+        Label(
+          syncStatus == .monitoring ? "Pause Updates" : "Resume Updates",
+          systemImage: syncStatus == .monitoring ? "pause" : "play")
+      }
+      .buttonStyle(StudioCanvasButtonStyle(kind: .quiet))
+      .disabled(
+        store.isChangingAutomaticUpdates || syncStatus == .indexing
+          || (syncStatus != .monitoring && !hasAvailableRoot))
+    }
+  }
+
+  private var syncSummary: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Label(syncState.title, systemImage: syncState.symbol)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(syncState.color)
+      Text(syncState.detail)
+        .font(.callout)
+        .foregroundStyle(StudioShellPalette.mutedInk)
+        .frame(maxWidth: 700, alignment: .leading)
+      if syncStatus == .indexing, let progress = store.indexingProgress {
+        VStack(alignment: .leading, spacing: 7) {
+          ProgressView(value: progress.fractionCompleted).tint(StudioShellPalette.ink)
+          HStack {
+            Text(progressLabel(progress))
+            Spacer()
+            Text("\(progress.completed) of \(max(progress.total, progress.completed))")
+              .monospacedDigit()
+          }
+          .font(.caption)
+          .foregroundStyle(StudioShellPalette.mutedInk)
+        }
+      }
+      if let statistics = store.lastStatistics {
+        DisclosureGroup {
           VStack(alignment: .leading, spacing: 12) {
-            Text("Latest scan")
-              .font(.headline)
             HStack(spacing: 24) {
               LocationMetric(value: statistics.projectCount, label: "Projects")
               LocationMetric(value: statistics.setCount, label: "Sets")
@@ -45,83 +154,108 @@ struct LocationsView: View {
               LocationMetric(value: statistics.audioAssetCount, label: "Audio")
             }
             Text(
-              "Completed in \(statistics.duration.formatted(.number.precision(.fractionLength(1)))) seconds"
+              "Completed \(statistics.completedAt.formatted(date: .abbreviated, time: .shortened)) · \(statistics.duration.formatted(.number.precision(.fractionLength(1)))) seconds"
             )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(.caption).foregroundStyle(StudioShellPalette.mutedInk)
+            if statistics.issueCount > 0 {
+              Label(
+                "\(statistics.issueCount) indexing issue\(statistics.issueCount == 1 ? "" : "s") recorded",
+                systemImage: "exclamationmark.triangle"
+              )
+              .font(.caption).foregroundStyle(.orange)
+            }
           }
-          .padding(.vertical, 8)
+          .padding(.top, 10)
+        } label: {
+          Text(isSample ? "Example scan diagnostics" : "Latest scan diagnostics").font(
+            .subheadline.weight(.semibold)
+          ).foregroundStyle(
+            StudioShellPalette.ink)
         }
-
-        HStack(spacing: 10) {
-          Button("Rescan Active Root", action: store.rescan)
-            .buttonStyle(.borderedProminent)
-            .disabled(activeRoot?.availability != .available || isSample)
-          Button("Add Library Folder…", action: store.chooseLibraryFolder)
-        }
-
-        Label(watcherStatus.text, systemImage: watcherStatus.symbol)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: 680, alignment: .leading)
+        .tint(StudioShellPalette.mutedInk)
       }
-      .padding(38)
-      .frame(maxWidth: 920, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .center)
     }
   }
 
-  private var activeRoot: RegisteredLibraryRoot? {
-    store.registeredRoots.first {
-      $0.fileURL.standardizedFileURL.path == index.rootURL.standardizedFileURL.path
+  private var activeRoot: RegisteredLibraryRoot? { store.registeredRoots.first(where: isActive) }
+  private var hasAvailableRoot: Bool {
+    store.registeredRoots.contains { $0.availability == .available }
+  }
+  private func isActive(_ root: RegisteredLibraryRoot) -> Bool {
+    root.fileURL.standardizedFileURL.path == index.rootURL.standardizedFileURL.path
+  }
+  private func progressLabel(_ progress: IndexingProgress) -> String {
+    return switch progress.phase {
+    case .discovering: "Finding projects"
+    case .parsingSets: "Reading Set evidence"
+    case .classifyingAudio: "Classifying audio"
+    case .finalizing: "Saving library evidence"
+    case .complete: "Update complete"
     }
   }
 
-  private var watcherStatus: (text: String, symbol: String) {
+  private var syncState: (title: String, detail: String, symbol: String, color: Color) {
     if isSample {
       return (
-        "Sample data is static. No folders are opened and file watching is not running.",
-        "pause.circle"
+        "Sample preview",
+        "This is static sample data. No folders are opened and no file watching is running.",
+        "shippingbox", StudioShellPalette.mutedInk
       )
     }
-    guard let activeRoot else {
+    guard let root = activeRoot else {
       return (
-        "Select a registered root to inspect its file-watching status.", "questionmark.circle"
+        "Waiting for a folder", "Add a folder to start a private, read-only library.",
+        "folder.badge.plus", StudioShellPalette.mutedInk
       )
     }
-    switch activeRoot.availability {
+    switch root.availability {
     case .available:
       switch syncStatus {
       case .monitoring:
         return (
-          "File watching is active. Stable Set saves are indexed and snapshotted automatically.",
-          "waveform.path.ecg"
+          "Watching for changes",
+          "Stable Ableton Set saves are picked up automatically across available folders while the source files stay in place.",
+          "waveform.path.ecg", .green
         )
       case .indexing:
         return (
-          "This root is indexing now. File watching resumes when the scan finishes.",
-          "arrow.triangle.2.circlepath"
+          "Updating the library",
+          store.automaticUpdatesEnabled
+            ? "Reading available folders. You can keep browsing while the library updates."
+            : "This manual scan refreshes available folders. Automatic watching remains paused.",
+          "arrow.triangle.2.circlepath", .orange
         )
       case .idle, .stopped:
+        if store.automaticUpdatesEnabled {
+          return (
+            "Automatic updates not running",
+            "Resume Updates to watch available folders again, or Update Library for a single scan.",
+            "pause.circle", StudioShellPalette.mutedInk
+          )
+        }
         return (
-          "This root is available, but file watching is not currently running.", "pause.circle"
+          "Updates paused",
+          "Automatic watching is paused. Resume updates whenever you want Studio Time Machine to follow new Set saves.",
+          "pause.circle", StudioShellPalette.mutedInk
         )
       }
     case .unavailable:
       return (
-        "File watching is paused while this root is unavailable. Its cached library remains inspectable.",
-        "externaldrive.badge.xmark"
+        "Drive unavailable",
+        "This folder is offline. Cached library evidence remains available to inspect, and other available folders can continue watching.",
+        "externaldrive.badge.xmark", .orange
       )
     case .permissionRequired:
       return (
-        "File watching is paused until folder permission is granted again. Add the folder to recover access.",
-        "lock.trianglebadge.exclamationmark"
+        "Permission needed",
+        "Access to this folder is required again. Cached evidence remains available while other available folders can continue watching.",
+        "lock.trianglebadge.exclamationmark", .red
       )
     }
   }
 }
 
-private struct RegisteredRootRow: View {
+private struct LocationRow: View {
   let root: RegisteredLibraryRoot
   let isActive: Bool
   let isSampleRoot: Bool
@@ -129,79 +263,67 @@ private struct RegisteredRootRow: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: 14) {
-      Image(systemName: rootSymbol)
-        .font(.title2)
-        .foregroundStyle(.secondary)
-        .frame(width: 34)
-
+      Image(systemName: rootSymbol).font(.title3).foregroundStyle(StudioShellPalette.mutedInk)
+        .frame(width: 26)
       VStack(alignment: .leading, spacing: 5) {
         HStack(spacing: 8) {
-          Text(root.displayName)
-            .font(.headline)
+          Text(root.displayName).font(.headline).foregroundStyle(StudioShellPalette.ink)
           if isActive {
-            Text("ACTIVE")
-              .font(.caption2.weight(.bold))
-              .padding(.horizontal, 7)
-              .padding(.vertical, 3)
-              .background(.quaternary, in: Capsule())
+            Text("CURRENT").font(.caption2.weight(.bold)).foregroundStyle(StudioShellPalette.ink)
+              .padding(.horizontal, 7).padding(.vertical, 3).background(
+                StudioShellPalette.signal, in: Capsule())
           }
         }
         LocalPathText(url: root.fileURL, font: .callout, lineLimit: 1)
-        Label(statusText, systemImage: statusSymbol)
-          .font(.caption.weight(.medium))
-          .foregroundStyle(statusColor)
-        if let lastScannedAt = root.lastScannedAt {
-          Text("Last scanned \(lastScannedAt.formatted(date: .abbreviated, time: .shortened))")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        Label(statusText, systemImage: statusSymbol).font(.caption.weight(.medium)).foregroundStyle(
+          statusColor)
+        if let date = root.lastScannedAt {
+          Text("Evidence from \(date.formatted(date: .abbreviated, time: .shortened))").font(
+            .caption
+          ).foregroundStyle(StudioShellPalette.mutedInk)
         }
       }
-
-      Spacer()
-
+      Spacer(minLength: 18)
       VStack(alignment: .trailing, spacing: 8) {
-        Text("\(root.projectCount) projects · \(root.setCount) Sets")
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
-        if !isActive && root.lastScannedAt != nil {
-          Button("Open Cached Library", action: open)
-            .controlSize(.small)
+        Text("\(root.projectCount) projects · \(root.setCount) Sets").font(
+          .caption.monospacedDigit()
+        ).foregroundStyle(StudioShellPalette.mutedInk)
+        if !isActive && !isSampleRoot && root.lastScannedAt != nil {
+          Button("Open cached library", action: open).buttonStyle(
+            StudioCanvasButtonStyle(kind: .quiet)
+          ).controlSize(.small)
         }
       }
     }
     .padding(.vertical, 16)
   }
-
   private var rootSymbol: String {
     isSampleRoot
       ? "shippingbox"
       : (root.availability == .available
         ? "externaldrive.fill" : "externaldrive.badge.exclamationmark")
   }
-
   private var statusText: String {
-    if isSampleRoot { return "Sample data · static and read-only" }
+    if isSampleRoot { return "Static sample data · read-only" }
     return switch root.availability {
-    case .available: "Available · indexed read-only"
-    case .unavailable: "Drive or folder unavailable · cached data retained"
-    case .permissionRequired: "Folder permission required"
+    case .available: "Available · read-only"
+    case .unavailable: "Offline · cached evidence retained"
+    case .permissionRequired: "Access required"
     }
   }
-
   private var statusSymbol: String {
-    switch root.availability {
+    return switch root.availability {
     case .available: "checkmark.circle"
     case .unavailable: "externaldrive.badge.xmark"
     case .permissionRequired: "lock.trianglebadge.exclamationmark"
     }
   }
-
   private var statusColor: Color {
-    if isSampleRoot { return .secondary }
+    if isSampleRoot { return StudioShellPalette.mutedInk }
     return switch root.availability {
-    case .available: Color.green
-    case .unavailable: Color.orange
-    case .permissionRequired: Color.red
+    case .available: .green
+    case .unavailable: .orange
+    case .permissionRequired: .red
     }
   }
 }
@@ -209,14 +331,11 @@ private struct RegisteredRootRow: View {
 private struct LocationMetric: View {
   let value: Int
   let label: String
-
   var body: some View {
     VStack(alignment: .leading, spacing: 3) {
-      Text("\(value)")
-        .font(.title3.monospacedDigit().weight(.semibold))
-      Text(label)
-        .font(.caption)
-        .foregroundStyle(.secondary)
+      Text("\(value)").font(.title3.monospacedDigit().weight(.semibold)).foregroundStyle(
+        StudioShellPalette.ink)
+      Text(label).font(.caption).foregroundStyle(StudioShellPalette.mutedInk)
     }
     .frame(minWidth: 76, alignment: .leading)
   }

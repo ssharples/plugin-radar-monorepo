@@ -8,6 +8,7 @@ extension Notification.Name {
 
 struct LibraryRootView: View {
   @Bindable var store: StudioLibraryStore
+  @State private var previewHeight: CGFloat = 90
 
   var body: some View {
     ZStack {
@@ -74,6 +75,11 @@ struct LibraryRootView: View {
         detailContent
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .background(StudioShellPalette.canvas)
+          .safeAreaInset(edge: .bottom, spacing: 0) {
+            if store.player.currentAsset != nil {
+              Color.clear.frame(height: max(0, previewHeight - 90))
+            }
+          }
           .safeAreaInset(edge: .top, spacing: 0) {
             if let message = store.noticeMessage {
               StudioNoticeView(
@@ -88,10 +94,16 @@ struct LibraryRootView: View {
           PreviewTransportView(
             asset: asset, isSample: store.isSampleLibrary, player: store.player
           )
+          .background {
+            GeometryReader { proxy in
+              Color.clear.preference(key: PreviewHeightPreferenceKey.self, value: proxy.size.height)
+            }
+          }
           .padding(.horizontal, 28)
           .padding(.bottom, 18)
         }
       }
+      .onPreferenceChange(PreviewHeightPreferenceKey.self) { previewHeight = $0 }
     }
     .background(StudioShellPalette.canvas)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -135,6 +147,7 @@ struct LibraryRootView: View {
             ProjectDetailView(project: project, store: store)
           } else if let work = store.selectedWork {
             WorkDetailView(work: work, store: store)
+              .id(work.id)
           } else {
             StudioLibraryView(index: index, store: store)
           }
@@ -158,6 +171,11 @@ struct LibraryRootView: View {
 
 }
 
+private struct PreviewHeightPreferenceKey: PreferenceKey {
+  static let defaultValue: CGFloat = 90
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
 private struct StudioAccessibilityIsolationHost<Content: View>: NSViewRepresentable {
   let isAccessibilityHidden: Bool
   let content: Content
@@ -172,6 +190,10 @@ private struct StudioAccessibilityIsolationHost<Content: View>: NSViewRepresenta
 
   func makeNSView(context: Context) -> NSHostingView<Content> {
     let hostingView = NSHostingView(rootView: content)
+    // SwiftUI's outer layout owns this embedded workspace. Deriving a second
+    // set of AppKit min/ideal/max constraints from changing filter content can
+    // create an update-constraints loop when the result list becomes empty.
+    hostingView.sizingOptions = []
     hostingView.setAccessibilityHidden(isAccessibilityHidden)
     return hostingView
   }
@@ -234,6 +256,11 @@ private struct StudioCommandBarView: View {
             ? "Back to \(store.selectedWork?.displayName ?? "Song")"
             : "Back to \(store.destination.title)"
         )
+        .accessibilityLabel(
+          store.selectedProject != nil && store.selectedWork != nil
+            ? "Back to \(store.selectedWork?.displayName ?? "Song")"
+            : "Back to \(store.destination.title)"
+        )
       }
 
       Text(store.destination.title)
@@ -255,8 +282,8 @@ private struct StudioCommandBarView: View {
   }
 
   private var selectionTitle: String? {
-    if let work = store.selectedWork { return work.displayName }
     if let project = store.selectedProject { return project.displayName }
+    if let work = store.selectedWork { return work.displayName }
     return nil
   }
 }

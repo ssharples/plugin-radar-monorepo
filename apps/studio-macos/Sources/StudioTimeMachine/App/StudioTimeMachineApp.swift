@@ -22,7 +22,7 @@ struct StudioTimeMachineApp: App {
       CommandGroup(replacing: .newItem) {}
 
       CommandMenu("Library") {
-        Button("Choose Library Folder…") {
+        Button("Add to Studio…") {
           store.chooseLibraryFolder()
         }
         .keyboardShortcut("o", modifiers: .command)
@@ -31,7 +31,7 @@ struct StudioTimeMachineApp: App {
           store.rescan()
         }
         .keyboardShortcut("r", modifiers: .command)
-        .disabled(store.library == nil)
+        .disabled(!store.canUpdateLibrary)
 
         Button("Add Sample Location…") {
           store.chooseSampleLocations()

@@ -72,26 +72,26 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
     <div className="mt-1.5 border-t border-plugin-border/50 pt-1.5 space-y-1.5">
       {/* Category + Effect Type + Circuit */}
       <div className="flex flex-wrap items-center gap-1">
-        <span className={`px-1.5 py-0.5 text-[9px] rounded border font-medium ${categoryColor}`}>
+        <span className={`px-1.5 py-0.5 text-[10px] rounded border font-medium ${categoryColor}`}>
           {capitalize(enriched.category)}
         </span>
         {enriched.effectType && (
-          <span className="px-1.5 py-0.5 text-[9px] rounded bg-plugin-bg text-plugin-text border border-plugin-border">
+          <span className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-text border border-plugin-border">
             {enriched.effectType}
           </span>
         )}
         {enriched.circuitEmulation && (
-          <span className="px-1.5 py-0.5 text-[9px] rounded bg-plugin-bg text-plugin-dim border border-plugin-border italic">
+          <span className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-dim border border-plugin-border italic">
             {enriched.circuitEmulation}
           </span>
         )}
         {enriched.isFree && (
-          <span className="px-1.5 py-0.5 text-[9px] rounded bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
+          <span className="px-1.5 py-0.5 text-[10px] rounded bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
             Free
           </span>
         )}
         {!enriched.isFree && enriched.currentPrice !== undefined && (
-          <span className="px-1.5 py-0.5 text-[9px] rounded bg-plugin-bg text-plugin-text border border-plugin-border font-mono">
+          <span className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-text border border-plugin-border ">
             {formatPrice(enriched.currentPrice, enriched.currency)}
             {enriched.msrp && enriched.currentPrice !== enriched.msrp && (
               <span className="line-through text-plugin-dim ml-1">
@@ -109,7 +109,7 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
           {tonalChars.map((char) => (
             <span
               key={char}
-              className="px-1 py-px text-[8px] rounded bg-plugin-accent/10 text-plugin-accent border border-plugin-accent/20 capitalize"
+              className="px-1 py-px text-[10px] rounded bg-plugin-accent/10 text-plugin-accent border border-plugin-accent/20 capitalize"
             >
               {char}
             </span>
@@ -119,7 +119,7 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
 
       {/* Short description */}
       {enriched.shortDescription && (
-        <p className="text-[10px] text-plugin-muted leading-snug">
+        <p className="text-[11px] text-plugin-muted leading-snug">
           {enriched.shortDescription}
         </p>
       )}
@@ -127,7 +127,7 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
       {/* Expand/collapse for full details */}
       <button
         onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-        className="flex items-center gap-0.5 text-[9px] text-plugin-accent hover:text-plugin-accent/80 transition-colors"
+        className="flex items-center gap-0.5 text-[10px] text-plugin-accent hover:text-plugin-accent/80 transition-colors"
       >
         {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         {expanded ? 'Less' : 'More details'}
@@ -138,7 +138,7 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
           {/* Full description */}
           {enriched.description && (
             <div>
-              <p className="text-[10px] text-plugin-text leading-snug">{enriched.description}</p>
+              <p className="text-[11px] text-plugin-text leading-snug">{enriched.description}</p>
             </div>
           )}
 
@@ -147,11 +147,11 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
             <div>
               <div className="flex items-center gap-1 mb-0.5">
                 <Music className="w-2.5 h-2.5 text-plugin-dim" />
-                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Works Well On</span>
+                <span className="text-[10px] text-plugin-dim uppercase tracking-wider font-medium">Works Well On</span>
               </div>
               <div className="flex flex-wrap gap-0.5">
                 {enriched.worksWellOn.map((w) => (
-                  <span key={w} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                  <span key={w} className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
                     {w.replace('-', ' ')}
                   </span>
                 ))}
@@ -164,11 +164,11 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
             <div>
               <div className="flex items-center gap-1 mb-0.5">
                 <Sliders className="w-2.5 h-2.5 text-plugin-dim" />
-                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Use Cases</span>
+                <span className="text-[10px] text-plugin-dim uppercase tracking-wider font-medium">Use Cases</span>
               </div>
               <div className="flex flex-wrap gap-0.5">
                 {enriched.useCases.map((u) => (
-                  <span key={u} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                  <span key={u} className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
                     {u.replace('-', ' ')}
                   </span>
                 ))}
@@ -181,11 +181,11 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
             <div>
               <div className="flex items-center gap-1 mb-0.5">
                 <Globe className="w-2.5 h-2.5 text-plugin-dim" />
-                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Genre</span>
+                <span className="text-[10px] text-plugin-dim uppercase tracking-wider font-medium">Genre</span>
               </div>
               <div className="flex flex-wrap gap-0.5">
                 {enriched.genreSuitability.map((g) => (
-                  <span key={g} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                  <span key={g} className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
                     {g.replace('-', ' ').replace('&', '&')}
                   </span>
                 ))}
@@ -198,11 +198,11 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
             <div>
               <div className="flex items-center gap-1 mb-0.5">
                 <Heart className="w-2.5 h-2.5 text-plugin-dim" />
-                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Comparable To</span>
+                <span className="text-[10px] text-plugin-dim uppercase tracking-wider font-medium">Comparable To</span>
               </div>
               <div className="flex flex-wrap gap-0.5">
                 {enriched.comparableTo.map((c) => (
-                  <span key={c} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border">
+                  <span key={c} className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border">
                     {c}
                   </span>
                 ))}
@@ -215,11 +215,11 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
             <div>
               <div className="flex items-center gap-1 mb-0.5">
                 <Tag className="w-2.5 h-2.5 text-plugin-dim" />
-                <span className="text-[9px] text-plugin-dim uppercase tracking-wider font-medium">Key Features</span>
+                <span className="text-[10px] text-plugin-dim uppercase tracking-wider font-medium">Key Features</span>
               </div>
               <div className="flex flex-wrap gap-0.5">
                 {enriched.keyFeatures.map((f) => (
-                  <span key={f} className="px-1.5 py-0.5 text-[8px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
+                  <span key={f} className="px-1.5 py-0.5 text-[10px] rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize">
                     {f.replace('-', ' ')}
                   </span>
                 ))}
@@ -232,23 +232,23 @@ function EnrichmentDetail({ enriched }: { enriched: EnrichedPluginData }) {
             {enriched.skillLevel && (
               <div className="flex items-center gap-1">
                 <GraduationCap className="w-2.5 h-2.5 text-plugin-dim" />
-                <span className="text-[9px] text-plugin-muted capitalize">{enriched.skillLevel}</span>
+                <span className="text-[10px] text-plugin-muted capitalize">{enriched.skillLevel}</span>
               </div>
             )}
             {enriched.cpuUsage && (
               <div className="flex items-center gap-1">
                 <Cpu className="w-2.5 h-2.5 text-plugin-dim" />
-                <span className="text-[9px] text-plugin-muted capitalize">{enriched.cpuUsage} CPU</span>
+                <span className="text-[10px] text-plugin-muted capitalize">{enriched.cpuUsage} CPU</span>
               </div>
             )}
             {enriched.isIndustryStandard && (
-              <span className="text-[9px] text-yellow-400 font-medium">⭐ Industry Standard</span>
+              <span className="text-[10px] text-yellow-400 font-medium">⭐ Industry Standard</span>
             )}
           </div>
 
           {/* Price info */}
           {!enriched.isFree && (
-            <div className="flex items-center gap-2 text-[9px]">
+            <div className="flex items-center gap-2 text-[10px]">
               {enriched.currentPrice !== undefined && (
                 <span className="text-plugin-text font-medium">
                   {formatPrice(enriched.currentPrice, enriched.currency)}
@@ -327,7 +327,7 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
       >
         {/* Number badge */}
         <span className={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-xxs font-bold mt-0.5 ${
-          isSelected ? 'bg-plugin-accent text-black' : slot.bypassed ? 'bg-plugin-border/50 text-plugin-dim' : 'bg-plugin-border text-plugin-muted'
+          isSelected ? 'bg-plugin-accent text-plugin-on-accent' : slot.bypassed ? 'bg-plugin-border/50 text-plugin-dim' : 'bg-plugin-border text-plugin-muted'
         }`}>
           {slot.index + 1}
         </span>
@@ -351,11 +351,11 @@ function SlotItem({ slot, isSelected, onSelect, onRemove, onToggleBypass, onOpen
           {/* Minimal enrichment info when not selected */}
           {!isSelected && enriched && (
             <div className="flex items-center gap-1 mt-0.5">
-              <span className={`px-1 py-px text-[8px] rounded border font-medium ${CATEGORY_COLORS[enriched.category] ?? CATEGORY_COLORS.utility}`}>
+              <span className={`px-1 py-px text-[10px] rounded border font-medium ${CATEGORY_COLORS[enriched.category] ?? CATEGORY_COLORS.utility}`}>
                 {capitalize(enriched.category)}
               </span>
               {enriched.effectType && (
-                <span className="text-[8px] text-plugin-dim">{enriched.effectType}</span>
+                <span className="text-[10px] text-plugin-dim">{enriched.effectType}</span>
               )}
             </div>
           )}
@@ -462,7 +462,7 @@ export function PluginViewer() {
           <Link2 className="w-3.5 h-3.5 text-plugin-accent" />
           <h2 className="text-xs font-semibold text-plugin-text uppercase tracking-wider">Chain</h2>
         </div>
-        <span className="text-xxs text-plugin-dim font-mono bg-plugin-bg px-1.5 py-0.5 rounded border border-plugin-border">
+        <span className="text-xxs text-plugin-dim  bg-plugin-bg px-1.5 py-0.5 rounded border border-plugin-border">
           {slots.length}
         </span>
       </div>
@@ -511,7 +511,7 @@ export function PluginViewer() {
 
               {/* Output indicator */}
               <div className="flex items-center justify-center gap-1.5 pt-0.5">
-                <div className="w-2 h-2 rounded-full bg-plugin-accent shadow-[0_0_6px_rgba(137,87,42,0.4)]" />
+                <div className="w-2 h-2 rounded-full bg-plugin-accent shadow-[0_0_6px_rgba(139,124,255,0.5)]" />
                 <span className="text-xxs text-plugin-dim uppercase tracking-widest font-medium">Out</span>
               </div>
             </SortableContext>

@@ -4,18 +4,26 @@ import SwiftUI
 struct WorkDetailView: View {
   let work: StudioWork
   @Bindable var store: StudioLibraryStore
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var selectedRevisionID: String?
   @State private var showsAllVersions = false
+  @State private var showsVersionPicker = false
   @State private var showsSelectedExports = false
+  @State private var historySnapshot: WorkHistorySnapshot?
+  @State private var isLoadingHistory = true
+  @State private var availableWidth: CGFloat = 1000
 
   private let collapsedVersionCount = 12
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 28) {
+      VStack(alignment: .leading, spacing: 24) {
         header
 
-        if timelineEntries.isEmpty {
+        if isLoadingHistory && historySnapshot == nil {
+          ProgressView("Reading project contents…")
+            .frame(maxWidth: .infinity, minHeight: 320)
+        } else if timelineEntries.isEmpty {
           ContentUnavailableView(
             "No versions found",
             systemImage: "clock.arrow.circlepath",
@@ -23,34 +31,67 @@ struct WorkDetailView: View {
           )
           .frame(maxWidth: .infinity, minHeight: 320)
         } else {
-          timelineSection
+          if let selectedEntry {
+            selectedVersionActions(selectedEntry)
+            ProjectContentsView(entry: selectedEntry, store: store)
+              .id(selectedEntry.id)
+            selectedExportsDisclosure(selectedEntry)
+          }
           sessionSources
         }
       }
-      .padding(.horizontal, 42)
+      .padding(.horizontal, 32)
       .padding(.top, 32)
       .padding(.bottom, store.player.currentAsset == nil ? 50 : 118)
-      .frame(maxWidth: 960, alignment: .leading)
+      .frame(maxWidth: 1100, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
     }
-    .onAppear {
-      if selectedRevisionID == nil {
-        let restoredID = store.selectedWorkRevisionID.flatMap { rememberedID in
-          timelineEntries.contains(where: { $0.id == rememberedID }) ? rememberedID : nil
+    .background {
+      GeometryReader { proxy in
+        Color.clear.onChange(of: proxy.size.width, initial: true) { _, width in
+          availableWidth = width - 64
         }
-        selectedRevisionID = restoredID ?? timelineEntries.first?.id
-        store.selectedWorkRevisionID = selectedRevisionID
       }
+    }
+    .sheet(isPresented: $showsVersionPicker) {
+      VStack(alignment: .leading, spacing: 18) {
+        HStack {
+          Text("Choose a version").font(.title2.weight(.semibold))
+          Spacer()
+          Button("Done") { showsVersionPicker = false }
+            .keyboardShortcut(.cancelAction)
+        }
+        ScrollView { timelineSection }
+      }
+      .padding(24)
+      .frame(width: 760, height: 620)
+      .background(StudioShellPalette.canvas)
+    }
+    .task(id: historyRequestKey) {
+      let requestedWork = work
+      isLoadingHistory = true
+      let worker = Task.detached(priority: .userInitiated) {
+        try? WorkHistorySnapshot(work: requestedWork)
+      }
+      let snapshot = await withTaskCancellationHandler {
+        await worker.value
+      } onCancel: {
+        worker.cancel()
+      }
+      guard !Task.isCancelled, let snapshot else { return }
+      historySnapshot = snapshot
+      isLoadingHistory = false
+      reconcileSelection(in: snapshot.entries)
     }
   }
 
   private var header: some View {
     HStack(alignment: .center, spacing: 24) {
-      ProjectObjectView(identity: work.displayName, size: 128, showsDisc: true, isActive: true)
+      ProjectObjectView(identity: work.displayName, size: 88, showsDisc: true, isActive: true)
 
       VStack(alignment: .leading, spacing: 7) {
         Text(work.displayName)
-          .font(.custom("Helvetica Neue", size: 36).weight(.bold))
+          .font(.custom("Helvetica Neue", size: 34).weight(.bold))
           .lineLimit(2)
 
         HStack(spacing: 8) {
@@ -61,17 +102,34 @@ struct WorkDetailView: View {
           Text("·")
             .foregroundStyle(.tertiary)
 
-          Text(historySummary)
-            .foregroundStyle(.secondary)
+          if let tempo = selectedEntry?.revision.set.content.tempo {
+            Text("\(tempo.formatted(.number.precision(.fractionLength(0...1)))) BPM")
+              .foregroundStyle(.secondary)
+          }
         }
 
         HStack(spacing: 8) {
-          Label(dateRangeText, systemImage: "calendar")
           Label(groupingLabel, systemImage: groupingSymbol)
             .help(confidenceText)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+      }
+
+      if needsOrganisationReview {
+        if work.sessions.count == 1, let session = work.sessions.first {
+          Button("Organise…") { store.editOrganisation(for: session) }
+            .buttonStyle(StudioCanvasButtonStyle(kind: .secondary))
+        } else {
+          Menu {
+            ForEach(work.sessions) { session in
+              Button(session.displayName) { store.editOrganisation(for: session) }
+            }
+          } label: {
+            Label("Organise…", systemImage: "folder.badge.gearshape")
+          }
+          .buttonStyle(StudioCanvasButtonStyle(kind: .secondary))
+        }
       }
 
       Spacer(minLength: 0)
@@ -94,12 +152,7 @@ struct WorkDetailView: View {
           .foregroundStyle(.secondary)
       }
 
-      if let selectedEntry {
-        selectedVersionActions(selectedEntry)
-        selectedExportsDisclosure(selectedEntry)
-      }
-
-      VStack(spacing: 0) {
+      LazyVStack(spacing: 0) {
         ForEach(Array(visibleTimelineEntries.enumerated()), id: \.element.id) { index, entry in
           WorkRevisionTimelineRow(
             entry: entry,
@@ -108,9 +161,16 @@ struct WorkDetailView: View {
             isLast: index == visibleTimelineEntries.count - 1,
             artifactCount: artifacts(for: entry).count
           ) {
-            withAnimation(.easeOut(duration: 0.16)) {
+            let update = {
               selectedRevisionID = entry.id
               store.selectedWorkRevisionID = entry.id
+              showsSelectedExports = false
+              showsVersionPicker = false
+            }
+            if reduceMotion {
+              update()
+            } else {
+              withAnimation(.easeOut(duration: 0.16), update)
             }
           }
         }
@@ -118,8 +178,12 @@ struct WorkDetailView: View {
 
       if timelineEntries.count > collapsedVersionCount {
         Button {
-          withAnimation(.easeOut(duration: 0.18)) {
+          if reduceMotion {
             showsAllVersions.toggle()
+          } else {
+            withAnimation(.easeOut(duration: 0.18)) {
+              showsAllVersions.toggle()
+            }
           }
         } label: {
           Label(
@@ -136,111 +200,66 @@ struct WorkDetailView: View {
   }
 
   private func selectedVersionActions(_ entry: WorkTimelineEntry) -> some View {
-    let linkedArtifacts = artifacts(for: entry)
-    let verified = verifiedExports(for: entry)
-    return HStack(spacing: 18) {
+    let isWide = availableWidth >= 620
+    let layout =
+      isWide
+      ? AnyLayout(HStackLayout(spacing: 12))
+      : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+    return layout {
       VStack(alignment: .leading, spacing: 4) {
-        HStack(spacing: 8) {
-          Text(entry.displayName)
-            .font(.headline)
-            .foregroundStyle(.white)
-            .lineLimit(1)
-          if entry.id == timelineEntries.first?.id {
-            Text("LATEST")
-              .font(.caption2.weight(.bold))
-              .foregroundStyle(StudioShellPalette.ink)
-              .padding(.horizontal, 7)
-              .padding(.vertical, 3)
-              .background(StudioShellPalette.signal, in: Capsule())
-          }
-        }
+        Text(entry.displayName)
+          .font(.callout.weight(.semibold))
+          .lineLimit(1)
+          .truncationMode(.middle)
         Text(
-          "\(entry.session.role.displayName) · \(entry.dateText) · \(entry.revision.set.structure.trackCount) tracks"
+          "\(entry.id == timelineEntries.first?.id ? "Latest saved version" : "Earlier version") · \(entry.dateText)"
         )
         .font(.caption)
-        .foregroundStyle(.white.opacity(0.56))
-        .lineLimit(1)
-
-        if !linkedArtifacts.isEmpty || !verified.isEmpty {
-          HStack(spacing: 8) {
-            if !verified.isEmpty {
-              Label(
-                "\(verified.flatMap(\.outputs).count) verified",
-                systemImage: "checkmark.seal")
-            }
-            if !linkedArtifacts.isEmpty {
-              Label(artifactSummary(linkedArtifacts), systemImage: "waveform")
-            }
-            if verified.isEmpty && linkedArtifacts.contains(where: { $0.confidence != .automatic })
-            {
-              Text("Likely from this version")
-            }
-          }
-          .font(.caption2.weight(.medium))
-          .foregroundStyle(.white.opacity(0.68))
-        }
+        .foregroundStyle(.secondary)
       }
+      if isWide { Spacer(minLength: 0) }
+      versionActionButtons(entry)
+    }
+    .padding(.vertical, 12)
+    .accessibilityElement(children: .contain)
+  }
 
-      Spacer(minLength: 12)
-
+  private func versionActionButtons(_ entry: WorkTimelineEntry) -> some View {
+    HStack(spacing: 12) {
       Button {
-        store.openRevision(entry.revision, in: entry.session)
+        showsVersionPicker = true
       } label: {
-        Label("Details", systemImage: "doc.text.magnifyingglass")
+        Label("Versions · \(timelineEntries.count)", systemImage: "clock.arrow.circlepath")
       }
-      .buttonStyle(StudioShellButtonStyle(kind: .secondary))
-      .help("Open this version's details without expanding the inspector")
-
+      .buttonStyle(StudioCanvasButtonStyle(kind: .quiet))
+      .help("Choose which saved version supplies the tracks, audio references and devices below")
       Menu {
-        Button("Master WAV…") {
-          store.chooseLiveExportDestination(
-            for: entry.revision,
-            in: entry.session,
-            source: .main
-          )
-        }
-        Button("Stems — Individual Tracks…") {
-          store.chooseLiveExportDestination(
-            for: entry.revision,
-            in: entry.session,
-            source: .allIndividualTracks(expectedTrackCount: nil)
-          )
-        }
+        Button("Set Details…") { store.openRevision(entry.revision, in: entry.session) }
+        Button("Reveal Set in Finder") { store.revealInFinder(entry.revision.set.fileURL) }
         Divider()
-        Button("Reveal Set in Finder") {
-          store.revealInFinder(entry.revision.set.fileURL)
+        Button("Export Master WAV…") {
+          store.chooseLiveExportDestination(for: entry.revision, in: entry.session, source: .main)
+        }
+        Button("Export Stems…") {
+          store.chooseLiveExportDestination(
+            for: entry.revision, in: entry.session,
+            source: .allIndividualTracks(expectedTrackCount: nil))
         }
       } label: {
-        Label("Export", systemImage: "square.and.arrow.up")
-          .font(.system(size: 12, weight: .semibold, design: .rounded))
-          .foregroundStyle(.white.opacity(0.88))
-          .padding(.horizontal, 13)
-          .frame(height: 34)
-          .background(Color.white.opacity(0.08))
-          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-          .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .stroke(StudioShellPalette.chromeStroke, lineWidth: 1)
-          }
+        Image(systemName: "ellipsis").frame(width: 24, height: 30)
       }
       .menuStyle(.borderlessButton)
-      .tint(.white.opacity(0.88))
       .fixedSize()
-      .help("Review a no-overwrite Ableton export")
-
+      .accessibilityLabel("Actions for selected Set")
       Button {
         store.planOpenInAbletonLive(for: entry.revision, in: entry.session)
       } label: {
-        Label("Open in Live…", systemImage: "play.fill")
+        Label("Open in Live…", systemImage: "arrow.up.right.square")
       }
-      .buttonStyle(StudioShellButtonStyle(kind: .primary))
-      .help("Review the exact Set and Ableton Live installation before opening")
+      .buttonStyle(StudioCanvasButtonStyle(kind: .secondary))
+      .help("Review the exact Set before opening it in Ableton Live")
     }
-    .padding(.horizontal, 18)
-    .padding(.vertical, 15)
-    .background(StudioShellPalette.ink)
-    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    .accessibilityElement(children: .contain)
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   @ViewBuilder
@@ -360,23 +379,19 @@ struct WorkDetailView: View {
         Label("Session sources", systemImage: "folder.badge.gearshape")
           .font(.headline)
         Spacer()
-        Text("\(work.sessions.count) physical folders · files untouched")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "\(work.sessions.count) physical folder\(work.sessions.count == 1 ? "" : "s") · files untouched"
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       }
     }
     .padding(.vertical, 6)
   }
 
-  private var timelineEntries: [WorkTimelineEntry] {
-    work.sessions
-      .flatMap { session in
-        session.revisions.map { WorkTimelineEntry(session: session, revision: $0) }
-      }
-      .sorted {
-        ($0.date ?? .distantPast) > ($1.date ?? .distantPast)
-      }
-  }
+  private var historyRequestKey: String { "\(work.id):\(store.workCatalogGeneration)" }
+
+  private var timelineEntries: [WorkTimelineEntry] { historySnapshot?.entries ?? [] }
 
   private var visibleTimelineEntries: [WorkTimelineEntry] {
     showsAllVersions ? timelineEntries : Array(timelineEntries.prefix(collapsedVersionCount))
@@ -388,40 +403,28 @@ struct WorkDetailView: View {
   }
 
   private func artifacts(for entry: WorkTimelineEntry) -> [RevisionArtifactAssociation] {
-    RevisionArtifactResolver()
-      .resolve(assets: entry.session.previewAssets, revisions: entry.session.revisions)
-      .filter { $0.revisionID == entry.revision.id }
+    historySnapshot?.artifacts(for: entry) ?? []
+  }
+
+  private func reconcileSelection(in entries: [WorkTimelineEntry]) {
+    let availableIDs = Set(entries.map(\.id))
+    let rememberedID = selectedRevisionID ?? store.selectedWorkRevisionID
+    selectedRevisionID =
+      rememberedID.flatMap { availableIDs.contains($0) ? $0 : nil }
+      ?? entries.first?.id
+    store.selectedWorkRevisionID = selectedRevisionID
+    if let selectedRevisionID,
+      let index = entries.firstIndex(where: { $0.id == selectedRevisionID }),
+      index >= collapsedVersionCount
+    {
+      showsAllVersions = true
+    }
   }
 
   private func verifiedExports(for entry: WorkTimelineEntry) -> [AbletonExportEvidence] {
     store.abletonExportEvidence.filter {
       $0.revisionID == entry.revision.id || $0.setID == entry.revision.set.id
     }
-  }
-
-  private func artifactSummary(_ artifacts: [RevisionArtifactAssociation]) -> String {
-    let stems = artifacts.count { $0.kind == .stem }
-    let masters = artifacts.count { $0.kind == .master }
-    let others = artifacts.count - stems - masters
-    return [
-      stems > 0 ? "\(stems) stem\(stems == 1 ? "" : "s")" : nil,
-      masters > 0 ? "\(masters) master\(masters == 1 ? "" : "s")" : nil,
-      others > 0 ? "\(others) bounce\(others == 1 ? "" : "s")" : nil,
-    ].compactMap { $0 }.joined(separator: " · ")
-  }
-
-  private var historySummary: String {
-    "\(timelineEntries.count) versions across \(work.sessions.count) Sessions"
-  }
-
-  private var dateRangeText: String {
-    let dates = timelineEntries.compactMap(\.date).sorted()
-    guard let first = dates.first, let last = dates.last else { return "Dates unavailable" }
-    if Calendar.current.isDate(first, inSameDayAs: last) {
-      return first.formatted(date: .abbreviated, time: .omitted)
-    }
-    return
-      "\(first.formatted(.dateTime.month(.abbreviated).year()))–\(last.formatted(.dateTime.month(.abbreviated).year()))"
   }
 
   private var groupingLabel: String {
@@ -445,22 +448,11 @@ struct WorkDetailView: View {
     case .unresolved: "Artist needs review"
     }
   }
-}
 
-private struct WorkTimelineEntry: Identifiable {
-  let session: StudioSession
-  let revision: StudioSetRevision
-
-  var id: String { revision.id }
-  var date: Date? { revision.timestamp.value ?? revision.set.modifiedAt }
-
-  var displayName: String {
-    let cleaned = revision.set.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-    return cleaned.isEmpty || cleaned == "\\" ? session.displayName : cleaned
-  }
-
-  var dateText: String {
-    date?.formatted(date: .abbreviated, time: .shortened) ?? "Date unavailable"
+  private var needsOrganisationReview: Bool {
+    work.artist.displayName == "Unknown"
+      || work.confidence == .suggested
+      || work.confidence == .unresolved
   }
 }
 
@@ -493,7 +485,7 @@ private struct WorkRevisionTimelineRow: View {
                 "LATEST", foreground: StudioShellPalette.ink, background: StudioShellPalette.signal)
             } else {
               statusTag(
-                entry.revision.set.isBackup ? "BACKUP" : "CURRENT",
+                entry.revision.set.isBackup ? "BACKUP" : "SET",
                 foreground: .secondary,
                 background: Color.secondary.opacity(0.09)
               )
@@ -545,7 +537,7 @@ private struct WorkRevisionTimelineRow: View {
     .accessibilityLabel(
       "\(entry.displayName), \(entry.session.role.displayName), \(entry.dateText)\(isLatest ? ", latest version" : "")"
     )
-    .accessibilityHint("Select this version to open, inspect or export")
+    .accessibilityHint("Choose this version to browse its tracks, source audio and devices")
   }
 
   private var dateColumn: some View {

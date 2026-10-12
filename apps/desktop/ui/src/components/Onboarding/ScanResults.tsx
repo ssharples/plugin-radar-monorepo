@@ -40,17 +40,17 @@ export function ScanResults() {
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
       {/* Headline */}
-      <h2 className="font-mono text-lg text-plugin-text crt-text uppercase tracking-wider mb-1">
+      <h2 className=" text-lg text-plugin-text uppercase tracking-wider mb-1">
         Found {scanResult.totalDiscovered} Plugins
       </h2>
-      <p className="text-plugin-dim text-xxs font-mono mb-6">
+      <p className="text-plugin-dim text-xxs  mb-6">
         Completed in {durationSec}s
       </p>
 
       {/* Issues section */}
       {hasIssues && (
         <div className="w-full mb-6">
-          <h3 className="text-plugin-muted text-xs font-mono uppercase tracking-wider mb-3">
+          <h3 className="text-plugin-muted text-xs  uppercase tracking-wider mb-3">
             {scanResult.totalBlacklisted} {scanResult.totalBlacklisted === 1 ? 'issue' : 'issues'} found
           </h3>
 
@@ -59,14 +59,14 @@ export function ScanResults() {
             const plugins = grouped[reason]!
             return (
               <div key={reason} className="mb-3">
-                <div className={`text-xxs font-mono px-3 py-2 rounded-propane border ${config.color} mb-1`}>
+                <div className={`text-xxs  px-3 py-2 rounded-md border ${config.color} mb-1`}>
                   <span className="uppercase font-bold">{config.label}</span>
                   <span className="ml-2 opacity-70">{config.description}</span>
                 </div>
                 {plugins.map((p, i) => (
                   <div
                     key={i}
-                    className="text-plugin-dim text-xxs font-mono pl-4 py-0.5 truncate"
+                    className="text-plugin-dim text-xxs  pl-4 py-0.5 truncate"
                   >
                     {p.name}
                   </div>
@@ -81,13 +81,13 @@ export function ScanResults() {
       <div className="flex flex-col w-full gap-2">
         <button
           onClick={continueFromResults}
-          className="w-full py-2.5 bg-plugin-accent hover:bg-plugin-accent-bright text-black font-mono text-sm uppercase tracking-wider rounded-propane transition-colors"
+          className="w-full py-2.5 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent  text-sm uppercase tracking-wider rounded-md transition-colors"
         >
-          Continue to Propane
+          Continue to ProChain
         </button>
         <button
           onClick={rescan}
-          className="w-full py-2 bg-transparent border border-plugin-border hover:border-plugin-accent text-plugin-muted hover:text-plugin-text font-mono text-xs uppercase tracking-wider rounded-propane transition-colors"
+          className="w-full py-2 bg-transparent border border-plugin-border hover:border-plugin-accent text-plugin-muted hover:text-plugin-text  text-xs uppercase tracking-wider rounded-md transition-colors"
         >
           Rescan All
         </button>

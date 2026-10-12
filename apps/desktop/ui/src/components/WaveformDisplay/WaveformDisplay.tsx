@@ -68,13 +68,13 @@ export function WaveformDisplay({ showInput = true, showOutput = true }: Wavefor
 
     // Draw output waveform (accent orange)
     if (showOutput && postDataRef.current.length > 0) {
-      drawWaveform(ctx, postDataRef.current, width, canvasHeight, `rgba(137, 87, 42, ${baseOpacity})`);
+      drawWaveform(ctx, postDataRef.current, width, canvasHeight, `rgba(139, 124, 255, ${baseOpacity})`);
     }
 
     // Draw zoom indicator if zoomed
     if (zoomX > 1 || zoomY > 1) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.font = '9px monospace';
+      ctx.font = '10px "JetBrains Mono", monospace';
       ctx.fillText(`${zoomX.toFixed(1)}x / ${zoomY.toFixed(1)}x`, 4, 10);
     }
   }, [showInput, showOutput, zoomX, zoomY, panX]);

@@ -38,9 +38,9 @@ export interface OnboardingActions {
   startScan: () => void
   skipScan: () => void
   handleScanProgress: (progress: number, currentPlugin: string) => void
-  handlePluginDiscovered: () => void
+  handlePluginDiscovered: (count?: number) => void
   handlePluginBlacklisted: (plugin: BlacklistedPlugin) => void
-  handleScanComplete: () => void
+  handleScanComplete: () => void | Promise<void>
   handleScanError: (error: string) => void
   continueFromResults: () => void
   rescan: () => void

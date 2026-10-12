@@ -16,6 +16,7 @@ public struct SampleUsageAggregator: @unchecked Sendable {
   ) -> SampleUsageAggregation {
     let projectRoots = indexes.flatMap(\.projects).map(\.rootURL)
     var occurrences: [SampleUsageOccurrence] = []
+    var occurrenceIDs = Set<String>()
     var seedsByPath: [String: SampleResourceSeed] = [:]
 
     for index in indexes {
@@ -67,18 +68,22 @@ public struct SampleUsageAggregator: @unchecked Sendable {
                       : (dependency?.availability == .disconnected ? .disconnected : .missing),
                     metadata: metadata)
                 }
-                occurrences.append(
-                  SampleUsageOccurrence(
-                    id: StableID.forValue(
-                      "sample-use:\(set.id):\(track.id):\(clip.id):\(sampleID)"),
-                    sampleID: sampleID, workID: work?.id, workName: work?.displayName,
-                    sessionID: project.id, sessionName: project.displayName,
-                    timelineID: timeline.id, setID: set.id, setName: set.displayName,
-                    setURL: set.fileURL, setModifiedAt: set.modifiedAt,
-                    trackID: track.id, trackName: track.name, clipID: clip.id,
-                    clipName: clip.name, placement: clip.placement, isWarped: clip.isWarped,
-                    warpMode: clip.warpMode, warpMarkerCount: clip.warpMarkerCount,
-                    deviceChain: track.devices))
+                let occurrence = SampleUsageOccurrence(
+                  id: StableID.forValue(
+                    "sample-use:\(set.id):\(track.id):\(clip.id):\(sampleID)"),
+                  sampleID: sampleID, workID: work?.id, workName: work?.displayName,
+                  sessionID: project.id, sessionName: project.displayName,
+                  timelineID: timeline.id, setID: set.id, setName: set.displayName,
+                  setURL: set.fileURL, setModifiedAt: set.modifiedAt,
+                  trackID: track.id, trackName: track.name, clipID: clip.id,
+                  clipName: clip.name, placement: clip.placement, isWarped: clip.isWarped,
+                  warpMode: clip.warpMode, warpMarkerCount: clip.warpMarkerCount,
+                  deviceChain: track.devices)
+                // Overlapping registered roots can expose the same physical Set more than once.
+                // Keep one evidence row per stable occurrence identity before persisting the batch.
+                if occurrenceIDs.insert(occurrence.id).inserted {
+                  occurrences.append(occurrence)
+                }
               }
             }
           }

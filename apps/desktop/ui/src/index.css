@@ -2,30 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Self-hosted fonts for JUCE WebView (no network access) */
+/* Self-hosted fonts for the JUCE WebView (no network access).
+   Barlow Semi Condensed: UI text. JetBrains Mono: numbers and readouts.
+   Both SIL Open Font License — see src/fonts/OFL-*.txt */
 @font-face {
-  font-family: 'Cutive Mono';
+  font-family: 'Barlow Semi Condensed';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('./fonts/CutiveMono-Regular.woff2') format('woff2');
+  src: url('./fonts/BarlowSemiCondensed-400.woff2') format('woff2');
 }
-
 @font-face {
-  font-family: 'Nosifer';
+  font-family: 'Barlow Semi Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/BarlowSemiCondensed-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/BarlowSemiCondensed-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('./fonts/Nosifer-Regular.woff2') format('woff2');
+  src: url('./fonts/JetBrainsMono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/JetBrainsMono-500.woff2') format('woff2');
 }
 
 :root {
-  font-family: 'Cutive Mono', monospace;
+  font-family: 'Barlow Semi Condensed', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: #eceef2;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Tailwind rem units are based on 16px; keep the html font-size at 16px
+   so spacing stays predictable and set the body text size instead. */
+html { font-size: 16px; }
 
 * {
   box-sizing: border-box;
@@ -34,7 +63,9 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #000000;
+  background-color: #0c0d10;
+  color: #eceef2;
+  font-size: 13px;
   overflow: hidden;
 }
 
@@ -44,57 +75,56 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Default scrollbar — Propane amber */
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(139, 124, 255, 0.7);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: rgba(139, 124, 255, 0.35);
+}
+
+/* Default scrollbar — thin graphite */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #121212;
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(137, 87, 42, 0.24);
+  background: #2a2e35;
   border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #89572a;
+  background: #3a3f48;
+  background-clip: padding-box;
 }
 
-/* Custom PNG-backed scrollbar for chain area */
+/* Chain canvas scrollbar — slightly wider for easier grabbing */
 .chain-scrollbar::-webkit-scrollbar {
-  width: 16px;
+  width: 10px;
 }
 
-.chain-scrollbar::-webkit-scrollbar-track {
-  background: url('./assets/scrollbar-bg.png') repeat-y;
-  background-size: 16px auto;
-}
-
-.chain-scrollbar::-webkit-scrollbar-thumb {
-  background: url('./assets/scrollbar-thumb.png') repeat-y;
-  background-size: 16px auto;
-  border-radius: 0;
-}
-
-.chain-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: url('./assets/scrollbar-thumb.png') repeat-y;
-  background-size: 16px auto;
-  filter: brightness(1.3);
-}
-
-/* CRT text glow effect */
-.crt-text {
-  text-shadow: 0 0 0.95px rgba(255, 255, 255, 0.6);
-}
-
-/* Propane label utility */
-.propane-label {
-  font-family: 'Cutive Mono', monospace;
+/* Small uppercase section label */
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  color: #5d636e;
+}
+
+/* Numeric readouts */
+.num {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Plugin slot transitions */
@@ -102,17 +132,14 @@ html, body, #root {
   opacity: 0;
   transform: translateY(-10px);
 }
-
 .slot-enter-active {
   opacity: 1;
   transform: translateY(0);
   transition: opacity 200ms, transform 200ms;
 }
-
 .slot-exit {
   opacity: 1;
 }
-
 .slot-exit-active {
   opacity: 0;
   transform: translateY(10px);
@@ -125,17 +152,23 @@ html, body, #root {
     -45deg,
     transparent,
     transparent 3px,
-    rgba(201, 148, 74, 0.12) 3px,
-    rgba(201, 148, 74, 0.12) 6px
+    rgba(214, 168, 90, 0.14) 3px,
+    rgba(214, 168, 90, 0.14) 6px
   );
 }
-
 .drop-zone-stripes-parallel {
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
     transparent 3px,
-    rgba(90, 120, 66, 0.12) 3px,
-    rgba(90, 120, 66, 0.12) 6px
+    rgba(63, 191, 174, 0.14) 3px,
+    rgba(63, 191, 174, 0.14) 6px
   );
+}
+
+/* Faint dot grid behind the chain canvas */
+.canvas-grid {
+  background-color: #0c0d10;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 16px 16px;
 }

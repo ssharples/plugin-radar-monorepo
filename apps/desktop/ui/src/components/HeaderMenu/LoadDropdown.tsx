@@ -78,12 +78,12 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
   }, [loadPreset, onClose]);
 
   return (
-    <div className="w-80 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl animate-slide-up max-h-[70vh] flex flex-col">
+    <div className="w-80 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up max-h-[70vh] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-plugin-border flex-shrink-0">
         <div className="flex items-center gap-2">
           <FolderOpen className="w-3.5 h-3.5 text-plugin-accent" />
-          <span className="text-xs font-mono uppercase font-semibold text-plugin-text">Load Chain</span>
+          <span className="text-xs  uppercase font-semibold text-plugin-text">Load Chain</span>
         </div>
         <button onClick={onClose} className="text-plugin-dim hover:text-plugin-text">
           <X className="w-3.5 h-3.5" />
@@ -99,7 +99,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search local presets..."
-            className="w-full bg-black/40 border border-plugin-border rounded-propane font-mono pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+            className="w-full bg-plugin-bg border border-plugin-border rounded-md  pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             autoFocus
           />
         </div>
@@ -121,7 +121,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
               <div className="mb-3">
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Clock className="w-3 h-3 text-plugin-dim" />
-                  <span className="text-[10px] font-mono text-plugin-dim uppercase tracking-wider font-medium">
+                  <span className="text-[11px]  text-plugin-dim uppercase tracking-wider font-medium">
                     Recent
                   </span>
                 </div>
@@ -141,7 +141,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
             <div>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <FileText className="w-3 h-3 text-plugin-dim" />
-                <span className="text-[10px] font-mono text-plugin-dim uppercase tracking-wider font-medium">
+                <span className="text-[11px]  text-plugin-dim uppercase tracking-wider font-medium">
                   {search ? `Results (${filtered.length})` : 'All Local Presets'}
                 </span>
               </div>
@@ -169,7 +169,7 @@ export function LoadDropdown({ onClose }: LoadDropdownProps) {
       <div className="px-3 py-2 border-t border-plugin-border flex-shrink-0">
         <button
           onClick={handleImportFile}
-          className="w-full flex items-center justify-center gap-1.5 text-[11px] text-plugin-muted hover:text-plugin-text border border-dashed border-plugin-border hover:border-plugin-accent/40 rounded px-3 py-1.5 transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 text-xs text-plugin-muted hover:text-plugin-text border border-dashed border-plugin-border hover:border-plugin-accent/40 rounded px-3 py-1.5 transition-colors"
         >
           <Upload className="w-3 h-3" />
           Import from File...
@@ -198,11 +198,11 @@ function PresetRow({
       onClick={() => onLoad(preset)}
       className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left hover:bg-white/5 transition-colors group"
     >
-      <span className="text-xs font-mono text-plugin-text truncate group-hover:text-plugin-accent transition-colors">
+      <span className="text-xs  text-plugin-text truncate group-hover:text-plugin-accent transition-colors">
         {preset.name}
       </span>
       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-        <span className="text-[10px] text-plugin-dim">
+        <span className="text-[11px] text-plugin-dim">
           {preset.category}
         </span>
         <span

@@ -10,9 +10,14 @@ export function PresetBrowser() {
     currentPreset,
     selectedCategory,
     loading,
+    pendingLoad,
+    loadProgress,
+    loadIssues,
+    loadStatus,
     fetchPresets,
     fetchCategories,
     loadPreset,
+    loadAvailableEffects,
     deletePreset,
     setSelectedCategory,
   } = usePresetStore();
@@ -49,7 +54,7 @@ export function PresetBrowser() {
         </div>
         <button
           onClick={() => setShowSaveModal(true)}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-plugin-accent hover:bg-plugin-accent/80 text-white transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-plugin-accent hover:bg-plugin-accent/80 text-plugin-text transition-colors"
         >
           <Save className="w-3 h-3" />
           Save
@@ -63,6 +68,20 @@ export function PresetBrowser() {
           <p className="text-sm text-plugin-text font-medium truncate">
             {currentPreset.name}
           </p>
+        </div>
+      )}
+
+      {pendingLoad && loadProgress && (
+        <div className="px-3 py-2 bg-plugin-bg border-b border-plugin-border" role="status" aria-live="polite">
+          <div className="flex items-center justify-between gap-2 text-xs text-plugin-text"><span>Loading candidate…</span><span className=" text-plugin-muted">{loadProgress.completed} / {loadProgress.total || '—'}</span></div>
+          {loadProgress.currentPlugin && <p className="mt-1 truncate text-[11px] text-plugin-muted">{loadProgress.currentPlugin}</p>}
+        </div>
+      )}
+      {!pendingLoad && (loadStatus === 'failed' || loadStatus === 'partial') && loadIssues.length > 0 && loadProgress?.path && (
+        <div className="px-3 py-2 bg-plugin-bg border-b border-plugin-border" role="alert">
+          <p className={`text-xs ${loadStatus === 'partial' ? 'text-amber-300' : 'text-red-300'}`}>{loadStatus === 'partial' ? 'Loaded with unavailable effects.' : 'Preset load failed. Current preset is still active.'}</p>
+          {!!loadIssues.length && <ul className="mt-1 space-y-0.5 text-[11px] text-plugin-muted">{loadIssues.slice(0, 3).map((issue) => <li key={`${issue.name}-${issue.reason}`} className="truncate">{issue.name}: {issue.reason}</li>)}</ul>}
+          <button className="mt-2 text-[11px] uppercase tracking-wide text-plugin-accent hover:underline" onClick={() => loadAvailableEffects()}>Load available effects</button>
         </div>
       )}
 

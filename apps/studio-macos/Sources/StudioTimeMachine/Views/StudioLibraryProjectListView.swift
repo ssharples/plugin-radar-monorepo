@@ -40,7 +40,7 @@ struct StudioLibraryProjectListView: View {
           .padding(.vertical, 16)
           .onAppear(perform: loadNextPage)
       } else {
-        Text("All \(works.count) Songs loaded")
+        Text("\(works.count) Song\(works.count == 1 ? "" : "s") shown")
           .font(.system(size: 11, weight: .medium, design: .rounded))
           .foregroundStyle(StudioShellPalette.mutedInk.opacity(0.72))
           .frame(maxWidth: .infinity)
@@ -82,19 +82,19 @@ private struct SongProjectFileGroup: View {
   let openSong: () -> Void
   let openRevision: (StudioSetRevision, StudioSession) -> Void
   let reveal: (URL) -> Void
-
-  private var catalog: SongProjectFileCatalog {
-    SongProjectFileCatalog(work: work)
-  }
+  @State private var showsAllFiles = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
+    let catalog = SongProjectFileCatalog(work: work)
+    let visibleFamilies = showsAllFiles ? catalog.families : Array(catalog.families.prefix(1))
     VStack(spacing: 0) {
-      songHeader
+      songHeader(catalog)
 
       Divider()
         .overlay(StudioShellPalette.canvasStroke)
 
-      ForEach(Array(catalog.families.enumerated()), id: \.element.id) { index, family in
+      ForEach(Array(visibleFamilies.enumerated()), id: \.element.id) { index, family in
         ProjectFileFamilyRow(
           family: family,
           isLatest: index == 0,
@@ -102,9 +102,31 @@ private struct SongProjectFileGroup: View {
           reveal: reveal
         )
 
-        if index < catalog.families.count - 1 || !catalog.unmatchedBackups.isEmpty {
+        if index < visibleFamilies.count - 1 || !catalog.unmatchedBackups.isEmpty {
           groupDivider
         }
+      }
+
+      if catalog.families.count > 1 {
+        Button {
+          withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+            showsAllFiles.toggle()
+          }
+        } label: {
+          Label(
+            showsAllFiles
+              ? "Show latest Set file only"
+              : "Show \(catalog.families.count - 1) more Set file\(catalog.families.count == 2 ? "" : "s")",
+            systemImage: showsAllFiles ? "chevron.up" : "chevron.down"
+          )
+          .font(.caption.weight(.medium))
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, 18)
+          .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(StudioShellPalette.mutedInk)
+        .accessibilityValue(showsAllFiles ? "Expanded" : "Collapsed")
       }
 
       if !catalog.unmatchedBackups.isEmpty {
@@ -129,7 +151,7 @@ private struct SongProjectFileGroup: View {
       .overlay(StudioShellPalette.canvasStroke.opacity(0.76))
   }
 
-  private var songHeader: some View {
+  private func songHeader(_ catalog: SongProjectFileCatalog) -> some View {
     Button(action: openSong) {
       HStack(spacing: 16) {
         ProjectObjectView(
@@ -191,6 +213,7 @@ private struct ProjectFileFamilyRow: View {
   let reveal: (URL) -> Void
   @State private var backupsExpanded = false
   @State private var isHovered = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     VStack(spacing: 0) {
@@ -213,7 +236,7 @@ private struct ProjectFileFamilyRow: View {
           }
         }
         .background(StudioShellPalette.ink.opacity(0.024))
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        .transition(.opacity)
       }
     }
   }
@@ -287,7 +310,7 @@ private struct ProjectFileFamilyRow: View {
   }
 
   private var primaryStatusTag: some View {
-    Text(isLatest ? "LATEST" : "CURRENT")
+    Text(isLatest ? "LATEST" : "SET")
       .font(.system(size: 8, weight: .bold, design: .rounded))
       .tracking(0.45)
       .foregroundStyle(isLatest ? StudioShellPalette.ink : StudioShellPalette.mutedInk)
@@ -301,7 +324,7 @@ private struct ProjectFileFamilyRow: View {
 
   private var backupDisclosure: some View {
     Button {
-      withAnimation(.easeInOut(duration: 0.18)) {
+      withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
         backupsExpanded.toggle()
       }
     } label: {

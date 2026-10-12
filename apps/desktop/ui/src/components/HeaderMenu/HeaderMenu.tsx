@@ -1,16 +1,29 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Save, FolderOpen, Globe, Settings, Check, X, Share2 } from 'lucide-react';
+import { Save, FolderOpen, Settings, Check, X, Share2, Pencil, Workflow, Library } from 'lucide-react';
 import { SaveDropdown } from './SaveDropdown';
 import { LoadDropdown } from './LoadDropdown';
 import { AvatarDropdown } from './AvatarDropdown';
 import { QuickSharePanel } from './QuickSharePanel';
-import { ChainBrowser } from '../ChainBrowser';
+import { ProChainMark } from '../Brand/ProChainMark';
 import { useChainStore } from '../../stores/chainStore';
 import { usePresetStore } from '../../stores/presetStore';
 
-type ActiveDropdown = 'save' | 'load' | 'browse' | 'share' | 'settings' | 'avatar' | null;
+type ActiveDropdown = 'save' | 'load' | 'share' | 'settings' | 'avatar' | null;
 
-export function HeaderMenu() {
+export type AppView = 'chain' | 'library';
+
+interface HeaderMenuProps {
+  /** Which main view is showing */
+  view?: AppView;
+  /** Switch between the chain editor and the chain library */
+  onViewChange?: (view: AppView) => void;
+}
+
+/**
+ * App top bar: brand, Chain/Library switch, chain name, and chain actions
+ * (save, open, share, settings) plus the account menu.
+ */
+export function HeaderMenu({ view = 'chain', onViewChange }: HeaderMenuProps = {}) {
   const [active, setActive] = useState<ActiveDropdown>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -60,9 +73,9 @@ export function HeaderMenu() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [close, isEditingName]);
 
-  // Close dropdowns on outside click (but not for browse modal)
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!active || active === 'browse') return;
+    if (!active) return;
     const handler = (e: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
         close();
@@ -105,65 +118,43 @@ export function HeaderMenu() {
   };
 
   const btnBase =
-    'flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase font-medium rounded transition-all relative';
+    'h-8 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold rounded-md transition-colors relative';
   const btnInactive =
-    'text-plugin-muted hover:text-plugin-text hover:bg-white/5';
-  const btnActive = 'text-plugin-text bg-white/8 shadow-sm';
+    'text-plugin-muted hover:text-plugin-text hover:bg-plugin-raised';
+  const btnActive = 'text-plugin-text bg-plugin-raised';
+
+  const tab = (id: AppView, label: string, Icon: typeof Workflow) => (
+    <button
+      onClick={() => onViewChange?.(id)}
+      className={`h-7 inline-flex items-center gap-1.5 px-3 rounded-md text-xs font-semibold transition-colors ${
+        view === id
+          ? 'bg-plugin-raised text-plugin-text shadow-card'
+          : 'text-plugin-muted hover:text-plugin-text'
+      }`}
+      aria-pressed={view === id}
+    >
+      <Icon className={`w-3.5 h-3.5 ${view === id ? 'text-plugin-accent' : ''}`} />
+      {label}
+    </button>
+  );
 
   return (
-    <div ref={headerRef} className="relative">
-      {/* Header bar */}
-      <div className="flex items-center gap-0.5 px-2 py-1 bg-plugin-surface border-b border-plugin-border">
-        {/* Avatar / Profile */}
-        <AvatarDropdown isOpen={active === 'avatar'} onToggle={() => toggle('avatar')} onClose={close} />
-        <div className="w-px h-5 bg-plugin-border mr-1" />
+    <div ref={headerRef} className="relative z-40">
+      <div className="flex items-center gap-2 h-11 pl-3 pr-2 bg-plugin-surface border-b border-plugin-border">
+        {/* Brand */}
+        <ProChainMark className="flex-shrink-0" />
 
-        {/* Save */}
-        <button
-          onClick={() => toggle('save')}
-          className={`${btnBase} ${active === 'save' ? btnActive : btnInactive}`}
-          title="Save chain"
-        >
-          <Save className="w-3.5 h-3.5" />
-          <span>Save</span>
-        </button>
+        {/* View switch */}
+        <div className="flex items-center p-0.5 rounded-lg bg-plugin-bg border border-plugin-border ml-1">
+          {tab('chain', 'Chain', Workflow)}
+          {tab('library', 'Library', Library)}
+        </div>
 
-        {/* Load */}
-        <button
-          onClick={() => toggle('load')}
-          className={`${btnBase} ${active === 'load' ? btnActive : btnInactive}`}
-          title="Load chain"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-          <span>Load</span>
-        </button>
-
-        {/* Browse */}
-        <button
-          onClick={() => toggle('browse')}
-          className={`${btnBase} ${active === 'browse' ? btnActive : btnInactive}`}
-          title="Browse community chains"
-        >
-          <Globe className="w-3.5 h-3.5" />
-          <span>Browse</span>
-        </button>
-
-        {/* Share */}
-        <button
-          onClick={() => toggle('share')}
-          className={`${btnBase} ${active === 'share' ? btnActive : btnInactive}`}
-          title="Share chain"
-        >
-          <Share2 className="w-3.5 h-3.5" />
-          <span>Share</span>
-        </button>
-
-        {/* Divider */}
         <div className="w-px h-5 bg-plugin-border mx-1" />
 
-        {/* Chain Name */}
+        {/* Chain name */}
         {isEditingName ? (
-          <div className="flex items-center gap-1 flex-1 min-w-0">
+          <div className="flex items-center gap-1 flex-1 min-w-0 max-w-[360px]">
             <input
               ref={nameInputRef}
               type="text"
@@ -174,76 +165,97 @@ export function HeaderMenu() {
                 if (e.key === 'Escape') cancelEditName();
               }}
               onBlur={commitName}
-              className="flex-1 min-w-0 px-2 py-0.5 bg-black/40 border border-plugin-accent/50 rounded font-mono text-xs text-plugin-text font-medium focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="flex-1 min-w-0 h-7 px-2 bg-plugin-bg border border-plugin-accent/60 rounded-md text-[13px] text-plugin-text font-semibold focus:outline-none"
               maxLength={64}
             />
-            <button
-              onClick={commitName}
-              className="p-0.5 text-green-400 hover:text-green-300"
-              title="Confirm"
-            >
+            <button onClick={commitName} className="w-6 h-6 inline-flex items-center justify-center rounded text-green-400 hover:bg-green-500/10" title="Confirm">
               <Check className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={cancelEditName}
-              className="p-0.5 text-red-400 hover:text-red-300"
-              title="Cancel"
-            >
+            <button onClick={cancelEditName} className="w-6 h-6 inline-flex items-center justify-center rounded text-red-400 hover:bg-red-500/10" title="Cancel">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
         ) : (
           <button
             onClick={startEditingName}
-            className="flex-1 min-w-0 px-2 py-0.5 text-left text-xs font-medium text-plugin-text hover:text-plugin-accent truncate transition-colors group"
+            className="group min-w-0 flex items-center gap-1.5 h-7 px-1.5 -ml-0.5 rounded-md hover:bg-plugin-raised transition-colors"
             title="Click to rename chain"
           >
-            <span className="group-hover:underline decoration-dotted underline-offset-2">
-              {chainName}
-            </span>
+            <span className="truncate text-[13px] font-semibold text-plugin-text">{chainName}</span>
+            <Pencil className="w-3 h-3 text-plugin-dim opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
             {targetInputLufs !== null && (
-              <span className="ml-2 text-[10px] text-plugin-muted font-normal">
-                🎚️ {targetInputLufs} LUFS
+              <span className="num flex-shrink-0 text-[10px] text-plugin-muted px-1.5 py-0.5 rounded bg-plugin-bg border border-plugin-border">
+                {targetInputLufs} LUFS
               </span>
             )}
           </button>
         )}
 
-        {/* Settings */}
-        <button
-          onClick={() => toggle('settings')}
-          className={`${btnBase} ${active === 'settings' ? btnActive : btnInactive}`}
-          title="Chain settings"
-        >
-          <Settings className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex-1" />
+
+        {/* Chain actions */}
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => toggle('save')}
+            className={`${btnBase} ${active === 'save' ? btnActive : btnInactive}`}
+            title="Save chain"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Save</span>
+          </button>
+          <button
+            onClick={() => toggle('load')}
+            className={`${btnBase} ${active === 'load' ? btnActive : btnInactive}`}
+            title="Open a saved chain"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Open</span>
+          </button>
+          <button
+            onClick={() => toggle('share')}
+            className={`${btnBase} ${active === 'share' ? btnActive : btnInactive}`}
+            title="Share chain"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Share</span>
+          </button>
+          <button
+            onClick={() => toggle('settings')}
+            className={`${btnBase} !px-2 ${active === 'settings' ? btnActive : btnInactive}`}
+            title="Chain settings"
+            aria-label="Chain settings"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="w-px h-5 bg-plugin-border mx-1" />
+
+        {/* Account */}
+        <AvatarDropdown isOpen={active === 'avatar'} onToggle={() => toggle('avatar')} onClose={close} />
       </div>
 
       {/* Dropdown panels */}
       {active === 'save' && (
-        <div className="absolute left-0 top-full z-50 mt-0.5">
+        <div className="absolute right-2 top-full z-50 mt-1">
           <SaveDropdown onClose={close} />
         </div>
       )}
 
       {active === 'load' && (
-        <div className="absolute left-0 top-full z-50 mt-0.5">
+        <div className="absolute right-2 top-full z-50 mt-1">
           <LoadDropdown onClose={close} />
         </div>
       )}
 
       {active === 'share' && (
-        <div className="absolute left-0 top-full z-50 mt-0.5">
+        <div className="absolute right-2 top-full z-50 mt-1">
           <QuickSharePanel onClose={close} />
         </div>
       )}
 
-      {active === 'browse' && (
-        <ChainBrowser onClose={close} />
-      )}
-
       {active === 'settings' && (
-        <div className="absolute right-0 top-full z-50 mt-0.5">
+        <div className="absolute right-2 top-full z-50 mt-1">
           <SettingsDropdown onClose={close} />
         </div>
       )}
@@ -275,15 +287,15 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="w-72 bg-plugin-surface border border-plugin-border rounded-lg shadow-xl p-4 animate-slide-up">
-      <h3 className="text-xs font-mono font-semibold text-plugin-text mb-3 uppercase tracking-wider">
-        Chain Settings
+    <div className="w-72 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel p-4 animate-slide-up">
+      <h3 className="text-[13px] font-semibold text-plugin-text mb-3">
+        Chain settings
       </h3>
 
       {/* Target LUFS */}
       <div className="mb-3">
-        <label className="block text-[11px] font-mono text-plugin-muted mb-1.5">
-          🎚️ Target Input LUFS
+        <label className="block text-xs  text-plugin-muted mb-1.5">
+          Target input loudness (LUFS)
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -293,14 +305,14 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
             min={-40}
             max={0}
             step={1}
-            className="w-16 bg-black/40 border border-plugin-border rounded px-2 py-1 text-xs text-plugin-text font-mono text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+            className="w-16 bg-plugin-bg border border-plugin-border rounded px-2 py-1 text-xs text-plugin-text  text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent"
 
           />
-          <span className="text-[10px] text-plugin-dim">dB</span>
+          <span className="text-[11px] text-plugin-dim">dB</span>
           <select
             value={lufsValue}
             onChange={(e) => setLufsValue(Number(e.target.value))}
-            className="flex-1 bg-black/40 border border-plugin-border rounded px-2 py-1 text-[11px] font-mono text-plugin-muted focus:outline-none"
+            className="flex-1 bg-plugin-bg border border-plugin-border rounded px-2 py-1 text-xs  text-plugin-muted focus:outline-none"
           >
             {LUFS_PRESETS.map((p) => (
               <option key={p.value} value={p.value}>
@@ -309,7 +321,7 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
             ))}
           </select>
         </div>
-        <p className="text-[10px] text-plugin-dim mt-1">
+        <p className="text-[11px] text-plugin-dim mt-1">
           Recommended input level for this chain
         </p>
       </div>
@@ -317,13 +329,13 @@ function SettingsDropdown({ onClose }: { onClose: () => void }) {
       <div className="flex gap-2">
         <button
           onClick={clearLufs}
-          className="flex-1 text-[11px] text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2 py-1.5 transition-colors"
+          className="flex-1 text-xs text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2 py-1.5 transition-colors"
         >
           Clear Target
         </button>
         <button
           onClick={applyLufs}
-          className="flex-1 text-[11px] text-white bg-plugin-accent hover:bg-plugin-accent/80 rounded px-2 py-1.5 font-medium transition-colors"
+          className="flex-1 text-xs text-plugin-on-accent bg-plugin-accent hover:bg-plugin-accent-bright rounded-md px-2 py-1.5 font-semibold transition-colors"
         >
           Apply
         </button>

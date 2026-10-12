@@ -1,0 +1,42 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:8:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/ui
+
+ ❯ src/stores/__tests__/onboardingStore.test.ts (29 tests | 2 failed) 84ms
+       × records scanDurationMs on completion 4ms
+       × includes blacklisted plugins in scan result 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/stores/__tests__/onboardingStore.test.ts > onboardingStore > scan step > records scanDurationMs on completion
+TypeError: Cannot read properties of null (reading 'scanDurationMs')
+ ❯ src/stores/__tests__/onboardingStore.test.ts:197:32
+    195|
+    196|       const state = useOnboardingStore.getState()
+    197|       expect(state.scanResult!.scanDurationMs).toBeGreaterThanOrEqual(…
+       |                                ^
+    198|     })
+    199|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/stores/__tests__/onboardingStore.test.ts > onboardingStore > scan step > includes blacklisted plugins in scan result
+TypeError: Cannot read properties of null (reading 'totalBlacklisted')
+ ❯ src/stores/__tests__/onboardingStore.test.ts:231:32
+    229|
+    230|       const state = useOnboardingStore.getState()
+    231|       expect(state.scanResult!.totalBlacklisted).toBe(1)
+       |                                ^
+    232|       expect(state.scanResult!.blacklistedPlugins[0].reason).toBe('sca…
+    233|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 16 passed (17)
+      Tests  2 failed | 162 passed (164)
+   Start at  13:21:24
+   Duration  4.88s (transform 3.76s, setup 2.20s, import 5.28s, tests 5.78s, environment 28.22s)
+

@@ -69,7 +69,7 @@ export function DropZone({
   }
 
   const lineColor = isParallelContext ? 'bg-plugin-parallel' : 'bg-plugin-serial';
-  const glowColor = isParallelContext ? 'shadow-[0_0_8px_rgba(90,120,66,0.3)]' : 'shadow-[0_0_8px_rgba(201,148,74,0.3)]';
+  const glowColor = isParallelContext ? 'shadow-[0_0_8px_rgba(63,191,174,0.4)]' : 'shadow-[0_0_8px_rgba(214,168,90,0.4)]';
   const borderColor = isParallelContext ? 'border-plugin-parallel/50' : 'border-plugin-serial/50';
   const bgColor = isParallelContext ? 'bg-plugin-parallel/10' : 'bg-plugin-serial/10';
 
@@ -126,13 +126,13 @@ export function DropZone({
           className={`
             absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50
             flex items-center gap-1.5 px-2.5 py-1 rounded-md
-            bg-plugin-surface/95 border border-plugin-border
+            bg-plugin-raised border border-plugin-border-bright
             text-xs text-plugin-muted whitespace-nowrap
             animate-fade-in
             backdrop-blur-sm shadow-lg
           `}
         >
-          <span>Hold <kbd className="px-1 py-0.5 rounded bg-plugin-border text-plugin-text text-xxs font-mono">Shift</kbd> + drop to create parallel group</span>
+          <span>Hold <kbd className="px-1 py-0.5 rounded bg-plugin-border text-plugin-text text-xxs">Shift</kbd> + drop to create parallel group</span>
         </div>
       )}
     </div>

@@ -60,3 +60,11 @@ bash apps/studio-macos/script/build_and_run.sh --verify
 Only run a real-corpus `studio-index` command against user-approved library roots. Do not assume sample-mode UI, a successful build, or an HTTP response proves that real local indexing works.
 
 When a task explicitly changes the website, Convex backend, or JUCE/plugin surface, run that surface's relevant checks and consult its local documentation. Keep those results separate from macOS app verification.
+
+## Standing plugin quality gates
+
+For every production change in `apps/desktop/src/` or `apps/desktop/ui/src/`, follow [the plugin quality workflow](tools/quality/README.md): passing relevant tests, then per-function CRAP <= 6, then mutation >= 80% for each changed module with no easily killable survivors. Run `npm run quality:gate -- --files <changed production files>`; this refreshes coverage before mutation. Apply the gate to all changed modules before completing a production task.
+
+Unmapped functions are N/A and block completion; never substitute zero or claim a pass. Add behavioral tests before cohesive refactoring, preserve public behavior, and never exclude production code or add tautological tests to satisfy a score. Review exact surviving diffs; equivalent exclusions require an exact source-bound identity and behavioral proof in `tools/quality/equivalents.json`. Report commands, worst scores, counts, survivors and N/A reasons.
+
+C++ Mull is configured only until a matching LLVM/Mull toolchain is explicitly supplied. `quality:mutation-config` is not a mutation pass; do not install heavy native tooling implicitly. TypeScript uses the installed Stryker adapter. These gates do not extend to Studio Time Machine, the website or Convex.

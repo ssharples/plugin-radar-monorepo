@@ -215,14 +215,14 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
       onClick={onClose}
     >
       <div
-        className="bg-plugin-surface rounded-propane-lg w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col border border-plugin-border shadow-2xl animate-slide-up"
+        className="bg-plugin-surface rounded-lg w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col border border-plugin-border shadow-2xl animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-plugin-border flex-shrink-0">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-plugin-accent" />
-            <span className="text-sm font-mono uppercase font-bold text-plugin-text">Community Chains</span>
+            <span className="text-sm  uppercase font-bold text-plugin-text">Community Chains</span>
           </div>
           <button
             onClick={onClose}
@@ -242,7 +242,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder="Search chains..."
-              className="w-full bg-black/40 border border-plugin-border rounded-propane font-mono pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+              className="w-full bg-plugin-bg border border-plugin-border rounded-md  pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
 
@@ -250,7 +250,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="bg-black/40 border border-plugin-border rounded-propane font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
+            className="bg-plugin-bg border border-plugin-border rounded-md  px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
@@ -261,7 +261,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-black/40 border border-plugin-border rounded-propane font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
+            className="bg-plugin-bg border border-plugin-border rounded-md  px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none"
           >
             {SORT_OPTIONS.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -295,7 +295,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             {previewChain.tags?.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
                 {previewChain.tags.map((tag: string) => (
-                  <span key={tag} className="px-1.5 py-0.5 bg-plugin-accent/15 text-plugin-accent rounded text-[10px]">
+                  <span key={tag} className="px-1.5 py-0.5 bg-plugin-accent/15 text-plugin-accent rounded text-[11px]">
                     {tag}
                   </span>
                 ))}
@@ -306,7 +306,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             {previewChain.targetInputLufs != null && (
               <div className="flex items-center gap-2 mb-3 text-xs">
                 <span className="text-plugin-muted">🎚️ Target:</span>
-                <span className="font-mono font-medium text-plugin-accent">
+                <span className=" font-medium text-plugin-accent">
                   {previewChain.targetInputLufs} LUFS
                 </span>
               </div>
@@ -327,7 +327,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                       ? '✅ All plugins available'
                       : `⚠️ Missing ${compatibility.missingCount} plugins`}
                   </span>
-                  <span className="font-mono font-bold text-plugin-text">
+                  <span className=" font-bold text-plugin-text">
                     {compatibility.percentage}%
                   </span>
                 </div>
@@ -344,7 +344,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
 
             {/* Plugin slots */}
             <div className="mb-4">
-              <h4 className="text-[10px] font-mono text-plugin-dim uppercase tracking-wider mb-2">
+              <h4 className="text-[11px]  text-plugin-dim uppercase tracking-wider mb-2">
                 Plugins ({previewChain.slots?.length ?? 0})
               </h4>
               <div className="space-y-1">
@@ -372,11 +372,11 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                           <span className="text-plugin-dim ml-1.5">{slot.manufacturer}</span>
                         </div>
                         {sub ? (
-                          <span className="text-green-400 text-[10px]">✓ {sub.altName}</span>
+                          <span className="text-green-400 text-[11px]">✓ {sub.altName}</span>
                         ) : isMissing ? (
-                          <span className="text-red-400 text-[10px]">Missing</span>
+                          <span className="text-red-400 text-[11px]">Missing</span>
                         ) : (
-                          <span className="text-green-400 text-[10px]">✓</span>
+                          <span className="text-green-400 text-[11px]">✓</span>
                         )}
                       </div>
                       {isMissing && !sub && missingSlot?.alternatives?.length ? (
@@ -386,7 +386,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                               key={j}
                               onClick={() => handleSubstitute(slot.position ?? idx, slot.pluginName, alt)}
                               className="px-1.5 py-0.5 bg-plugin-accent/20 text-plugin-accent
-                                         hover:bg-plugin-accent/30 rounded text-[10px] transition-colors"
+                                         hover:bg-plugin-accent/30 rounded text-[11px] transition-colors"
                             >
                               Use {alt.name}
                             </button>
@@ -395,7 +395,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                       ) : sub ? (
                         <button
                           onClick={() => handleUndoSubstitute(slot.position ?? idx)}
-                          className="mt-0.5 text-plugin-muted hover:text-white text-[10px] underline"
+                          className="mt-0.5 text-plugin-muted hover:text-plugin-text text-[11px] underline"
                         >
                           undo
                         </button>
@@ -420,7 +420,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => handleLoadChain(previewChain)}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded-lg px-4 py-2 text-xs font-mono uppercase font-bold transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded-lg px-4 py-2 text-xs  uppercase font-bold transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
                 {substitutions.size > 0
@@ -433,7 +433,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                     setForkName(`${previewChain.name} (fork)`);
                     setShowForkInput(true);
                   }}
-                  className="flex items-center gap-1.5 border border-plugin-border hover:border-plugin-accent/40 text-plugin-muted hover:text-plugin-text rounded-lg px-4 py-2 text-xs font-mono uppercase transition-colors"
+                  className="flex items-center gap-1.5 border border-plugin-border hover:border-plugin-accent/40 text-plugin-muted hover:text-plugin-text rounded-lg px-4 py-2 text-xs  uppercase transition-colors"
                 >
                   <GitFork className="w-3.5 h-3.5" />
                   Fork
@@ -449,13 +449,13 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
                   value={forkName}
                   onChange={(e) => setForkName(e.target.value)}
                   placeholder="Fork name..."
-                  className="flex-1 bg-black/40 border border-plugin-border rounded font-mono px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+                  className="flex-1 bg-plugin-bg border border-plugin-border rounded  px-2.5 py-1.5 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
                   autoFocus
                 />
                 <button
                   onClick={() => handleFork(previewChain)}
                   disabled={forking || !forkName.trim()}
-                  className="px-3 py-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded text-xs font-mono uppercase font-bold disabled:opacity-40"
+                  className="px-3 py-1.5 bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded text-xs  uppercase font-bold disabled:opacity-40"
                 >
                   {forking ? '...' : 'Fork'}
                 </button>
@@ -510,7 +510,7 @@ export function BrowseModal({ onClose }: BrowseModalProps) {
             >
               <ChevronLeft className="w-3 h-3" /> Prev
             </button>
-            <span className="text-[10px] text-plugin-dim">
+            <span className="text-[11px] text-plugin-dim">
               Page {page + 1} of {totalPages}
             </span>
             <button
@@ -561,7 +561,7 @@ function ChainCard({
             </span>
           </div>
           {chain.author?.name && (
-            <span className="text-[10px] text-plugin-dim ml-6">
+            <span className="text-[11px] text-plugin-dim ml-6">
               by @{chain.author.name}
             </span>
           )}
@@ -569,7 +569,7 @@ function ChainCard({
       </div>
 
       {/* Plugin preview */}
-      <div className="text-[11px] text-plugin-muted mb-1.5 ml-6 truncate">
+      <div className="text-xs text-plugin-muted mb-1.5 ml-6 truncate">
         {pluginPreview}
         {pluginCount > 4 ? ` ... (${pluginCount} plugins)` : ` (${pluginCount} plugins)`}
       </div>
@@ -577,14 +577,14 @@ function ChainCard({
       {/* Stats row */}
       <div className="flex items-center gap-3 ml-6 mb-2">
         {chain.targetInputLufs != null && (
-          <span className="text-[10px] text-plugin-accent font-mono">
+          <span className="text-[11px] text-plugin-accent ">
             🎚️ {chain.targetInputLufs} LUFS
           </span>
         )}
-        <span className="flex items-center gap-0.5 text-[10px] text-plugin-dim">
+        <span className="flex items-center gap-0.5 text-[11px] text-plugin-dim">
           <Download className="w-2.5 h-2.5" /> {chain.downloads}
         </span>
-        <span className="flex items-center gap-0.5 text-[10px] text-plugin-dim">
+        <span className="flex items-center gap-0.5 text-[11px] text-plugin-dim">
           <Heart className="w-2.5 h-2.5" /> {chain.likes}
         </span>
       </div>
@@ -593,20 +593,20 @@ function ChainCard({
       <div className="flex items-center gap-1.5 ml-6">
         <button
           onClick={onLoad}
-          className="px-2.5 py-1 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded text-[10px] font-mono uppercase font-bold transition-colors"
+          className="px-2.5 py-1 bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded text-[11px]  uppercase font-bold transition-colors"
         >
           Load
         </button>
         <button
           onClick={onPreview}
-          className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] font-mono uppercase transition-colors"
+          className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[11px]  uppercase transition-colors"
         >
           Preview
         </button>
         {isLoggedIn && (
           <button
             onClick={onFork}
-            className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[10px] font-mono uppercase transition-colors"
+            className="px-2.5 py-1 border border-plugin-border hover:border-plugin-accent/30 text-plugin-muted hover:text-plugin-text rounded text-[11px]  uppercase transition-colors"
           >
             Fork
           </button>

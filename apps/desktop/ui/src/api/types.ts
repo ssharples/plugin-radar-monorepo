@@ -112,6 +112,14 @@ export interface PluginNodeUI {
   branchGainDb: number;
   solo: boolean;
   mute: boolean;
+  suspended?: boolean;
+  recallSafe?: boolean;      // chain and preset loads keep this slot
+  ignoreLatency?: boolean;   // left out of delay compensation
+  latencySamples?: number;   // latency the plugin reports
+  polarityInverted?: boolean;
+  persistentId?: string;
+  missing?: boolean;
+  loadError?: string;
 }
 
 export interface GroupNodeUI {
@@ -121,6 +129,7 @@ export interface GroupNodeUI {
   mode: 'serial' | 'parallel';
   dryWet: number;
   collapsed: boolean;
+  polarityInverted?: boolean;
   children: ChainNodeUI[];
 }
 
@@ -140,6 +149,63 @@ export interface ApiResponse<T = void> {
   preset?: PresetInfo;
   message?: string;
   data?: T;
+  requestId?: number;
+  status?: 'committed' | 'partial' | 'failed' | 'superseded';
+  issues?: Array<{ name: string; reason: string }>;
+}
+
+export interface LoadProgress {
+  requestId: number;
+  path: string;
+  status: 'loading' | 'validating' | 'committing' | 'committed' | 'partial' | 'failed' | 'superseded';
+  completed: number;
+  total: number;
+  currentPlugin?: string;
+  issues?: Array<{ name: string; reason: string }>;
+}
+
+export interface AutomationBinding {
+  proxyId: string;
+  pluginId: string;
+  parameterIndex: number;
+  parameterId: string;
+  parameterName: string;
+}
+
+export interface AutomationBindingsResponse {
+  success: boolean;
+  capacity: 2048;
+  used: number;
+  bindings: AutomationBinding[];
+  error?: string;
+}
+
+// =============================================
+// Macro types
+// =============================================
+
+export interface MacroLinkUI {
+  pluginId: string;
+  parameterId: string;
+  nodeId: number;          // -1 when the plugin is missing
+  pluginName: string;
+  parameterName: string;
+  min: number;             // 0-1, parameter value with the macro at 0
+  max: number;             // 0-1, parameter value with the macro at 1
+  available: boolean;
+}
+
+export interface MacroUI {
+  index: number;
+  name: string;
+  value: number;
+  links: MacroLinkUI[];
+}
+
+export interface MacrosResponse {
+  success: boolean;
+  macros?: MacroUI[];
+  error?: string;
 }
 
 // =============================================

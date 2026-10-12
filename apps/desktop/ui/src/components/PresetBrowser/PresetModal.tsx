@@ -69,7 +69,7 @@ export function PresetModal({ onClose }: PresetModalProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSaveModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm bg-plugin-accent hover:bg-plugin-accent/80 text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm bg-plugin-accent hover:bg-plugin-accent/80 text-plugin-text transition-colors"
             >
               <Save className="w-4 h-4" />
               Save

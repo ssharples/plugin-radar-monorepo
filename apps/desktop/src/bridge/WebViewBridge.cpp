@@ -8,6 +8,8 @@
 #include "../audio/AudioMeter.h"
 #include "../audio/FFTProcessor.h"
 #include "../audio/NodeMeterProcessor.h"
+#include "../automation/ParameterProxyPool.h"
+#include "../audio/HostedPluginProcessor.h"
 #include <cmath>
 
 WebViewBridge::WebViewBridge(PluginManager& pm,
@@ -22,7 +24,16 @@ WebViewBridge::WebViewBridge(PluginManager& pm,
 
 WebViewBridge::~WebViewBridge()
 {
+    lifetime->store(false, std::memory_order_release);
+    if (ownerProcessor) ownerProcessor->setAnalysisSubscriptions(false, false);
     stopTimer();
+    webBrowser = nullptr;
+    pluginManager.onScanComplete = std::move(previousScanComplete);
+    pluginManager.onScanProgress = std::move(previousScanProgress);
+    pluginManager.onPluginBlacklisted = std::move(previousBlacklisted);
+    chainProcessor.onChainChanged = std::move(previousChainChanged);
+    presetManager.onPresetListChanged = std::move(previousPresetListChanged);
+    presetManager.onPresetLoaded = std::move(previousPresetLoaded);
     if (instanceRegistry)
         instanceRegistry->removeListener(this);
     if (mirrorManager)
@@ -62,7 +73,14 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             {
                 auto pluginId = args[0].toString();
                 int insertIndex = args.size() > 1 ? static_cast<int>(args[1]) : -1;
-                completion(addPlugin(pluginId, insertIndex));
+                if (auto desc = pluginManager.findPluginByIdentifier(pluginId))
+                    chainProcessor.addPluginAsync(*desc, 0, insertIndex, [this, guard = lifetime, completion](bool success, juce::String error) mutable {
+                        if (!guard->load(std::memory_order_acquire)) return;
+                        auto* result = new juce::DynamicObject(); result->setProperty("success", success);
+                        if (success) result->setProperty("chainState", getChainState()); else result->setProperty("error", error);
+                        completion(juce::var(result));
+                    });
+                else { auto* result = new juce::DynamicObject(); result->setProperty("success", false); result->setProperty("error", "Plugin not found: " + pluginId); completion(juce::var(result)); }
             }
             else
             {
@@ -124,7 +142,44 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
         .withNativeFunction("loadPreset", [this](const juce::Array<juce::var>& args,
                                                   juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             if (args.size() >= 1)
-                completion(loadPreset(args[0].toString()));
+            {
+                const auto path = args[0].toString();
+                const bool allowPartial = args.size() >= 2 && static_cast<bool>(args[1]);
+                const auto clientRequestId = args.size() >= 3 ? static_cast<juce::int64>(args[2]) : 0;
+                presetManager.loadPresetAsync(juce::File(path), allowPartial,
+                    [this, guard = lifetime, completion, clientRequestId](ChainProcessor::RestoreResult restore) mutable {
+                        if (!guard->load(std::memory_order_acquire)) return;
+                        auto* result = new juce::DynamicObject();
+                        result->setProperty("success", restore.success);
+                        result->setProperty("status", restore.status);
+                        result->setProperty("requestId", clientRequestId > 0 ? clientRequestId : static_cast<juce::int64>(restore.requestId));
+                        if (restore.error.isNotEmpty()) result->setProperty("error", restore.error);
+                        result->setProperty("chainState", getChainState());
+                        if (auto* preset = presetManager.getCurrentPreset())
+                            result->setProperty("preset", preset->toJson());
+                        juce::Array<juce::var> issues;
+                        for (const auto& issue : restore.issues)
+                        {
+                            auto* source = issue.getDynamicObject();
+                            auto* normalized = new juce::DynamicObject();
+                            normalized->setProperty("name", source ? source->getProperty("pluginName") : juce::var());
+                            normalized->setProperty("reason", source ? source->getProperty("message") : juce::var());
+                            issues.add(juce::var(normalized));
+                        }
+                        result->setProperty("issues", issues);
+                        completion(juce::var(result));
+                    },
+                    [this, guard = lifetime, clientRequestId](uint64_t requestId, const juce::String& stage, int completed, int total, const juce::String& name) {
+                        if (!guard->load(std::memory_order_acquire)) return;
+                        auto* progress = new juce::DynamicObject();
+                        progress->setProperty("requestId", clientRequestId > 0 ? clientRequestId : static_cast<juce::int64>(requestId));
+                        progress->setProperty("status", stage == "creating" ? "loading" : stage);
+                        progress->setProperty("completed", completed);
+                        progress->setProperty("total", total);
+                        if (name.isNotEmpty()) progress->setProperty("currentPlugin", name);
+                        emitEvent("loadProgress", juce::var(progress));
+                    });
+            }
             else
                 completion(juce::var());
         })
@@ -174,6 +229,10 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             juce::ignoreUnused(args);
             completion(stopWaveformStream());
         })
+        .withNativeFunction("setAnalysisSubscriptions", [this](const juce::Array<juce::var>& args,
+                                                                  juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? setAnalysisSubscriptions(args[0]) : juce::var());
+        })
         .withNativeFunction("setInputGain", [this](const juce::Array<juce::var>& args,
                                                     juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             if (args.size() >= 1)
@@ -205,7 +264,7 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 setMatchLock(static_cast<bool>(args[0]));
                 auto* result = new juce::DynamicObject();
                 result->setProperty("success", true);
-                result->setProperty("matchLockEnabled", matchLockEnabled.load(std::memory_order_relaxed));
+                result->setProperty("matchLockEnabled", ownerProcessor ? ownerProcessor->isGainMatchEnabled() : matchLockEnabled.load(std::memory_order_relaxed));
                 completion(juce::var(result));
             }
             else
@@ -217,7 +276,7 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                                                          juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             juce::ignoreUnused(args);
             auto* result = new juce::DynamicObject();
-            result->setProperty("matchLockEnabled", matchLockEnabled.load(std::memory_order_relaxed));
+            result->setProperty("matchLockEnabled", ownerProcessor ? ownerProcessor->isGainMatchEnabled() : matchLockEnabled.load(std::memory_order_relaxed));
             completion(juce::var(result));
         })
         // Cloud sharing - export/import chains with preset data
@@ -230,14 +289,11 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                                                    juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             if (args.size() >= 1)
             {
-                bool success = chainProcessor.importChainWithPresets(args[0]);
-                auto* result = new juce::DynamicObject();
-                result->setProperty("success", success);
-                if (success)
-                    result->setProperty("chainState", getChainState());
-                else
-                    result->setProperty("error", "Failed to import chain");
-                completion(juce::var(result));
+                chainProcessor.requestImportChainWithPresets(args[0], [this, guard = lifetime, completion](ChainProcessor::RestoreResult restore) mutable {
+                    if (!guard->load(std::memory_order_acquire)) return;
+                    auto* result = new juce::DynamicObject(); result->setProperty("success", restore.success); result->setProperty("status", restore.status); result->setProperty("requestId", static_cast<juce::int64>(restore.requestId));
+                    if (restore.success) result->setProperty("chainState", getChainState()); else result->setProperty("error", restore.error.isNotEmpty() ? restore.error : "Failed to import chain"); completion(juce::var(result));
+                }, false, true);
             }
             else
             {
@@ -270,10 +326,10 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             {
                 int slotIndex = static_cast<int>(args[0]);
                 auto presetData = args[1].toString();
-                bool success = chainProcessor.setSlotPresetData(slotIndex, presetData);
-                auto* result = new juce::DynamicObject();
-                result->setProperty("success", success);
-                completion(juce::var(result));
+                chainProcessor.requestSlotPresetData(slotIndex, presetData, [completion](ChainProcessor::RestoreResult restore) mutable {
+                    auto* result = new juce::DynamicObject(); result->setProperty("success", restore.success); result->setProperty("status", restore.status);
+                    if (!restore.success) result->setProperty("error", restore.error); completion(juce::var(result));
+                });
             }
             else
             {
@@ -335,6 +391,34 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
             else
                 completion(juce::var());
         })
+        .withNativeFunction("setBranchPolarity", [this](const juce::Array<juce::var>& args,
+                                                     juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+                completion(setBranchPolarity(args[0]));
+            else
+                completion(juce::var());
+        })
+        .withNativeFunction("setNodeRecallSafe", [this](const juce::Array<juce::var>& args,
+                                                     juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+                completion(setNodeRecallSafe(args[0]));
+            else
+                completion(juce::var());
+        })
+        .withNativeFunction("setNodeIgnoreLatency", [this](const juce::Array<juce::var>& args,
+                                                     juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+                completion(setNodeIgnoreLatency(args[0]));
+            else
+                completion(juce::var());
+        })
+        .withNativeFunction("setNodeSidechain", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            if (args.size() >= 1)
+                completion(setNodeSidechain(args[0]));
+            else
+                completion(juce::var());
+        })
         .withNativeFunction("moveNode", [this](const juce::Array<juce::var>& args,
                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
             if (args.size() >= 1)
@@ -351,10 +435,17 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
         })
         .withNativeFunction("addPluginToGroup", [this](const juce::Array<juce::var>& args,
                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
-            if (args.size() >= 1)
-                completion(addPluginToGroup(args[0]));
-            else
-                completion(juce::var());
+            if (args.size() >= 1) {
+                auto parsed = args[0].isString() ? juce::JSON::parse(args[0].toString()) : args[0];
+                if (auto* obj = parsed.getDynamicObject()) {
+                    auto pluginId = obj->getProperty("pluginId").toString(); int parentId = static_cast<int>(obj->getProperty("parentId")); int index = static_cast<int>(obj->getProperty("insertIndex"));
+                    if (auto desc = pluginManager.findPluginByIdentifier(pluginId))
+                        chainProcessor.addPluginAsync(*desc, parentId, index, [this, guard = lifetime, completion](bool success, juce::String error) mutable { if (!guard->load(std::memory_order_acquire)) return; auto* result = new juce::DynamicObject(); result->setProperty("success", success); if (success) result->setProperty("chainState", getChainState()); else result->setProperty("error", error); completion(juce::var(result)); });
+                    else { auto* result = new juce::DynamicObject(); result->setProperty("success", false); result->setProperty("error", "Plugin not found: " + pluginId); completion(juce::var(result)); }
+                    return;
+                }
+            }
+            completion(juce::var());
         })
         .withNativeFunction("setNodeBypassed", [this](const juce::Array<juce::var>& args,
                                                        juce::WebBrowserComponent::NativeFunctionCompletion completion) {
@@ -362,6 +453,54 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 completion(setNodeBypassed(args[0]));
             else
                 completion(juce::var());
+        })
+        .withNativeFunction("setNodeSuspended", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? setNodeSuspended(args[0]) : juce::var());
+        })
+        .withNativeFunction("setCrossoverFrequency", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? setCrossoverFrequency(args[0]) : juce::var());
+        })
+        .withNativeFunction("getMacros", [this](const juce::Array<juce::var>&,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(getMacros());
+        })
+        .withNativeFunction("setMacroValue", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? setMacroValue(args[0]) : juce::var());
+        })
+        .withNativeFunction("addMacroLink", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? addMacroLink(args[0]) : juce::var());
+        })
+        .withNativeFunction("removeMacroLink", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? removeMacroLink(args[0]) : juce::var());
+        })
+        .withNativeFunction("setMacroLinkRange", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? setMacroLinkRange(args[0]) : juce::var());
+        })
+        .withNativeFunction("setMacroLinkCurve", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? setMacroLinkCurve(args[0]) : juce::var());
+        })
+        .withNativeFunction("renameMacro", [this](const juce::Array<juce::var>& args,
+                                                 juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? renameMacro(args[0]) : juce::var());
+        })
+        .withNativeFunction("getAutomationBindings", [this](const juce::Array<juce::var>& args,
+                                                              juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? getAutomationBindings(args[0]) : juce::var());
+        })
+        .withNativeFunction("assignAutomation", [this](const juce::Array<juce::var>& args,
+                                                         juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? assignAutomation(args[0]) : juce::var());
+        })
+        .withNativeFunction("unassignAutomation", [this](const juce::Array<juce::var>& args,
+                                                           juce::WebBrowserComponent::NativeFunctionCompletion completion) {
+            completion(args.size() >= 1 ? unassignAutomation(args[0]) : juce::var());
         })
         .withNativeFunction("duplicateNode", [this](const juce::Array<juce::var>& args,
                                                      juce::WebBrowserComponent::NativeFunctionCompletion completion) {
@@ -372,12 +511,12 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 if (obj && obj->hasProperty("nodeId"))
                 {
                     int nodeId = static_cast<int>(obj->getProperty("nodeId"));
-                    bool success = chainProcessor.duplicateNode(nodeId);
-                    auto* result = new juce::DynamicObject();
-                    result->setProperty("success", success);
-                    if (success)
-                        result->setProperty("chainState", chainProcessor.getChainStateAsJson());
-                    completion(juce::var(result));
+                    chainProcessor.duplicateNodeAsync(nodeId, [this, guard = lifetime, completion](ChainProcessor::RestoreResult restore) mutable {
+                        if (!guard->load(std::memory_order_acquire)) return;
+                        auto* result = new juce::DynamicObject(); result->setProperty("success", restore.success); result->setProperty("status", restore.status);
+                        if (restore.success) result->setProperty("chainState", chainProcessor.getChainStateAsJson()); else result->setProperty("error", restore.error);
+                        completion(juce::var(result));
+                    });
                 }
                 else
                     completion(juce::var());
@@ -566,8 +705,7 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                 const juce::PluginDescription* newDesc = nullptr;
                 for (auto& desc : pluginList)
                 {
-                    if (desc.createIdentifierString() == newPluginUid ||
-                        juce::String(desc.uniqueId) == newPluginUid)
+                    if (desc.createIdentifierString() == newPluginUid)
                     {
                         newDesc = &desc;
                         break;
@@ -583,56 +721,13 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
                     return;
                 }
                 
-                // Remove old, add new at same position
-                bool removed = chainProcessor.removePlugin(flatIndex);
-                if (!removed)
-                {
-                    auto* result = new juce::DynamicObject();
-                    result->setProperty("success", false);
-                    result->setProperty("error", "Failed to remove old plugin");
+                chainProcessor.replaceNodeAsync(nodeId, *newDesc, translatedParams, [this, guard = lifetime, completion](ChainProcessor::RestoreResult restore) mutable {
+                    if (!guard->load(std::memory_order_acquire)) return;
+                    auto* result = new juce::DynamicObject(); result->setProperty("success", restore.success); result->setProperty("status", restore.status);
+                    result->setProperty("requestId", static_cast<juce::int64>(restore.requestId));
+                    if (restore.success) result->setProperty("chainState", getChainState()); else result->setProperty("error", restore.error);
                     completion(juce::var(result));
-                    return;
-                }
-                
-                bool added = chainProcessor.addPlugin(*newDesc, flatIndex);
-                if (!added)
-                {
-                    auto* result = new juce::DynamicObject();
-                    result->setProperty("success", false);
-                    result->setProperty("error", "Failed to add new plugin");
-                    completion(juce::var(result));
-                    return;
-                }
-                
-                // Apply translated parameters to the new plugin
-                int appliedCount = 0;
-                if (translatedParams.isArray())
-                {
-                    // Get the new processor (should be at the same flat index)
-                    auto* newProcessor = chainProcessor.getSlotProcessor(flatIndex);
-                    if (newProcessor)
-                    {
-                        auto& procParams = newProcessor->getParameters();
-                        for (int i = 0; i < translatedParams.size(); ++i)
-                        {
-                            auto paramEntry = translatedParams[i];
-                            int paramIndex = static_cast<int>(paramEntry.getProperty("paramIndex", -1));
-                            float value = static_cast<float>(paramEntry.getProperty("value", 0.0f));
-                            
-                            if (paramIndex >= 0 && paramIndex < procParams.size())
-                            {
-                                procParams[paramIndex]->setValue(value);
-                                appliedCount++;
-                            }
-                        }
-                    }
-                }
-                
-                auto* result = new juce::DynamicObject();
-                result->setProperty("success", true);
-                result->setProperty("appliedParams", appliedCount);
-                result->setProperty("chainState", getChainState());
-                completion(juce::var(result));
+                });
             }
             else
             {
@@ -652,10 +747,14 @@ juce::WebBrowserComponent::Options WebViewBridge::getOptions()
         })
         .withNativeFunction("copyChainFromInstance", [this](const juce::Array<juce::var>& args,
                                                              juce::WebBrowserComponent::NativeFunctionCompletion completion) {
-            if (args.size() >= 1)
-                completion(copyChainFromInstance(static_cast<int>(args[0])));
-            else
-                completion(juce::var());
+            if (args.size() < 1 || !instanceRegistry) { completion(juce::var()); return; }
+            auto info = instanceRegistry->getInstanceInfo(static_cast<int>(args[0]));
+            auto* source = info.processor ? dynamic_cast<PluginChainManagerProcessor*>(info.processor) : nullptr;
+            if (!source) { auto* r = new juce::DynamicObject(); r->setProperty("success", false); r->setProperty("error", "Target instance not found"); completion(juce::var(r)); return; }
+            chainProcessor.requestImportChainWithPresets(source->getChainProcessor().exportChainWithPresets(), [this, guard = lifetime, completion](ChainProcessor::RestoreResult restore) mutable {
+                if (!guard->load(std::memory_order_acquire)) return;
+                auto* r = new juce::DynamicObject(); r->setProperty("success", restore.success); r->setProperty("status", restore.status); if (restore.success) r->setProperty("chainState", getChainState()); else r->setProperty("error", restore.error); completion(juce::var(r));
+            }, false, true);
         })
         .withNativeFunction("startMirror", [this](const juce::Array<juce::var>& args,
                                                    juce::WebBrowserComponent::NativeFunctionCompletion completion) {
@@ -686,7 +785,15 @@ void WebViewBridge::setBrowserComponent(juce::WebBrowserComponent* browser)
 
 void WebViewBridge::bindCallbacks()
 {
-    pluginManager.onScanComplete = [this]() {
+    previousScanComplete = std::move(pluginManager.onScanComplete);
+    previousScanProgress = std::move(pluginManager.onScanProgress);
+    previousBlacklisted = std::move(pluginManager.onPluginBlacklisted);
+    previousChainChanged = std::move(chainProcessor.onChainChanged);
+    previousPresetListChanged = std::move(presetManager.onPresetListChanged);
+    previousPresetLoaded = std::move(presetManager.onPresetLoaded);
+    pluginManager.onScanComplete = [this, guard = lifetime]() {
+        if (!guard->load()) return;
+        if (previousScanComplete) previousScanComplete();
         // Send final progress event to indicate scan is complete
         auto* progressObj = new juce::DynamicObject();
         progressObj->setProperty("progress", 1.0f);
@@ -697,7 +804,12 @@ void WebViewBridge::bindCallbacks()
         emitEvent("pluginListChanged", getPluginList());
     };
 
-    pluginManager.onScanProgress = [this](float progress, const juce::String& currentPlugin) {
+    pluginManager.onScanProgress = [this, guard = lifetime](float progress, const juce::String& currentPlugin) {
+        if (!guard->load()) return;
+        if (previousScanProgress) previousScanProgress(progress, currentPlugin);
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (now - lastScanNotificationMs < 100.0) return;
+        lastScanNotificationMs = now;
         auto* obj = new juce::DynamicObject();
         obj->setProperty("progress", progress);
         obj->setProperty("currentPlugin", currentPlugin);
@@ -709,24 +821,30 @@ void WebViewBridge::bindCallbacks()
     };
 
     // Wrap existing onChainChanged callback (set by PluginProcessor for registry updates)
-    auto existingChainCallback = chainProcessor.onChainChanged;
-    chainProcessor.onChainChanged = [this, existingChainCallback]() {
-        if (existingChainCallback) existingChainCallback();
+    chainProcessor.onChainChanged = [this, guard = lifetime]() {
+        if (!guard->load()) return;
+        if (previousChainChanged) previousChainChanged();
         emitEvent("chainChanged", getChainState());
     };
 
-    presetManager.onPresetListChanged = [this]() {
+    presetManager.onPresetListChanged = [this, guard = lifetime]() {
+        if (!guard->load()) return;
+        if (previousPresetListChanged) previousPresetListChanged();
         emitEvent("presetListChanged", getPresetList());
     };
 
-    presetManager.onPresetLoaded = [this](const PresetInfo* preset) {
+    presetManager.onPresetLoaded = [this, guard = lifetime](const PresetInfo* preset) {
+        if (!guard->load()) return;
+        if (previousPresetLoaded) previousPresetLoaded(preset);
         if (preset)
             emitEvent("presetLoaded", preset->toJson());
         else
             emitEvent("presetLoaded", juce::var());
     };
 
-    pluginManager.onPluginBlacklisted = [this](const juce::String& pluginPath, ScanFailureReason reason) {
+    pluginManager.onPluginBlacklisted = [this, guard = lifetime](const juce::String& pluginPath, ScanFailureReason reason) {
+        if (!guard->load()) return;
+        if (previousBlacklisted) previousBlacklisted(pluginPath, reason);
         auto* obj = new juce::DynamicObject();
         obj->setProperty("path", pluginPath);
         obj->setProperty("name", juce::File(pluginPath).getFileNameWithoutExtension());
@@ -774,6 +892,7 @@ std::optional<juce::WebBrowserComponent::Resource> WebViewBridge::resourceHandle
 
 void WebViewBridge::timerCallback()
 {
+    if (webBrowser) emitMacroValuesIfChanged();
     if (!waveformStreamActive || !webBrowser)
         return;
 
@@ -870,9 +989,10 @@ void WebViewBridge::timerCallback()
         }
     }
 
-    // Continuous match lock logic
-    if (inputMeter && outputMeter && matchLockEnabled.load(std::memory_order_relaxed) && gainProcessor)
-    {
+    /* Continuous match lock is owned by PluginProcessor/GainProcessor. The
+       bridge only forwards the user preference; it must not run DSP control
+       math on the UI timer. */
+    /*
         auto inputReadingsML = inputMeter->getReadings();
         auto outputReadingsML = outputMeter->getReadings();
 
@@ -942,6 +1062,7 @@ void WebViewBridge::timerCallback()
             }
         }
     }
+    */
 }
 
 // Native function implementations
@@ -1189,7 +1310,8 @@ juce::var WebViewBridge::createGroup(const juce::var& args)
     for (const auto& v : *childIdsVar.getArray())
         childIds.push_back(static_cast<ChainNodeId>(static_cast<int>(v)));
 
-    GroupMode mode = modeStr == "parallel" ? GroupMode::Parallel : GroupMode::Serial;
+    GroupMode mode = GroupMode::Serial;
+    parseGroupMode(modeStr, mode);
 
     auto groupId = chainProcessor.createGroup(childIds, mode, name);
     if (groupId >= 0)
@@ -1253,7 +1375,8 @@ juce::var WebViewBridge::setGroupMode(const juce::var& args)
     auto* obj = parsed.getDynamicObject();
     int groupId = static_cast<int>(obj->getProperty("groupId"));
     auto modeStr = obj->getProperty("mode").toString();
-    GroupMode mode = modeStr == "parallel" ? GroupMode::Parallel : GroupMode::Serial;
+    GroupMode mode = GroupMode::Serial;
+    parseGroupMode(modeStr, mode);
 
     if (chainProcessor.setGroupMode(groupId, mode))
     {
@@ -1393,6 +1516,126 @@ juce::var WebViewBridge::setBranchMute(const juce::var& args)
     return juce::var(result);
 }
 
+juce::var WebViewBridge::setBranchPolarity(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+
+    juce::var parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+
+    if (!parsed.isObject())
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Invalid arguments");
+        return juce::var(result);
+    }
+
+    auto* obj = parsed.getDynamicObject();
+    int nodeId = static_cast<int>(obj->getProperty("nodeId"));
+    bool value = static_cast<bool>(obj->getProperty("inverted"));
+
+    if (chainProcessor.setBranchPolarity(nodeId, value))
+    {
+        result->setProperty("success", true);
+        result->setProperty("chainState", getChainState());
+    }
+    else
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Failed to set branch polarity");
+    }
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::setNodeRecallSafe(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+
+    juce::var parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+
+    if (!parsed.isObject())
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Invalid arguments");
+        return juce::var(result);
+    }
+
+    auto* obj = parsed.getDynamicObject();
+    int nodeId = static_cast<int>(obj->getProperty("nodeId"));
+    bool value = static_cast<bool>(obj->getProperty("recallSafe"));
+
+    if (chainProcessor.setNodeRecallSafe(nodeId, value))
+    {
+        result->setProperty("success", true);
+        result->setProperty("chainState", getChainState());
+    }
+    else
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Failed to set recall safe");
+    }
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::setNodeIgnoreLatency(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+
+    juce::var parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+
+    if (!parsed.isObject())
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Invalid arguments");
+        return juce::var(result);
+    }
+
+    auto* obj = parsed.getDynamicObject();
+    int nodeId = static_cast<int>(obj->getProperty("nodeId"));
+    bool value = static_cast<bool>(obj->getProperty("ignoreLatency"));
+
+    if (chainProcessor.setNodeIgnoreLatency(nodeId, value))
+    {
+        result->setProperty("success", true);
+        result->setProperty("chainState", getChainState());
+    }
+    else
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Failed to set ignore latency");
+    }
+
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::setNodeSidechain(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+    juce::var parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+    auto* obj = parsed.getDynamicObject();
+    if (obj == nullptr)
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "Invalid arguments");
+        return juce::var(result);
+    }
+
+    const int nodeId = static_cast<int>(obj->getProperty("nodeId"));
+    const bool value = static_cast<bool>(obj->getProperty("sidechain"));
+    if (chainProcessor.setNodeSidechain(nodeId, value))
+    {
+        result->setProperty("success", true);
+        result->setProperty("chainState", getChainState());
+    }
+    else
+    {
+        result->setProperty("success", false);
+        result->setProperty("error", "This plugin has no sidechain input");
+    }
+    return juce::var(result);
+}
+
 juce::var WebViewBridge::moveNodeOp(const juce::var& args)
 {
     auto* result = new juce::DynamicObject();
@@ -1517,6 +1760,261 @@ juce::var WebViewBridge::setNodeBypassed(const juce::var& args)
     result->setProperty("chainState", getChainState());
 
     return juce::var(result);
+}
+
+juce::var WebViewBridge::setNodeSuspended(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+    auto parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+    auto* obj = parsed.getDynamicObject();
+    if (obj == nullptr || !obj->hasProperty("nodeId") || !obj->hasProperty("suspended"))
+    {
+        result->setProperty("success", false); result->setProperty("error", "Invalid arguments");
+        return juce::var(result);
+    }
+    const bool success = chainProcessor.setNodeSuspended(static_cast<int>(obj->getProperty("nodeId")),
+                                                         static_cast<bool>(obj->getProperty("suspended")));
+    result->setProperty("success", success);
+    if (success) result->setProperty("chainState", getChainState());
+    else result->setProperty("error", "Unable to update suspend state");
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::getAutomationBindings(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+    result->setProperty("success", false); result->setProperty("capacity", 2048); result->setProperty("used", 0);
+    result->setProperty("bindings", juce::Array<juce::var>());
+    if (parameterPool == nullptr) { result->setProperty("error", "Automation pool unavailable"); return juce::var(result); }
+    auto parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+    auto* obj = parsed.getDynamicObject();
+    auto* node = obj ? ChainNodeHelpers::findById(chainProcessor.getRootNode(), static_cast<int>(obj->getProperty("nodeId"))) : nullptr;
+    if (node == nullptr || !node->isPlugin()) { result->setProperty("error", "Plugin node not found"); return juce::var(result); }
+    const auto pluginId = node->getPlugin().persistentId;
+    juce::Array<juce::var> bindings;
+    int used = 0;
+    for (int host = 0; host < 2048; ++host)
+    {
+        const auto& binding = parameterPool->bindings().getBinding(host);
+        if (!binding.isAssigned()) continue;
+        ++used;
+        if (binding.pluginPersistentId != pluginId) continue;
+        auto* item = new juce::DynamicObject();
+        item->setProperty("proxyId", juce::String(host)); item->setProperty("pluginId", pluginId);
+        item->setProperty("parameterIndex", binding.fallbackParameterIndex);
+        item->setProperty("parameterId", binding.parameterId);
+        item->setProperty("parameterName", binding.parameterId);
+        bindings.add(juce::var(item));
+    }
+    result->setProperty("success", true); result->setProperty("used", used); result->setProperty("bindings", bindings);
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::assignAutomation(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject(); result->setProperty("success", false);
+    if (parameterPool == nullptr) { result->setProperty("error", "Automation pool unavailable"); return juce::var(result); }
+    auto parsed = args.isString() ? juce::JSON::parse(args.toString()) : args; auto* obj = parsed.getDynamicObject();
+    auto* node = obj ? ChainNodeHelpers::findById(chainProcessor.getRootNode(), static_cast<int>(obj->getProperty("nodeId"))) : nullptr;
+    const int parameterIndex = obj ? static_cast<int>(obj->getProperty("parameterIndex")) : -1;
+    if (node == nullptr || !node->isPlugin() || parameterIndex < 0) { result->setProperty("error", "Invalid plugin parameter"); return juce::var(result); }
+    int host = -1; for (int i = 0; i < 2048; ++i) if (!parameterPool->bindings().getBinding(i).isAssigned()) { host = i; break; }
+    if (host < 0) { result->setProperty("error", "Automation capacity reached"); return juce::var(result); }
+    auto& leaf = node->getPlugin(); auto* processor = chainProcessor.getNodeProcessor(node->id);
+    juce::String parameterId; if (processor && parameterIndex < processor->getParameters().size())
+    {
+        auto* parameter = processor->getParameters()[parameterIndex];
+        if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*>(parameter)) parameterId = hosted->getParameterID();
+        else if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(parameter)) parameterId = withId->getParameterID();
+    }
+    if (!parameterPool->assignBinding(host, leaf.persistentId, parameterId, parameterIndex)) { result->setProperty("error", "Unable to expose parameter"); return juce::var(result); }
+    result->setProperty("success", true); result->setProperty("proxyId", juce::String(host)); return juce::var(result);
+}
+
+juce::var WebViewBridge::unassignAutomation(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject(); auto parsed = args.isString() ? juce::JSON::parse(args.toString()) : args; auto* obj = parsed.getDynamicObject();
+    const int host = obj ? obj->getProperty("proxyId").toString().getIntValue() : -1;
+    const bool success = parameterPool != nullptr && host >= 0 && host < 2048 && parameterPool->unassignBinding(host);
+    result->setProperty("success", success); if (!success) result->setProperty("error", "Automation binding not found"); return juce::var(result);
+}
+
+//==============================================================================
+// Macros
+//==============================================================================
+
+namespace {
+juce::DynamicObject* parseArgs(const juce::var& args, juce::var& holder)
+{
+    holder = args.isString() ? juce::JSON::parse(args.toString()) : args;
+    return holder.getDynamicObject();
+}
+
+juce::var macroFailure(const juce::String& error)
+{
+    auto* result = new juce::DynamicObject();
+    result->setProperty("success", false); result->setProperty("error", error);
+    return juce::var(result);
+}
+}
+
+juce::var WebViewBridge::setCrossoverFrequency(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (obj == nullptr
+        || !chainProcessor.setCrossoverFrequency(static_cast<int>(obj->getProperty("groupId")), static_cast<int>(obj->getProperty("index")),
+                                                 static_cast<float>(static_cast<double>(obj->getProperty("frequency")))))
+        return macroFailure("Failed to set crossover frequency");
+    auto* result = new juce::DynamicObject();
+    result->setProperty("success", true);
+    result->setProperty("chainState", getChainState());
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::getMacros()
+{
+    auto* result = new juce::DynamicObject();
+    if (macroManager == nullptr) return macroFailure("Macros unavailable");
+    auto plugins = chainProcessor.getFlatPluginList();
+    juce::Array<juce::var> macrosArr;
+    for (int m = 0; m < MacroManager::kNumMacros; ++m)
+    {
+        const auto& macro = macroManager->getMacro(m);
+        auto* item = new juce::DynamicObject();
+        item->setProperty("index", m);
+        item->setProperty("name", macro.name);
+        item->setProperty("value", macroManager->getValue(m));
+        juce::Array<juce::var> links;
+        for (int l = 0; l < static_cast<int>(macro.links.size()); ++l)
+        {
+            const auto& link = macro.links[static_cast<size_t>(l)];
+            auto* linkObj = new juce::DynamicObject();
+            linkObj->setProperty("pluginId", link.pluginId);
+            linkObj->setProperty("parameterId", link.parameterId);
+            linkObj->setProperty("min", link.min);
+            linkObj->setProperty("max", link.max);
+            linkObj->setProperty("curve", link.curve);
+            const bool available = macroManager->isLinkAvailable(m, l);
+            linkObj->setProperty("available", available);
+            juce::String pluginName, parameterName = link.parameterId;
+            int nodeId = -1;
+            for (int flat = 0; flat < static_cast<int>(plugins.size()); ++flat)
+            {
+                if (plugins[static_cast<size_t>(flat)]->persistentId != link.pluginId) continue;
+                pluginName = plugins[static_cast<size_t>(flat)]->description.name;
+                nodeId = chainProcessor.getNodeIdByFlatIndex(flat);
+                if (auto* processor = chainProcessor.getSlotProcessor(flat))
+                    for (auto* parameter : processor->getParameters())
+                    {
+                        juce::String id;
+                        if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*>(parameter)) id = hosted->getParameterID();
+                        else if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(parameter)) id = withId->getParameterID();
+                        if (id == link.parameterId || (link.parameterId.isEmpty() && parameter->getParameterIndex() == link.fallbackIndex))
+                        { parameterName = parameter->getName(64); break; }
+                    }
+                break;
+            }
+            linkObj->setProperty("nodeId", nodeId);
+            linkObj->setProperty("pluginName", pluginName);
+            linkObj->setProperty("parameterName", parameterName);
+            links.add(juce::var(linkObj));
+        }
+        item->setProperty("links", links);
+        macrosArr.add(juce::var(item));
+    }
+    result->setProperty("success", true);
+    result->setProperty("macros", macrosArr);
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::setMacroValue(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (macroManager == nullptr || obj == nullptr) return macroFailure("Invalid arguments");
+    const int index = static_cast<int>(obj->getProperty("index"));
+    if (index < 0 || index >= MacroManager::kNumMacros) return macroFailure("Macro not found");
+    macroManager->setValue(index, static_cast<float>(static_cast<double>(obj->getProperty("value"))));
+    lastEmittedMacroValues[static_cast<size_t>(index)] = macroManager->getValue(index);
+    auto* result = new juce::DynamicObject(); result->setProperty("success", true);
+    return juce::var(result);
+}
+
+juce::var WebViewBridge::addMacroLink(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (macroManager == nullptr || obj == nullptr) return macroFailure("Invalid arguments");
+    auto* node = ChainNodeHelpers::findById(chainProcessor.getRootNode(), static_cast<int>(obj->getProperty("nodeId")));
+    const int parameterIndex = static_cast<int>(obj->getProperty("parameterIndex"));
+    auto* processor = node != nullptr ? chainProcessor.getNodeProcessor(node->id) : nullptr;
+    if (node == nullptr || !node->isPlugin() || processor == nullptr
+        || parameterIndex < 0 || parameterIndex >= processor->getParameters().size())
+        return macroFailure("Invalid plugin parameter");
+    auto* parameter = processor->getParameters()[parameterIndex];
+    MacroLink link;
+    link.pluginId = node->getPlugin().persistentId;
+    link.fallbackIndex = parameterIndex;
+    if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*>(parameter)) link.parameterId = hosted->getParameterID();
+    else if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(parameter)) link.parameterId = withId->getParameterID();
+    // Default range: from where the control sits now up to its maximum
+    link.min = obj->hasProperty("min") ? static_cast<float>(static_cast<double>(obj->getProperty("min"))) : parameter->getValue();
+    link.max = obj->hasProperty("max") ? static_cast<float>(static_cast<double>(obj->getProperty("max"))) : 1.0f;
+    if (!macroManager->addLink(static_cast<int>(obj->getProperty("index")), link))
+        return macroFailure("Unable to link parameter");
+    return getMacros();
+}
+
+juce::var WebViewBridge::removeMacroLink(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (macroManager == nullptr || obj == nullptr
+        || !macroManager->removeLink(static_cast<int>(obj->getProperty("index")), static_cast<int>(obj->getProperty("linkIndex"))))
+        return macroFailure("Macro link not found");
+    return getMacros();
+}
+
+juce::var WebViewBridge::setMacroLinkRange(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (macroManager == nullptr || obj == nullptr
+        || !macroManager->setLinkRange(static_cast<int>(obj->getProperty("index")), static_cast<int>(obj->getProperty("linkIndex")),
+                                       static_cast<float>(static_cast<double>(obj->getProperty("min"))),
+                                       static_cast<float>(static_cast<double>(obj->getProperty("max")))))
+        return macroFailure("Macro link not found");
+    return getMacros();
+}
+
+juce::var WebViewBridge::setMacroLinkCurve(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (macroManager == nullptr || obj == nullptr
+        || !macroManager->setLinkCurve(static_cast<int>(obj->getProperty("index")), static_cast<int>(obj->getProperty("linkIndex")),
+                                       static_cast<float>(static_cast<double>(obj->getProperty("curve")))))
+        return macroFailure("Macro link not found");
+    return getMacros();
+}
+
+juce::var WebViewBridge::renameMacro(const juce::var& args)
+{
+    juce::var holder; auto* obj = parseArgs(args, holder);
+    if (macroManager == nullptr || obj == nullptr
+        || !macroManager->rename(static_cast<int>(obj->getProperty("index")), obj->getProperty("name").toString()))
+        return macroFailure("Macro not found");
+    return getMacros();
+}
+
+void WebViewBridge::emitMacroValuesIfChanged()
+{
+    if (macroManager == nullptr) return;
+    bool changed = false;
+    juce::Array<juce::var> values;
+    for (int m = 0; m < MacroManager::kNumMacros; ++m)
+    {
+        const auto value = macroManager->getValue(m);
+        changed |= std::abs(value - lastEmittedMacroValues[static_cast<size_t>(m)]) > 1.0e-4f;
+        lastEmittedMacroValues[static_cast<size_t>(m)] = value;
+        values.add(value);
+    }
+    if (changed) emitEvent("macroValues", juce::var(values));
 }
 
 //==============================================================================
@@ -1644,10 +2142,21 @@ juce::var WebViewBridge::stopWaveformStream()
     auto* result = new juce::DynamicObject();
 
     waveformStreamActive = false;
+    if (ownerProcessor) ownerProcessor->setAnalysisSubscriptions(false, false);
     stopTimer();
     result->setProperty("success", true);
 
     return juce::var(result);
+}
+
+juce::var WebViewBridge::setAnalysisSubscriptions(const juce::var& args)
+{
+    auto* result = new juce::DynamicObject();
+    auto parsed = args.isString() ? juce::JSON::parse(args.toString()) : args;
+    auto* obj = parsed.getDynamicObject();
+    if (ownerProcessor == nullptr || obj == nullptr) { result->setProperty("success", false); result->setProperty("error", "Analysis controller unavailable"); return juce::var(result); }
+    ownerProcessor->setAnalysisSubscriptions(static_cast<bool>(obj->getProperty("waveform")), static_cast<bool>(obj->getProperty("fft")));
+    result->setProperty("success", true); return juce::var(result);
 }
 
 //==============================================================================
@@ -1974,6 +2483,11 @@ juce::var WebViewBridge::getMirrorStateOp()
 void WebViewBridge::setMatchLock(bool enabled)
 {
     matchLockEnabled.store(enabled, std::memory_order_relaxed);
+    if (ownerProcessor)
+    {
+        ownerProcessor->setGainMatchEnabled(enabled);
+        return;
+    }
     matchLockStuckCounter.store(0, std::memory_order_relaxed);
 
     if (enabled && inputMeter && outputMeter)

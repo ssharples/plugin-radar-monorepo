@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Layers, GitBranch, X, GripVertical } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, GitBranch, X, GripVertical, Ungroup } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useChainStore } from '../../stores/chainStore';
 import type { GroupNodeUI, ChainNodeUI } from '../../api/types';
@@ -72,17 +72,12 @@ export function GroupContainer({
 
   const isSerial = node.mode === 'serial';
   const isParallel = node.mode === 'parallel';
-  const borderColor = isSerial ? 'border-plugin-serial/30' : 'border-plugin-parallel/30';
-  const bgColor = isSerial ? 'bg-plugin-serial/5' : 'bg-plugin-parallel/5';
   const childCount = countNodes(node.children);
+  const isDropTarget = isGroupDropOver && isDragActive && !isDragging;
 
-  // Highlight states for drop target
-  const dropHighlightBorder = isGroupDropOver && isDragActive
-    ? (isParallel ? 'border-plugin-parallel/70' : 'border-plugin-serial/70')
-    : borderColor;
-  const dropHighlightBg = isGroupDropOver && isDragActive
-    ? (isParallel ? 'bg-plugin-parallel/15' : 'bg-plugin-serial/15')
-    : bgColor;
+  const tone = isSerial
+    ? { bar: 'bg-plugin-serial', text: 'text-plugin-serial', border: 'border-plugin-serial/25', bg: 'bg-plugin-serial/[0.035]', ring: 'ring-plugin-serial/50' }
+    : { bar: 'bg-plugin-parallel', text: 'text-plugin-parallel', border: 'border-plugin-parallel/25', bg: 'bg-plugin-parallel/[0.035]', ring: 'ring-plugin-parallel/50' };
 
   // Combine refs for both draggable and droppable
   const setRef = (el: HTMLElement | null) => {
@@ -90,121 +85,121 @@ export function GroupContainer({
     setDropRef(el);
   };
 
+  const stop = {
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+  };
+
   return (
     <div
       ref={setRef}
       className={`
-        rounded-propane-lg border transition-all duration-200
-        ${dropHighlightBorder} ${dropHighlightBg}
-        ${isDragging ? 'opacity-30 scale-[0.98]' : ''}
-        overflow-hidden
+        relative rounded-lg border transition-[border-color,background-color,opacity] duration-150 overflow-hidden
+        ${tone.border} ${tone.bg}
+        ${isDropTarget ? `ring-2 ${tone.ring}` : ''}
+        ${isDragging ? 'opacity-30' : ''}
       `}
-      style={{ marginLeft: depth > 0 ? 8 : 0 }}
+      style={{ marginLeft: depth > 0 ? 4 : 0 }}
     >
-      {/* Group Header — entire row is draggable (5px movement activates) */}
+      {/* Mode colour bar */}
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${tone.bar} opacity-80`} />
+
+      {/* Group header — entire row is draggable (5px movement activates) */}
       <div
         {...dragAttributes}
         {...dragListeners}
-        className="flex items-center gap-2 px-3 py-2 cursor-grab active:cursor-grabbing"
+        className="flex items-center gap-1.5 h-9 pl-2.5 pr-1.5 cursor-grab active:cursor-grabbing border-b border-white/[0.04]"
       >
-        {/* Drag handle indicator */}
-        <div className="flex-shrink-0 p-0.5 text-plugin-muted">
-          <GripVertical className="w-3.5 h-3.5" />
-        </div>
+        <GripVertical className="w-3.5 h-3.5 text-plugin-dim flex-shrink-0" />
 
-        {/* Collapse toggle */}
         <button
           onClick={(e) => { e.stopPropagation(); toggleGroupCollapsed(node.id); }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="flex-shrink-0 p-0.5 rounded hover:bg-plugin-border/50 text-plugin-muted"
+          className="flex-shrink-0 w-5 h-5 inline-flex items-center justify-center rounded hover:bg-plugin-raised text-plugin-muted"
+          aria-label={node.collapsed ? 'Expand group' : 'Collapse group'}
         >
-          {node.collapsed ? (
-            <ChevronRight className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5" />
-          )}
+          {node.collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
 
-        {/* Group icon */}
         {isSerial ? (
-          <Layers className="w-3.5 h-3.5 text-plugin-serial flex-shrink-0" />
+          <Layers className={`w-3.5 h-3.5 ${tone.text} flex-shrink-0`} />
         ) : (
-          <GitBranch className="w-3.5 h-3.5 text-plugin-parallel flex-shrink-0" />
+          <GitBranch className={`w-3.5 h-3.5 ${tone.text} flex-shrink-0`} />
         )}
 
-        {/* Group name */}
-        <span className="text-xs font-medium font-mono uppercase text-plugin-text truncate flex-1">
+        <span className="text-[13px] font-semibold text-plugin-text truncate min-w-0">
           {node.name}
         </span>
+        <span className="num text-[10px] text-plugin-dim flex-shrink-0">{childCount}</span>
+
+        <div className="flex-1" />
 
         {/* Mode toggle */}
-        <div className="flex items-center bg-plugin-bg rounded overflow-hidden border border-plugin-border" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center p-0.5 rounded-md bg-plugin-bg border border-plugin-border flex-shrink-0" {...stop}>
           <button
             onClick={() => setGroupMode(node.id, 'serial')}
-            className={`px-2 py-0.5 text-xxs font-medium transition-colors ${
-              isSerial
-                ? 'bg-plugin-serial/20 text-plugin-serial'
-                : 'text-plugin-muted hover:text-plugin-text'
+            className={`h-5 px-1.5 rounded text-[11px] font-semibold transition-colors ${
+              isSerial ? 'bg-plugin-serial/20 text-plugin-serial' : 'text-plugin-dim hover:text-plugin-text'
             }`}
+            title="Serial: plugins run one after another"
           >
-            SER
+            Serial
           </button>
           <button
             onClick={() => setGroupMode(node.id, 'parallel')}
-            className={`px-2 py-0.5 text-xxs font-medium transition-colors ${
-              isParallel
-                ? 'bg-plugin-parallel/20 text-plugin-parallel'
-                : 'text-plugin-muted hover:text-plugin-text'
+            className={`h-5 px-1.5 rounded text-[11px] font-semibold transition-colors ${
+              isParallel ? 'bg-plugin-parallel/20 text-plugin-parallel' : 'text-plugin-dim hover:text-plugin-text'
             }`}
+            title="Parallel: branches run side by side and are summed"
           >
-            PAR
+            Parallel
           </button>
         </div>
 
-        {/* Dry/Wet for serial groups (non-root) */}
+        {/* Dry/Wet for serial groups */}
         {isSerial && (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-            <span className="text-xxs text-plugin-muted">D/W</span>
+          <div className="flex items-center gap-1.5 pl-1 flex-shrink-0" {...stop}>
+            <span className="section-label">Mix</span>
             <Slider
               value={node.dryWet}
               min={0}
               max={1}
               step={0.01}
               color="blue"
-              width="w-14"
+              width="w-16"
               onChange={(v) => setGroupDryWet(node.id, v)}
               title={`Dry/Wet: ${Math.round(node.dryWet * 100)}%`}
             />
-            <span className="text-xxs text-plugin-muted w-7 text-right tabular-nums">
+            <span className="num text-[10px] text-plugin-muted w-8 text-right">
               {Math.round(node.dryWet * 100)}%
             </span>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-          {/* Dissolve group */}
+        <div className="flex items-center gap-0.5 pl-0.5 flex-shrink-0" {...stop}>
           <button
             onClick={() => dissolveGroup(node.id)}
-            className="p-1 rounded text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50 transition-colors"
+            className="w-6 h-6 inline-flex items-center justify-center rounded text-plugin-dim hover:text-plugin-text hover:bg-plugin-raised transition-colors"
             title="Dissolve group (ungroup)"
+            aria-label="Dissolve group"
           >
-            <Layers className="w-3 h-3" />
+            <Ungroup className="w-3.5 h-3.5" />
           </button>
-          {/* Remove entire group */}
           <button
             onClick={() => removeNode(node.id)}
-            className="p-1 rounded text-plugin-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+            className="w-6 h-6 inline-flex items-center justify-center rounded text-plugin-dim hover:text-red-400 hover:bg-red-500/10 transition-colors"
             title="Remove group and all contents"
+            aria-label="Remove group"
           >
-            <X className="w-3 h-3" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Children */}
       {!node.collapsed && (
-        <div className="px-2 pb-2">
+        <div className="pl-3 pr-1.5 pt-1 pb-1.5">
           {node.children.length === 0 ? (
             <EmptyGroupDropZone
               groupId={node.id}
@@ -232,23 +227,9 @@ export function GroupContainer({
 
       {/* Collapsed summary */}
       {node.collapsed && (
-        <div className="px-3 pb-2 text-xxs text-plugin-muted">
-          {childCount} plugin{childCount !== 1 ? 's' : ''}
+        <div className="pl-9 pr-3 py-1.5 text-[11px] text-plugin-muted">
+          {childCount} plugin{childCount !== 1 ? 's' : ''} {isParallel ? 'in parallel' : 'in series'}
         </div>
-      )}
-
-      {/* Drop target overlay when dragging over */}
-      {isGroupDropOver && isDragActive && !isDragging && (
-        <div
-          className={`
-            absolute inset-0 rounded-propane-lg pointer-events-none z-10
-            animate-fade-in transition-all duration-200
-            ${isParallel
-              ? 'ring-2 ring-plugin-parallel/40 animate-glow-pulse'
-              : 'ring-2 ring-plugin-serial/40 animate-glow-pulse'
-            }
-          `}
-        />
       )}
     </div>
   );
@@ -283,13 +264,13 @@ function EmptyGroupDropZone({
       ref={setNodeRef}
       onClick={handleClick}
       className={`
-        mx-1 rounded-lg border-2 border-dashed transition-all duration-200
+        rounded-lg border border-dashed transition-colors duration-150 h-10
         ${isOver && isDragActive
-          ? `${borderColor} ${bgColor} py-4`
-          : 'border-plugin-border/40 py-3'
+          ? `${borderColor} ${bgColor}`
+          : 'border-plugin-border-bright/70'
         }
         flex items-center justify-center gap-2 cursor-pointer
-        hover:border-plugin-border/60
+        hover:border-plugin-accent/50
       `}
     >
       <span className={`text-xs ${isOver && isDragActive ? textColor : 'text-plugin-muted'}`}>

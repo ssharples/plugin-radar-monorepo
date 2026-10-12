@@ -3,6 +3,11 @@ name: Studio Time Machine
 description: A calm, private macOS archive where studio projects become objects that can be heard, inspected, and safely recovered.
 colors:
   ink: "#000000"
+  shell-ink: "#131411"
+  shell-muted-ink: "#63635A"
+  shell-signal: "#CDF143"
+  shell-chrome-stroke: "rgba(255, 255, 255, 0.10)"
+  shell-canvas-stroke: "rgba(0, 0, 0, 0.08)"
   paper-ink: "#FFFFFF"
   shell-chrome: "#0E0F0D"
   shell-chrome-raised: "#181A17"
@@ -89,6 +94,10 @@ Studio Time Machine uses the Codex and ChatGPT desktop applications as its struc
 
 The application is an Operate surface. A custom but macOS-literate sidebar, Song-first Spotlight overlay, breadcrumb command bar, optional inspector, settings scene, keyboard commands, review sheets, context menus, disclosure groups, segmented pickers, and system status semantics do the interaction work. Library status and location management sit in the sidebar footer, leaving the command bar for context and inspection. Generous negative space keeps archive-scale evidence legible. The sleeve-and-disc object remains the memorable expression: it carries project and version lineage while the shell stays near-monochrome.
 
+Studio Library browsing is Song-first: a segmented Show Songs control switches between All Songs, Recently opened, and Needs organising views, while a quiet sort menu orders by Last saved or Name. List mode presents each Song as a single project-file group; the newest Set file is visible first, older Set families sit behind an explicit disclosure, and backups remain nested beneath their owning family. Grid mode keeps the same work identity and density tokens. These controls are native SwiftUI surfaces and should remain subordinate to the archive objects.
+
+Opening a Song leads directly to its working contents. A compact selected-Set row keeps Versions, Open in Live and a secondary actions menu nearby. Tracks and Audio files are the two primary views. The track list keeps parsed group nesting and pairs each selection with referenced audio and ordered devices. Arrangement and Session-view source audio stays visible; take-lane-only audio, clip detail and device sample resources expand on demand. Available audio rows use one shared player and expose a real file drag plus Copy Audio File and Reveal actions. Audio-file browsing covers the selected physical project folder across saved versions, and Possible bounces is explicitly a filename suggestion. Track and device reuse uses an exact-source guide for Live’s Browser. History is a version chooser, while detailed diagnostics, export plans and recovery remain secondary. Narrow workspaces stack the track list and its contents and put search on its own row.
+
 The light workspace is shipped and reviewed. Semantic SwiftUI foreground styles, `NSColor.textBackgroundColor`, `.bar`, `.regularMaterial`, native dividers, standard controls, and system status colors are runtime-resolved macOS materials—not fixed color tokens. The frontmatter therefore records only literal colors found in the implementation. Dark Mode, final product naming, future project-object generation, compare-window treatment, and the boundary between the main window and auxiliary preview or inspection windows remain unresolved visual decisions.
 
 **Key Characteristics:**
@@ -155,15 +164,17 @@ The shell is intentionally semantic and near-monochrome; literal color is reserv
 
 The app opens at a 1240 × 800 default window and holds a 980 × 650 minimum. A fixed 258-point custom sidebar occupies the full dark window surface while the central workspace is inset by 8 points and clipped to a 16-point continuous shape. The optional inspector remains 260 to 380 points, ideally 310. Breadcrumbs and the inspector toggle sit in a light command bar inside the workspace; the sidebar search action opens a restrained upper-centred modal over the window.
 
-Library grids adapt between spacious objects (220–290 point columns, 36 point gaps) and compact archive browsing (168–220 point columns, 22 point gaps). Main destinations use approximately 38 points of horizontal workspace padding and 30–34 points above the first heading. Project detail is centered within a 980-point reading width with 42-point side padding and 40-point section separation. Locations and private chains use a tighter 920-point evidence width. Bottom padding expands when the floating transport is present so content is never obscured.
+Library grids adapt between spacious objects (220–290 point columns, 36 point gaps) and compact archive browsing (168–220 point columns, 22 point gaps). Main destinations use approximately 38 points of horizontal workspace padding and 30–34 points above the first heading. The Song content browser is centered within an 1100-point reading width with 32-point side padding and 24-point section separation. Secondary Set detail retains its 980-point reading width. Locations and private chains use a tighter 920-point evidence width. Bottom padding expands when the floating transport is present so content is never obscured.
 
 First run, indexing, and failure are single-purpose states centered in the full detail workspace. First run presents one explicit folder action and two quiet privacy assurances. Indexing adds determinate progress when totals are known, names the current phase, reports reused Sets, and repeats that nothing is changed. Failure uses the native unavailable-state pattern and one retry action.
 
-The selected Set moves from project and version lineage into evidence. A horizontal timeline chooser precedes version rows; then a 520-point segmented lens switches among Tracks, Devices, Clips, and Media. Semantic changes from the previous version live in an expandable disclosure above the lens. Preview and recovery form three equal evidence panels; snapshot history and restore, branch, and recovered-audio plans expand into focused review sheets with exact source and destination evidence. The inspector remains the denser secondary reading surface for file, structure, dependency, compatibility, and selected-chain detail.
+The secondary Set Details screen moves from project and version lineage into deeper evidence; it remains accessible from the selected Set actions menu. A horizontal timeline chooser precedes version rows; then a 520-point segmented lens switches among Tracks, Devices, Clips, and Media. Semantic changes from the previous version live in an expandable disclosure above the lens. Preview and recovery form three equal evidence panels; snapshot history and restore, branch, and recovered-audio plans expand into focused review sheets with exact source and destination evidence. The inspector remains the denser secondary reading surface for file, structure, dependency, compatibility, and selected-chain detail.
 
 Registered roots persist between launches. Rows distinguish active, available, unavailable, and permission-required roots; cached libraries stay inspectable while a drive is disconnected. File-watching copy distinguishes monitoring, indexing, paused, permission recovery, and static sample data. Do not visually imply that a cached root is currently live.
 
-Deterministic review states are part of the implementation contract: `--sample-welcome`, `--sample-indexing`, `--sample-failure`, `--sample-dense`, `--sample-root-states`, `--sample-loose-audio`, `--sample-search`, `--sample-snapshots`, `--sample-restore-plan`, `--sample-recovery-plan`, `--sample-approximate-plan`, `--sample-live-plan`, and the `--sample-project-*` family select stable surfaces. Project lens variants include `--sample-project-devices`, `--sample-project-clips`, and `--sample-project-media`; private-chain variants include `--sample-chains`, `--sample-chain-recommendations`, `--sample-chain-occurrences`, and `--sample-chain-plugins`. Review-only sample plans disable their execution actions.
+Deterministic review states are part of the implementation contract: `--sample-welcome`, `--sample-indexing`, `--sample-failure`, `--sample-dense`, `--sample-disclosures`, `--sample-root-states`, `--sample-loose-audio`, `--sample-search`, `--sample-snapshots`, `--sample-restore-plan`, `--sample-recovery-plan`, `--sample-approximate-plan`, `--sample-live-plan`, and the `--sample-project-*` family select stable surfaces. Project lens variants include `--sample-project-devices`, `--sample-project-clips`, and `--sample-project-media`; private-chain variants include `--sample-chains`, `--sample-chain-recommendations`, `--sample-chain-occurrences`, and `--sample-chain-plugins`. Review-only sample plans disable their execution actions.
+
+Automatic library watching is an explicit preference. “Add to Studio” registers a root and performs the initial read; “Update Library” performs a manual scan; “Pause Updates” stops watching without removing cached evidence; and “Resume Updates” starts watching and reconciles changes. Disabled or unavailable roots keep cached inspection available but disable actions that require an available root. Sample and review sessions must not write to the user’s persisted library evidence, registered roots, assignments, or recent-history state; appearance preferences such as density and presentation remain shared UI preferences.
 
 **The Workspace, Not Dashboard Rule.** Prefer wide reading lanes, rows, and native inspectors. Add cards only when a bounded decision genuinely needs a shared container.
 
@@ -207,6 +218,20 @@ The signature project object combines a sleeve at 82% of its square frame with a
 - **Buttons:** Shell and canvas buttons use the product's compact continuous-corner styles while retaining native keyboard, focus, menu, help, disabled, and accessibility behavior. Black marks primary canvas actions; low-alpha tonal fills handle secondary and quiet actions.
 - **Chips:** Selected timeline chips are black with the semantic workspace foreground; unselected chips use a quiet secondary fill. Evidence tags use quaternary native fill.
 - **Lenses:** Tracks, Devices, Clips, and Media use a native segmented picker capped at 520 points. Lens changes use a restrained 0.18-second ease-out transition.
+
+### Studio Library Browse Controls and Song Project Files
+
+- **Browse controls:** Show Songs uses a native segmented picker for All Songs, Recently opened, and Needs organising. Sort Songs is a compact menu with Last saved and Name options; filtering and ordering operate on the resolved local Work catalogue.
+- **Song groups:** Each list row is a continuous 16-point raised surface with a Song header, session and backup summary, and the latest project file family. Older Set families appear only after an explicit “Show more Set files” disclosure; a family’s backup disclosure remains local to that family.
+- **Labels:** The newest family uses `LATEST`; additional families use `SET`; backups retain explicit backup copy language. Never collapse distinct Set files into one “current” file or imply a physical move.
+- **Accessibility:** Disclosure values say Expanded or Collapsed, and Reduce Motion removes browse and backup transition animation while preserving the state change.
+
+### Floating Audio Clip Editor
+
+- **Entry:** Clip expands the existing floating transport and selects up to two seconds at the playhead. Done returns to the full source preview. Selecting a different audio file clears the previous edit and pending clipboard work.
+- **Range:** Drag the waveform to select, drag either trim handle, or edit In/Out seconds with three decimal places. Left/Right Arrow or the accessibility adjust action moves the selection by 10 ms. The visible waveform bounds remain labelled when zoomed. Loop repeats the selection; this audition loop does not promise gapless playback.
+- **Output:** Copy Clip creates and copies a new WAV. The source filename, selected range and Studio Clips destination are visible together; Location reveals the full selectable output path and retention explanation before export. A completed clip gains Drag Clip and Reveal in Finder. Changing the selection invalidates the previous result without deleting a file that another app may reference.
+- **Layout:** Keep the existing 690-point regular-material transport. Numeric controls and actions wrap at compact widths, including with the inspector open. The workspace reserves the measured extra editor height so its final rows remain reachable. No second floating panel or export approval sheet is needed for this user-triggered clip copy.
 
 ### Evidence Rows and Inspector
 
@@ -259,6 +284,8 @@ The signature project object combines a sleeve at 82% of its square frame with a
 - **Do** keep browsing-path preference separate from safety-critical plan destinations, which always show the full local path.
 - **Do** explain local search and chain recommendation provenance, keep their heavy work off the main actor, and never imply a cloud AI dependency.
 - **Do** keep deterministic sample arguments working as repeatable visual-review fixtures.
+- **Do** keep Song browsing controls quiet, explicit, and derived from the resolved local Work catalogue; make older Set files and backups discoverable through disclosures.
+- **Do** keep automatic watching separate from one-off updates, and show paused, unavailable, indexing, and monitoring states with text and symbols.
 - **Do** preserve unresolved product decisions as unresolved: release boundary; supported Live versions and future-format behavior; retention, cross-volume moves, root priority, and broader merged-library browsing beyond the fixed global-search behavior; future semantic-search scope and opt-in boundary; extraction formats and safe-restore contract; preview thresholds; Ableton render viability; plug-in catalogue integration; naming, pricing, cloud, community, and account timing; Dark Mode; generated object art; compare windows; and auxiliary-window boundaries.
 
 ### Don't:
@@ -274,3 +301,4 @@ The signature project object combines a sleeve at 82% of its square frame with a
 - **Don't** present inspect-only chains as recoverable racks or fabricate native chain files.
 - **Don't** imply cached roots are connected, sample data is live, or unresolved lifecycle contracts are guaranteed.
 - **Don't** introduce account, cloud, AI, sharing, or community pressure into the private local-first archive without explicit opt-in and a resolved product decision.
+- **Don't** hide older Set files behind an implied destructive “cleanup,” or make a list row suggest that virtual grouping moved anything on disk.

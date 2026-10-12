@@ -11,12 +11,12 @@ struct FirstRunView: View {
         .accessibilityHidden(true)
 
       VStack(spacing: 10) {
-        Text("Find the work already in your studio")
+        Text("Less file hunting. More music.")
           .font(.custom("Helvetica Neue", size: 28).weight(.bold))
           .multilineTextAlignment(.center)
 
         Text(
-          "Choose a folder containing Ableton projects. Studio Time Machine builds a private, read-only library of Sets, backups, and existing audio."
+          "Bring your Ableton folders into one private library. Find a Song, hear your bounces, and return to any saved version. New saves appear automatically while Studio is open."
         )
         .font(.body)
         .foregroundStyle(.secondary)
@@ -26,7 +26,7 @@ struct FirstRunView: View {
       }
 
       Button(action: chooseFolder) {
-        Label("Choose Ableton Folder", systemImage: "folder")
+        Label("Add to Studio", systemImage: "folder.badge.plus")
           .frame(minWidth: 180)
       }
       .buttonStyle(.borderedProminent)

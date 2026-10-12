@@ -2,9 +2,15 @@
 #include "ScannerUtils.h"
 #include "../utils/PlatformPaths.h"
 
-PluginManager::PluginManager()
+PluginManager::PluginManager(InstanceFactory factory, AsyncInstanceFactory asyncFactory)
+    : instanceFactory(std::move(factory)), asyncInstanceFactory(std::move(asyncFactory))
 {
-    // Only scan AU plugins for now
+    // Tests supply an isolated factory and never inspect the user's plugin cache.
+    if (instanceFactory)
+        return;
+    #if JUCE_PLUGINHOST_VST3
+    formatManager.addFormat(new juce::VST3PluginFormat());
+    #endif
     #if JUCE_PLUGINHOST_AU
     formatManager.addFormat(new juce::AudioUnitPluginFormat());
     #if JUCE_DEBUG
@@ -251,7 +257,23 @@ std::unique_ptr<juce::AudioPluginInstance> PluginManager::createPluginInstance(
     int blockSize,
     juce::String& errorMessage)
 {
+    if (instanceFactory)
+        return instanceFactory(desc, sampleRate, blockSize, errorMessage);
     return formatManager.createPluginInstance(desc, sampleRate, blockSize, errorMessage);
+}
+
+void PluginManager::createPluginInstanceAsync(const juce::PluginDescription& desc, double rate,
+                                             int block, CreationCallback callback)
+{
+    if (asyncInstanceFactory) { asyncInstanceFactory(desc, rate, block, std::move(callback)); return; }
+    if (instanceFactory)
+    {
+        juce::String error;
+        auto instance = instanceFactory(desc, rate, block, error);
+        callback(std::move(instance), error);
+        return;
+    }
+    formatManager.createPluginInstanceAsync(desc, rate, block, std::move(callback));
 }
 
 std::optional<juce::PluginDescription> PluginManager::findPluginByUid(int uid) const
@@ -736,4 +758,3 @@ PluginManager::BackgroundScanResult PluginManager::scanPluginWithHelper(const ju
 
     return { { true, ScanFailureReason::None }, std::move(parsed.plugins), pluginPath };
 }
-

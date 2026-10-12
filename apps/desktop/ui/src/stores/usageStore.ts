@@ -43,17 +43,17 @@ export const useUsageStore = create<UsageState>((set, get) => ({
   recordPluginLoad: (uid, name, manufacturer) => {
     set((state) => {
       const now = Date.now();
-      const existing = state.plugins[uid];
+      const existing: Partial<PluginUsage> = state.plugins[uid] || {};
       const updated = {
         ...state.plugins,
         [uid]: {
           uid,
           name,
           manufacturer,
-          loadCount: (existing?.loadCount || 0) + 1,
+          loadCount: (existing.loadCount || 0) + 1,
           lastUsedAt: now,
-          firstUsedAt: existing?.firstUsedAt || now,
-          coUsage: existing?.coUsage || {},
+          firstUsedAt: existing.firstUsedAt || now,
+          coUsage: existing.coUsage || {},
         },
       };
       saveToStorage(updated);

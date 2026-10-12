@@ -26,9 +26,9 @@ describe('LoginStep', () => {
     expect(screen.getByPlaceholderText('Name')).toBeInTheDocument()
   })
 
-  it('renders Propane branding', () => {
+  it('renders ProChain branding', () => {
     render(<LoginStep />)
-    expect(screen.getByText('PROPANE')).toBeInTheDocument()
+    expect(screen.getByText('PROCHAIN')).toBeInTheDocument()
   })
 
   it('disables submit when fields are empty', () => {

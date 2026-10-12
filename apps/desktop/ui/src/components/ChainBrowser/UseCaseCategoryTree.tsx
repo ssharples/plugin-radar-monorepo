@@ -139,7 +139,7 @@ export function UseCaseCategoryTree({
           onSelectGroup(null);
           onSelectUseCase(null);
         }}
-        className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-mono transition-colors ${
+        className={`w-full text-left px-2 py-1.5 rounded text-xs  transition-colors ${
           !selectedGroup && !selectedUseCase
             ? 'bg-plugin-accent/20 text-plugin-accent font-medium'
             : 'text-plugin-muted hover:text-plugin-text hover:bg-white/5'
@@ -156,7 +156,7 @@ export function UseCaseCategoryTree({
           <div key={group.value}>
             <button
               onClick={() => handleGroupClick(group.value)}
-              className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-[11px] font-mono transition-colors ${
+              className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-xs  transition-colors ${
                 isGroupSelected
                   ? 'bg-plugin-accent/20 text-plugin-accent font-medium'
                   : selectedGroup === group.value
@@ -179,7 +179,7 @@ export function UseCaseCategoryTree({
                   <button
                     key={uc.value}
                     onClick={() => handleUseCaseClick(uc.value, group.value)}
-                    className={`w-full text-left pl-4 pr-2 py-1 rounded text-[10px] font-mono transition-colors ${
+                    className={`w-full text-left pl-4 pr-2 py-1 rounded text-[11px]  transition-colors ${
                       selectedUseCase === uc.value
                         ? 'bg-plugin-accent/20 text-plugin-accent font-medium'
                         : 'text-plugin-dim hover:text-plugin-muted hover:bg-white/5'

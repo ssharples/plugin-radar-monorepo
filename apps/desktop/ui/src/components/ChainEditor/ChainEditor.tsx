@@ -21,7 +21,6 @@ import { ChainNodeList } from './ChainNodeList';
 import { DragPreview } from './DragPreview';
 import { ChainTemplates } from './ChainTemplates';
 import { MirrorIndicator } from './MirrorIndicator';
-import { HeaderMenu } from '../HeaderMenu';
 import { getLastSlotHoverSide, resetLastSlotHoverSide } from './ChainSlot';
 
 // Root parent ID (the implicit root group)
@@ -386,47 +385,42 @@ export function ChainEditor() {
   // Compute 1-based DFS slot numbers for all plugins
   const slotNumbers = useMemo(() => computeSlotNumbers(nodes), [nodes]);
 
+  const toolBtn = 'h-7 min-w-7 px-1.5 inline-flex items-center justify-center gap-1 rounded-md transition-colors';
+  const toolIdle = 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-raised';
+
   return (
     <div className="relative flex flex-col h-full overflow-hidden">
 
-      {/* Unified Header Menu — save/load/browse/chain name */}
-      <HeaderMenu />
+      {/* Chain toolbar */}
+      <div className="flex items-center gap-1 h-10 px-3 border-b border-plugin-border bg-plugin-surface/60 flex-shrink-0">
+        {/* History */}
+        <div className="flex items-center">
+          <button
+            onClick={() => undo()}
+            disabled={!canUndo()}
+            className={`${toolBtn} ${canUndo() ? toolIdle : 'text-plugin-dim/60 cursor-not-allowed'}`}
+            title="Undo (⌘Z)"
+            aria-label="Undo"
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => redo()}
+            disabled={!canRedo()}
+            className={`${toolBtn} ${canRedo() ? toolIdle : 'text-plugin-dim/60 cursor-not-allowed'}`}
+            title="Redo (⌘⇧Z)"
+            aria-label="Redo"
+          >
+            <Redo2 className="w-4 h-4" />
+          </button>
+        </div>
 
-      {/* Chain Toolbar */}
-      <div className="flex items-center justify-between px-2 py-1 border-b border-plugin-border/30">
-        <div className="flex items-center gap-1">
-          {/* Undo/Redo buttons with history depth badges */}
-          <div className="relative">
-            <button
-              onClick={() => undo()}
-              disabled={!canUndo()}
-              className={`p-1 rounded transition-colors ${
-                canUndo()
-                  ? 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50'
-                  : 'text-plugin-dim cursor-not-allowed'
-              }`}
-              title="Undo (⌘Z)"
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => redo()}
-              disabled={!canRedo()}
-              className={`p-1 rounded transition-colors ${
-                canRedo()
-                  ? 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50'
-                  : 'text-plugin-dim cursor-not-allowed'
-              }`}
-              title="Redo (⌘⇧Z)"
-            >
-              <Redo2 className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="w-px h-5 bg-plugin-border mx-1.5" />
 
-          {/* A/B/C Snapshots */}
-          <div className="flex items-center gap-0.5 ml-1">
+        {/* A/B/C Snapshots */}
+        <div className="flex items-center gap-1.5">
+          <span className="section-label hidden md:inline">Snap</span>
+          <div className="flex items-center p-0.5 rounded-md bg-plugin-bg border border-plugin-border">
             {[0, 1, 2].map((i) => {
               const label = ['A', 'B', 'C'][i];
               const snapshot = snapshots[i];
@@ -444,15 +438,13 @@ export function ChainEditor() {
                       saveSnapshot(i);
                     }
                   }}
-                  className={`
-                    w-5 h-5 rounded text-[10px] font-bold transition-all
-                    ${isActive
-                      ? 'bg-plugin-accent text-white shadow-glow-accent'
+                  className={`relative w-6 h-5 rounded text-[11px] font-semibold transition-colors ${
+                    isActive
+                      ? 'bg-plugin-accent text-plugin-on-accent'
                       : snapshot
-                        ? 'bg-plugin-accent/15 text-plugin-accent border border-plugin-accent/30 hover:bg-plugin-accent/25'
-                        : 'bg-plugin-border/50 text-plugin-dim hover:text-plugin-muted hover:bg-plugin-border'
-                    }
-                  `}
+                        ? 'text-plugin-accent-bright hover:bg-plugin-raised'
+                        : 'text-plugin-dim hover:text-plugin-muted hover:bg-plugin-raised'
+                  }`}
                   title={
                     snapshot
                       ? `${isActive ? 'Active snapshot' : 'Recall snapshot'} ${label} \u2022 Shift+click to overwrite \u2022 \u2318${i + 1}`
@@ -460,94 +452,105 @@ export function ChainEditor() {
                   }
                 >
                   {label}
+                  {snapshot && !isActive && (
+                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-plugin-accent" />
+                  )}
                 </button>
               );
             })}
           </div>
-
-          {/* Separator */}
-          {totalPlugins > 0 && (
-            <div className="w-px h-4 bg-plugin-border mx-1" />
-          )}
-
-          {/* Group select mode toggle */}
-          {totalPlugins >= 2 && (
-            <button
-              onClick={() => {
-                setGroupSelectMode(prev => !prev);
-                if (groupSelectMode) setSelectedIds(new Set());
-              }}
-              className={`p-1 rounded transition-colors flex items-center gap-1 ${
-                groupSelectMode
-                  ? 'text-plugin-accent bg-plugin-accent/15 ring-1 ring-plugin-accent/30'
-                  : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50'
-              }`}
-              title="Group select mode — click plugins to select, then create group"
-            >
-              <MousePointer2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Toggle All Bypass */}
-          {totalPlugins > 0 && (
-            <button
-              onClick={handleToggleAllBypass}
-              className={`p-1 rounded transition-colors ${
-                bypassState.allBypassed
-                  ? 'text-red-400 bg-red-500/15 hover:bg-red-500/25'
-                  : bypassState.anyBypassed
-                    ? 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/15'
-                    : 'text-green-400 hover:text-green-300 hover:bg-green-500/15'
-              }`}
-              title={
-                bypassState.allBypassed
-                  ? 'Enable all plugins'
-                  : 'Bypass all plugins'
-              }
-            >
-              <Power className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Toggle All Plugin Windows */}
-          {totalPlugins > 0 && (
-            <button
-              onClick={handleToggleAllWindows}
-              className={`p-1 rounded transition-colors flex items-center gap-1 ${
-                windowState.openCount > 0
-                  ? 'text-plugin-accent hover:text-plugin-accent/80 hover:bg-plugin-accent/15'
-                  : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-border/50'
-              }`}
-              title={
-                windowState.openCount > 0
-                  ? `Close all plugin windows (${windowState.openCount}/${windowState.totalCount} open)`
-                  : 'Open all plugin windows'
-              }
-            >
-              <AppWindow className="w-3.5 h-3.5" />
-              {windowState.totalCount > 0 && (
-                <span className="text-[10px] leading-none">
-                  {windowState.openCount}/{windowState.totalCount}
-                </span>
-              )}
-            </button>
-          )}
-
-          <span className="text-[10px] font-mono uppercase text-plugin-dim ml-1">
-            {totalPlugins}
-          </span>
         </div>
+
+        {totalPlugins > 0 && <div className="w-px h-5 bg-plugin-border mx-1.5" />}
+
+        {/* Group select mode toggle */}
+        {totalPlugins >= 2 && (
+          <button
+            onClick={() => {
+              setGroupSelectMode(prev => !prev);
+              if (groupSelectMode) setSelectedIds(new Set());
+            }}
+            className={`${toolBtn} ${
+              groupSelectMode
+                ? 'text-plugin-accent bg-plugin-accent/15 ring-1 ring-inset ring-plugin-accent/40'
+                : toolIdle
+            }`}
+            title="Select mode — click plugins to select, then group them"
+            aria-pressed={groupSelectMode}
+          >
+            <MousePointer2 className="w-3.5 h-3.5" />
+            <span className="text-xs hidden lg:inline">Select</span>
+          </button>
+        )}
+
+        {/* Toggle All Bypass */}
+        {totalPlugins > 0 && (
+          <button
+            onClick={handleToggleAllBypass}
+            className={`${toolBtn} ${
+              bypassState.allBypassed
+                ? 'text-red-400 bg-red-500/15 hover:bg-red-500/25'
+                : bypassState.anyBypassed
+                  ? 'text-yellow-400 hover:bg-yellow-500/15'
+                  : 'text-green-400 hover:bg-green-500/10'
+            }`}
+            title={bypassState.allBypassed ? 'Enable all plugins' : 'Bypass all plugins'}
+          >
+            <Power className="w-3.5 h-3.5" />
+            <span className="text-xs hidden lg:inline">{bypassState.allBypassed ? 'All off' : 'Bypass all'}</span>
+          </button>
+        )}
+
+        {/* Toggle All Plugin Windows */}
+        {totalPlugins > 0 && (
+          <button
+            onClick={handleToggleAllWindows}
+            className={`${toolBtn} ${
+              windowState.openCount > 0
+                ? 'text-plugin-accent hover:bg-plugin-accent/15'
+                : toolIdle
+            }`}
+            title={
+              windowState.openCount > 0
+                ? `Close all plugin windows (${windowState.openCount}/${windowState.totalCount} open)`
+                : 'Open all plugin windows'
+            }
+          >
+            <AppWindow className="w-3.5 h-3.5" />
+            {windowState.totalCount > 0 && (
+              <span className="num text-[10px] leading-none">
+                {windowState.openCount}/{windowState.totalCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        <div className="flex-1" />
 
         {/* Mirror indicator — shown when linked to another track */}
         <MirrorIndicator />
+
+        <span className="text-xs text-plugin-dim whitespace-nowrap mx-1.5">
+          <span className="num text-plugin-muted">{totalPlugins}</span> plugin{totalPlugins === 1 ? '' : 's'}
+        </span>
+
+        <button
+          onClick={() => window.dispatchEvent(new Event('openPluginBrowser'))}
+          className="h-7 inline-flex items-center gap-1 pl-1.5 pr-2.5 rounded-md bg-plugin-accent text-plugin-on-accent text-xs font-semibold hover:bg-plugin-accent-bright transition-colors"
+          title="Add a plugin (⌘B opens the plugin list)"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add plugin
+        </button>
       </div>
 
-      {/* Chain */}
+      {/* Chain canvas */}
       <div
-        className="flex-1 overflow-y-auto p-2 chain-scrollbar"
+        className="flex-1 overflow-y-auto chain-scrollbar canvas-grid"
         onContextMenu={handleContextMenu}
         onClick={() => { selectNode(null); setSelectedIds(new Set()); }}
       >
+        <div className="max-w-[880px] mx-auto px-3 py-3">
         {loading && !hasNodes ? (
           <div className="flex items-center justify-center h-32 text-plugin-muted">
             Loading...
@@ -562,12 +565,9 @@ export function ChainEditor() {
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
           >
-            <div className="space-y-2">
-              {/* Input indicator */}
-              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
-                <div className="w-2 h-2 rounded-full bg-plugin-success" />
-                Audio Input
-              </div>
+            <div className="space-y-1.5">
+              {/* Input terminal */}
+              <SignalTerminal label="Input" />
 
               {/* Tree-based rendering with drop zones */}
               <ChainNodeList
@@ -592,11 +592,8 @@ export function ChainEditor() {
                 isDragActive={isDragActive}
               />
 
-              {/* Output indicator */}
-              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-plugin-muted">
-                <div className="w-2 h-2 rounded-full bg-plugin-accent" />
-                Audio Output
-              </div>
+              {/* Output terminal */}
+              <SignalTerminal label="Output" />
             </div>
 
             {/* Drag overlay - follows cursor */}
@@ -619,30 +616,31 @@ export function ChainEditor() {
             </DragOverlay>
           </DndContext>
         )}
+        </div>
       </div>
 
       {/* Floating action bar when 2+ nodes selected */}
       {selectedIds.size >= 2 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-40 animate-slide-up">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-plugin-surface/95 border border-plugin-border shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
-            <span className="text-[11px] text-plugin-muted mr-1">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-plugin-raised border border-plugin-border-bright shadow-panel">
+            <span className="text-xs text-plugin-muted mr-1">
               {selectedIds.size} selected
             </span>
             <button
               onClick={() => handleCreateGroup('serial')}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium bg-plugin-serial/12 text-plugin-serial border border-plugin-serial/30 hover:bg-plugin-serial/20 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-plugin-serial/12 text-plugin-serial border border-plugin-serial/30 hover:bg-plugin-serial/20 transition-colors"
             >
               <Layers className="w-3.5 h-3.5" />
               Serial Group
-              <kbd className="text-[9px] opacity-60 font-mono ml-1">⌘G</kbd>
+              <kbd className="text-[10px] opacity-60  ml-1">⌘G</kbd>
             </button>
             <button
               onClick={() => handleCreateGroup('parallel')}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium bg-plugin-parallel/12 text-plugin-parallel border border-plugin-parallel/30 hover:bg-plugin-parallel/20 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-plugin-parallel/12 text-plugin-parallel border border-plugin-parallel/30 hover:bg-plugin-parallel/20 transition-colors"
             >
               <GitBranch className="w-3.5 h-3.5" />
               Parallel Group
-              <kbd className="text-[9px] opacity-60 font-mono ml-1">⌘⇧G</kbd>
+              <kbd className="text-[10px] opacity-60  ml-1">⌘⇧G</kbd>
             </button>
             <button
               onClick={() => { setSelectedIds(new Set()); setGroupSelectMode(false); }}
@@ -658,13 +656,13 @@ export function ChainEditor() {
       {/* Context menu for creating groups */}
       {contextMenu && selectedIds.size >= 2 && (
         <div
-          className="fixed z-50 bg-plugin-surface border border-plugin-border rounded-lg shadow-lg py-1 min-w-[180px]"
+          className="fixed z-50 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel py-1 min-w-[190px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={() => handleCreateGroup('serial')}
-            className="w-full px-3 py-1.5 text-left text-sm text-plugin-text hover:bg-plugin-border/50 flex items-center gap-2"
+            className="w-full px-3 py-1.5 text-left text-sm text-plugin-text hover:bg-plugin-accent/10 flex items-center gap-2"
           >
             <Layers className="w-4 h-4 text-plugin-serial" />
             Create Serial Group
@@ -672,7 +670,7 @@ export function ChainEditor() {
           </button>
           <button
             onClick={() => handleCreateGroup('parallel')}
-            className="w-full px-3 py-1.5 text-left text-sm text-plugin-text hover:bg-plugin-border/50 flex items-center gap-2"
+            className="w-full px-3 py-1.5 text-left text-sm text-plugin-text hover:bg-plugin-accent/10 flex items-center gap-2"
           >
             <GitBranch className="w-4 h-4 text-plugin-parallel" />
             Create Parallel Group
@@ -855,23 +853,23 @@ function EmptySlot({
       ref={setNodeRef}
       onClick={handleClick}
       className={`
-        mx-0 rounded-lg border-2 border-dashed transition-all duration-200
-        flex items-center justify-center gap-2
+        rounded-lg border border-dashed transition-colors duration-150
+        flex items-center justify-center gap-2 h-10
         ${isOver && isDragActive
-          ? 'border-plugin-accent bg-plugin-accent/10 py-4 cursor-default'
+          ? 'border-plugin-accent bg-plugin-accent/10 cursor-default'
           : isDragActive
-            ? 'border-plugin-border/70 bg-plugin-bg/30 py-3 cursor-default'
-            : 'border-plugin-border/40 py-2.5 cursor-pointer hover:border-plugin-accent/40 hover:bg-plugin-accent/5'
+            ? 'border-plugin-border-bright bg-plugin-surface/40 cursor-default'
+            : 'border-plugin-border-bright/70 cursor-pointer hover:border-plugin-accent/60 hover:bg-plugin-accent/5 group'
         }
       `}
     >
       <Plus className={`w-3.5 h-3.5 ${
-        isOver && isDragActive ? 'text-plugin-accent' : 'text-plugin-dim'
+        isOver && isDragActive ? 'text-plugin-accent' : 'text-plugin-dim group-hover:text-plugin-accent'
       }`} />
-      <span className={`text-xs ${
+      <span className={`text-xs font-medium ${
         isOver && isDragActive
           ? 'text-plugin-accent'
-          : 'text-plugin-dim'
+          : 'text-plugin-muted group-hover:text-plugin-text'
       }`}>
         {isOver && isDragActive
           ? 'Drop here'
@@ -884,3 +882,13 @@ function EmptySlot({
   );
 }
 
+/** Small input/output marker at the top and bottom of the chain. */
+function SignalTerminal({ label }: { label: 'Input' | 'Output' }) {
+  return (
+    <div className="flex items-center gap-2 h-6 px-1 text-[11px] text-plugin-dim">
+      <span className={`w-1.5 h-1.5 rounded-full ${label === 'Input' ? 'bg-plugin-success' : 'bg-plugin-accent'}`} />
+      <span className="uppercase tracking-wider font-semibold">{label}</span>
+      <span className="flex-1 h-px bg-plugin-border" />
+    </div>
+  );
+}

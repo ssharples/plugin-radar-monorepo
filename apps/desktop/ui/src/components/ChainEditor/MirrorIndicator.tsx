@@ -45,7 +45,7 @@ export function MirrorIndicator() {
   return (
     <div
       className={`
-        flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono
+        flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] 
         border transition-all duration-300
         ${pulse
           ? 'bg-plugin-accent/20 border-plugin-accent/50 shadow-glow-accent'

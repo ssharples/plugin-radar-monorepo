@@ -1,0 +1,4 @@
+{
+  "description": "Exact source-bound mutant identities only. Each entry requires a reason proving behavioral equivalence; no path/operator wildcards.",
+  "equivalents": []
+}

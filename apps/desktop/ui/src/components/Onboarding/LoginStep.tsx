@@ -19,22 +19,22 @@ export function LoginStep() {
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-sm px-6 animate-fade-in">
-      {/* Propane brand */}
-      <h1 className="font-brand text-3xl text-plugin-accent crt-text mb-1 tracking-wider">
-        PROPANE
+      {/* ProChain brand */}
+      <h1 className="font-semibold text-3xl text-plugin-accent mb-1 tracking-wider">
+        PROCHAIN
       </h1>
-      <p className="text-plugin-dim text-xxs font-mono uppercase tracking-widest mb-8">
-        Plugin Chain Manager
+      <p className="text-plugin-dim text-xxs  uppercase tracking-widest mb-8">
+        Plugin chains for any brand
       </p>
 
       {/* Auth mode tabs */}
-      <div className="flex w-full mb-6 border border-plugin-border rounded-propane overflow-hidden">
+      <div className="flex w-full mb-6 border border-plugin-border rounded-md overflow-hidden">
         <button
           type="button"
           onClick={() => setAuthMode('login')}
-          className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${
+          className={`flex-1 py-2 text-xs  uppercase tracking-wider transition-colors ${
             authMode === 'login'
-              ? 'bg-plugin-accent text-black'
+              ? 'bg-plugin-accent text-plugin-on-accent'
               : 'bg-black/40 text-plugin-muted hover:text-plugin-text'
           }`}
         >
@@ -43,9 +43,9 @@ export function LoginStep() {
         <button
           type="button"
           onClick={() => setAuthMode('register')}
-          className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${
+          className={`flex-1 py-2 text-xs  uppercase tracking-wider transition-colors ${
             authMode === 'register'
-              ? 'bg-plugin-accent text-black'
+              ? 'bg-plugin-accent text-plugin-on-accent'
               : 'bg-black/40 text-plugin-muted hover:text-plugin-text'
           }`}
         >
@@ -61,7 +61,7 @@ export function LoginStep() {
             placeholder="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2.5 bg-black/40 border border-plugin-border rounded-propane font-mono text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
+            className="w-full px-3 py-2.5 bg-plugin-bg border border-plugin-border rounded-md  text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
             autoComplete="name"
           />
         )}
@@ -70,7 +70,7 @@ export function LoginStep() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-3 py-2.5 bg-black/40 border border-plugin-border rounded-propane font-mono text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
+          className="w-full px-3 py-2.5 bg-plugin-bg border border-plugin-border rounded-md  text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
           autoComplete="email"
         />
         <input
@@ -78,12 +78,12 @@ export function LoginStep() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-3 py-2.5 bg-black/40 border border-plugin-border rounded-propane font-mono text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
+          className="w-full px-3 py-2.5 bg-plugin-bg border border-plugin-border rounded-md  text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors"
           autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
         />
 
         {authError && (
-          <div className="text-red-400 text-xs font-mono bg-red-500/10 border border-red-500/20 rounded-propane px-3 py-2">
+          <div className="text-red-400 text-xs  bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2">
             {authError}
           </div>
         )}
@@ -91,7 +91,7 @@ export function LoginStep() {
         <button
           type="submit"
           disabled={isDisabled || authLoading}
-          className="w-full py-2.5 mt-1 bg-plugin-accent hover:bg-plugin-accent-bright text-black font-mono text-sm uppercase tracking-wider rounded-propane transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-2.5 mt-1 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent  text-sm uppercase tracking-wider rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {authLoading ? 'Loading...' : authMode === 'login' ? 'Sign In' : 'Create Account'}
         </button>

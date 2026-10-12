@@ -7,11 +7,26 @@ class ProxyParameter : public juce::AudioProcessorParameterWithID,
                        public juce::AudioProcessorParameter::Listener
 {
 public:
+    class ReadGuard
+    {
+    public:
+        ReadGuard(const ProxyParameter& owner) noexcept;
+        ~ReadGuard();
+        juce::AudioProcessorParameter* get() const noexcept { return target; }
+        ReadGuard(const ReadGuard&) = delete;
+        ReadGuard& operator=(const ReadGuard&) = delete;
+    private:
+        const ProxyParameter& owner;
+        juce::AudioProcessorParameter* target = nullptr;
+        bool counted = true;
+    };
+
     ProxyParameter(int slotIndex, int paramIndex);
     ~ProxyParameter() override;
 
     void bind(juce::AudioProcessorParameter* param);
     void unbind();
+    bool isQuiescent() const noexcept { return activeReaders.load(std::memory_order_seq_cst) == 0; }
 
     // AudioProcessorParameter overrides
     float getValue() const override;
@@ -33,6 +48,8 @@ public:
 
 private:
     std::atomic<juce::AudioProcessorParameter*> target { nullptr };
+    mutable std::atomic<unsigned int> activeReaders { 0 };
+    std::atomic<bool> retiring { false };
     int slotIndex;
     int paramIndex;
 

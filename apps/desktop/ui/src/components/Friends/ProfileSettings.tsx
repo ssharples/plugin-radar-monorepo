@@ -73,7 +73,7 @@ export function ProfileSettings() {
   if (loading) {
     return (
       <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
-        <div className="text-gray-400 text-sm">Loading profile...</div>
+        <div className="text-plugin-muted text-sm">Loading profile...</div>
       </div>
     );
   }
@@ -82,7 +82,7 @@ export function ProfileSettings() {
     <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center gap-2 mb-4">
         <User size={18} className="text-plugin-accent" />
-        <h3 className="text-white font-mono font-medium">Profile Settings</h3>
+        <h3 className="text-plugin-text  font-medium">Profile Settings</h3>
       </div>
 
       {error && (
@@ -101,48 +101,48 @@ export function ProfileSettings() {
 
       <form onSubmit={handleSave} className="space-y-3">
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Username *</label>
+          <label className="block text-sm text-plugin-muted mb-1">Username *</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="your_username"
             required
-            className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white text-sm"
+            className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text text-sm"
           />
-          <p className="text-xs text-gray-500 mt-1">How friends will find you</p>
+          <p className="text-xs text-plugin-dim mt-1">How friends will find you</p>
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Email</label>
+          <label className="block text-sm text-plugin-muted mb-1">Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white text-sm"
+            className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text text-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Phone Number</label>
+          <label className="block text-sm text-plugin-muted mb-1">Phone Number</label>
           <input
             type="tel"
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             placeholder="+1 555-0123"
-            className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white text-sm"
+            className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text text-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Instagram</label>
+          <label className="block text-sm text-plugin-muted mb-1">Instagram</label>
           <input
             type="text"
             value={instagramHandle}
             onChange={(e) => setInstagramHandle(e.target.value)}
             placeholder="@yourhandle"
-            className="w-full bg-black/30 border border-plugin-border rounded px-3 py-2 text-white text-sm"
+            className="w-full bg-plugin-bg border border-plugin-border rounded px-3 py-2 text-plugin-text text-sm"
           />
         </div>
 
@@ -152,7 +152,7 @@ export function ProfileSettings() {
           className={`w-full flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium ${
             saving
               ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-              : 'bg-plugin-accent hover:bg-plugin-accent-bright text-white'
+              : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
           }`}
         >
           <Save size={14} />

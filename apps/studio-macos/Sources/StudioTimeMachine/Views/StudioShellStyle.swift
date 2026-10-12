@@ -17,6 +17,7 @@ struct StudioShellButtonStyle: ButtonStyle {
 
   let kind: Kind
   @Environment(\.isEnabled) private var isEnabled
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
@@ -30,9 +31,9 @@ struct StudioShellButtonStyle: ButtonStyle {
         RoundedRectangle(cornerRadius: 10, style: .continuous)
           .stroke(kind == .primary ? .clear : StudioShellPalette.chromeStroke, lineWidth: 1)
       }
-      .scaleEffect(configuration.isPressed ? 0.97 : 1)
+      .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
       .opacity(isEnabled ? 1 : 0.42)
-      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
   }
 
   private var foregroundColor: Color {
@@ -56,6 +57,7 @@ struct StudioCanvasButtonStyle: ButtonStyle {
 
   let kind: Kind
   @Environment(\.isEnabled) private var isEnabled
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
@@ -69,9 +71,9 @@ struct StudioCanvasButtonStyle: ButtonStyle {
         RoundedRectangle(cornerRadius: 10, style: .continuous)
           .stroke(kind == .secondary ? StudioShellPalette.ink.opacity(0.14) : .clear, lineWidth: 1)
       }
-      .scaleEffect(configuration.isPressed ? 0.97 : 1)
+      .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
       .opacity(isEnabled ? 1 : 0.42)
-      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
   }
 
   private var foregroundColor: Color {
@@ -87,37 +89,6 @@ struct StudioCanvasButtonStyle: ButtonStyle {
     case .secondary: StudioShellPalette.canvasRaised.opacity(isPressed ? 0.68 : 1)
     case .quiet: StudioShellPalette.ink.opacity(isPressed ? 0.10 : 0.001)
     }
-  }
-}
-
-struct StudioShellIconButton: View {
-  let title: String
-  let systemImage: String
-  var badge: Int?
-  var isActive = false
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      ZStack(alignment: .topTrailing) {
-        Image(systemName: systemImage)
-          .font(.system(size: 13, weight: .semibold))
-          .frame(width: 16, height: 16)
-
-        if let badge, badge > 0 {
-          Text("\(min(badge, 99))")
-            .font(.system(size: 8, weight: .bold, design: .rounded))
-            .foregroundStyle(StudioShellPalette.ink)
-            .padding(.horizontal, 4)
-            .frame(minWidth: 14, minHeight: 14)
-            .background(StudioShellPalette.signal, in: Capsule())
-            .offset(x: 9, y: -8)
-        }
-      }
-    }
-    .buttonStyle(StudioShellButtonStyle(kind: isActive ? .secondary : .ghost))
-    .help(title)
-    .accessibilityLabel(title)
   }
 }
 

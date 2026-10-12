@@ -63,7 +63,7 @@ export function OtherInstancesList() {
 
   return (
     <div className="mb-4">
-      <h3 className="text-[10px] font-mono uppercase text-plugin-muted mb-2 px-1">
+      <h3 className="section-label mb-2 px-1">
         Copy from another track
       </h3>
       <div className="space-y-1.5">
@@ -82,29 +82,29 @@ export function OtherInstancesList() {
                 flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-colors
                 ${isMirroredToThis
                   ? 'bg-plugin-accent/8 border-plugin-accent/30'
-                  : 'bg-plugin-card border-plugin-border/50 hover:border-plugin-accent/30'
+                  : 'bg-plugin-surface border-plugin-border hover:border-plugin-accent/30'
                 }
               `}
             >
               {/* Track info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-medium font-mono text-plugin-text truncate">
+                  <span className="text-xs font-medium  text-plugin-text truncate">
                     {inst.trackName}
                   </span>
                   {isMirroredToThis && (
-                    <span className="flex items-center gap-0.5 text-[9px] text-plugin-accent">
+                    <span className="flex items-center gap-0.5 text-[10px] text-plugin-accent">
                       <Link2 className="w-2.5 h-2.5" />
                       Mirrored
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-[10px] font-mono text-plugin-muted truncate">
+                  <span className="text-[11px]  text-plugin-muted truncate">
                     {chainPreview}
                   </span>
                   {inst.pluginCount > 0 && (
-                    <span className="text-[9px] text-plugin-dim shrink-0">
+                    <span className="text-[10px] text-plugin-dim shrink-0">
                       ({inst.pluginCount})
                     </span>
                   )}
@@ -118,7 +118,7 @@ export function OtherInstancesList() {
                     <button
                       onClick={() => handleCopy(inst.id)}
                       disabled={copying !== null}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono uppercase
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px]  uppercase
                         bg-plugin-border/50 text-plugin-text hover:bg-plugin-accent/15 hover:text-plugin-accent
                         transition-colors disabled:opacity-50"
                       title="Copy chain to this track (one-time)"
@@ -129,7 +129,7 @@ export function OtherInstancesList() {
                     <button
                       onClick={() => handleMirror(inst.id)}
                       disabled={mirroring !== null || mirrorState.isMirrored}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono uppercase
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px]  uppercase
                         bg-plugin-border/50 text-plugin-text hover:bg-plugin-accent/15 hover:text-plugin-accent
                         transition-colors disabled:opacity-50"
                       title="Mirror chain (live sync)"

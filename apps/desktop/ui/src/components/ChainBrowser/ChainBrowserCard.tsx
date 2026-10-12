@@ -38,7 +38,7 @@ export function ChainBrowserCard({
 
   return (
     <div
-      className="group bg-black/20 border border-plugin-border/50 rounded-propane p-3 hover:border-plugin-accent/30 hover:bg-black/30 transition-all cursor-pointer"
+      className="group bg-black/20 border border-plugin-border/50 rounded-md p-3 hover:border-plugin-accent/30 hover:bg-black/30 transition-all cursor-pointer"
       onClick={onPreview}
     >
       {/* Top row: name + compat badge */}
@@ -50,7 +50,7 @@ export function ChainBrowserCard({
           {/* Compatibility dot */}
           <div className="flex items-center gap-1">
             <div className={`w-2 h-2 rounded-full ${getCompatColor(compatPercent)}`} />
-            <span className="text-[9px] font-mono text-plugin-dim">
+            <span className="text-[10px]  text-plugin-dim">
               {getCompatLabel(compatPercent)}
             </span>
           </div>
@@ -59,20 +59,20 @@ export function ChainBrowserCard({
 
       {/* Author */}
       {chain.author?.name && (
-        <p className="text-[10px] text-plugin-dim mb-1">
+        <p className="text-[11px] text-plugin-dim mb-1">
           by @{chain.author.name}
         </p>
       )}
 
       {/* Plugin preview */}
-      <p className="text-[10px] text-plugin-muted truncate mb-2">
+      <p className="text-[11px] text-plugin-muted truncate mb-2">
         {pluginPreview}
         {pluginCount > 3 ? ` +${pluginCount - 3} more` : ''}
       </p>
 
       {/* Bottom row: stats + actions */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5 text-[9px] text-plugin-dim">
+        <div className="flex items-center gap-2.5 text-[10px] text-plugin-dim">
           <span className="flex items-center gap-0.5">
             <Download className="w-2.5 h-2.5" /> {chain.downloads}
           </span>
@@ -80,7 +80,7 @@ export function ChainBrowserCard({
             <Heart className="w-2.5 h-2.5" /> {chain.likes}
           </span>
           {chain.pluginCount > 0 && (
-            <span className="font-mono">{chain.pluginCount}p</span>
+            <span className="">{chain.pluginCount}p</span>
           )}
         </div>
 
@@ -102,7 +102,7 @@ export function ChainBrowserCard({
           </button>
           <button
             onClick={onLoad}
-            className="px-2 py-0.5 bg-plugin-accent hover:bg-plugin-accent-dim text-black rounded text-[9px] font-mono uppercase font-bold transition-colors"
+            className="px-2 py-0.5 bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded text-[10px]  uppercase font-bold transition-colors"
           >
             Load
           </button>

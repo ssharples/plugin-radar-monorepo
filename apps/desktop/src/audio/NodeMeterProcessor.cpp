@@ -5,6 +5,9 @@ NodeMeterProcessor::NodeMeterProcessor()
           .withInput("Input", juce::AudioChannelSet::stereo(), true)
           .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 {
+    // Node meters are inline UI instrumentation; full LUFS is opt-in for
+    // dedicated loudness consumers.
+    meter.setAnalysisMode(AudioMeter::AnalysisMode::peakOnly);
 }
 
 void NodeMeterProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)

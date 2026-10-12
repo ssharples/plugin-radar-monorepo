@@ -11,16 +11,32 @@ using ChainNodeId = int;
 enum class GroupMode
 {
     Serial,
-    Parallel
+    Parallel,
+    Crossover   // Each child is one frequency band; the bands add back up flat
 };
+
+constexpr int kMaxCrossoverBands = 5;
+
+// "serial" / "parallel" / "crossover"
+const char* groupModeName(GroupMode mode);
+bool parseGroupMode(const juce::String& text, GroupMode& mode);
+// Parallel and crossover groups both split the signal into summed branches
+inline bool isBranchingMode(GroupMode mode) { return mode != GroupMode::Serial; }
 
 struct PluginLeaf
 {
+    juce::String persistentId = juce::Uuid().toString();
     juce::PluginDescription description;
     juce::AudioProcessorGraph::NodeID graphNodeId;
     juce::AudioProcessorGraph::NodeID meterNodeId;       // Output meter (after plugin)
     juce::AudioProcessorGraph::NodeID inputMeterNodeId;  // Input meter (before plugin)
     bool bypassed = false;
+    bool suspended = false;
+    bool recallSafe = false;     // Chain/preset loads keep this slot as it is
+    bool ignoreLatency = false;  // Leave this plugin out of delay compensation
+    bool sidechain = false;      // Key the plugin from ProChain's sidechain input
+    juce::String retainedState;
+    juce::String loadError;
 };
 
 // Forward declare ChainNode so GroupData can hold unique_ptr<ChainNode>
@@ -36,7 +52,22 @@ struct GroupData
     juce::AudioProcessorGraph::NodeID dryWetMixNodeId;
     juce::AudioProcessorGraph::NodeID sumGainNodeId;
     std::vector<juce::AudioProcessorGraph::NodeID> branchGainNodeIds;
+    std::vector<juce::AudioProcessorGraph::NodeID> branchGateNodeIds;
+
+    // Crossover only: split points in Hz, one fewer than the bands (serialized)
+    std::vector<float> crossoverHz;
+    std::vector<juce::AudioProcessorGraph::NodeID> bandFilterNodeIds;
 };
+
+namespace CrossoverHelpers
+{
+    // Default split points for a number of bands
+    std::vector<float> defaultFrequencies(int numBands);
+    // Makes the split points fit the band count: keeps valid ones, else uses the defaults
+    void fitFrequencies(GroupData& group);
+    juce::String toString(const std::vector<float>& frequencies);
+    bool fromString(const juce::String& text, std::vector<float>& frequencies);
+}
 
 struct ChainNode
 {
@@ -45,6 +76,7 @@ struct ChainNode
     float branchGainDb = 0.0f;
     bool solo = false;
     bool mute = false;
+    bool polarityInverted = false;  // Flip the sign of this parallel branch
     bool collapsed = false;
     std::variant<PluginLeaf, GroupData> data;
 

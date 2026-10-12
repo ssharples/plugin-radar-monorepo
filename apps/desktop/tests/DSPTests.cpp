@@ -820,3 +820,42 @@ TEST_CASE("AudioMeter: mono input duplicated to both channels", "[dsp][meter]")
     // R channel uses L when only 1 channel
     REQUIRE_THAT(readings.peakR, WithinAbs(0.6f, 0.0001f));
 }
+
+TEST_CASE("BranchGainProcessor: polarity invert ramps to a flipped signal", "[dsp][gain][branch]")
+{
+    BranchGainProcessor proc;
+    proc.prepareToPlay(44100.0, 2048);
+    proc.setPolarityInverted(true);
+
+    juce::AudioBuffer<float> buf(2, 2048);
+    fillBuffer(buf, 0.5f);
+    juce::MidiBuffer midi;
+    proc.processBlock(buf, midi);
+
+    // Ramp starts near +0.5 (no click) and ends at -0.5 after 20 ms
+    REQUIRE(buf.getReadPointer(0)[0] > 0.45f);
+    REQUIRE_THAT(buf.getReadPointer(0)[2047], WithinAbs(-0.5f, 0.001f));
+    REQUIRE_THAT(buf.getReadPointer(1)[2047], WithinAbs(-0.5f, 0.001f));
+    REQUIRE(proc.isPolarityInverted());
+}
+
+TEST_CASE("BranchGainProcessor recovers cleanly after a mute", "[dsp][branch]")
+{
+    BranchGainProcessor gain;
+    gain.prepareToPlay(48000, 256);
+    juce::MidiBuffer midi;
+    auto run = [&] {
+        juce::AudioBuffer<float> b(2, 256);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::fill(b.getWritePointer(c), 1.0f, 256);
+        gain.processBlock(b, midi);
+        return b;
+    };
+    gain.setGainDb(-60.0f);
+    for (int i = 0; i < 20; ++i) run();
+    REQUIRE(std::abs(run().getSample(0, 255)) < 1.0e-4f);
+    gain.setGainDb(0.0f);
+    juce::AudioBuffer<float> out;
+    for (int i = 0; i < 20; ++i) out = run();
+    for (int i = 0; i < 256; ++i) REQUIRE(std::isfinite(out.getSample(0, i)));
+    REQUIRE(std::abs(out.getSample(0, 255) - 1.0f) < 1.0e-4f);
+}

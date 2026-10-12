@@ -8,7 +8,11 @@ struct PreviewTransportView: View {
 
   var body: some View {
     VStack(spacing: 4) {
-      WaveformScrubberView(asset: asset, player: player)
+      if player.clipSelection != nil {
+        AudioClipEditorView(asset: asset, player: player)
+      } else {
+        WaveformScrubberView(asset: asset, player: player)
+      }
 
       HStack(spacing: 13) {
         Button {
@@ -26,8 +30,10 @@ struct PreviewTransportView: View {
         }
         .buttonStyle(.borderless)
         .disabled(!asset.isAvailableOnDisk || player.isLoadingPlayback)
-        .help(
-          asset.isAvailableOnDisk ? "Play existing audio" : "File unavailable at indexed location")
+        .help(player.clipSelection == nil ? "Play existing audio" : "Audition selected range")
+        .accessibilityLabel(
+          player.isPlaying
+            ? "Pause preview" : (player.clipSelection == nil ? "Play preview" : "Play selection"))
 
         VStack(alignment: .leading, spacing: 2) {
           Text(asset.filename)
@@ -46,10 +52,16 @@ struct PreviewTransportView: View {
 
         Spacer(minLength: 16)
 
-        Text(timeText)
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
-          .accessibilityHidden(true)
+        if player.clipSelection == nil {
+          Button("Clip", systemImage: "scissors") { player.beginClipping() }
+            .buttonStyle(.borderless)
+            .disabled(player.duration <= 0 || !asset.isAvailableOnDisk)
+            .help("Select an excerpt to audition, copy, or drag into your DAW")
+          Text(timeText)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+        }
 
         Button {
           player.stop()
@@ -58,6 +70,7 @@ struct PreviewTransportView: View {
         }
         .buttonStyle(.borderless)
         .help("Close preview")
+        .accessibilityLabel("Close preview")
       }
       .padding(.horizontal, 16)
       .padding(.bottom, 10)
@@ -72,7 +85,7 @@ struct PreviewTransportView: View {
       }
     }
     .padding(.top, 7)
-    .frame(maxWidth: 760)
+    .frame(maxWidth: 690)
     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     .shadow(color: .black.opacity(0.16), radius: 20, x: 0, y: 10)
     .accessibilityElement(children: .contain)

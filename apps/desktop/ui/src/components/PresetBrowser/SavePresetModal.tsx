@@ -134,7 +134,7 @@ export function SavePresetModal({ onClose }: SavePresetModalProps) {
               (!useNewCategory && !category) ||
               (useNewCategory && !newCategory.trim())
             }
-            className="flex items-center gap-1.5 px-4 py-2 rounded text-sm bg-plugin-accent hover:bg-plugin-accent/80 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded text-sm bg-plugin-accent hover:bg-plugin-accent/80 text-plugin-text disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Preset'}

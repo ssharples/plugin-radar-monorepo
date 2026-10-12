@@ -98,6 +98,27 @@ enum SampleLibrary {
     )
   }
 
+  /// Deterministic, metadata-only fixture for archive disclosure and overflow review.
+  static func makeDisclosureReview() -> StudioLibraryIndex {
+    let root = URL(fileURLWithPath: "/Sample Studio Archive", isDirectory: true)
+    return StudioLibraryIndex(
+      rootURL: root,
+      scannedAt: Date(timeIntervalSince1970: 1_786_464_000),
+      projects: [
+        project(
+          root: root,
+          name: "Halogen Sky",
+          timelineNames: ["Halogen Sky", "Halogen Sky — Instrumental"],
+          assetNames: (1...30).map { ("Halogen Sky Mix \($0).wav", .otherAudio, true) },
+          seed: 1,
+          versionCount: 18
+        )
+      ],
+      unassignedAudioAssets: [],
+      issues: []
+    )
+  }
+
   static func makeSearchCompanion() -> StudioLibraryIndex {
     let root = URL(fileURLWithPath: "/Volumes/Field Archive", isDirectory: true)
     return StudioLibraryIndex(
@@ -429,11 +450,12 @@ enum SampleLibrary {
     name: String,
     timelineNames: [String],
     assetNames: [(String, PreviewAssetCategory, Bool)],
-    seed: Int
+    seed: Int,
+    versionCount: Int = 4
   ) -> StudioProject {
     let projectRoot = root.appendingPathComponent(name, isDirectory: true)
     let timelines = timelineNames.enumerated().map { index, timelineName in
-      let versions = (0..<(index == 0 ? 4 : 2)).map { version in
+      let versions = (0..<(index == 0 ? versionCount : 2)).map { version in
         set(
           projectRoot: projectRoot,
           name: timelineName,
@@ -479,7 +501,12 @@ enum SampleLibrary {
     structure.automationEnvelopeCount = 42 + (version * 3)
 
     let isBackup = version > 0
-    let filename = isBackup ? "\(name) [2026-08-\(10 - version) 21-0\(version)].als" : "\(name).als"
+    let modifiedAt = Date(
+      timeIntervalSince1970: 1_786_464_000 - Double(version * 86_400 + seed * 7_200))
+    let timestamp = modifiedAt.ISO8601Format().prefix(19)
+      .replacingOccurrences(of: "T", with: " ")
+      .replacingOccurrences(of: ":", with: "-")
+    let filename = isBackup ? "\(name) [\(timestamp)].als" : "\(name).als"
     let folder = isBackup ? projectRoot.appendingPathComponent("Backup") : projectRoot
 
     return AbletonSet(
@@ -487,8 +514,7 @@ enum SampleLibrary {
       fileURL: folder.appendingPathComponent(filename),
       displayName: filename.replacingOccurrences(of: ".als", with: ""),
       isBackup: isBackup,
-      modifiedAt: Date(
-        timeIntervalSince1970: 1_786_464_000 - Double(version * 86_400 + seed * 7_200)),
+      modifiedAt: modifiedAt,
       compressedBytes: Int64(5_600_000 + version * 230_000),
       xmlBytes: 28_000_000 + version * 1_100_000,
       creator: "Ableton Live 12.1",

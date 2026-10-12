@@ -249,7 +249,7 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
     ctx.lineWidth = 1;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.font = '8px monospace';
+    ctx.font = '9px "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
 
@@ -441,7 +441,7 @@ export function SpectrumAnalyzer({ mode = 'bars', octaveMode = 'third' }: Spectr
     for (let i = 1; i < points.length; i++) {
       ctx.lineTo(points[i].x, points[i].y);
     }
-    ctx.strokeStyle = '#89572a';
+    ctx.strokeStyle = '#a598ff';
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }, []);

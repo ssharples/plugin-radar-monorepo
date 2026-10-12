@@ -1,6 +1,7 @@
 import { Plus, Music, Sliders } from 'lucide-react';
 import type { PluginDescription } from '../../api/types';
 import { usePluginStore } from '../../stores/pluginStore';
+import { CATEGORY_COLORS, CATEGORY_LABELS } from '../../constants/categoryColors';
 
 interface PluginItemProps {
   plugin: PluginDescription;
@@ -10,45 +11,6 @@ interface PluginItemProps {
   onInsert?: () => void;
   onMouseEnter?: () => void;
 }
-
-// Category → color mapping for badges
-const CATEGORY_COLORS: Record<string, string> = {
-  eq: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  compressor: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  limiter: 'bg-red-500/20 text-red-300 border-red-500/30',
-  reverb: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  delay: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-  saturation: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  modulation: 'bg-green-500/20 text-green-300 border-green-500/30',
-  'stereo-imaging': 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  'gate-expander': 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-  'de-esser': 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-  filter: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  'channel-strip': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  metering: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-  'noise-reduction': 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-  multiband: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
-  utility: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  eq: 'EQ',
-  compressor: 'Compressor',
-  limiter: 'Limiter',
-  reverb: 'Reverb',
-  delay: 'Delay',
-  saturation: 'Saturation',
-  modulation: 'Modulation',
-  'stereo-imaging': 'Stereo',
-  'gate-expander': 'Gate',
-  'de-esser': 'De-esser',
-  filter: 'Filter',
-  'channel-strip': 'Strip',
-  metering: 'Meter',
-  'noise-reduction': 'Denoise',
-  multiband: 'Multiband',
-  utility: 'Utility',
-};
 
 function formatPrice(cents: number | undefined, currency: string = 'USD'): string {
   if (cents === undefined || cents === null) return '';
@@ -101,28 +63,28 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-xs font-mono text-plugin-text truncate leading-tight font-medium">{plugin.name}</p>
+          <p className="text-xs  text-plugin-text truncate leading-tight font-medium">{plugin.name}</p>
           {/* Category badge */}
           {enriched && categoryLabel && (
-            <span className={`flex-shrink-0 px-1 py-px text-[9px] leading-tight rounded border font-medium ${categoryColor}`}>
+            <span className={`flex-shrink-0 px-1 py-px text-[10px] leading-tight rounded border font-medium ${categoryColor}`}>
               {categoryLabel}
             </span>
           )}
           {/* Price badge */}
           {enriched?.isFree && (
-            <span className="flex-shrink-0 px-1 py-px text-[9px] leading-tight rounded bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
+            <span className="flex-shrink-0 px-1 py-px text-[10px] leading-tight rounded bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
               Free
             </span>
           )}
           {enriched && !enriched.isFree && enriched.currentPrice !== undefined && (
-            <span className="flex-shrink-0 text-[9px] text-plugin-dim font-mono">
+            <span className="flex-shrink-0 text-[10px] text-plugin-dim ">
               {formatPrice(enriched.currentPrice, enriched.currency)}
             </span>
           )}
         </div>
 
         {/* Manufacturer + format / effect type */}
-        <p className="text-xxs font-mono text-plugin-dim truncate leading-tight">
+        <p className="text-xxs  text-plugin-dim truncate leading-tight">
           {plugin.manufacturer}
           <span className="text-plugin-border-bright"> / </span>
           {effectSubtitle || plugin.format}
@@ -134,7 +96,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
             {tonalChars.map((char) => (
               <span
                 key={char}
-                className="px-1 py-px text-[9px] leading-tight rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize"
+                className="px-1 py-px text-[10px] leading-tight rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize"
               >
                 {char}
               </span>
@@ -144,7 +106,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
 
         {/* Short description (only shown when highlighted or enriched data exists and there's space) */}
         {enriched?.shortDescription && isHighlighted && (
-          <p className="text-[9px] text-plugin-dim leading-tight mt-0.5 line-clamp-1">
+          <p className="text-[10px] text-plugin-dim leading-tight mt-0.5 line-clamp-1">
             {enriched.shortDescription}
           </p>
         )}
@@ -163,7 +125,7 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
             e.stopPropagation();
             onAdd();
           }}
-          className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 bg-plugin-accent/15 hover:bg-plugin-accent text-plugin-accent hover:text-black transition-all mt-0.5"
+          className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 bg-plugin-accent/15 hover:bg-plugin-accent text-plugin-accent hover:text-plugin-on-accent transition-all mt-0.5"
           title="Add to chain"
         >
           <Plus className="w-3 h-3" />

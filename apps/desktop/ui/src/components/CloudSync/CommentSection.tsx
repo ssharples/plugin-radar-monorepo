@@ -65,14 +65,14 @@ function CommentItem({
     <div className={depth > 0 ? 'ml-4 border-l border-plugin-border pl-3' : ''}>
       <div className="py-2">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono font-medium text-plugin-text">
+          <span className="text-xs  font-medium text-plugin-text">
             {comment.authorName}
           </span>
           <span className="text-xxs text-plugin-muted">
             {formatRelativeTime(comment.createdAt)}
           </span>
         </div>
-        <p className="text-sm font-mono text-gray-300 whitespace-pre-wrap break-words">
+        <p className="text-sm  text-gray-300 whitespace-pre-wrap break-words">
           {comment.content}
         </p>
         <div className="flex items-center gap-3 mt-1">
@@ -102,13 +102,13 @@ function CommentItem({
               onChange={(e) => setReplyText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleReply()}
               placeholder="Write a reply..."
-              className="flex-1 bg-black/30 border border-plugin-border rounded px-2 py-1 text-sm text-white"
+              className="flex-1 bg-plugin-bg border border-plugin-border rounded px-2 py-1 text-sm text-plugin-text"
               autoFocus
             />
             <button
               onClick={handleReply}
               disabled={submitting || !replyText.trim()}
-              className="px-2 py-1 text-xs font-mono bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded"
+              className="px-2 py-1 text-xs  bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-text rounded"
             >
               {submitting ? '...' : 'Reply'}
             </button>
@@ -166,7 +166,7 @@ export function CommentSection({
 
   return (
     <div>
-      <h4 className="text-sm font-mono font-medium text-plugin-text mb-3">
+      <h4 className="text-sm  font-medium text-plugin-text mb-3">
         Comments {comments.length > 0 && `(${comments.length})`}
       </h4>
 
@@ -178,12 +178,12 @@ export function CommentSection({
             onChange={(e) => setNewComment(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             placeholder="Add a comment..."
-            className="flex-1 bg-black/30 border border-plugin-border rounded px-3 py-1.5 text-sm text-white"
+            className="flex-1 bg-plugin-bg border border-plugin-border rounded px-3 py-1.5 text-sm text-plugin-text"
           />
           <button
             onClick={handleSubmit}
             disabled={submitting || !newComment.trim()}
-            className="px-3 py-1.5 text-xs font-mono bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-gray-600 text-white rounded font-medium"
+            className="px-3 py-1.5 text-xs  bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-text rounded font-medium"
           >
             {submitting ? '...' : 'Post'}
           </button>

@@ -39,6 +39,9 @@ void PluginChainManagerEditor::initializeWebView()
 
     // Pass FFT processor to the bridge for spectrum analysis
     webViewBridge->setFFTProcessor(&processorRef.getFFTProcessor());
+    webViewBridge->setParameterPool(&processorRef.getParameterPool());
+    webViewBridge->setMacroManager(&processorRef.getMacroManager());
+    webViewBridge->setOwnerProcessor(&processorRef);
 
     // Pass instance registry and mirror manager for cross-instance awareness
     webViewBridge->setInstanceRegistry(&processorRef.getInstanceRegistry(), processorRef.getInstanceId());
