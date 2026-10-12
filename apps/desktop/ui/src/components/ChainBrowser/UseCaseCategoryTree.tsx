@@ -139,10 +139,10 @@ export function UseCaseCategoryTree({
           onSelectGroup(null);
           onSelectUseCase(null);
         }}
-        className={`w-full text-left px-2 py-1.5 rounded text-xs  transition-colors ${
+        className={`w-full text-left px-2 h-7 rounded-md text-[13px] transition-colors ${
           !selectedGroup && !selectedUseCase
-            ? 'bg-plugin-accent/20 text-plugin-accent font-medium'
-            : 'text-plugin-muted hover:text-plugin-text hover:bg-white/5'
+            ? 'bg-plugin-accent/15 text-plugin-accent-bright font-medium'
+            : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-raised'
         }`}
       >
         All Categories
@@ -156,12 +156,12 @@ export function UseCaseCategoryTree({
           <div key={group.value}>
             <button
               onClick={() => handleGroupClick(group.value)}
-              className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-xs  transition-colors ${
+              className={`w-full flex items-center gap-1.5 px-2 h-7 rounded-md text-[13px] transition-colors ${
                 isGroupSelected
-                  ? 'bg-plugin-accent/20 text-plugin-accent font-medium'
+                  ? 'bg-plugin-accent/15 text-plugin-accent-bright font-medium'
                   : selectedGroup === group.value
-                    ? 'text-plugin-text bg-white/5'
-                    : 'text-plugin-muted hover:text-plugin-text hover:bg-white/5'
+                    ? 'text-plugin-text bg-plugin-raised'
+                    : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-raised'
               }`}
             >
               {isExpanded ? (
@@ -169,20 +169,19 @@ export function UseCaseCategoryTree({
               ) : (
                 <ChevronRight className="w-3 h-3 flex-shrink-0" />
               )}
-              <span className="text-xs">{group.emoji}</span>
               <span className="truncate">{group.label}</span>
             </button>
 
             {isExpanded && (
-              <div className="ml-4 mt-0.5 space-y-0.5">
+              <div className="ml-[11px] pl-2 border-l border-plugin-border mt-0.5 mb-1 space-y-0.5">
                 {group.useCases.map((uc) => (
                   <button
                     key={uc.value}
                     onClick={() => handleUseCaseClick(uc.value, group.value)}
-                    className={`w-full text-left pl-4 pr-2 py-1 rounded text-[11px]  transition-colors ${
+                    className={`w-full text-left px-2 h-6 rounded-md text-xs transition-colors ${
                       selectedUseCase === uc.value
-                        ? 'bg-plugin-accent/20 text-plugin-accent font-medium'
-                        : 'text-plugin-dim hover:text-plugin-muted hover:bg-white/5'
+                        ? 'bg-plugin-accent/15 text-plugin-accent-bright font-medium'
+                        : 'text-plugin-dim hover:text-plugin-muted hover:bg-plugin-raised'
                     }`}
                   >
                     {uc.label}

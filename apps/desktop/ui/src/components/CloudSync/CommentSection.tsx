@@ -108,7 +108,7 @@ function CommentItem({
             <button
               onClick={handleReply}
               disabled={submitting || !replyText.trim()}
-              className="px-2 py-1 text-xs  bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-text rounded"
+              className="px-2 py-1 text-xs  bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-on-accent font-semibold rounded-md"
             >
               {submitting ? '...' : 'Reply'}
             </button>
@@ -183,7 +183,7 @@ export function CommentSection({
           <button
             onClick={handleSubmit}
             disabled={submitting || !newComment.trim()}
-            className="px-3 py-1.5 text-xs  bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-text rounded font-medium"
+            className="px-3 py-1.5 text-xs  bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-on-accent font-semibold rounded-md font-medium"
           >
             {submitting ? '...' : 'Post'}
           </button>

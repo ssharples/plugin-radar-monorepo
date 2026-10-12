@@ -120,7 +120,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
           <Inbox size={18} className="text-plugin-accent" />
           <h3 className="text-plugin-text  font-medium">Received Chains</h3>
           {chains.length > 0 && (
-            <span className="bg-plugin-accent text-plugin-text text-xs rounded-full px-2 py-0.5 animate-pulse">
+            <span className="bg-plugin-accent text-plugin-on-accent font-semibold text-xs rounded-full px-2 py-0.5 animate-pulse">
               {chains.length}
             </span>
           )}

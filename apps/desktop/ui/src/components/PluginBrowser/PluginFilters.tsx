@@ -151,17 +151,18 @@ export function PluginFilters() {
 
   return (
     <div className="relative" ref={advancedRef}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {/* Type toggle */}
-        <div className="flex rounded overflow-hidden border border-plugin-border">
+        <div className="flex items-center rounded-md bg-plugin-bg border border-plugin-border p-0.5">
           {typeOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setTypeFilter(opt.value)}
-              className={`px-1.5 py-0.5 text-xxs  uppercase transition-all ${
+              aria-pressed={typeFilter === opt.value}
+              className={`h-6 px-1.5 text-[11px] font-semibold rounded transition-colors ${
                 typeFilter === opt.value
-                  ? 'bg-plugin-accent text-plugin-on-accent font-semibold'
-                  : 'bg-plugin-bg text-plugin-muted hover:text-plugin-text'
+                  ? 'bg-plugin-raised text-plugin-text'
+                  : 'text-plugin-dim hover:text-plugin-text'
               }`}
             >
               {opt.label}
@@ -173,7 +174,8 @@ export function PluginFilters() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="bg-plugin-bg text-xxs  text-plugin-muted rounded px-1.5 py-0.5 border border-plugin-border focus:outline-none focus:border-plugin-accent/50 cursor-pointer"
+          aria-label="Sort plugins"
+          className="h-7 bg-plugin-bg text-[11px] text-plugin-muted rounded-md px-1 border border-plugin-border focus:outline-none focus:border-plugin-accent/50 cursor-pointer"
         >
           {sortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -186,7 +188,8 @@ export function PluginFilters() {
         {enrichmentLoaded && (
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xxs  uppercase rounded border transition-all ${
+            aria-expanded={showAdvanced}
+            className={`h-7 flex items-center gap-0.5 px-1.5 text-[11px] font-semibold rounded-md border transition-colors ${
               activeFilterCount > 0
                 ? 'bg-plugin-accent/15 text-plugin-accent border-plugin-accent/40'
                 : 'bg-plugin-bg text-plugin-muted border-plugin-border hover:text-plugin-text'

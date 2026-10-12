@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useOnboardingStore } from '../../stores/onboardingStore'
+import { ProChainMark } from '../Brand/ProChainMark'
 
 export function CompletionStep() {
   const { completeOnboarding } = useOnboardingStore()
@@ -17,12 +18,11 @@ export function CompletionStep() {
       className="flex flex-col items-center justify-center w-full h-full animate-fade-in cursor-pointer"
       onClick={completeOnboarding}
     >
-      <h1 className="font-semibold text-4xl text-plugin-accent mb-2 tracking-wider animate-scale-in">
-        PROCHAIN
-      </h1>
-      <p className="text-plugin-muted text-xs  uppercase tracking-widest animate-fade-in-up">
-        Welcome to your signal chain
-      </p>
+      <div className="animate-scale-in">
+        <ProChainMark size={44} showWord={false} />
+      </div>
+      <h1 className="mt-4 text-4xl font-semibold text-plugin-text tracking-tight animate-scale-in">ProChain</h1>
+      <p className="mt-1.5 text-plugin-muted text-sm animate-fade-in-up">Welcome to your signal chain</p>
     </div>
   )
 }

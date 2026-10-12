@@ -71,7 +71,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
           </p>
           <button
             onClick={onClose}
-            className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text rounded px-4 py-2"
+            className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold rounded-md px-4 py-2"
           >
             Close
           </button>
@@ -106,7 +106,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
             
             <button
               onClick={onClose}
-              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text rounded px-4 py-2"
+              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold rounded-md px-4 py-2"
             >
               Done
             </button>
@@ -212,7 +212,7 @@ export function SaveChainModal({ slots, onClose, onSaved }: SaveChainModalProps)
               className={`flex-1 rounded px-4 py-2 font-medium ${
                 saving
                   ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-                  : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
+                  : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold'
               }`}
             >
               {saving ? 'Saving...' : 'Save Chain'}

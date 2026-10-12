@@ -59,11 +59,6 @@ vi.mock('../../api/convex-client', () => ({
   swapPluginInChain: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-vi.mock('../../assets/rackmount-strip.png', () => ({ default: '' }));
-vi.mock('../../assets/plugin-container.png', () => ({ default: '' }));
-vi.mock('../../assets/plugin-instance-interface.png', () => ({ default: '' }));
-vi.mock('../../assets/bypass-icon.svg', () => ({ default: '' }));
-vi.mock('../../assets/duplicate-icon.svg', () => ({ default: '' }));
 
 // Mock store data
 let mockCloudChainStore: any = {};

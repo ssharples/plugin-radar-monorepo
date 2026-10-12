@@ -79,7 +79,7 @@ export function CloudSync() {
               href="https://pluginradar.com/forgot-password"
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text rounded px-3 py-2 text-sm  font-medium text-center mb-2"
+              className="block w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold rounded-md px-3 py-2 text-sm  font-medium text-center mb-2"
             >
               Open Reset Page ↗
             </a>
@@ -148,7 +148,7 @@ export function CloudSync() {
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="flex-1 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text rounded px-3 py-2 text-sm  font-medium"
+                className="flex-1 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold rounded-md px-3 py-2 text-sm  font-medium"
               >
                 {isRegister ? 'Create Account' : 'Sign In'}
               </button>
@@ -192,7 +192,7 @@ export function CloudSync() {
         className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
           isSyncing
             ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-            : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
+            : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold'
         }`}
       >
         <Cloud className={`w-4 h-4 ${isSyncing ? 'animate-pulse' : ''}`} />

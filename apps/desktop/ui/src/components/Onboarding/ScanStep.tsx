@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useOnboardingStore } from '../../stores/onboardingStore'
 import { juceBridge } from '../../api/juce-bridge'
 import type { BlacklistedPlugin } from '../../stores/onboardingTypes'
@@ -67,17 +68,15 @@ export function ScanStep() {
     : ''
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
-      <h2 className=" text-lg text-plugin-text uppercase tracking-wider mb-2">
-        Scanning Your Plugins
-      </h2>
-      <p className="text-plugin-dim text-xxs  text-center mb-8 max-w-xs leading-relaxed">
+    <div className="flex flex-col w-full max-w-[420px] px-6 animate-fade-in">
+      <h2 className="text-xl font-semibold text-plugin-text tracking-tight">Scanning Your Plugins</h2>
+      <p className="text-plugin-muted text-[13px] mt-1 mb-6 leading-snug">
         Finding all AU & VST3 plugins on your system. Plugins that crash or need authorization will be noted.
       </p>
 
       {scanError ? (
         <div className="w-full">
-          <div className="text-red-400 text-xs  bg-red-500/10 border border-red-500/20 rounded-md px-4 py-3 mb-4">
+          <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/25 rounded-md px-3 py-2.5 mb-3" role="alert">
             {scanError}
           </div>
           <button
@@ -85,57 +84,46 @@ export function ScanStep() {
               startScan()
               juceBridge.startScan(false).catch((err) => handleScanError(String(err)))
             }}
-            className="w-full py-2 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent  text-xs uppercase rounded-md transition-colors"
+            className="w-full h-10 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent text-sm font-semibold rounded-md transition-colors"
           >
             Retry Scan
           </button>
         </div>
       ) : (
         <>
-          {/* Progress bar */}
-          <div className="w-full h-2 bg-plugin-border rounded-full overflow-hidden mb-3">
-            <div
-              className="h-full bg-plugin-accent rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-
-          {/* Percentage */}
-          <div className="text-2xl  text-plugin-accent mb-2">
-            {progressPercent}%
-          </div>
-
-          {/* Currently scanning */}
-          {scanActive && truncatedName && (
-            <div className="text-plugin-dim  text-xxs truncate max-w-full mb-4">
-              {truncatedName}
+          <div className="rounded-lg border border-plugin-border bg-plugin-surface p-4">
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="num text-3xl font-medium text-plugin-text">{progressPercent}%</span>
+              <span className="num text-xs text-plugin-muted">{pluginsDiscovered} plugins found</span>
             </div>
-          )}
-
-          {/* Discovered counter */}
-          <div className="text-plugin-muted  text-xs mb-4">
-            {pluginsDiscovered} plugins found
+            <div className="w-full h-1.5 bg-plugin-raised rounded-full overflow-hidden" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
+              <div
+                className="h-full bg-plugin-accent rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="h-4 mt-2 text-[11px] text-plugin-dim truncate">
+              {scanActive && truncatedName ? truncatedName : null}
+            </div>
           </div>
 
-          {/* Blacklisted warnings */}
           {blacklistedPlugins.length > 0 && (
-            <div className="w-full max-h-24 overflow-y-auto mb-4">
+            <div className="w-full max-h-28 overflow-y-auto mt-3 space-y-1">
               {blacklistedPlugins.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 text-xxs  text-plugin-warning bg-plugin-warning/10 border border-plugin-warning/20 rounded-md px-3 py-1.5 mb-1"
+                  className="flex items-center gap-2 text-xs text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-3 py-1.5"
                 >
-                  <span className="shrink-0">!</span>
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   <span className="truncate">{p.name}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Skip link */}
           <button
             onClick={skipScan}
-            className="text-plugin-dim text-xxs  hover:text-plugin-muted transition-colors mt-2"
+            className="self-start text-plugin-muted text-xs hover:text-plugin-text underline underline-offset-2 transition-colors mt-4"
           >
             Skip for now
           </button>

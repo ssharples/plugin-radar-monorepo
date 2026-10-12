@@ -54,7 +54,7 @@ export function PresetBrowser() {
         </div>
         <button
           onClick={() => setShowSaveModal(true)}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-plugin-accent hover:bg-plugin-accent/80 text-plugin-text transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-plugin-accent hover:bg-plugin-accent/80 text-plugin-on-accent font-semibold transition-colors"
         >
           <Save className="w-3 h-3" />
           Save

@@ -26,7 +26,6 @@ vi.mock('../../../api/convex-client', () => ({
 }))
 
 // Mock image imports
-vi.mock('../../../assets/ui-bg.png', () => ({ default: 'ui-bg.png' }))
 
 describe('OnboardingFlow Integration', () => {
   beforeEach(() => {
@@ -37,7 +36,7 @@ describe('OnboardingFlow Integration', () => {
 
   it('shows auth step initially', () => {
     render(<OnboardingFlow />)
-    expect(screen.getByText('PROCHAIN')).toBeInTheDocument()
+    expect(screen.getByText('ProChain')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Email')).toBeInTheDocument()
   })
 

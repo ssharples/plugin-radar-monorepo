@@ -1,112 +1,132 @@
-import { Download, Heart, Bookmark, BookmarkCheck } from 'lucide-react';
+import { Download, Heart, Bookmark, BookmarkCheck, Star, GitFork } from 'lucide-react';
 
 interface ChainBrowserCardProps {
   chain: any;
-  compatPercent: number | null; // null if not logged in
+  /** null when logged out or unknown */
+  compatPercent: number | null;
   isInCollection: boolean;
+  selected?: boolean;
   onPreview: () => void;
   onLoad: () => void;
-  onToggleCollection: () => void;
+  onToggleCollection?: () => void;
+  /** Extra line under the title, e.g. "Private" or "from web" */
+  note?: string;
 }
 
-function getCompatColor(percent: number | null): string {
-  if (percent === null) return 'bg-plugin-dim'; // not logged in
-  if (percent === 100) return 'bg-green-500';
-  if (percent >= 80) return 'bg-yellow-500';
-  if (percent >= 50) return 'bg-orange-500';
-  return 'bg-red-500';
-}
-
-function getCompatLabel(percent: number | null): string {
-  if (percent === null) return '—';
-  return `${percent}%`;
+function compatTone(percent: number | null) {
+  if (percent === null) return { bar: 'bg-plugin-dim', text: 'text-plugin-dim' };
+  if (percent === 100) return { bar: 'bg-green-500', text: 'text-green-400' };
+  if (percent >= 60) return { bar: 'bg-yellow-500', text: 'text-yellow-400' };
+  return { bar: 'bg-red-500', text: 'text-red-400' };
 }
 
 export function ChainBrowserCard({
   chain,
   compatPercent,
   isInCollection,
+  selected,
   onPreview,
   onLoad,
   onToggleCollection,
+  note,
 }: ChainBrowserCardProps) {
-  const pluginPreview = chain.slots
-    ?.slice(0, 3)
-    .map((s: any) => s.pluginName)
-    .join(' → ');
-  const pluginCount = chain.slots?.length ?? chain.pluginCount;
+  const slots: any[] = chain.slots ?? [];
+  const pluginCount: number = slots.length || chain.pluginCount || 0;
+  const shown = slots.slice(0, 4);
+  const tone = compatTone(compatPercent);
+  const rating: number | undefined = chain.averageRating ?? chain.rating;
 
   return (
     <div
-      className="group bg-black/20 border border-plugin-border/50 rounded-md p-3 hover:border-plugin-accent/30 hover:bg-black/30 transition-all cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
       onClick={onPreview}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPreview();
+        }
+      }}
+      className={`group flex flex-col rounded-lg border bg-plugin-surface p-3 cursor-pointer transition-colors ${
+        selected
+          ? 'border-plugin-accent/70 shadow-glow-accent'
+          : 'border-plugin-border hover:border-plugin-border-bright hover:bg-plugin-surface-alt'
+      }`}
     >
-      {/* Top row: name + compat badge */}
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <h4 className="text-xs font-medium text-plugin-text truncate flex-1">
-          {chain.name}
-        </h4>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Compatibility dot */}
-          <div className="flex items-center gap-1">
-            <div className={`w-2 h-2 rounded-full ${getCompatColor(compatPercent)}`} />
-            <span className="text-[10px]  text-plugin-dim">
-              {getCompatLabel(compatPercent)}
-            </span>
-          </div>
+      {/* Title row */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-semibold text-plugin-text truncate leading-tight">{chain.name}</h4>
+          <p className="text-xs text-plugin-dim truncate mt-0.5">
+            {chain.author?.name ? <>by <span className="text-plugin-muted">{chain.author.name}</span></> : note ?? ' '}
+            {chain.author?.name && note ? <span> · {note}</span> : null}
+          </p>
         </div>
+        {chain.forkedFrom && <GitFork className="w-3.5 h-3.5 text-plugin-dim mt-0.5 flex-shrink-0" aria-label="Fork" />}
+        {onToggleCollection && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollection();
+            }}
+            className={`-mr-1 -mt-0.5 w-7 h-7 inline-flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${
+              isInCollection ? 'text-plugin-accent' : 'text-plugin-dim hover:text-plugin-text hover:bg-plugin-raised'
+            }`}
+            title={isInCollection ? 'Remove from saved' : 'Save to your collection'}
+            aria-label={isInCollection ? 'Remove from saved' : 'Save to collection'}
+          >
+            {isInCollection ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+          </button>
+        )}
       </div>
 
-      {/* Author */}
-      {chain.author?.name && (
-        <p className="text-[11px] text-plugin-dim mb-1">
-          by @{chain.author.name}
-        </p>
-      )}
+      {/* Signal flow preview */}
+      <ol className="flex flex-wrap items-center gap-1 mt-2.5 min-h-[22px]">
+        {shown.map((s: any, i: number) => (
+          <li key={i} className="inline-flex items-center gap-1 max-w-full">
+            {i > 0 && <span className="text-plugin-dim text-[10px]" aria-hidden>›</span>}
+            <span className="px-1.5 h-[22px] inline-flex items-center rounded bg-plugin-bg border border-plugin-border text-[11px] text-plugin-muted truncate max-w-[120px]">
+              {s.pluginName}
+            </span>
+          </li>
+        ))}
+        {pluginCount > shown.length && (
+          <li className="text-[11px] text-plugin-dim">+{pluginCount - shown.length}</li>
+        )}
+        {shown.length === 0 && pluginCount > 0 && (
+          <li className="text-[11px] text-plugin-dim">{pluginCount} plugins</li>
+        )}
+      </ol>
 
-      {/* Plugin preview */}
-      <p className="text-[11px] text-plugin-muted truncate mb-2">
-        {pluginPreview}
-        {pluginCount > 3 ? ` +${pluginCount - 3} more` : ''}
-      </p>
-
-      {/* Bottom row: stats + actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5 text-[10px] text-plugin-dim">
-          <span className="flex items-center gap-0.5">
-            <Download className="w-2.5 h-2.5" /> {chain.downloads}
-          </span>
-          <span className="flex items-center gap-0.5">
-            <Heart className="w-2.5 h-2.5" /> {chain.likes}
-          </span>
-          {chain.pluginCount > 0 && (
-            <span className="">{chain.pluginCount}p</span>
-          )}
+      {/* Ownership */}
+      <div className="mt-3 flex items-center gap-2">
+        <div className="flex-1 h-1 rounded-full bg-plugin-raised overflow-hidden" aria-hidden>
+          <div className={`h-full ${tone.bar}`} style={{ width: compatPercent === null ? '0%' : `${compatPercent}%` }} />
         </div>
+        <span className={`num text-[11px] ${tone.text}`} title="Share of these plugins you own">
+          {compatPercent === null ? '—' : compatPercent === 100 ? 'All owned' : `${compatPercent}% owned`}
+        </span>
+      </div>
 
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={onToggleCollection}
-            className={`p-1 rounded transition-colors ${
-              isInCollection
-                ? 'text-plugin-accent'
-                : 'text-plugin-dim hover:text-plugin-muted'
-            }`}
-            title={isInCollection ? 'Remove from collection' : 'Add to collection'}
-          >
-            {isInCollection ? (
-              <BookmarkCheck className="w-3 h-3" />
-            ) : (
-              <Bookmark className="w-3 h-3" />
-            )}
-          </button>
-          <button
-            onClick={onLoad}
-            className="px-2 py-0.5 bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded text-[10px]  uppercase font-bold transition-colors"
-          >
-            Load
-          </button>
-        </div>
+      {/* Footer */}
+      <div className="mt-2.5 flex items-center gap-3 text-[11px] text-plugin-dim">
+        {rating ? (
+          <span className="inline-flex items-center gap-0.5"><Star className="w-3 h-3" /> <span className="num">{Number(rating).toFixed(1)}</span></span>
+        ) : null}
+        <span className="inline-flex items-center gap-0.5"><Heart className="w-3 h-3" /> <span className="num">{chain.likes ?? 0}</span></span>
+        <span className="inline-flex items-center gap-0.5"><Download className="w-3 h-3" /> <span className="num">{chain.downloads ?? 0}</span></span>
+        <span className="flex-1" />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onLoad();
+          }}
+          className="h-7 px-2.5 rounded-md text-xs font-semibold bg-plugin-raised text-plugin-text border border-plugin-border-bright hover:bg-plugin-accent hover:text-plugin-on-accent hover:border-plugin-accent transition-colors"
+          title={compatPercent === 100 ? 'Load into your chain' : 'Open to pick swaps, then load'}
+        >
+          Load
+        </button>
       </div>
     </div>
   );

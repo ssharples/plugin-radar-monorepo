@@ -1,10 +1,14 @@
 import { Component, ErrorInfo, ReactNode, useState, useEffect, useCallback } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { PluginBrowser } from './components/PluginBrowser';
 import { ChainEditor } from './components/ChainEditor';
 import { WaveformDisplay } from './components/WaveformDisplay';
 import { SpectrumAnalyzer } from './components/SpectrumAnalyzer';
 import { PresetModal } from './components/PresetBrowser';
 import { Footer } from './components/Footer';
+import { HeaderMenu } from './components/HeaderMenu';
+import type { AppView } from './components/HeaderMenu';
+import { ChainBrowser } from './components/ChainBrowser';
 import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { usePresetStore } from './stores/presetStore';
@@ -12,11 +16,6 @@ import { useSyncStore } from './stores/syncStore';
 import { useOfflineStore, startRetryLoop } from './stores/offlineStore';
 import { executeQueuedWrite } from './api/convex-client';
 import { juceBridge } from './api/juce-bridge';
-import uiBg from './assets/ui-bg.png';
-import headerBg from './assets/header.png';
-import analyzerContainer from './assets/analyzer-container.png';
-import analyzerDisplay from './assets/analyzer-display.png';
-import inputButtonBg from './assets/input-button-bg.png';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -37,9 +36,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-4 bg-red-900 text-plugin-text">
-          <h2 className="text-lg font-bold">Something went wrong</h2>
-          <pre className="mt-2 text-sm overflow-auto">
+        <div className="p-4 m-3 rounded-lg border border-red-500/40 bg-red-500/10 text-plugin-text">
+          <h2 className="text-base font-semibold text-red-300">Something went wrong</h2>
+          <pre className="mt-2 text-xs overflow-auto text-plugin-muted">
             {this.state.error?.message}
             {'\n'}
             {this.state.error?.stack}
@@ -53,10 +52,34 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 
 type AnalyzerView = 'waveform' | 'spectrum';
 
+/** Small per-viewer UI memory. Storage can be missing inside a plugin WebView. */
+function readPref<T extends string>(key: string, fallback: T): T {
+  try {
+    return (localStorage.getItem(`prochain.${key}`) as T) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(`prochain.${key}`, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+const HEADER_HEIGHT = 44;
+const FOOTER_HEIGHT = 56;
+
 function App() {
   const [showPresetModal, setShowPresetModal] = useState(false);
-  const [analyzerView, setAnalyzerView] = useState<AnalyzerView>('waveform');
-  const [browserOpen, setBrowserOpen] = useState(false);
+  const [view, setView] = useState<AppView>('chain');
+  const [libraryVisited, setLibraryVisited] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState<{ q?: string; n: number }>({ n: 0 });
+
+  const [analyzerView, setAnalyzerView] = useState<AnalyzerView>(() => readPref('analyzer', 'waveform'));
+  const [analyzerOpen, setAnalyzerOpen] = useState(() => readPref('analyzerOpen', '1') === '1');
+  const [browserOpen, setBrowserOpen] = useState(() => readPref('browserOpen', '1') === '1');
 
   // Waveform sub-controls
   const [showInput, setShowInput] = useState(true);
@@ -71,7 +94,6 @@ function App() {
   const { initialize: initSync } = useSyncStore();
   const { initialize: initOffline } = useOfflineStore();
 
-  // Initialize onboarding check
   useEffect(() => {
     initOnboarding().catch(console.error);
   }, [initOnboarding]);
@@ -101,38 +123,75 @@ function App() {
     };
   }, [isOnboardingComplete]);
 
+  // Only ask C++ for analysis data the visible analyzer needs
+  const analyzerVisible = analyzerOpen && view === 'chain';
   useEffect(() => {
     if (!isOnboardingComplete) return;
-    juceBridge.setAnalysisSubscriptions(analyzerView === 'waveform', analyzerView === 'spectrum');
+    juceBridge.setAnalysisSubscriptions(
+      analyzerVisible && analyzerView === 'waveform',
+      analyzerVisible && analyzerView === 'spectrum'
+    );
     return () => { juceBridge.setAnalysisSubscriptions(false, false); };
-  }, [analyzerView, isOnboardingComplete]);
+  }, [analyzerView, analyzerVisible, isOnboardingComplete]);
 
-  // Cmd+B to toggle browser
+  useEffect(() => writePref('analyzer', analyzerView), [analyzerView]);
+  useEffect(() => writePref('analyzerOpen', analyzerOpen ? '1' : '0'), [analyzerOpen]);
+  useEffect(() => writePref('browserOpen', browserOpen ? '1' : '0'), [browserOpen]);
+
+  const changeView = useCallback((next: AppView) => {
+    setView(next);
+    if (next === 'library') setLibraryVisited(true);
+  }, []);
+
+  // Cmd+B toggles the plugin list, Cmd+L the library
   useEffect(() => {
     if (!isOnboardingComplete) return;
     const handleKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === 'b') {
         e.preventDefault();
-        setBrowserOpen(prev => !prev);
+        setView('chain');
+        setBrowserOpen((prev) => !prev);
+      } else if (e.key === 'l') {
+        e.preventDefault();
+        setView((v) => {
+          const next = v === 'library' ? 'chain' : 'library';
+          if (next === 'library') setLibraryVisited(true);
+          return next;
+        });
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOnboardingComplete]);
 
-  // Listen for openPluginBrowser events from child components
+  // "Add plugin" buttons open the docked plugin list (PluginBrowser focuses its search)
   useEffect(() => {
     if (!isOnboardingComplete) return;
-    const handler = () => setBrowserOpen(true);
+    const handler = () => {
+      setView('chain');
+      setBrowserOpen(true);
+    };
     window.addEventListener('openPluginBrowser', handler);
     return () => window.removeEventListener('openPluginBrowser', handler);
   }, [isOnboardingComplete]);
 
+  // "Browse the library" buttons, optionally with a search
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    const handler = (e: Event) => {
+      const search = (e as CustomEvent<{ search?: string }>).detail?.search;
+      setLibrarySearch((prev) => ({ q: search ?? '', n: prev.n + 1 }));
+      changeView('library');
+    };
+    window.addEventListener('openChainLibrary', handler);
+    return () => window.removeEventListener('openChainLibrary', handler);
+  }, [isOnboardingComplete, changeView]);
+
   const toggleBrowser = useCallback(() => {
-    setBrowserOpen(prev => !prev);
+    setBrowserOpen((prev) => !prev);
   }, []);
 
-  // Show onboarding flow if not complete
   if (!isOnboardingComplete) {
     return (
       <ErrorBoundary>
@@ -141,208 +200,174 @@ function App() {
     );
   }
 
-  const ANALYZER_HEIGHT = 134;
-  const FOOTER_HEIGHT = 66;
-
   return (
     <ErrorBoundary>
-      {/* Full-page background */}
-      <div
-        className="relative flex flex-col w-full h-full select-none overflow-hidden"
-        style={{
-          backgroundImage: `url(${uiBg})`,
-          backgroundSize: '100% 100%',
-          backgroundRepeat: 'no-repeat',
-        }}
-      >
-        {/* Header — 33px, PNG background */}
-        <div
-          className="relative flex-shrink-0"
-          style={{
-            height: 33,
-            backgroundImage: `url(${headerBg})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        />
-
-        {/* Chain area — fills remaining space, scrollable */}
-        <div
-          className="flex-1 min-h-0 overflow-hidden"
-          style={{ padding: '0 23px' }}
-        >
-          <ErrorBoundary>
-            <ChainEditor />
-          </ErrorBoundary>
+      <div className="relative flex flex-col w-full h-full select-none overflow-hidden bg-plugin-bg text-plugin-text">
+        {/* Top bar */}
+        <div className="relative z-30 flex-shrink-0 border-b border-plugin-border" style={{ height: HEADER_HEIGHT }}>
+          <HeaderMenu view={view} onViewChange={changeView} />
         </div>
 
-        {/* Analyzer — two-layer: container frame + display background */}
-        <div
-          className="flex-shrink-0 relative mx-3"
-          style={{
-            height: ANALYZER_HEIGHT,
-            backgroundImage: `url(${analyzerContainer})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        >
-          {/* Controls bar — in the container bezel above the display */}
-          <div className="absolute top-2 left-3 right-3 flex items-center gap-1.5 z-10">
-            {/* View toggle */}
-            <button
-              onClick={() => setAnalyzerView('waveform')}
-              className="relative"
-              style={{
-                width: 62, height: 18,
-                backgroundImage: `url(${inputButtonBg})`,
-                backgroundSize: '100% 100%',
-              }}
+        {/* Workspace */}
+        <div className="flex flex-1 min-h-0">
+          {/* Chain view */}
+          <div className={view === 'chain' ? 'flex flex-1 min-w-0 min-h-0' : 'hidden'}>
+            <aside
+              className={`flex-shrink-0 border-r border-plugin-border bg-plugin-surface transition-[width] duration-150 ${
+                browserOpen ? 'w-[236px] lg:w-[272px]' : 'w-11'
+              }`}
+              aria-label="Plugins"
             >
-              <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
-                analyzerView === 'waveform' ? 'text-plugin-text' : 'text-plugin-text/40'
-              }`}>
-                Waveform
-              </span>
-            </button>
-            <button
-              onClick={() => setAnalyzerView('spectrum')}
-              className="relative"
-              style={{
-                width: 62, height: 18,
-                backgroundImage: `url(${inputButtonBg})`,
-                backgroundSize: '100% 100%',
-              }}
-            >
-              <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
-                analyzerView === 'spectrum' ? 'text-plugin-text' : 'text-plugin-text/40'
-              }`}>
-                Spectrum
-              </span>
-            </button>
+              <ErrorBoundary>
+                <PluginBrowser collapsed={!browserOpen} onToggle={toggleBrowser} />
+              </ErrorBoundary>
+            </aside>
 
-            {/* Sub-controls — right-aligned */}
-            <div className="ml-auto flex items-center gap-1">
-              {analyzerView === 'waveform' ? (
-                <>
+            <div className="flex flex-col flex-1 min-w-0 min-h-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ErrorBoundary>
+                  <ChainEditor />
+                </ErrorBoundary>
+              </div>
+
+              {/* Analyzer strip */}
+              <section className="flex-shrink-0 border-t border-plugin-border bg-plugin-surface" aria-label="Analyzer">
+                <div className="flex items-center gap-2 h-8 px-2">
                   <button
-                    onClick={() => setShowInput(v => !v)}
-                    className="relative"
-                    style={{
-                      width: 50, height: 18,
-                      backgroundImage: `url(${inputButtonBg})`,
-                      backgroundSize: '100% 100%',
-                    }}
+                    onClick={() => setAnalyzerOpen((v) => !v)}
+                    className="w-6 h-6 inline-flex items-center justify-center rounded text-plugin-dim hover:text-plugin-text hover:bg-plugin-raised"
+                    aria-expanded={analyzerOpen}
+                    aria-label={analyzerOpen ? 'Hide analyzer' : 'Show analyzer'}
+                    title={analyzerOpen ? 'Hide analyzer' : 'Show analyzer'}
                   >
-                    <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
-                      showInput ? 'text-plugin-text' : 'text-plugin-text/30'
-                    }`}>
-                      Input
-                    </span>
+                    {analyzerOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
                   </button>
-                  <button
-                    onClick={() => setShowOutput(v => !v)}
-                    className="relative"
-                    style={{
-                      width: 50, height: 18,
-                      backgroundImage: `url(${inputButtonBg})`,
-                      backgroundSize: '100% 100%',
+                  <Segmented
+                    label="Analyzer view"
+                    value={analyzerView}
+                    onChange={(v) => {
+                      setAnalyzerView(v as AnalyzerView);
+                      setAnalyzerOpen(true);
                     }}
-                  >
-                    <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
-                      showOutput ? 'text-plugin-accent' : 'text-plugin-text/30'
-                    }`}>
-                      Output
-                    </span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  {(['bars', 'line', 'octave'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setSpecMode(m)}
-                      className="relative"
-                      style={{
-                        width: 46, height: 18,
-                        backgroundImage: `url(${inputButtonBg})`,
-                        backgroundSize: '100% 100%',
-                      }}
-                    >
-                      <span className={`absolute inset-0 flex items-center justify-center text-[10px]  uppercase transition-colors ${
-                        specMode === m ? 'text-plugin-accent' : 'text-plugin-text/30'
-                      }`}>
-                        {m}
-                      </span>
-                    </button>
+                    options={[
+                      { value: 'waveform', label: 'Waveform' },
+                      { value: 'spectrum', label: 'Spectrum' },
+                    ]}
+                  />
+                  <div className="flex-1" />
+                  {analyzerOpen && (analyzerView === 'waveform' ? (
+                    <div className="flex items-center gap-1">
+                      <Toggle on={showInput} onClick={() => setShowInput((v) => !v)} label="Input" dot="bg-plugin-muted" />
+                      <Toggle on={showOutput} onClick={() => setShowOutput((v) => !v)} label="Output" dot="bg-plugin-accent" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Segmented
+                        label="Spectrum style"
+                        value={specMode}
+                        onChange={(v) => setSpecMode(v as typeof specMode)}
+                        options={[
+                          { value: 'bars', label: 'Bars' },
+                          { value: 'line', label: 'Line' },
+                          { value: 'octave', label: 'Octave' },
+                        ]}
+                      />
+                      {specMode === 'octave' && (
+                        <button
+                          onClick={() => setOctaveMode((v) => (v === 'third' ? 'full' : 'third'))}
+                          className="num h-6 px-2 rounded-md border border-plugin-border text-[11px] text-plugin-muted hover:text-plugin-text"
+                          title="Octave band width"
+                        >
+                          {octaveMode === 'third' ? '1/3' : '1/1'}
+                        </button>
+                      )}
+                    </div>
                   ))}
-                  {specMode === 'octave' && (
-                    <button
-                      onClick={() => setOctaveMode(v => v === 'third' ? 'full' : 'third')}
-                      className="relative"
-                      style={{
-                        width: 50, height: 18,
-                        backgroundImage: `url(${inputButtonBg})`,
-                        backgroundSize: '100% 100%',
-                      }}
-                    >
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px]  text-plugin-text/60">
-                        {octaveMode === 'third' ? '1/3' : '1/1'}
-                      </span>
-                    </button>
-                  )}
-                </>
-              )}
+                </div>
+                {analyzerOpen && (
+                  <div className="relative mx-2 mb-2 h-[84px] lg:h-[104px] [@media(max-height:680px)]:h-[60px] rounded-md overflow-hidden bg-plugin-bg border border-plugin-border">
+                    {analyzerView === 'waveform' ? (
+                      <WaveformDisplay showInput={showInput} showOutput={showOutput} />
+                    ) : (
+                      <SpectrumAnalyzer mode={specMode} octaveMode={octaveMode} />
+                    )}
+                  </div>
+                )}
+              </section>
             </div>
           </div>
 
-          {/* Display area — inner screen with display PNG background */}
-          <div
-            className="absolute overflow-hidden"
-            style={{
-              top: 32,
-              left: 8,
-              right: 8,
-              height: 94,
-              backgroundImage: `url(${analyzerDisplay})`,
-              backgroundSize: '100% 100%',
-              backgroundRepeat: 'no-repeat',
-            }}
-          >
-            {analyzerView === 'waveform' ? (
-              <WaveformDisplay showInput={showInput} showOutput={showOutput} />
-            ) : (
-              <SpectrumAnalyzer mode={specMode} octaveMode={octaveMode} />
-            )}
-          </div>
+          {/* Library view (kept mounted after first visit so filters survive) */}
+          {libraryVisited && (
+            <div className={view === 'library' ? 'flex flex-1 min-w-0 min-h-0' : 'hidden'}>
+              <ErrorBoundary>
+                <ChainBrowser
+                  initialSearch={librarySearch.q}
+                  searchNonce={librarySearch.n}
+                  onLoaded={() => setView('chain')}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
         </div>
 
-        {/* Footer — fixed height */}
-        <div className="flex-shrink-0" style={{ height: FOOTER_HEIGHT }}>
+        {/* Footer */}
+        <div className="relative z-20 flex-shrink-0" style={{ height: FOOTER_HEIGHT }}>
           <Footer
             currentPresetName={currentPreset?.name}
             onPresetClick={() => setShowPresetModal(true)}
           />
         </div>
 
-        {/* Plugin browser overlay */}
-        {browserOpen && (
-          <div className="fixed inset-0 z-50" style={{ top: 33 }}>
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/40" onClick={toggleBrowser} />
-            {/* Panel */}
-            <div className="absolute left-0 top-0 bottom-0 w-[300px] bg-plugin-surface border-r border-plugin-border shadow-2xl">
-              <ErrorBoundary>
-                <PluginBrowser onClose={toggleBrowser} />
-              </ErrorBoundary>
-            </div>
-          </div>
-        )}
-
         {showPresetModal && (
           <PresetModal onClose={() => setShowPresetModal(false)} />
         )}
       </div>
     </ErrorBoundary>
+  );
+}
+
+function Segmented({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center rounded-md bg-plugin-bg border border-plugin-border p-0.5" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          aria-pressed={value === o.value}
+          className={`h-5 px-2 rounded text-[11px] font-semibold transition-colors ${
+            value === o.value ? 'bg-plugin-raised text-plugin-text' : 'text-plugin-dim hover:text-plugin-text'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Toggle({ on, onClick, label, dot }: { on: boolean; onClick: () => void; label: string; dot: string }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`h-6 inline-flex items-center gap-1.5 px-2 rounded-md border text-[11px] font-semibold transition-colors ${
+        on ? 'border-plugin-border-bright text-plugin-text' : 'border-plugin-border text-plugin-dim'
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${on ? dot : 'bg-plugin-border-bright'}`} />
+      {label}
+    </button>
   );
 }
 

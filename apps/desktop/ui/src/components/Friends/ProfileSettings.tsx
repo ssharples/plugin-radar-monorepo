@@ -152,7 +152,7 @@ export function ProfileSettings() {
           className={`w-full flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium ${
             saving
               ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-              : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
+              : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold'
           }`}
         >
           <Save size={14} />

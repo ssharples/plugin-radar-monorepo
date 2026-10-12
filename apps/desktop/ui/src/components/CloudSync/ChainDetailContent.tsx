@@ -34,10 +34,42 @@ export interface ChainDetailContentProps {
   onToggleCollection?: () => void;
 }
 
-interface Substitution {
+export interface Substitution {
   originalName: string;
   altName: string;
   altManufacturer: string;
+}
+
+/** Why the server thinks an alternative is close (field may be absent). */
+function reasonsOf(alt: unknown): string | undefined {
+  const r = (alt as { similarityReasons?: unknown } | undefined)?.similarityReasons;
+  return typeof r === 'string' && r ? r : Array.isArray(r) ? r.join(', ') : undefined;
+}
+
+/** Turn a cloud chain into the JSON juceBridge.importChain expects, applying any swaps. */
+export function buildImportData(chain: any, substitutions: Map<number, Substitution> = new Map()) {
+  const slots: any[] = chain?.slots ?? [];
+  return {
+    version: 1,
+    numSlots: slots.length,
+    slots: slots.map((slot: any, idx: number) => {
+      const sub = substitutions.get(slot.position ?? idx);
+      return {
+        type: 'plugin',
+        id: idx + 1,
+        index: slot.position ?? idx,
+        name: sub ? sub.altName : slot.pluginName,
+        manufacturer: sub ? sub.altManufacturer : slot.manufacturer,
+        format: slot.format || 'VST3',
+        uid: sub ? 0 : (slot.uid || 0),
+        fileOrIdentifier: sub ? '' : (slot.fileOrIdentifier || ''),
+        version: slot.version || '',
+        bypassed: slot.bypassed ?? false,
+        presetData: sub ? '' : (slot.presetData || ''),
+        presetSizeBytes: sub ? 0 : (slot.presetSizeBytes || 0),
+      };
+    }),
+  };
 }
 
 /**
@@ -180,27 +212,7 @@ export function ChainDetailContent({
 
   const handleLoadChain = async () => {
     downloadChain(chain._id);
-    const chainData = {
-      version: 1,
-      numSlots: slots.length,
-      slots: slots.map((slot: any, idx: number) => {
-        const sub = substitutions.get(slot.position ?? idx);
-        return {
-          type: 'plugin',
-          id: idx + 1,
-          index: slot.position ?? idx,
-          name: sub ? sub.altName : slot.pluginName,
-          manufacturer: sub ? sub.altManufacturer : slot.manufacturer,
-          format: slot.format || 'VST3',
-          uid: sub ? 0 : (slot.uid || 0),
-          fileOrIdentifier: sub ? '' : (slot.fileOrIdentifier || ''),
-          version: slot.version || '',
-          bypassed: slot.bypassed ?? false,
-          presetData: sub ? '' : (slot.presetData || ''),
-          presetSizeBytes: sub ? 0 : (slot.presetSizeBytes || 0),
-        };
-      }),
-    };
+    const chainData = buildImportData(chain, substitutions);
     setLoadingChain(true);
     try {
       await onLoad(chainData);
@@ -426,7 +438,7 @@ export function ChainDetailContent({
                           <span className="text-[10px] uppercase tracking-wider font-semibold text-plugin-dim">You own a close match</span>
                           <div className="flex flex-wrap gap-1">
                             {alternatives.map((alt, j) => (
-                              <span key={j} className="inline-flex items-center rounded-md border border-plugin-accent/30 bg-plugin-accent/10 overflow-hidden" title={alt.similarityReasons || `${alt.name} by ${alt.manufacturer}`}>
+                              <span key={j} className="inline-flex items-center rounded-md border border-plugin-accent/30 bg-plugin-accent/10 overflow-hidden" title={reasonsOf(alt) || `${alt.name} by ${alt.manufacturer}`}>
                                 <button
                                   onClick={() => handleSubstitute(position, slot.pluginName, alt)}
                                   className="px-1.5 py-0.5 text-plugin-accent-bright hover:bg-plugin-accent/20 text-[11px] font-medium transition-colors"
@@ -447,8 +459,8 @@ export function ChainDetailContent({
                               </span>
                             ))}
                           </div>
-                          {alternatives[0]?.similarityReasons && (
-                            <span className="text-[10px] text-plugin-dim truncate">{alternatives[0].similarityReasons}</span>
+                          {reasonsOf(alternatives[0]) && (
+                            <span className="text-[10px] text-plugin-dim truncate">{reasonsOf(alternatives[0])}</span>
                           )}
                         </div>
                       ) : (

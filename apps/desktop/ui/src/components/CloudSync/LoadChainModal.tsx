@@ -104,7 +104,7 @@ export function LoadChainModal({ onClose, onLoad }: LoadChainModalProps) {
             <button
               onClick={handleLoadByCode}
               disabled={shareCode.length < 6}
-              className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-text rounded px-4 py-2 "
+              className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-border-bright text-plugin-on-accent font-semibold rounded-md px-4 py-2 "
             >
               Load
             </button>

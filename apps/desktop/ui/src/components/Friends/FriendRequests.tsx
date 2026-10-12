@@ -94,7 +94,7 @@ export function FriendRequests() {
           <Bell size={18} className="text-plugin-accent" />
           <h3 className="text-plugin-text  font-medium">Friend Requests</h3>
           {requests.length > 0 && (
-            <span className="bg-plugin-accent text-plugin-text text-xs rounded-full px-2 py-0.5">
+            <span className="bg-plugin-accent text-plugin-on-accent font-semibold text-xs rounded-full px-2 py-0.5">
               {requests.length}
             </span>
           )}

@@ -110,7 +110,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
             <div className="text-green-400 font-medium mb-4">{success}</div>
             <button
               onClick={onClose}
-              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text rounded px-4 py-2"
+              className="w-full bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold rounded-md px-4 py-2"
             >
               Done
             </button>
@@ -159,7 +159,7 @@ export function ShareChainModal({ chainId, chainName, onClose }: ShareChainModal
                 className={`flex-1 flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium ${
                   sending || !selectedFriend
                     ? 'bg-plugin-accent/50 text-plugin-accent cursor-not-allowed'
-                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
+                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold'
                 }`}
               >
                 <Send size={14} />

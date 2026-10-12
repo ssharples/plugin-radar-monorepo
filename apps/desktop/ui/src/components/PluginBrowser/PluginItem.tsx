@@ -1,7 +1,7 @@
-import { Plus, Music, Sliders } from 'lucide-react';
+import { Plus, Music, CornerDownLeft } from 'lucide-react';
 import type { PluginDescription } from '../../api/types';
 import { usePluginStore } from '../../stores/pluginStore';
-import { CATEGORY_COLORS, CATEGORY_LABELS } from '../../constants/categoryColors';
+import { CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_SWATCH } from '../../constants/categoryColors';
 
 interface PluginItemProps {
   plugin: PluginDescription;
@@ -38,65 +38,54 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
     ...(enriched?.sonicCharacter ?? []),
   ].slice(0, 3);
 
+  const swatch = enriched ? (CATEGORY_SWATCH[enriched.category] ?? CATEGORY_SWATCH.utility) : 'bg-plugin-border-bright';
+
   return (
     <div
-      className={`group flex items-start gap-2 px-2 py-1.5 rounded border transition-all cursor-pointer ${
+      className={`group relative flex items-center gap-2.5 pl-3 pr-1.5 py-1.5 rounded-md border transition-colors cursor-pointer ${
         isHighlighted
           ? 'bg-plugin-accent/10 border-plugin-accent/40'
-          : 'bg-transparent border-transparent hover:bg-plugin-surface-alt hover:border-plugin-border'
+          : 'bg-transparent border-transparent hover:bg-plugin-surface-alt'
       }`}
       onDoubleClick={onAdd}
       onClick={isHighlighted && onInsert ? onInsert : undefined}
       onMouseEnter={onMouseEnter}
+      title="Double-click to add to the chain"
     >
-      {/* Icon */}
-      <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded mt-0.5 ${
-        plugin.isInstrument ? 'bg-plugin-accent/15 text-plugin-accent' : 'bg-plugin-border text-plugin-muted'
-      }`}>
-        {plugin.isInstrument ? (
-          <Music className="w-3 h-3" />
-        ) : (
-          <Sliders className="w-3 h-3" />
-        )}
-      </div>
+      {/* Category stripe */}
+      <span className={`absolute left-1 top-2 bottom-2 w-[3px] rounded-full ${swatch} ${enriched ? 'opacity-80' : 'opacity-40'}`} aria-hidden />
 
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-xs  text-plugin-text truncate leading-tight font-medium">{plugin.name}</p>
-          {/* Category badge */}
-          {enriched && categoryLabel && (
-            <span className={`flex-shrink-0 px-1 py-px text-[10px] leading-tight rounded border font-medium ${categoryColor}`}>
-              {categoryLabel}
-            </span>
-          )}
-          {/* Price badge */}
+          {plugin.isInstrument && <Music className="w-3 h-3 text-plugin-accent flex-shrink-0" aria-label="Instrument" />}
+          <p className="text-[13px] text-plugin-text truncate leading-tight font-medium">{plugin.name}</p>
           {enriched?.isFree && (
-            <span className="flex-shrink-0 px-1 py-px text-[10px] leading-tight rounded bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
+            <span className="flex-shrink-0 px-1 text-[10px] leading-4 rounded bg-green-500/15 text-green-300 font-semibold">
               Free
-            </span>
-          )}
-          {enriched && !enriched.isFree && enriched.currentPrice !== undefined && (
-            <span className="flex-shrink-0 text-[10px] text-plugin-dim ">
-              {formatPrice(enriched.currentPrice, enriched.currency)}
             </span>
           )}
         </div>
 
-        {/* Manufacturer + format / effect type */}
-        <p className="text-xxs  text-plugin-dim truncate leading-tight">
+        <p className="text-[11px] text-plugin-dim truncate leading-tight mt-0.5">
           {plugin.manufacturer}
-          <span className="text-plugin-border-bright"> / </span>
+          <span className="text-plugin-border-bright"> · </span>
           {effectSubtitle || plugin.format}
+          {enriched && !enriched.isFree && enriched.currentPrice !== undefined && (
+            <span className="num"> · {formatPrice(enriched.currentPrice, enriched.currency)}</span>
+          )}
         </p>
 
-        {/* Tonal character tags */}
-        {tonalChars.length > 0 && (
-          <div className="flex items-center gap-0.5 mt-0.5">
+        {isHighlighted && (enriched || tonalChars.length > 0) && (
+          <div className="flex items-center gap-1 mt-1 min-w-0">
+            {enriched && categoryLabel && (
+              <span className={`flex-shrink-0 px-1 text-[10px] leading-4 rounded border font-medium ${categoryColor}`}>
+                {categoryLabel}
+              </span>
+            )}
             {tonalChars.map((char) => (
               <span
                 key={char}
-                className="px-1 py-px text-[10px] leading-tight rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize"
+                className="px-1 text-[10px] leading-4 rounded bg-plugin-bg text-plugin-muted border border-plugin-border capitalize truncate"
               >
                 {char}
               </span>
@@ -104,20 +93,17 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
           </div>
         )}
 
-        {/* Short description (only shown when highlighted or enriched data exists and there's space) */}
         {enriched?.shortDescription && isHighlighted && (
-          <p className="text-[10px] text-plugin-dim leading-tight mt-0.5 line-clamp-1">
+          <p className="text-[11px] text-plugin-dim leading-tight mt-1 line-clamp-2">
             {enriched.shortDescription}
           </p>
         )}
-
       </div>
 
-      {/* Add button / Enter hint */}
       {isHighlighted ? (
-        <span className="flex-shrink-0 flex items-center gap-1 text-plugin-accent text-xxs font-medium px-1.5 py-0.5 rounded bg-plugin-accent/10 mt-0.5">
-          <Plus className="w-3 h-3" />
-          Enter
+        <span className="flex-shrink-0 flex items-center gap-1 text-plugin-accent-bright text-[11px] font-semibold px-1.5 h-6 rounded bg-plugin-accent/15">
+          <CornerDownLeft className="w-3 h-3" />
+          Add
         </span>
       ) : (
         <button
@@ -125,10 +111,11 @@ export function PluginItem({ plugin, isHighlighted = false, onAdd, onInsert, onM
             e.stopPropagation();
             onAdd();
           }}
-          className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 bg-plugin-accent/15 hover:bg-plugin-accent text-plugin-accent hover:text-plugin-on-accent transition-all mt-0.5"
+          className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 bg-plugin-accent/15 hover:bg-plugin-accent text-plugin-accent-bright hover:text-plugin-on-accent transition-colors"
           title="Add to chain"
+          aria-label={`Add ${plugin.name} to chain`}
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="w-3.5 h-3.5" />
         </button>
       )}
     </div>

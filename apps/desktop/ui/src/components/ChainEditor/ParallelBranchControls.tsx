@@ -72,7 +72,7 @@ export function ParallelBranchControls({ node, branchIndex }: ParallelBranchCont
           onChange={(v) => setBranchGain(node.id, v)}
           title={`${gainDb.toFixed(1)} dB`}
         />
-        <span className="num text-[10px] text-plugin-muted w-11 text-right">
+        <span className="num text-[10px] text-plugin-muted w-14 text-right whitespace-nowrap">
           {gainDb >= 0 ? '+' : ''}{gainDb.toFixed(1)} dB
         </span>
       </div>

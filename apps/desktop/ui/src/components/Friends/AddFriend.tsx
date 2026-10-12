@@ -100,7 +100,7 @@ export function AddFriend() {
         <button
           onClick={handleSearch}
           disabled={searching || query.trim().length < 2}
-          className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-accent/50 text-plugin-text rounded px-3 py-2"
+          className="bg-plugin-accent hover:bg-plugin-accent-bright disabled:bg-plugin-accent/50 text-plugin-on-accent font-semibold rounded-md px-3 py-2"
         >
           <Search size={16} />
         </button>
@@ -143,7 +143,7 @@ export function AddFriend() {
                 className={`flex items-center gap-1 text-sm rounded px-3 py-1 ${
                   sending === user.userId
                     ? 'bg-plugin-accent/50 text-plugin-accent cursor-wait'
-                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-text'
+                    : 'bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent font-semibold'
                 }`}
               >
                 <UserPlus size={14} />
