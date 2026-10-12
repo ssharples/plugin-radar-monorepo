@@ -1,217 +1,270 @@
+import Link from "next/link";
 import {
-  Plugs,
-  GitFork,
-  Gauge,
-  Waveform,
-  WaveSquare,
-  Timer,
-  ShareNetwork,
-  ArrowsLeftRight,
-  Check,
-  X as XIcon,
-  Minus,
+  ArrowRight,
   DownloadSimple,
+  CheckCircle,
+  ArrowsLeftRight,
+  GitFork,
+  CloudArrowUp,
+  SlidersHorizontal,
+  Users,
 } from "@phosphor-icons/react/dist/ssr";
-import { AnimatedHeroContent } from "@/components/AnimatedHeroContent";
+import { api } from "@/convex/_generated/api";
+import { convexServer } from "@/lib/convex-server";
+import { PluginCard } from "@/components/plugin-card";
+import { ChainCardRedesign } from "@/components/chains/ChainCardRedesign";
 import { InteractiveHeroBackground } from "@/components/InteractiveHeroBackground";
-import { InteractiveFeatureShowcase } from "@/components/InteractiveFeatureShowcase";
-import { LiquidMetalCard } from "@/components/LiquidMetalCard";
+import { CHAIN_USE_CASE_GROUPS } from "@plugin-radar/shared/chainUseCases";
 
-export default function Home() {
+// Refresh the chains, plugins and counts every five minutes.
+export const revalidate = 300;
+
+// Return null instead of failing the page when Convex can't be reached.
+async function load<T>(fn: () => Promise<T>): Promise<T | null> {
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
+}
+
+export default async function Home() {
+  const [stats, chainsResult, trendingPlugins, plugins, manufacturers] = await Promise.all([
+    load(() => convexServer.query(api.stats.overview, {})),
+    load(() =>
+      convexServer.query(api.pluginDirectory.browseChainsPaginated, {
+        sortBy: "popular",
+        limit: 6,
+        offset: 0,
+      })
+    ),
+    load(() => convexServer.query(api.mentions.getTrendingPlugins, { limit: 6 })),
+    load(() => convexServer.query(api.plugins.list, { limit: 6 })),
+    load(() => convexServer.query(api.manufacturers.list, { limit: 12 })),
+  ]);
+
+  const chains = chainsResult?.chains ?? [];
+  const hasTrending = !!trendingPlugins && trendingPlugins.length > 0;
+  const pluginsToShow: any[] = (hasTrending ? trendingPlugins : plugins?.items) ?? [];
+
   return (
     <div className="relative">
-      {/* ===== HERO SECTION ===== */}
+      {/* ===== HERO ===== */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-transparent" />
-
-        {/* Interactive WebGL Background */}
         <InteractiveHeroBackground />
 
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-[#deff0a]/[0.03] rounded-full blur-[140px] pointer-events-none" />
-
-        <div className="container mx-auto px-4 lg:px-6 pt-20 pb-16 relative z-10">
-          <AnimatedHeroContent />
-
-          {/* Stats row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-16">
-            <StatCard value="Fast" label="Think in milliseconds" />
-            <StatCard value="Ergonomic" label="Keyboard first" />
-            <StatCard value="Unified" label="One view, every plugin" />
-            <StatCard value="Crash-safe" label="Out-of-process scanning" />
+        <div className="container mx-auto px-4 lg:px-6 py-16 lg:py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center relative z-10">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-semibold text-[#deff0a] bg-[#deff0a]/10 border border-[#deff0a]/20 rounded-full px-3 py-1 mb-6">
+              Works with VST3, AU and AAX plugins from any brand
+            </p>
+            <h1 className="text-3xl sm:text-4xl xl:text-5xl font-bold tracking-tight text-stone-100 leading-[1.1]">
+              Plugin chains you can share.
+              <span className="block text-stone-500">With anyone, using any brand.</span>
+            </h1>
+            <p className="mt-6 text-lg text-stone-400 max-w-xl leading-relaxed">
+              Build a chain in the ProChain plugin, save it to the cloud, and share it.
+              When someone opens it, we show which plugins they already own and suggest
+              swaps for the ones they don&apos;t.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/chains"
+                className="neon-button inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm"
+              >
+                Browse chains
+                <ArrowRight weight="bold" className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/plugins"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.05] hover:bg-white/[0.08] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.08] text-sm"
+              >
+                Explore plugins
+              </Link>
+            </div>
+            {stats && (
+              <dl className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+                <Stat value={stats.totalPlugins?.toLocaleString()} label="plugins in the catalog" />
+                <Stat value={stats.totalManufacturers?.toLocaleString()} label="brands" />
+                <Stat value={stats.freePlugins?.toLocaleString()} label="free plugins" />
+              </dl>
+            )}
           </div>
+
+          <ChainPreview />
         </div>
       </section>
 
       <div className="section-line" />
 
-      {/* ===== FEATURE SHOWCASE ===== */}
-      <InteractiveFeatureShowcase />
-
-      <div className="section-line" />
-
-      {/* ===== COMPARISON TABLE ===== */}
-      <section className="container mx-auto px-4 lg:px-6 py-20">
-        <div className="text-center mb-12">
-          <p className="text-xs text-[#deff0a] uppercase tracking-[0.2em] font-semibold mb-3">Comparison</p>
-          <h2 className="text-3xl font-bold text-stone-100 mb-3">
-            Built differently. Priced differently.
-          </h2>
-          <p className="text-stone-500 max-w-lg mx-auto">
-            The only plugin chainer built around keyboard-first workflow — no ecosystem lock-in, no subscription, full metering at every stage.
-          </p>
+      {/* ===== BROWSE BY USE ===== */}
+      <section className="container mx-auto px-4 lg:px-6 py-16">
+        <SectionHeader title="Find a chain for the job" href="/chains" linkText="All chains" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {CHAIN_USE_CASE_GROUPS.map((group) => (
+            <Link
+              key={group.value}
+              href={`/chains?category=${group.value}`}
+              className="glass-card neon-border-hover rounded-xl p-4"
+            >
+              <span className="text-2xl" aria-hidden="true">{group.emoji}</span>
+              <p className="mt-3 font-semibold text-stone-100">{group.label}</p>
+              <p className="text-xs text-stone-500 mt-0.5">
+                {group.useCases.slice(0, 2).map((u) => u.label).join(", ")}
+              </p>
+            </Link>
+          ))}
         </div>
-        <div className="max-w-4xl mx-auto overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.08]">
-                <th className="text-left py-4 px-4 text-stone-500 font-medium">#</th>
-                <th className="text-left py-4 px-4 text-stone-500 font-medium">Feature</th>
-                <th className="py-4 px-4 text-center bg-[#deff0a]/[0.03]">
-                  <span className="text-white font-semibold">ProChain</span>
-                  <span className="block text-[10px] neon-text font-bold mt-0.5"><s className="opacity-60">$60</s> $30 launch</span>
-                </th>
-                <th className="py-4 px-4 text-center text-stone-500 font-medium">
-                  Waves StudioVerse
-                  <span className="block text-[10px] text-stone-600 mt-0.5">$14.99–$24.99/mo</span>
-                </th>
-                <th className="py-4 px-4 text-center text-stone-500 font-medium">
-                  KSHMR Chain
-                  <span className="block text-[10px] text-stone-600 mt-0.5">~$49 one-time</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              <CompareRow n={1} feature="Works with ANY plugin" pro="yes" waves="no" kshmr="yes" wavesNote="Waves only" />
-              <CompareRow n={2} feature="LUFS metering (ITU-R BS.1770)" pro="yes" waves="no" kshmr="no" />
-              <CompareRow n={3} feature="FFT spectrum analysis" pro="yes" proNote="2048-pt" waves="no" kshmr="no" />
-              <CompareRow n={4} feature="Pre/post waveform display" pro="yes" waves="no" kshmr="no" />
-              <CompareRow n={5} feature="Cross-instance mirroring" pro="yes" waves="no" kshmr="no" />
-              <CompareRow n={6} feature="Friends & private sharing" pro="yes" waves="no" kshmr="no" />
-              <CompareRow n={7} feature="Plugin compatibility check" pro="yes" waves="na" kshmr="no" />
-              <CompareRow n={8} feature="Crash-safe plugin scanning" pro="yes" proNote="Out-of-process" waves="na" kshmr="no" />
-              <CompareRow n={9} feature="Per-plugin metering" pro="yes" proNote="Peak + RMS" waves="no" kshmr="partial" kshmrNote="RMS only" />
-              <CompareRow n={10} feature="Dry/wet per plugin + group" pro="yes" waves="partial" wavesNote="Limited" kshmr="partial" kshmrNote="Plugin only" />
-              <CompareRow n={11} feature="Auto latency compensation" pro="yes" waves="na" kshmr="no" />
-              <CompareRow n={12} feature="Serial + parallel routing" pro="yes" waves="no" kshmr="yes" wavesNote="Linear only" />
-              <CompareRow n={13} feature="Cross-DAW chain sharing" pro="yes" waves="yes" kshmr="no" wavesNote="Waves only" />
-              <CompareRow n={14} feature="Community chain library" pro="yes" proNote="Rate, comment, fork" waves="yes" wavesNote="Waves chains" kshmr="no" />
-              <CompareRow n={15} feature="DAW parameter automation" pro="yes" waves="yes" kshmr="yes" kshmrNote="Macro" />
-              <CompareRow n={16} feature="Oversampling" pro="yes" proNote="Up to 4x" waves="no" kshmr="yes" kshmrNote="Up to 16x" />
-              <CompareRow n={17} feature="Pricing model" pro="text" proText="$30 launch ($60 regular)" waves="text" wavesText="$15–$25/mo" kshmr="text" kshmrText="~$49 one-time" />
-              <CompareRow n={18} feature="Free trial" pro="yes" waves="no" kshmr="no" />
-            </tbody>
-          </table>
-        </div>
+      </section>
+
+      {/* ===== COMMUNITY CHAINS ===== */}
+      <section className="container mx-auto px-4 lg:px-6 pb-16">
+        <SectionHeader title="Popular chains" href="/chains?sort=popular" linkText="Browse all" />
+        {chains.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {chains.map((chain: any) => (
+              <ChainCardRedesign key={chain._id} chain={chain} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/[0.1] p-10 text-center">
+            <p className="text-stone-200 font-semibold">No public chains yet</p>
+            <p className="mt-1 text-sm text-stone-500 max-w-md mx-auto">
+              Build a chain in the ProChain plugin and press Share. It will show up here for
+              everyone to load, rate and fork.
+            </p>
+          </div>
+        )}
       </section>
 
       <div className="section-line" />
 
       {/* ===== HOW IT WORKS ===== */}
-      <section className="container mx-auto px-4 lg:px-6 py-20">
-        <div className="text-center mb-14">
-          <p className="text-xs text-[#deff0a] uppercase tracking-[0.2em] font-semibold mb-3">How It Works</p>
-          <h2 className="text-3xl font-bold text-stone-100">
-            Your DAW just got faster.
-          </h2>
-        </div>
-        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          <StepCard
-            number="01"
-            title="Install"
-            description="Load ProChain in your DAW. A crash-safe out-of-process scanner finds every VST3, AU, and AAX plugin on your system automatically — nothing to configure."
-          />
-          <StepCard
-            number="02"
+      <section id="how-it-works" className="container mx-auto px-4 lg:px-6 py-16">
+        <p className="text-xs text-[#deff0a] uppercase tracking-[0.2em] font-semibold mb-3">How it works</p>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-stone-100 mb-10">
+          Build it once. Load it anywhere.
+        </h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          <Step
+            n={1}
+            icon={<SlidersHorizontal className="w-5 h-5" />}
             title="Build"
-            description="Drag plugins into your chain. Keyboard shortcuts to navigate between every insert. Serial, parallel, nested routing — one view, no windows, no chaos."
+            text="Load ProChain on any track in your DAW. Drop in plugins from any brand, in series or in parallel."
           />
-          <StepCard
-            number="03"
-            title="Flow"
-            description="Mix and record without breaking concentration. Every shortcut, every meter, every routing decision in one place. Share when you've got something great."
+          <Step
+            n={2}
+            icon={<CloudArrowUp className="w-5 h-5" />}
+            title="Share"
+            text="Save the chain to the cloud with its settings. Keep it private, send it to a friend, or make it public."
+          />
+          <Step
+            n={3}
+            icon={<ArrowsLeftRight className="w-5 h-5" />}
+            title="Load anywhere"
+            text="Anyone can open your chain. If they're missing a plugin, ProChain suggests one they own instead."
           />
         </div>
       </section>
 
       <div className="section-line" />
 
-      {/* ===== OPEN BETA CARD ===== */}
-      <section id="pricing" className="container mx-auto px-4 lg:px-6 py-20">
-        <div className="max-w-lg mx-auto">
-          <LiquidMetalCard className="p-8 text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#deff0a]/10 border border-[#deff0a]/20 text-[#deff0a] text-xs font-bold mb-6 uppercase tracking-wider">
-              Launch Sale — 50% Off
-            </div>
-
-            {/* Price */}
-            <div className="mb-6">
-              <span className="text-2xl font-bold text-stone-500 line-through mr-3">$60</span>
-              <span className="text-6xl font-extrabold neon-text">$30</span>
-            </div>
-
-            {/* Features */}
-            <ul className="text-left space-y-3 mb-8 max-w-xs mx-auto">
-              {[
-                "Every VST3, AU, and AAX plugin",
-                "Keyboard-first navigation",
-                "Serial & parallel routing",
-                "Per-plugin metering + spectrum analysis",
-                "Automatic latency compensation",
-                "Chain sharing — public or private",
-                "macOS and Windows",
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-3 text-stone-300 text-sm">
-                  <Check weight="bold" className="w-4 h-4 text-[#deff0a] shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-
-            {/* CTA */}
-            <a
-              href="/pricing"
-              className="neon-button w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm"
-            >
-              Start Free Trial
-            </a>
-            <p className="text-stone-500 text-xs mt-4">
-              7-day free trial. Then $30 (regular $60). One-time, no subscription.
-            </p>
-          </LiquidMetalCard>
+      {/* ===== WHY ===== */}
+      <section className="container mx-auto px-4 lg:px-6 py-16">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-stone-100 mb-3">
+          Not locked to one brand
+        </h2>
+        <p className="text-stone-400 max-w-2xl mb-10">
+          Other chain libraries only load their own maker&apos;s plugins. ProChain loads the
+          plugins you already have, whoever made them.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Feature
+            icon={<CheckCircle className="w-5 h-5" />}
+            title="Chains I can use"
+            text="Sign in and filter to chains you can load right now with the plugins you own."
+          />
+          <Feature
+            icon={<ArrowsLeftRight className="w-5 h-5" />}
+            title="Smart swaps"
+            text="Missing a plugin? See close matches you own, or where to get it."
+          />
+          <Feature
+            icon={<GitFork className="w-5 h-5" />}
+            title="Fork and remix"
+            text="Copy any public chain, change it, and share your take. The original creator gets credit."
+          />
+          <Feature
+            icon={<Users className="w-5 h-5" />}
+            title="Follow creators"
+            text="Rate and comment on chains, and follow the engineers whose sound you like."
+          />
         </div>
+      </section>
+
+      {/* ===== PLUGINS ===== */}
+      <section className="container mx-auto px-4 lg:px-6 pb-16">
+        <SectionHeader
+          title={hasTrending ? "Trending plugins" : "Plugins"}
+          href="/plugins"
+          linkText="Browse the catalog"
+        />
+        {pluginsToShow.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {pluginsToShow.slice(0, 6).map((plugin: any) => (
+              <PluginCard key={plugin._id} plugin={plugin} />
+            ))}
+          </div>
+        )}
+
+        {manufacturers && manufacturers.length > 0 && (
+          <div className="mt-8 flex flex-wrap gap-2">
+            {manufacturers.map((m: any) => (
+              <Link
+                key={m._id}
+                href={`/manufacturers/${m.slug}`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.15] text-sm text-stone-300 hover:text-white transition-colors"
+              >
+                {m.name}
+                <span className="text-stone-500 text-xs tabular-nums">{m.pluginCount}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="section-line" />
 
-      {/* ===== DOWNLOAD CTA ===== */}
-      <section className="container mx-auto px-4 lg:px-6 py-20">
+      {/* ===== GET PROCHAIN ===== */}
+      <section id="get-prochain" className="container mx-auto px-4 lg:px-6 py-20">
         <div className="relative rounded-2xl overflow-hidden border border-[#deff0a]/10">
           <div className="absolute inset-0 bg-gradient-to-br from-[#deff0a]/[0.03] via-transparent to-transparent" />
           <div className="relative px-8 py-14 text-center">
-            <h2 className="text-3xl font-bold text-stone-100 mb-3">
-              Take the short way.
+            <h2 className="text-3xl sm:text-4xl font-bold text-stone-100">
+              Get the ProChain plugin
             </h2>
-            <p className="text-stone-400 max-w-md mx-auto mb-8">
-              $30 launch price. $60 regular. No subscription.
+            <p className="mt-4 text-stone-400 max-w-xl mx-auto">
+              Load it in Logic Pro, Ableton Live, Reaper, Studio One, Cubase and more. Browsing
+              and sharing chains on this site is free.
             </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <a
+            <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+              <Link
                 href="/pricing"
-                className="neon-button inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm"
+                className="neon-button inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm"
               >
                 <DownloadSimple weight="bold" className="w-4 h-4" />
-                Start Free Trial — macOS
-              </a>
-              <a
-                href="/pricing"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.06] hover:bg-white/[0.1] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.08] text-sm"
+                Start free trial
+              </Link>
+              <Link
+                href="/account"
+                className="inline-flex items-center justify-center px-6 py-3 bg-white/[0.06] hover:bg-white/[0.1] text-stone-200 font-medium rounded-xl transition-all border border-white/[0.08] text-sm"
               >
-                Coming Soon — Windows
-              </a>
+                Create a free account
+              </Link>
             </div>
             <p className="text-stone-600 text-xs mt-4">
-              $30 launch price. No subscription required.
+              7-day free trial. Then $30 (50% off launch sale). No subscription.
             </p>
           </div>
         </div>
@@ -220,131 +273,112 @@ export default function Home() {
   );
 }
 
-/* ===== SUB-COMPONENTS ===== */
+/* ===== PIECES ===== */
 
-function StatCard({ value, label }: { value: string; label: string }) {
+function Stat({ value, label }: { value?: string; label: string }) {
   return (
-    <div className="glass-card rounded-xl px-5 py-4 animate-fade-in-up">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-2 h-2 rounded-full bg-[#deff0a]" />
-        <span className="text-2xl font-bold text-stone-100 tabular-nums">
-          {value}
+    <div className="flex items-baseline gap-1.5">
+      <dt className="sr-only">{label}</dt>
+      <dd className="font-bold text-stone-100 tabular-nums">{value ?? "–"}</dd>
+      <span className="text-stone-500">{label}</span>
+    </div>
+  );
+}
+
+// An illustration of a shared chain, showing what a visitor sees when they
+// open someone else's chain: which plugins they own and a suggested swap.
+function ChainPreview() {
+  const slots = [
+    { name: "Pro-Q 3", brand: "FabFilter", owned: true },
+    { name: "CLA-76", brand: "Waves", owned: true },
+    { name: "Decapitator", brand: "Soundtoys", owned: false, swap: "Saturn 2" },
+    { name: "ValhallaRoom", brand: "Valhalla DSP", owned: true },
+  ];
+  return (
+    <div className="glass-card-strong rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-sm font-semibold text-stone-100">Lead Vocal — Bright &amp; Upfront</p>
+          <p className="text-xs text-stone-500">by @mixbymaya · 4 plugins</p>
+        </div>
+        <span className="text-xs font-semibold text-[#deff0a] bg-[#deff0a]/10 border border-[#deff0a]/20 rounded-full px-2.5 py-1">
+          You own 3 of 4
         </span>
       </div>
-      <span className="text-xs text-stone-500 uppercase tracking-wider">{label}</span>
-    </div>
-  );
-}
-
-function StepCard({
-  number,
-  title,
-  description,
-}: {
-  number: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="glass-card rounded-xl p-6 text-center group neon-border-hover transition-all">
-      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 mb-5 group-hover:bg-[#deff0a]/10 transition-colors">
-        <span className="text-xl font-bold text-[#deff0a]">{number}</span>
-      </div>
-      <h3 className="text-lg font-semibold text-stone-100 mb-2">{title}</h3>
-      <p className="text-stone-500 text-sm leading-relaxed">{description}</p>
-    </div>
-  );
-}
-
-function FeatureCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="glass-card rounded-xl p-5 group neon-border-hover transition-all">
-      <div className="text-white mb-3 group-hover:text-[#deff0a] transition-colors">
-        {icon}
-      </div>
-      <h3 className="font-semibold text-stone-100 mb-1.5 text-sm">{title}</h3>
-      <p className="text-stone-500 text-sm leading-relaxed">{description}</p>
-    </div>
-  );
-}
-
-function CompareRow({
-  n,
-  feature,
-  pro,
-  waves,
-  kshmr,
-  proNote,
-  proText,
-  wavesNote,
-  wavesText,
-  kshmrNote,
-  kshmrText,
-}: {
-  n: number;
-  feature: string;
-  pro: "yes" | "no" | "partial" | "na" | "text";
-  waves: "yes" | "no" | "partial" | "na" | "text";
-  kshmr: "yes" | "no" | "partial" | "na" | "text";
-  proNote?: string;
-  proText?: string;
-  wavesNote?: string;
-  wavesText?: string;
-  kshmrNote?: string;
-  kshmrText?: string;
-}) {
-  const renderCell = (val: string, note?: string, text?: string, isProChain = false) => {
-    if (val === "text") {
-      return (
-        <span className={`text-xs font-medium ${isProChain ? "text-[#deff0a]" : "text-stone-400"}`}>
-          {text}
+      <ol className="space-y-2">
+        {slots.map((s, i) => (
+          <li
+            key={s.name}
+            className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+              s.owned ? "border-white/[0.06] bg-black/40" : "border-[#deff0a]/25 bg-[#deff0a]/[0.04]"
+            }`}
+          >
+            <span className="w-5 text-xs text-stone-500 tabular-nums">{i + 1}</span>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-medium ${s.owned ? "text-stone-200" : "text-stone-400 line-through"}`}>
+                {s.name}
+              </p>
+              <p className="text-xs text-stone-500">{s.brand}</p>
+            </div>
+            {s.owned ? (
+              <CheckCircle weight="fill" className="w-4 h-4 text-green-500" aria-label="Owned" />
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs text-[#deff0a]">
+                <ArrowsLeftRight className="w-3.5 h-3.5" />
+                Swap for {s.swap}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+      <div className="mt-4 flex gap-2">
+        <span className="neon-button flex-1 inline-flex items-center justify-center h-9 rounded-lg text-sm">
+          Load in ProChain
         </span>
-      );
-    }
-    if (val === "yes") {
-      return (
-        <div className="flex flex-col items-center gap-0.5">
-          <Check weight="bold" className={`w-5 h-5 mx-auto ${isProChain ? "text-[#deff0a]" : "text-white"}`} />
-          {note && <span className={`text-[10px] ${isProChain ? "text-[#deff0a]/70" : "text-stone-500"}`}>{note}</span>}
-        </div>
-      );
-    }
-    if (val === "partial") {
-      return (
-        <div className="flex flex-col items-center gap-0.5">
-          <Minus weight="bold" className="w-4 h-4 text-stone-500 mx-auto" />
-          {note && <span className="text-[10px] text-stone-600">{note}</span>}
-        </div>
-      );
-    }
-    if (val === "na") {
-      return <span className="text-[10px] text-stone-600">N/A</span>;
-    }
-    return (
-      <div className="flex flex-col items-center gap-0.5">
-        <XIcon weight="bold" className="w-4 h-4 text-stone-700 mx-auto" />
-        {note && <span className="text-[10px] text-stone-600">{note}</span>}
+        <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-white/[0.1] text-sm text-stone-300">
+          <GitFork className="w-4 h-4" /> Fork
+        </span>
       </div>
-    );
-  };
+    </div>
+  );
+}
 
+function SectionHeader({ title, href, linkText }: { title: string; href: string; linkText: string }) {
   return (
-    <tr className="hover:bg-white/[0.02] transition-colors">
-      <td className="py-3 px-4 text-stone-600 text-xs tabular-nums">{n}</td>
-      <td className="py-3 px-4 text-stone-300">{feature}</td>
-      <td className="py-3 px-4 text-center bg-[#deff0a]/[0.03]">
-        {renderCell(pro, proNote, proText, true)}
-      </td>
-      <td className="py-3 px-4 text-center">{renderCell(waves, wavesNote, wavesText)}</td>
-      <td className="py-3 px-4 text-center">{renderCell(kshmr, kshmrNote, kshmrText)}</td>
-    </tr>
+    <div className="flex items-end justify-between gap-4 mb-6">
+      <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-100">{title}</h2>
+      <Link
+        href={href}
+        className="shrink-0 inline-flex items-center gap-1 text-sm text-stone-400 hover:text-[#deff0a] transition-colors"
+      >
+        {linkText}
+        <ArrowRight className="w-3.5 h-3.5" />
+      </Link>
+    </div>
+  );
+}
+
+function Step({ n, icon, title, text }: { n: number; icon: React.ReactNode; title: string; text: string }) {
+  return (
+    <div className="glass-card neon-border-hover rounded-xl p-6">
+      <div className="flex items-center gap-3 mb-3">
+        <span className="w-9 h-9 rounded-lg bg-[#deff0a]/10 text-[#deff0a] flex items-center justify-center">
+          {icon}
+        </span>
+        <span className="text-xs text-stone-500 tabular-nums">Step {n}</span>
+      </div>
+      <h3 className="font-semibold text-stone-100">{title}</h3>
+      <p className="mt-1 text-sm text-stone-400 leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+function Feature({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
+  return (
+    <div className="glass-card neon-border-hover rounded-xl p-5">
+      <span className="text-[#deff0a]">{icon}</span>
+      <h3 className="mt-3 font-semibold text-stone-100">{title}</h3>
+      <p className="mt-1 text-sm text-stone-400 leading-relaxed">{text}</p>
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BreadcrumbSchema } from "@/components/SchemaMarkup";
 import {
@@ -13,16 +13,14 @@ import {
   MagnifyingGlass,
   GraduationCap,
 } from "@phosphor-icons/react";
-import { ChainBrowserSidebar } from "@/components/chains/ChainBrowserSidebar";
+import {
+  ChainBrowserSidebar,
+  SORT_OPTIONS,
+  type CompatibilityFilter,
+} from "@/components/chains/ChainBrowserSidebar";
 import { ChainCardRedesign } from "@/components/chains/ChainCardRedesign";
 import { CHAIN_USE_CASE_GROUPS } from "@plugin-radar/shared/chainUseCases";
 import { useAuth } from "@/components/auth-provider";
-
-const SORT_OPTIONS = [
-  { value: "recent", label: "Most Recent" },
-  { value: "popular", label: "Most Popular" },
-  { value: "downloads", label: "Most Downloaded" },
-];
 
 const PAGE_SIZE = 30;
 
@@ -32,6 +30,7 @@ const GROUP_VALUES = new Set(CHAIN_USE_CASE_GROUPS.map((g) => g.value));
 interface ChainsPageClientProps {
   initialData: {
     chains: any[];
+    total?: number;
     hasMore: boolean;
   } | null;
   initialCategory: string;
@@ -47,7 +46,7 @@ export default function ChainsPageClient({
   initialSort,
   initialSearch,
 }: ChainsPageClientProps) {
-  const { sessionToken } = useAuth();
+  const { sessionToken, isAuthenticated } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -58,7 +57,7 @@ export default function ChainsPageClient({
   const searchFromUrl = searchParams.get("q") || initialSearch;
 
   const [searchInput, setSearchInput] = useState(searchFromUrl);
-  const [showCompatible, setShowCompatible] = useState(false);
+  const [compatibility, setCompatibility] = useState<CompatibilityFilter>("all");
   const [educatorOnly, setEducatorOnly] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
@@ -74,6 +73,7 @@ export default function ChainsPageClient({
     genre: genre || undefined,
     sortBy,
     educatorOnly: educatorOnly || undefined,
+    compatibilityFilter: compatibility,
     sessionToken: sessionToken || undefined,
     limit: displayCount,
     offset: 0,
@@ -81,18 +81,9 @@ export default function ChainsPageClient({
 
   // Server data shown until live query resolves
   const result = liveResult ?? initialData;
-  const chains = result?.chains;
+  const filteredChains = result?.chains;
   const hasMore = result?.hasMore ?? false;
-
-  // Client-side compatibility filter
-  const filteredChains = useMemo(() => {
-    if (!chains) return undefined;
-    if (!showCompatible) return chains;
-    return chains.filter((chain: any) => {
-      if (chain.compatibility === undefined) return true;
-      return chain.compatibility >= 100;
-    });
-  }, [chains, showCompatible]);
+  const total = result?.total;
 
   const handleLoadMore = useCallback(() => {
     setDisplayCount((prev) => prev + PAGE_SIZE);
@@ -123,6 +114,25 @@ export default function ChainsPageClient({
   const handleSearchSubmit = () => {
     updateFilter("q", searchInput.trim() || null);
   };
+
+  // Search as you type: update the address bar 300ms after the last keystroke.
+  useEffect(() => {
+    const q = searchInput.trim();
+    if (q === searchFromUrl.trim()) return;
+    const t = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (q) params.set("q", q);
+      else params.delete("q");
+      const qs = params.toString();
+      router.replace(qs ? `/chains?${qs}` : "/chains", { scroll: false });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, searchFromUrl, searchParams, router]);
+
+  // Start from the first page whenever the filters change.
+  useEffect(() => {
+    setDisplayCount(PAGE_SIZE);
+  }, [category, genre, sortBy, searchFromUrl, compatibility, educatorOnly]);
 
   return (
     <div className="relative">
@@ -245,8 +255,9 @@ export default function ChainsPageClient({
                 onGenreChange={handleGenreChange}
                 sortBy={sortBy}
                 onSortChange={handleSortChange}
-                showCompatible={showCompatible}
-                onCompatibleChange={setShowCompatible}
+                compatibility={compatibility}
+                onCompatibilityChange={setCompatibility}
+                isAuthenticated={isAuthenticated}
                 educatorOnly={educatorOnly}
                 onEducatorOnlyChange={setEducatorOnly}
               />
@@ -267,8 +278,9 @@ export default function ChainsPageClient({
               onGenreChange={handleGenreChange}
               sortBy={sortBy}
               onSortChange={handleSortChange}
-              showCompatible={showCompatible}
-              onCompatibleChange={setShowCompatible}
+              compatibility={compatibility}
+              onCompatibilityChange={setCompatibility}
+              isAuthenticated={isAuthenticated}
               educatorOnly={educatorOnly}
               onEducatorOnlyChange={setEducatorOnly}
             />
@@ -277,9 +289,12 @@ export default function ChainsPageClient({
           {/* Main Grid */}
           <div className="flex-1 min-w-0">
             {/* Active filter indicators */}
-            {(category || genre || educatorOnly) && (
-              <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <span className="text-xs text-stone-500">Filtered by:</span>
+            <div className="flex items-center gap-2 mb-4 flex-wrap min-h-6">
+                <span className="text-xs text-stone-500">
+                  {total === undefined
+                    ? "Loading chains…"
+                    : `${total} ${total === 1 ? "chain" : "chains"}`}
+                </span>
                 {category && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/10 border border-[#deff0a]/20 rounded-full text-xs text-white">
                     {category}
@@ -313,8 +328,18 @@ export default function ChainsPageClient({
                     </button>
                   </span>
                 )}
-              </div>
-            )}
+                {compatibility !== "all" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/10 border border-[#deff0a]/20 rounded-full text-xs text-white">
+                    {compatibility === "full" ? "I own every plugin" : "Missing 2 or fewer"}
+                    <button
+                      onClick={() => setCompatibility("all")}
+                      className="hover:text-[#deff0a] transition"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+            </div>
 
             {filteredChains ? (
               filteredChains.length > 0 ? (
@@ -330,7 +355,7 @@ export default function ChainsPageClient({
                     No chains found
                   </h3>
                   <p className="text-stone-400">
-                    {category || searchFromUrl || genre || educatorOnly
+                    {category || searchFromUrl || genre || educatorOnly || compatibility !== "all"
                       ? "Try adjusting your filters or search terms."
                       : "No chains shared yet. Be the first — build a chain in ProChain and share it with the community."}
                   </p>
