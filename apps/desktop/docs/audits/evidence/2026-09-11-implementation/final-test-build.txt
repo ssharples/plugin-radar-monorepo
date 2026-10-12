@@ -1,0 +1,12 @@
+[ 68%] Built target Catch2
+[ 70%] Built target Catch2WithMain
+[ 70%] Building CXX object CMakeFiles/PluginChainManager_Tests.dir/tests/ChainPerformanceBenchmark.cpp.o
+[ 72%] Linking CXX executable PluginChainManager_Tests
+[100%] Built target PluginChainManager_Tests
+[  1%] Built target PluginChainManagerData
+[ 61%] Built target Catch2
+[ 87%] Built target PluginChainManager
+[ 88%] Built target Catch2WithMain
+[ 88%] Building CXX object CMakeFiles/PluginChainManager_WrapperTests.dir/tests/ChainPerformanceBenchmark.cpp.o
+[ 88%] Linking CXX executable PluginChainManager_WrapperTests
+[100%] Built target PluginChainManager_WrapperTests

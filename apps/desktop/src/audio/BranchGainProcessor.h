@@ -18,6 +18,10 @@ public:
     void setGainDb(float dB);
     float getGainDb() const { return gainDb.load(std::memory_order_relaxed); }
 
+    // Phase invert: ramps the sign from +1 to -1 (or back) to avoid a click
+    void setPolarityInverted(bool shouldInvert);
+    bool isPolarityInverted() const { return polarityInverted.load(std::memory_order_relaxed); }
+
     // AudioProcessor overrides
     const juce::String getName() const override { return "BranchGain"; }
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -41,10 +45,12 @@ public:
     void setStateInformation(const void*, int) override {}
 
 private:
-    static float dbToLinear(float dB) noexcept;
+    static float dbToLinear(float dB);
 
     std::atomic<float> gainDb{0.0f};
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedGain;
+    std::atomic<bool> polarityInverted{false};
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedSign;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BranchGainProcessor)
 };

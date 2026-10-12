@@ -16,8 +16,6 @@ interface UsageState {
   recordCoUsage: (uid1: number, uid2: number) => void;
   getUsageStats: (uid: number) => PluginUsage | undefined;
   getTopCoUsage: (uid: number, limit?: number) => Array<{ uid: number; count: number }>;
-  getPluginUsageCount: (uid: number) => number;
-  getMostRecentPlugins: () => PluginUsage[];
 }
 
 const STORAGE_KEY = 'plugin_usage_stats';
@@ -31,16 +29,12 @@ function loadFromStorage(): Record<number, PluginUsage> {
   }
 }
 
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 function saveToStorage(plugins: Record<number, PluginUsage>) {
-  if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(plugins));
-    } catch {
-      // localStorage may be full or unavailable
-    }
-  }, 1000);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(plugins));
+  } catch {
+    // localStorage may be full or unavailable
+  }
 }
 
 export const useUsageStore = create<UsageState>((set, get) => ({
@@ -49,17 +43,17 @@ export const useUsageStore = create<UsageState>((set, get) => ({
   recordPluginLoad: (uid, name, manufacturer) => {
     set((state) => {
       const now = Date.now();
-      const existing = state.plugins[uid];
+      const existing: Partial<PluginUsage> = state.plugins[uid] || {};
       const updated = {
         ...state.plugins,
         [uid]: {
           uid,
           name,
           manufacturer,
-          loadCount: (existing?.loadCount || 0) + 1,
+          loadCount: (existing.loadCount || 0) + 1,
           lastUsedAt: now,
-          firstUsedAt: existing?.firstUsedAt || now,
-          coUsage: existing?.coUsage || {},
+          firstUsedAt: existing.firstUsedAt || now,
+          coUsage: existing.coUsage || {},
         },
       };
       saveToStorage(updated);
@@ -97,15 +91,5 @@ export const useUsageStore = create<UsageState>((set, get) => ({
       .map(([uidStr, count]) => ({ uid: Number(uidStr), count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, limit);
-  },
-
-  getPluginUsageCount: (uid) => {
-    const plugin = get().plugins[uid];
-    return plugin?.loadCount || 0;
-  },
-
-  getMostRecentPlugins: () => {
-    return Object.values(get().plugins)
-      .sort((a, b) => b.lastUsedAt - a.lastUsedAt);
   },
 }));

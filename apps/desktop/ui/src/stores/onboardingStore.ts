@@ -10,7 +10,6 @@ import { ONBOARDING_STORAGE_KEY } from './onboardingTypes'
 
 const initialState: OnboardingState = {
   isOnboardingComplete: false,
-  isInitializing: true,
   currentStep: 'auth' as OnboardingStep,
   authMode: 'login',
   authLoading: false,
@@ -29,42 +28,24 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
   ...initialState,
 
   initialize: async () => {
-    console.log('[onboardingStore] initialize() called')
     const hasEverCompleted = localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true'
-    console.log('[onboardingStore] hasEverCompleted:', hasEverCompleted)
 
     if (hasEverCompleted) {
-      // Check if session is still valid - with 5 second timeout
-      console.log('[onboardingStore] Checking session...')
+      // Check if session is still valid
       try {
         const { initializeAuth } = await import('../api/convex-client')
-        console.log('[onboardingStore] Calling initializeAuth()...')
-        const authPromise = initializeAuth()
-        const timeoutPromise = new Promise<false>((resolve) => {
-          console.log('[onboardingStore] Timeout timer started (5s)')
-          setTimeout(() => {
-            console.log('[onboardingStore] Timeout fired!')
-            resolve(false)
-          }, 5000)
-        })
-        console.log('[onboardingStore] Racing auth vs timeout...')
-        const hasSession = await Promise.race([authPromise, timeoutPromise])
-        console.log('[onboardingStore] Race result - hasSession:', hasSession)
+        const hasSession = await initializeAuth()
         if (hasSession) {
-          console.log('[onboardingStore] Session valid, completing onboarding')
-          set({ isOnboardingComplete: true, hasEverCompleted: true, isInitializing: false })
+          set({ isOnboardingComplete: true, hasEverCompleted: true })
           return
         }
-      } catch (err) {
-        console.error('[onboardingStore] Session check error:', err)
+      } catch {
         // Session check failed, show auth
       }
       // Has completed before but session expired — show auth, then skip to scan
-      console.log('[onboardingStore] Session expired, showing auth')
-      set({ hasEverCompleted: true, currentStep: 'auth', isInitializing: false })
+      set({ hasEverCompleted: true, currentStep: 'auth' })
     } else {
-      console.log('[onboardingStore] First time user, showing auth')
-      set({ hasEverCompleted: false, currentStep: 'auth', isInitializing: false })
+      set({ hasEverCompleted: false, currentStep: 'auth' })
     }
   },
 

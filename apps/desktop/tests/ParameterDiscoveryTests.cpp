@@ -199,6 +199,19 @@ TEST_CASE("ParameterDiscovery — NormalisableRange extraction", "[ParameterDisc
     }
 }
 
+TEST_CASE("ParameterDiscovery cache invalidates when parameter topology changes", "[ParameterDiscovery]")
+{
+    MockProcessor proc;
+    const auto first = ParameterDiscovery::discoverParameterMap(&proc, "CachePlugin", "TestMfr");
+    REQUIRE(first.totalCount == 5);
+
+    proc.addParameter(new juce::AudioParameterFloat(juce::ParameterID("Drive", 1), "Drive",
+                                                     juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    const auto second = ParameterDiscovery::discoverParameterMap(&proc, "CachePlugin", "TestMfr");
+    CHECK(second.totalCount == 6);
+    CHECK(second.parameters.size() == 6);
+}
+
 TEST_CASE("ParameterDiscovery — JSON serialization includes NormalisableRange", "[ParameterDiscovery]")
 {
     MockProcessor proc;

@@ -17,7 +17,6 @@ export interface ScanResult {
 
 export interface OnboardingState {
   isOnboardingComplete: boolean
-  isInitializing: boolean
   currentStep: OnboardingStep
   authMode: 'login' | 'register'
   authLoading: boolean

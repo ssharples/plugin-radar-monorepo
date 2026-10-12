@@ -1,24 +1,21 @@
-import { Component, ErrorInfo, ReactNode, useEffect, useCallback, useRef, useState } from 'react';
+import { Component, ErrorInfo, ReactNode, useState, useEffect, useCallback } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { PluginBrowser } from './components/PluginBrowser';
 import { ChainEditor } from './components/ChainEditor';
-import { KeyboardShortcutOverlay } from './components/KeyboardShortcutOverlay';
-// import { AiChatView } from './components/AiAssistant/AiChatView';
+import { WaveformDisplay } from './components/WaveformDisplay';
+import { SpectrumAnalyzer } from './components/SpectrumAnalyzer';
+import { PresetModal } from './components/PresetBrowser';
+import { Footer } from './components/Footer';
+import { HeaderMenu } from './components/HeaderMenu';
+import type { AppView } from './components/HeaderMenu';
+import { ChainBrowser } from './components/ChainBrowser';
+import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { usePresetStore } from './stores/presetStore';
 import { useSyncStore } from './stores/syncStore';
 import { useOfflineStore, startRetryLoop } from './stores/offlineStore';
-import { usePluginStore } from './stores/pluginStore';
-import { useKeyboardStore, ShortcutPriority } from './stores/keyboardStore';
 import { executeQueuedWrite } from './api/convex-client';
-import { GrainientBackground } from './components/GrainientBackground';
-import { InlineEditorSidebar } from './components/InlineEditorSidebar';
-import { InlineToolbar } from './components/InlineToolbar';
-import { InlineSearchOverlay } from './components/InlineSearchOverlay';
-import { PanelContainer } from './components/Panels';
-import { useChainStore, useChainActions } from './stores/chainStore';
-import { collectPlugins } from './utils/chainHelpers';
-import { UndoToast } from './components/UndoToast'
-import { NewPluginsToast } from './components/NewPluginsToast';
+import { juceBridge } from './api/juce-bridge';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -32,16 +29,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     return { hasError: true, error };
   }
 
-  componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {
-    // Error already captured in state via getDerivedStateFromError
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('React Error:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-4 bg-red-900 text-white">
-          <h2 className="text-lg font-bold">Something went wrong</h2>
-          <pre className="mt-2 text-sm overflow-auto">
+        <div className="p-4 m-3 rounded-lg border border-red-500/40 bg-red-500/10 text-plugin-text">
+          <h2 className="text-base font-semibold text-red-300">Something went wrong</h2>
+          <pre className="mt-2 text-xs overflow-auto text-plugin-muted">
             {this.state.error?.message}
             {'\n'}
             {this.state.error?.stack}
@@ -53,270 +50,324 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
-function InlineEditorLayout() {
-  const aiChatActive = useChainStore(s => s.aiChatActive);
-  const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
-  const { closeAiChat, openAiChat } = useChainActions();
+type AnalyzerView = 'waveform' | 'spectrum';
 
-  // AI-chat-only mode: no plugin is open, just AI chat
-  const aiChatOnly = aiChatActive && inlineEditorNodeId === null;
+/** Small per-viewer UI memory. Storage can be missing inside a plugin WebView. */
+function readPref<T extends string>(key: string, fallback: T): T {
+  try {
+    return (localStorage.getItem(`prochain.${key}`) as T) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(`prochain.${key}`, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+const HEADER_HEIGHT = 44;
+const FOOTER_HEIGHT = 56;
+
+function App() {
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [view, setView] = useState<AppView>('chain');
+  const [libraryVisited, setLibraryVisited] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState<{ q?: string; n: number }>({ n: 0 });
+
+  const [analyzerView, setAnalyzerView] = useState<AnalyzerView>(() => readPref('analyzer', 'waveform'));
+  const [analyzerOpen, setAnalyzerOpen] = useState(() => readPref('analyzerOpen', '1') === '1');
+  const [browserOpen, setBrowserOpen] = useState(() => readPref('browserOpen', '1') === '1');
+
+  // Waveform sub-controls
+  const [showInput, setShowInput] = useState(true);
+  const [showOutput, setShowOutput] = useState(true);
+
+  // Spectrum sub-controls
+  const [specMode, setSpecMode] = useState<'bars' | 'line' | 'octave'>('bars');
+  const [octaveMode, setOctaveMode] = useState<'third' | 'full'>('third');
+
+  const { isOnboardingComplete, initialize: initOnboarding } = useOnboardingStore();
+  const { currentPreset, fetchPresets } = usePresetStore();
+  const { initialize: initSync } = useSyncStore();
+  const { initialize: initOffline } = useOfflineStore();
+
+  useEffect(() => {
+    initOnboarding().catch(console.error);
+  }, [initOnboarding]);
+
+  // All hooks must be called unconditionally (React Rules of Hooks)
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    fetchPresets();
+  }, [fetchPresets, isOnboardingComplete]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    initSync().catch(console.error);
+  }, [initSync, isOnboardingComplete]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    initOffline();
+    startRetryLoop(executeQueuedWrite);
+  }, [initOffline, isOnboardingComplete]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    juceBridge.startWaveformStream();
+    return () => {
+      juceBridge.stopWaveformStream();
+    };
+  }, [isOnboardingComplete]);
+
+  // Only ask C++ for analysis data the visible analyzer needs
+  const analyzerVisible = analyzerOpen && view === 'chain';
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    juceBridge.setAnalysisSubscriptions(
+      analyzerVisible && analyzerView === 'waveform',
+      analyzerVisible && analyzerView === 'spectrum'
+    );
+    return () => { juceBridge.setAnalysisSubscriptions(false, false); };
+  }, [analyzerView, analyzerVisible, isOnboardingComplete]);
+
+  useEffect(() => writePref('analyzer', analyzerView), [analyzerView]);
+  useEffect(() => writePref('analyzerOpen', analyzerOpen ? '1' : '0'), [analyzerOpen]);
+  useEffect(() => writePref('browserOpen', browserOpen ? '1' : '0'), [browserOpen]);
+
+  const changeView = useCallback((next: AppView) => {
+    setView(next);
+    if (next === 'library') setLibraryVisited(true);
+  }, []);
+
+  // Cmd+B toggles the plugin list, Cmd+L the library
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === 'b') {
+        e.preventDefault();
+        setView('chain');
+        setBrowserOpen((prev) => !prev);
+      } else if (e.key === 'l') {
+        e.preventDefault();
+        setView((v) => {
+          const next = v === 'library' ? 'chain' : 'library';
+          if (next === 'library') setLibraryVisited(true);
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOnboardingComplete]);
+
+  // "Add plugin" buttons open the docked plugin list (PluginBrowser focuses its search)
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    const handler = () => {
+      setView('chain');
+      setBrowserOpen(true);
+    };
+    window.addEventListener('openPluginBrowser', handler);
+    return () => window.removeEventListener('openPluginBrowser', handler);
+  }, [isOnboardingComplete]);
+
+  // "Browse the library" buttons, optionally with a search
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+    const handler = (e: Event) => {
+      const search = (e as CustomEvent<{ search?: string }>).detail?.search;
+      setLibrarySearch((prev) => ({ q: search ?? '', n: prev.n + 1 }));
+      changeView('library');
+    };
+    window.addEventListener('openChainLibrary', handler);
+    return () => window.removeEventListener('openChainLibrary', handler);
+  }, [isOnboardingComplete, changeView]);
+
+  const toggleBrowser = useCallback(() => {
+    setBrowserOpen((prev) => !prev);
+  }, []);
+
+  if (!isOnboardingComplete) {
+    return (
+      <ErrorBoundary>
+        <OnboardingFlow />
+      </ErrorBoundary>
+    );
+  }
 
   return (
-    <div
-      className="flex flex-col w-full h-full select-none overflow-hidden"
-      style={{ background: '#0a0a0a' }}
-    >
-      {/* Top area: sidebar (left) + plugin overlay or AI chat (right) */}
-      <div className="flex flex-1 min-h-0">
-        <InlineEditorSidebar
-          galaxyActive={aiChatActive}
-          onToggleGalaxy={() => aiChatActive ? closeAiChat() : openAiChat()}
-        />
-        <PanelContainer>
-          {aiChatActive ? (
-            <div className="flex-1 min-h-0 overflow-hidden h-full text-white flex items-center justify-center">
-              <div>AI Chat Not Installed</div>
+    <ErrorBoundary>
+      <div className="relative flex flex-col w-full h-full select-none overflow-hidden bg-plugin-bg text-plugin-text">
+        {/* Top bar */}
+        <div className="relative z-30 flex-shrink-0 border-b border-plugin-border" style={{ height: HEADER_HEIGHT }}>
+          <HeaderMenu view={view} onViewChange={changeView} />
+        </div>
+
+        {/* Workspace */}
+        <div className="flex flex-1 min-h-0">
+          {/* Chain view */}
+          <div className={view === 'chain' ? 'flex flex-1 min-w-0 min-h-0' : 'hidden'}>
+            <aside
+              className={`flex-shrink-0 border-r border-plugin-border bg-plugin-surface transition-[width] duration-150 ${
+                browserOpen ? 'w-[236px] lg:w-[272px]' : 'w-11'
+              }`}
+              aria-label="Plugins"
+            >
+              <ErrorBoundary>
+                <PluginBrowser collapsed={!browserOpen} onToggle={toggleBrowser} />
+              </ErrorBoundary>
+            </aside>
+
+            <div className="flex flex-col flex-1 min-w-0 min-h-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ErrorBoundary>
+                  <ChainEditor />
+                </ErrorBoundary>
+              </div>
+
+              {/* Analyzer strip */}
+              <section className="flex-shrink-0 border-t border-plugin-border bg-plugin-surface" aria-label="Analyzer">
+                <div className="flex items-center gap-2 h-8 px-2">
+                  <button
+                    onClick={() => setAnalyzerOpen((v) => !v)}
+                    className="w-6 h-6 inline-flex items-center justify-center rounded text-plugin-dim hover:text-plugin-text hover:bg-plugin-raised"
+                    aria-expanded={analyzerOpen}
+                    aria-label={analyzerOpen ? 'Hide analyzer' : 'Show analyzer'}
+                    title={analyzerOpen ? 'Hide analyzer' : 'Show analyzer'}
+                  >
+                    {analyzerOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                  </button>
+                  <Segmented
+                    label="Analyzer view"
+                    value={analyzerView}
+                    onChange={(v) => {
+                      setAnalyzerView(v as AnalyzerView);
+                      setAnalyzerOpen(true);
+                    }}
+                    options={[
+                      { value: 'waveform', label: 'Waveform' },
+                      { value: 'spectrum', label: 'Spectrum' },
+                    ]}
+                  />
+                  <div className="flex-1" />
+                  {analyzerOpen && (analyzerView === 'waveform' ? (
+                    <div className="flex items-center gap-1">
+                      <Toggle on={showInput} onClick={() => setShowInput((v) => !v)} label="Input" dot="bg-plugin-muted" />
+                      <Toggle on={showOutput} onClick={() => setShowOutput((v) => !v)} label="Output" dot="bg-plugin-accent" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Segmented
+                        label="Spectrum style"
+                        value={specMode}
+                        onChange={(v) => setSpecMode(v as typeof specMode)}
+                        options={[
+                          { value: 'bars', label: 'Bars' },
+                          { value: 'line', label: 'Line' },
+                          { value: 'octave', label: 'Octave' },
+                        ]}
+                      />
+                      {specMode === 'octave' && (
+                        <button
+                          onClick={() => setOctaveMode((v) => (v === 'third' ? 'full' : 'third'))}
+                          className="num h-6 px-2 rounded-md border border-plugin-border text-[11px] text-plugin-muted hover:text-plugin-text"
+                          title="Octave band width"
+                        >
+                          {octaveMode === 'third' ? '1/3' : '1/1'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {analyzerOpen && (
+                  <div className="relative mx-2 mb-2 h-[84px] lg:h-[104px] [@media(max-height:680px)]:h-[60px] rounded-md overflow-hidden bg-plugin-bg border border-plugin-border">
+                    {analyzerView === 'waveform' ? (
+                      <WaveformDisplay showInput={showInput} showOutput={showOutput} />
+                    ) : (
+                      <SpectrumAnalyzer mode={specMode} octaveMode={octaveMode} />
+                    )}
+                  </div>
+                )}
+              </section>
             </div>
-          ) : (
-            /* Plugin editor is rendered natively by C++ in this space — leave transparent */
-            <div className="flex-1 h-full" />
+          </div>
+
+          {/* Library view (kept mounted after first visit so filters survive) */}
+          {libraryVisited && (
+            <div className={view === 'library' ? 'flex flex-1 min-w-0 min-h-0' : 'hidden'}>
+              <ErrorBoundary>
+                <ChainBrowser
+                  initialSearch={librarySearch.q}
+                  searchNonce={librarySearch.n}
+                  onLoaded={() => setView('chain')}
+                />
+              </ErrorBoundary>
+            </div>
           )}
-        </PanelContainer>
+        </div>
+
+        {/* Footer */}
+        <div className="relative z-20 flex-shrink-0" style={{ height: FOOTER_HEIGHT }}>
+          <Footer
+            currentPresetName={currentPreset?.name}
+            onPresetClick={() => setShowPresetModal(true)}
+          />
+        </div>
+
+        {showPresetModal && (
+          <PresetModal onClose={() => setShowPresetModal(false)} />
+        )}
       </div>
-      {/* Bottom toolbar — full width (hide when AI-chat-only, no plugin open) */}
-      {!aiChatOnly && (
-        <InlineToolbar
-          aiChatActive={aiChatActive}
-          onToggleAiChat={() => aiChatActive ? closeAiChat() : openAiChat()}
-        />
-      )}
-      <InlineSearchOverlay />
+    </ErrorBoundary>
+  );
+}
+
+function Segmented({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center rounded-md bg-plugin-bg border border-plugin-border p-0.5" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          aria-pressed={value === o.value}
+          className={`h-5 px-2 rounded text-[11px] font-semibold transition-colors ${
+            value === o.value ? 'bg-plugin-raised text-plugin-text' : 'text-plugin-dim hover:text-plugin-text'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-function App() {
-  console.log('[App] Rendering...')
-  const [browserOpen, setBrowserOpen] = useState(false);
-
-  const { isInitializing, initialize: initOnboarding } = useOnboardingStore();
-  const { fetchPresets } = usePresetStore();
-  const { initialize: initSync, isLoggedIn, autoSync } = useSyncStore();
-  const { initialize: initOffline } = useOfflineStore();
-  const { fetchPlugins, plugins, checkForNewPlugins } = usePluginStore();
-  const inlineEditorNodeId = useChainStore(s => s.inlineEditorNodeId);
-  const aiChatActive = useChainStore(s => s.aiChatActive);
-  const nodeCount = useChainStore(s => s.nodes.length);
-  const autoSyncFired = useRef(false);
-
-  console.log('[App] isInitializing:', isInitializing)
-  console.log('[App] isLoggedIn:', isLoggedIn)
-  console.log('[App] plugins.length:', plugins.length)
-  console.log('[App] inlineEditorNodeId:', inlineEditorNodeId)
-  console.log('[App] aiChatActive:', aiChatActive)
-  console.log('[App] nodeCount:', nodeCount)
-
-  // Initialize onboarding check
-  useEffect(() => {
-    console.log('[App] Starting onboarding initialization...')
-    initOnboarding().then(() => {
-      console.log('[App] Onboarding initialization complete')
-    }).catch((err) => {
-      console.error('[App] Onboarding initialization error:', err)
-    })
-  }, [initOnboarding]);
-
-  useEffect(() => {
-    fetchPresets();
-    fetchPlugins();
-  }, [fetchPresets, fetchPlugins]);
-
-  useEffect(() => {
-    initSync().catch(() => { });
-  }, [initSync]);
-
-  // Auto-check for new plugins once per session (after plugin list is loaded)
-  const newPluginsCheckFired = useRef(false)
-  useEffect(() => {
-    if (plugins.length === 0) return
-    if (newPluginsCheckFired.current) return
-    newPluginsCheckFired.current = true
-    checkForNewPlugins().catch(() => { })
-  }, [plugins.length, checkForNewPlugins])
-
-  // Auto-sync plugins to Convex once per session
-  useEffect(() => {
-    if (!isLoggedIn || plugins.length === 0) return;
-    if (autoSyncFired.current) return;
-    autoSyncFired.current = true;
-    autoSync().catch(() => { });
-  }, [isLoggedIn, plugins.length, autoSync]);
-
-  useEffect(() => {
-    initOffline();
-    startRetryLoop(executeQueuedWrite);
-  }, [initOffline]);
-
-  // Cmd+B to toggle browser
-  useEffect(() => {
-    const registerShortcut = useKeyboardStore.getState().registerShortcut;
-    return registerShortcut({
-      id: 'toggle-plugin-browser',
-      key: 'b',
-      priority: ShortcutPriority.GLOBAL,
-      allowInInputs: false,
-      handler: (e) => {
-        if (!e.metaKey && !e.ctrlKey) return;
-        e.preventDefault();
-        setBrowserOpen(prev => !prev);
-      }
-    });
-  }, []);
-
-  // Cmd+1..9 to jump to Nth plugin (works from both chain view and inline editor)
-  useEffect(() => {
-    const registerShortcut = useKeyboardStore.getState().registerShortcut;
-    const cleanups: (() => void)[] = [];
-
-    for (let n = 1; n <= 9; n++) {
-      cleanups.push(registerShortcut({
-        id: `app-plugin-jump-${n}`,
-        key: String(n),
-        priority: ShortcutPriority.GLOBAL,
-        allowInInputs: false,
-        handler: (e) => {
-          if (!e.metaKey && !e.ctrlKey) return;
-          if (e.altKey) return; // Let Cmd+Option+N pass through for snapshots
-          e.preventDefault();
-          const nodes = useChainStore.getState().nodes;
-          const allPlugins = collectPlugins(nodes);
-          const target = allPlugins[n - 1];
-          if (target) {
-            useChainStore.getState().openInlineEditor(target.id);
-          }
-        },
-      }));
-    }
-
-    // Cmd+0 → back to chain view
-    cleanups.push(registerShortcut({
-      id: 'app-back-to-chain',
-      key: '0',
-      priority: ShortcutPriority.GLOBAL,
-      allowInInputs: false,
-      handler: (e) => {
-        if (!e.metaKey && !e.ctrlKey) return;
-        e.preventDefault();
-        const state = useChainStore.getState();
-        if (state.aiChatActive) state.closeAiChat();
-        if (state.inlineEditorNodeId !== null) state.closeInlineEditor();
-      },
-    }));
-
-    return () => cleanups.forEach(fn => fn());
-  }, []);
-
-  // Listen for openPluginBrowser events from child components
-  useEffect(() => {
-    const handler = () => setBrowserOpen(true);
-    window.addEventListener('openPluginBrowser', handler);
-    return () => window.removeEventListener('openPluginBrowser', handler);
-  }, []);
-
-
-
-  // Listen for openBrowser event from HeaderMenu
-  useEffect(() => {
-    const handler = () => {
-      setBrowserOpen(true);
-    };
-    window.addEventListener('openBrowser', handler);
-    return () => window.removeEventListener('openBrowser', handler);
-  }, []);
-
-  const toggleBrowser = useCallback(() => {
-    setBrowserOpen(prev => {
-      const next = !prev;
-      // Notify ChainEditor's mini browser to collapse/expand
-      window.dispatchEvent(new Event(next ? 'openPluginBrowser' : 'closePluginBrowser'));
-      return next;
-    });
-  }, []);
-
-  // Wait for initialization to complete before rendering anything
-  if (isInitializing) {
-    return <div style={{ width: '100%', height: '100%', backgroundColor: '#000000' }} />;
-  }
-
-  const isInlineMode = inlineEditorNodeId !== null || aiChatActive;
-
-  const viewTransition = 'opacity 180ms ease, transform 180ms ease';
-
+function Toggle({ on, onClick, label, dot }: { on: boolean; onClick: () => void; label: string; dot: string }) {
   return (
-    <ErrorBoundary>
-      <div className="relative w-full h-full" style={{ background: '#0a0a0a' }}>
-        {/* Inline editor view */}
-        <div
-          className="absolute inset-0"
-          style={{
-            opacity: isInlineMode ? 1 : 0,
-            transform: isInlineMode ? 'translateY(0)' : 'translateY(4px)',
-            transition: viewTransition,
-            pointerEvents: isInlineMode ? 'auto' : 'none',
-            zIndex: isInlineMode ? 1 : 0,
-          }}
-        >
-          <InlineEditorLayout />
-        </div>
-
-        {/* Chain editor view */}
-        <div
-          className="absolute inset-0"
-          style={{
-            opacity: isInlineMode ? 0 : 1,
-            transform: isInlineMode ? 'translateY(4px)' : 'translateY(0)',
-            transition: viewTransition,
-            pointerEvents: isInlineMode ? 'none' : 'auto',
-            zIndex: isInlineMode ? 0 : 1,
-          }}
-        >
-          <div
-            className="relative flex flex-col w-full h-full select-none overflow-hidden"
-          >
-            {/* Animated gradient background */}
-            {!isInlineMode && (
-              <GrainientBackground
-                color1="#383838"
-                color2="#000000"
-                color3="#787878"
-              />
-            )}
-
-            {/* Chain area — fills remaining space */}
-            <div className="flex-1 min-h-0 overflow-hidden relative z-[1]">
-              <ErrorBoundary>
-                <ChainEditor />
-              </ErrorBoundary>
-            </div>
-
-            {/* Plugin browser overlay - full screen */}
-            {browserOpen && (
-              <ErrorBoundary>
-                <PluginBrowser onClose={toggleBrowser} />
-              </ErrorBoundary>
-            )}
-
-            {/* Keyboard shortcut overlay */}
-            <KeyboardShortcutOverlay />
-          </div>
-        </div>
-
-        {/* Undo toast — visible in both modes */}
-        <UndoToast />
-        {/* New plugins detected toast — global, bottom-right */}
-        <NewPluginsToast />
-      </div>
-    </ErrorBoundary>
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`h-6 inline-flex items-center gap-1.5 px-2 rounded-md border text-[11px] font-semibold transition-colors ${
+        on ? 'border-plugin-border-bright text-plugin-text' : 'border-plugin-border text-plugin-dim'
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${on ? dot : 'bg-plugin-border-bright'}`} />
+      {label}
+    </button>
   );
 }
 

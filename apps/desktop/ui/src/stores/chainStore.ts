@@ -1,51 +1,25 @@
 import { create } from 'zustand';
-import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings, FormatSubstitution, AutomationSlotWarning, LatencyWarning } from '../api/types';
-import { useMeterStore } from './meterStore';
+import type { ChainSlot, ChainNodeUI, ChainStateV2, NodeMeterReadings, AutomationBinding } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
 import { usePluginStore } from './pluginStore';
-import { getParameterMapByName, contributeParameterDiscovery } from '../api/convex-client';
-import { getCategoryColor } from '../constants/categoryColors';
-
-// ============================================
-// Throttled bridge call helper for continuous controls (knobs/sliders)
-// Coalesces rapid updates to ~60fps, only sends latest value.
-// ============================================
-type PendingCall = { fn: (...args: unknown[]) => Promise<unknown>; args: unknown[]; key: string };
-const _pendingCalls = new Map<string, PendingCall>();
-let _rafScheduled = false;
-
-function _flushPendingCalls() {
-  _rafScheduled = false;
-  const calls = Array.from(_pendingCalls.values());
-  _pendingCalls.clear();
-  for (const { fn, args } of calls) {
-    fn(...args);
-  }
-}
-
-/**
- * Throttle a bridge call to at most once per animation frame (~16ms / 60fps).
- * Only the latest args for each key are kept — intermediate values are dropped.
- */
-function throttledBridgeCall(key: string, fn: (...args: unknown[]) => Promise<unknown>, ...args: unknown[]) {
-  _pendingCalls.set(key, { fn, args, key });
-  if (!_rafScheduled) {
-    _rafScheduled = true;
-    requestAnimationFrame(_flushPendingCalls);
-  }
-}
+import { uploadDiscoveredParameterMap, getParameterMapByName } from '../api/convex-client';
 
 // ============================================
 // Undo/Redo snapshot type
 // ============================================
 interface ChainSnapshot {
-  binaryData: string;       // Base64 from captureSnapshot() — full state including plugin presets
-  nodes: ChainNodeUI[];     // Cached UI state for instant display
-  slots: ChainSlot[];       // Cached flat state
+  nodes: ChainNodeUI[];
+  slots: ChainSlot[];
 }
 
 const MAX_HISTORY = 50;
+
+/** A/B/C snapshot — full chain export including preset data */
+interface ABSnapshot {
+  data: unknown;
+  savedAt: number;
+}
 
 interface ChainStoreState {
   // Tree-based state (V2)
@@ -59,11 +33,8 @@ interface ChainStoreState {
   loading: boolean;
   error: string | null;
 
-  // LUFS target — the recommended input level for the currently loaded chain (legacy)
+  // LUFS target — the recommended input level for the currently loaded chain
   targetInputLufs: number | null;
-  // Peak dB target range — recommended input peak level for the currently loaded chain
-  targetInputPeakMin: number | null;
-  targetInputPeakMax: number | null;
   // Current chain name (for header display / rename)
   chainName: string;
 
@@ -72,52 +43,17 @@ interface ChainStoreState {
   future: ChainSnapshot[];
   /** Whether the last state change was from undo/redo (skip pushing to history) */
   _undoRedoInProgress: boolean;
-  /** Snapshot captured at the start of a continuous drag gesture (slider/knob) */
-  _continuousDragSnapshot: ChainSnapshot | null;
-  /** Timestamp of last _beginContinuousGesture call (for safety timer) */
-  _continuousGestureLastActivity: number;
+
+  // A/B/C Snapshots
+  snapshots: (ABSnapshot | null)[];
+  activeSnapshot: number | null;
 
   // Last cloud chain ID (for share-without-re-saving)
   lastCloudChainId: string | null;
 
-  // Plugin settings clipboard (copy/paste between slots)
-  pluginClipboard: { name: string; fileOrIdentifier: string; nodeId: number } | null;
-
-  // Toast notifications
-  toastMessage: string | null;
-
-  // Format substitutions from last chain import (AU→VST3 etc.)
-  formatSubstitutions: FormatSubstitution[];
-
-  // Inline plugin search state (nodeId + parentId + insertIndex)
-  inlineSearchState: { nodeId: number; parentId: number; insertIndex: number } | null;
-
-  // Per-plugin expandable controls panel
-  expandedNodeIds: Set<number>;
-
-  // Inline editor mode (plugin editor embedded in host window, null = webview mode)
-  inlineEditorNodeId: number | null;
-  searchOverlayActive: boolean;
-  searchOverlayMode: 'add' | 'replace';
-
-  // AI chat mode (replaces Galaxy visualizer)
-  aiChatActive: boolean;
-
-  // Automation slot warning (Team 3)
-  automationWarning: AutomationSlotWarning | null;
-
-  // Latency info from C++ (Team 4)
-  totalLatencySamples: number;
-  sampleRate: number;
-  latencyWarning: LatencyWarning | null;
-
-  // Track where the current chain was loaded from (for context-aware preset navigation)
-  chainSource: 'browse' | 'myChains' | 'preset' | null;
-  chainSourceList: string[]; // List of chain IDs from the source
-  chainSourceIndex: number;  // Current index in the source list
-
-  // Dirty state (chain modified since last save/load)
-  isDirty: boolean;
+  // Per-node meter data (keyed by ChainNodeId as string)
+  nodeMeterData: Record<string, NodeMeterReadings>;
+  automationByNode: Record<string, AutomationBinding[]>;
 }
 
 interface ChainActions {
@@ -134,6 +70,12 @@ interface ChainActions {
   removeNode: (nodeId: number) => Promise<boolean>;
   moveNode: (nodeId: number, newParentId: number, newIndex: number) => Promise<boolean>;
   toggleNodeBypass: (nodeId: number) => Promise<void>;
+  setNodeSuspended: (nodeId: number, suspended: boolean) => Promise<void>;
+  setNodeRecallSafe: (nodeId: number, recallSafe: boolean) => Promise<void>;
+  setNodeIgnoreLatency: (nodeId: number, ignoreLatency: boolean) => Promise<void>;
+  fetchAutomationBindings: (nodeId: number) => Promise<void>;
+  assignAutomation: (nodeId: number, parameterIndex: number) => Promise<boolean>;
+  unassignAutomation: (nodeId: number, proxyId: string) => Promise<boolean>;
   duplicateNode: (nodeId: number) => Promise<boolean>;
 
   // Group operations
@@ -141,23 +83,12 @@ interface ChainActions {
   dissolveGroup: (groupId: number) => Promise<boolean>;
   /** Dissolve group without pushing to undo history (for auto-dissolve after moveNode) */
   dissolveGroupSilent: (groupId: number) => Promise<boolean>;
-  setGroupMode: (groupId: number, mode: 'serial' | 'parallel' | 'midside' | 'fxselector') => Promise<void>;
-  setActiveBranch: (groupId: number, branchIndex: number) => Promise<void>;
+  setGroupMode: (groupId: number, mode: 'serial' | 'parallel') => Promise<void>;
   setGroupDryWet: (groupId: number, mix: number) => Promise<void>;
-  setGroupWetGain: (groupId: number, gainDb: number) => Promise<void>;
-  setNodeDucking: (nodeId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => Promise<void>;
   setBranchGain: (nodeId: number, gainDb: number) => Promise<void>;
-  setBranchMute: (nodeId: number, mute: boolean) => Promise<void>;
   setBranchSolo: (nodeId: number, solo: boolean) => Promise<void>;
-  addDryPath: (parentId: number, insertIndex?: number) => Promise<void>;
-
-  // Per-plugin controls
-  setNodeInputGain: (nodeId: number, gainDb: number) => Promise<void>;
-  setNodeOutputGain: (nodeId: number, gainDb: number) => Promise<void>;
-  setNodeDryWet: (nodeId: number, mix: number) => Promise<void>;
-  setNodeMidSideMode: (nodeId: number, mode: number) => Promise<void>;
-  setNodeAutoGain: (nodeId: number, enabled: boolean) => Promise<void>;
-  toggleNodeExpanded: (nodeId: number) => void;
+  setBranchMute: (nodeId: number, mute: boolean) => Promise<void>;
+  setBranchPolarity: (nodeId: number, inverted: boolean) => Promise<void>;
 
   // Editor management
   openPluginEditor: (nodeId: number) => Promise<void>;
@@ -169,10 +100,8 @@ interface ChainActions {
   // Backward compat alias
   selectSlot: (slotIndex: number | null) => void;
 
-  // LUFS target (legacy)
+  // LUFS target
   setTargetInputLufs: (lufs: number | null) => void;
-  // Peak range target
-  setTargetInputPeakRange: (min: number | null, max: number | null) => void;
   setChainName: (name: string) => void;
 
   // Cloud chain ID tracking
@@ -183,48 +112,12 @@ interface ChainActions {
   redo: () => Promise<void>;
   canUndo: () => boolean;
   canRedo: () => boolean;
-  /** Push current state (binary snapshot) to history before a mutation */
-  _pushHistory: () => Promise<void>;
-  /** Capture snapshot at drag start for continuous controls */
-  _beginContinuousGesture: () => Promise<void>;
-  /** Push drag-start snapshot to history on drag end */
-  _endContinuousGesture: () => void;
+  /** Push current state to history before a mutation */
+  _pushHistory: () => void;
 
-  // Plugin settings copy (direct copy between slots)
-  pastePluginSettings: (sourceNodeId: number, targetNodeId: number) => Promise<boolean>;
-
-  // Format substitutions
-  setFormatSubstitutions: (subs: FormatSubstitution[]) => void;
-  clearFormatSubstitutions: () => void;
-
-  // Toast
-  showToast: (message: string, durationMs?: number) => void;
-
-  // Inline plugin search
-  showInlineSearchBelow: (nodeId: number, parentId: number, insertIndex: number) => void;
-  hideInlineSearch: () => void;
-
-  // Inline editor mode (plugin editor embedded in host window)
-  openInlineEditor: (nodeId: number) => Promise<void>;
-  closeInlineEditor: () => Promise<void>;
-  showSearchOverlay: (mode?: 'add' | 'replace') => Promise<void>;
-  hideSearchOverlay: () => Promise<void>;
-
-  // AI chat
-  openAiChat: () => void;
-  closeAiChat: () => void;
-
-  // Chain source tracking & clear
-  clearChain: () => void;
-  setChainSource: (source: 'browse' | 'myChains' | 'preset' | null, list?: string[], index?: number) => void;
-
-  // Dirty state
-  setIsDirty: (dirty: boolean) => void;
-
-  // Slot colors (right-click palette)
-  slotColors: Record<number, string>;
-  setSlotColor: (nodeId: number, color: string) => void;
-  clearSlotColor: (nodeId: number) => void;
+  // A/B/C Snapshots
+  saveSnapshot: (index: number) => Promise<void>;
+  recallSnapshot: (index: number) => Promise<void>;
 }
 
 function applyState(state: ChainStateV2) {
@@ -232,8 +125,6 @@ function applyState(state: ChainStateV2) {
     nodes: state.nodes || [],
     slots: state.slots || [],
     lastCloudChainId: null,
-    totalLatencySamples: state.totalLatencySamples ?? 0,
-    sampleRate: state.sampleRate ?? 44100,
   };
 }
 
@@ -243,30 +134,6 @@ function findNodeById(nodes: ChainNodeUI[], id: number): ChainNodeUI | null {
     if (node.id === id) return node;
     if (node.type === 'group') {
       const found = findNodeById(node.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-/** Collect all plugin node IDs from a tree (for diffing new vs old). */
-function collectPluginNodeIds(nodes: ChainNodeUI[]): Set<number> {
-  const ids = new Set<number>();
-  for (const node of nodes) {
-    if (node.type === 'plugin') ids.add(node.id);
-    if (node.type === 'group') {
-      for (const id of collectPluginNodeIds(node.children)) ids.add(id);
-    }
-  }
-  return ids;
-}
-
-// Helper: find a node by ID anywhere in the tree
-function findNodeInTree(nodes: ChainNodeUI[], nodeId: number): ChainNodeUI | null {
-  for (const node of nodes) {
-    if (node.id === nodeId) return node;
-    if (node.type === 'group') {
-      const found = findNodeInTree(node.children, nodeId);
       if (found) return found;
     }
   }
@@ -299,18 +166,21 @@ async function autoDiscoverAndUpload(
   try {
     // Skip if no matched plugin ID — we need it for Convex storage
     if (!matchedPluginId) {
+      console.log('[AutoDiscovery] Skipping — plugin not matched to catalog:', pluginName);
       return;
     }
 
-    // Only skip discovery if a manual map exists (let crowdpool re-contribute for auto maps)
+    // Check if map already exists (don't waste time discovering if we have a good one)
     const existingMap = await getParameterMapByName(pluginName);
-    if (existingMap && existingMap.source === 'manual') {
+    if (existingMap && (existingMap.source === 'manual' || existingMap.confidence >= 80)) {
+      console.log('[AutoDiscovery] Skipping — high-quality map already exists for:', pluginName);
       return;
     }
 
     // Run JUCE discovery
     const discoveryResult = await juceBridge.discoverPluginParameters(nodeId);
     if (!discoveryResult.success || !discoveryResult.map) {
+      console.warn('[AutoDiscovery] Discovery failed for:', pluginName, discoveryResult.error);
       return;
     }
 
@@ -318,63 +188,15 @@ async function autoDiscoverAndUpload(
 
     // Skip if confidence too low
     if (map.confidence < 30) {
+      console.log('[AutoDiscovery] Skipping upload — confidence too low:', map.confidence, 'for', pluginName);
       return;
     }
 
-    // Compute matched count for crowdpool logic
-    const matchedCount = map.parameters.filter(
-      (p: { semantic: string }) => p.semantic !== 'unknown'
-    ).length;
-
-    // Upload via crowdpool mutation
-    await contributeParameterDiscovery(matchedPluginId, {
-      ...map,
-      matchedCount,
-      totalCount: map.parameters.length,
-      source: 'juce-scanned',
-    });
-  } catch (_err) {
-    // Silently ignored — auto-discovery is best-effort
-  }
-}
-
-/**
- * Auto-discover and upload parameter maps for all plugins in a chain.
- * Staggers calls with a 200ms delay to avoid overwhelming the host.
- * Fire-and-forget — errors are silently ignored.
- */
-export async function autoDiscoverAllPlugins(
-  nodes: ChainNodeUI[]
-): Promise<void> {
-  // Flatten tree to get all plugin leaf nodes
-  const pluginNodes: Array<{ nodeId: number; pluginName: string; uid: number }> = [];
-
-  function collectPlugins(nodeList: ChainNodeUI[]) {
-    for (const node of nodeList) {
-      if (node.type === 'plugin' && node.name) {
-        pluginNodes.push({
-          nodeId: node.id,
-          pluginName: node.name,
-          uid: node.uid,
-        });
-      }
-      if (node.type === 'group') {
-        collectPlugins(node.children);
-      }
-    }
-  }
-
-  collectPlugins(nodes);
-
-  // Look up matched Convex plugin IDs from enrichment data
-  const enrichedData = usePluginStore.getState().enrichedData;
-
-  for (const pn of pluginNodes) {
-    const enriched = enrichedData.get(pn.uid);
-    const matchedPluginId = enriched?._id;
-    await autoDiscoverAndUpload(pn.nodeId, pn.pluginName, matchedPluginId);
-    // Stagger to avoid overwhelming the host
-    await new Promise((r) => setTimeout(r, 200));
+    // Upload to Convex
+    const result = await uploadDiscoveredParameterMap(map, matchedPluginId);
+    console.log('[AutoDiscovery] Upload result for', pluginName, ':', result);
+  } catch (err) {
+    console.warn('[AutoDiscovery] Error for', pluginName, ':', err);
   }
 }
 
@@ -387,33 +209,15 @@ const initialState: ChainStoreState = {
   loading: false,
   error: null,
   targetInputLufs: null,
-  targetInputPeakMin: null,
-  targetInputPeakMax: null,
   chainName: 'Untitled Chain',
   lastCloudChainId: null,
   history: [],
   future: [],
   _undoRedoInProgress: false,
-  _continuousDragSnapshot: null,
-  _continuousGestureLastActivity: 0,
-  pluginClipboard: null,
-  toastMessage: null,
-  formatSubstitutions: [],
-  inlineSearchState: null,
-  expandedNodeIds: new Set<number>(),
-  inlineEditorNodeId: null,
-  searchOverlayActive: false,
-  searchOverlayMode: 'add' as const,
-  aiChatActive: false,
-  automationWarning: null,
-  totalLatencySamples: 0,
-  sampleRate: 44100,
-  latencyWarning: null,
-  chainSource: null,
-  chainSourceList: [],
-  chainSourceIndex: -1,
-  isDirty: false,
-  slotColors: {},
+  snapshots: [null, null, null],
+  activeSnapshot: null,
+  nodeMeterData: {},
+  automationByNode: {},
 };
 
 export const useChainStore = create<ChainStoreState & ChainActions>((set, get) => ({
@@ -423,111 +227,115 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // Undo/Redo
   // =============================================
 
-  _pushHistory: async () => {
-    if (get()._undoRedoInProgress) return;
-    set({ isDirty: true });
-    try {
-      // Capture full binary snapshot (includes all plugin preset data).
-      // We store only binaryData — nodes/slots are reconstructed from C++ on restore.
-      // This avoids structuredClone overhead on 50 history entries.
-      const binaryData = await juceBridge.captureSnapshot();
-      const { history } = get();
-      const snapshot: ChainSnapshot = {
-        binaryData,
-        nodes: [],
-        slots: [],
-      };
-      const newHistory = [...history, snapshot];
-      if (newHistory.length > MAX_HISTORY) {
-        newHistory.shift();
-      }
-      set({ history: newHistory, future: [] });
-    } catch (_err) {
-      // Silently ignored — snapshot serialization failure is non-critical
+  _pushHistory: () => {
+    const { nodes, slots, history } = get();
+    // Deep clone the current state for the snapshot
+    const snapshot: ChainSnapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      slots: JSON.parse(JSON.stringify(slots)),
+    };
+    const newHistory = [...history, snapshot];
+    // Cap at MAX_HISTORY
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
     }
+    // Clear redo stack on new mutation
+    set({ history: newHistory, future: [] });
   },
 
   canUndo: () => get().history.length > 0,
   canRedo: () => get().future.length > 0,
 
   undo: async () => {
-    const { history } = get();
+    const { history, future, nodes, slots } = get();
     if (history.length === 0) return;
 
-    set({ _undoRedoInProgress: true });
+    // Save current state to future (redo stack)
+    const currentSnapshot: ChainSnapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      slots: JSON.parse(JSON.stringify(slots)),
+    };
 
+    const newHistory = [...history];
+    const previousState = newHistory.pop()!;
+
+    set({
+      _undoRedoInProgress: true,
+      history: newHistory,
+      future: [...future, currentSnapshot],
+      nodes: previousState.nodes,
+      slots: previousState.slots,
+      lastCloudChainId: null,
+    });
+
+    // Sync the restored state to the JUCE backend
     try {
-      // Capture current state as binary for the redo stack
-      const currentBinary = await juceBridge.captureSnapshot();
-      const { history: freshHistory, future: freshFuture } = get();
-      if (freshHistory.length === 0) {
-        set({ _undoRedoInProgress: false });
-        return;
-      }
-
-      const currentSnapshot: ChainSnapshot = {
-        binaryData: currentBinary,
-        nodes: [],
-        slots: [],
-      };
-
-      const newHistory = [...freshHistory];
-      const previousState = newHistory.pop()!;
-
-      set({
-        history: newHistory,
-        future: [...freshFuture, currentSnapshot],
-        lastCloudChainId: null,
-      });
-
-      // Restore full binary snapshot (includes all plugin presets)
-      // Chain state will be applied via the chainChanged event
-      await juceBridge.restoreSnapshot(previousState.binaryData);
-    } catch (_err) {
-      // Silently ignored — undo restore failure leaves UI in last-known state
+      await juceBridge.importChain({ nodes: previousState.nodes, slots: previousState.slots });
+    } catch {
+      // importChain may fail if backend doesn't support state restore — UI state is still correct
     }
 
     set({ _undoRedoInProgress: false });
   },
 
   redo: async () => {
-    const { future } = get();
+    const { history, future, nodes, slots } = get();
     if (future.length === 0) return;
 
-    set({ _undoRedoInProgress: true });
+    // Save current state to history (undo stack)
+    const currentSnapshot: ChainSnapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      slots: JSON.parse(JSON.stringify(slots)),
+    };
 
+    const newFuture = [...future];
+    const nextState = newFuture.pop()!;
+
+    set({
+      _undoRedoInProgress: true,
+      history: [...history, currentSnapshot],
+      future: newFuture,
+      nodes: nextState.nodes,
+      slots: nextState.slots,
+      lastCloudChainId: null,
+    });
+
+    // Sync the restored state to the JUCE backend
     try {
-      // Capture current state as binary for the undo stack
-      const currentBinary = await juceBridge.captureSnapshot();
-      const { history: freshHistory, future: freshFuture } = get();
-      if (freshFuture.length === 0) {
-        set({ _undoRedoInProgress: false });
-        return;
-      }
-
-      const currentSnapshot: ChainSnapshot = {
-        binaryData: currentBinary,
-        nodes: [],
-        slots: [],
-      };
-
-      const newFuture = [...freshFuture];
-      const nextState = newFuture.pop()!;
-
-      set({
-        history: [...freshHistory, currentSnapshot],
-        future: newFuture,
-        lastCloudChainId: null,
-      });
-
-      // Restore full binary snapshot (includes all plugin presets)
-      // Chain state will be applied via the chainChanged event
-      await juceBridge.restoreSnapshot(nextState.binaryData);
-    } catch (_err) {
-      // Silently ignored — redo restore failure leaves UI in last-known state
+      await juceBridge.importChain({ nodes: nextState.nodes, slots: nextState.slots });
+    } catch {
+      // importChain may fail if backend doesn't support state restore — UI state is still correct
     }
 
     set({ _undoRedoInProgress: false });
+  },
+
+  // =============================================
+  // A/B/C Snapshots
+  // =============================================
+
+  saveSnapshot: async (index: number) => {
+    try {
+      const data = await juceBridge.exportChain();
+      const snapshots = [...get().snapshots];
+      snapshots[index] = { data, savedAt: Date.now() };
+      set({ snapshots, activeSnapshot: index });
+    } catch (err) {
+      console.warn('Failed to save snapshot:', err);
+    }
+  },
+
+  recallSnapshot: async (index: number) => {
+    const snapshot = get().snapshots[index];
+    if (!snapshot) return;
+
+    get()._pushHistory();
+    try {
+      await juceBridge.importChain(snapshot.data);
+      set({ activeSnapshot: index, lastCloudChainId: null });
+    } catch (err) {
+      console.warn('Failed to recall snapshot:', err);
+    }
   },
 
   fetchChainState: async () => {
@@ -545,50 +353,56 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // =============================================
 
   addPlugin: async (pluginId: string, insertIndex = -1) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.addPlugin(pluginId, insertIndex);
-      if (result.success) {
-        // Chain state will be applied via chainChanged event (sets loading: false)
-        // Defer usage tracking and auto-discovery to after chainChanged fires
-        setTimeout(() => {
-          const { slots, nodes } = get();
-          const newIndex = insertIndex === -1 ? slots.length - 1 : insertIndex;
-          const newPlugin = slots[newIndex];
-          if (newPlugin) {
-            const { recordPluginLoad, recordCoUsage } = useUsageStore.getState();
-            recordPluginLoad(newPlugin.uid, newPlugin.name, newPlugin.manufacturer);
-            slots.forEach((slot) => {
-              if (slot.uid !== newPlugin.uid) {
-                recordCoUsage(newPlugin.uid, slot.uid);
-                recordCoUsage(slot.uid, newPlugin.uid);
-              }
-            });
-          }
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        const newState = applyState(chainState);
+        set({ ...newState, loading: false });
 
-          // Fire-and-forget: auto-discover parameter map and upload to Convex
-          const findLastPluginNodeId = (nodeList: ChainNodeUI[]): number | null => {
-            let lastId: number | null = null;
-            for (const node of nodeList) {
-              if (node.type === 'plugin' && node.name === newPlugin?.name) {
-                lastId = node.id;
-              }
-              if (node.type === 'group') {
-                const found = findLastPluginNodeId(node.children);
-                if (found !== null) lastId = found;
-              }
+        // Track usage
+        const newSlots = newState.slots;
+        const newIndex = insertIndex === -1 ? newSlots.length - 1 : insertIndex;
+        const newPlugin = newSlots[newIndex];
+        if (newPlugin) {
+          const { recordPluginLoad, recordCoUsage } = useUsageStore.getState();
+          recordPluginLoad(newPlugin.uid, newPlugin.name, newPlugin.manufacturer);
+          newSlots.forEach((slot) => {
+            if (slot.uid !== newPlugin.uid) {
+              recordCoUsage(newPlugin.uid, slot.uid);
+              recordCoUsage(slot.uid, newPlugin.uid);
             }
-            return lastId;
-          };
-          const newNodeId = newPlugin ? findLastPluginNodeId(nodes) : null;
-          if (newNodeId !== null && newPlugin) {
-            const enrichedData = usePluginStore.getState().enrichedData;
-            const enriched = enrichedData.get(newPlugin.uid);
-            const matchedPluginId = enriched?._id;
-            autoDiscoverAndUpload(newNodeId, newPlugin.name, matchedPluginId).catch(() => {});
+          });
+        }
+
+        // Fire-and-forget: auto-discover parameter map and upload to Convex
+        // Find the node ID for the newly added plugin from the tree state
+        const newNodes = newState.nodes;
+        const findLastPluginNodeId = (nodes: ChainNodeUI[]): number | null => {
+          let lastId: number | null = null;
+          for (const node of nodes) {
+            if (node.type === 'plugin' && node.name === newPlugin?.name) {
+              lastId = node.id;
+            }
+            if (node.type === 'group') {
+              const found = findLastPluginNodeId(node.children);
+              if (found !== null) lastId = found;
+            }
           }
-        }, 50);
+          return lastId;
+        };
+        const newNodeId = newPlugin ? findLastPluginNodeId(newNodes) : null;
+        if (newNodeId !== null && newPlugin) {
+          // Look up matched Convex plugin ID from enrichment data
+          const enrichedData = usePluginStore.getState().enrichedData;
+          const enriched = enrichedData.get(newPlugin.uid);
+          const matchedPluginId = enriched?._id;
+          autoDiscoverAndUpload(newNodeId, newPlugin.name, matchedPluginId).catch(() => {
+            // Silently ignore — auto-discovery is best-effort
+          });
+        }
 
         return true;
       } else {
@@ -602,33 +416,13 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   addPluginToGroup: async (pluginId: string, parentId: number, insertIndex = -1) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.addPluginToGroup(pluginId, parentId, insertIndex);
-      if (result.success) {
-        // Chain state will be applied via chainChanged event (sets loading: false)
-        // Defer auto-discovery to after chainChanged fires
-        setTimeout(() => {
-          const { nodes } = get();
-          const findPluginNode = (nodeList: ChainNodeUI[], pid: string): ChainNodeUI | null => {
-            for (const node of nodeList) {
-              if (node.type === 'plugin' && node.fileOrIdentifier === pid) return node;
-              if (node.type === 'group') {
-                const found = findPluginNode(node.children, pid);
-                if (found) return found;
-              }
-            }
-            return null;
-          };
-          const addedNode = findPluginNode(nodes, pluginId);
-          if (addedNode) {
-            const enrichedData = usePluginStore.getState().enrichedData;
-            const enriched = enrichedData.get(addedNode.uid);
-            autoDiscoverAndUpload(addedNode.id, addedNode.name, enriched?._id).catch(() => {});
-          }
-        }, 50);
-
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
         return true;
       } else {
         set({ error: result.error || 'Failed to add plugin to group', loading: false });
@@ -641,12 +435,13 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   removePlugin: async (slotIndex: number) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.removePlugin(slotIndex);
-      if (result.success) {
-        // Chain state applied via chainChanged event
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
         return true;
       } else {
         set({ error: result.error || 'Failed to remove plugin', loading: false });
@@ -659,7 +454,7 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   movePlugin: async (fromIndex: number, toIndex: number) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     const { slots, nodes } = get();
     // Optimistic update for flat slots
     const newSlots = [...slots];
@@ -670,8 +465,9 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
 
     try {
       const result = await juceBridge.movePlugin(fromIndex, toIndex);
-      if (result.success) {
-        // Chain state applied via chainChanged event
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
         return true;
       } else {
         set({ slots, nodes, error: result.error || 'Failed to move plugin' });
@@ -688,16 +484,17 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     const slot = slots[slotIndex];
     if (!slot) return;
 
-    set({ isDirty: true });
-
     // Optimistic
     const newSlots = [...slots];
     newSlots[slotIndex] = { ...slot, bypassed: !slot.bypassed };
     set({ slots: newSlots });
 
     try {
-      await juceBridge.setSlotBypassed(slotIndex, !slot.bypassed);
-      // Chain state applied via chainChanged event
+      const result = await juceBridge.setSlotBypassed(slotIndex, !slot.bypassed);
+      if (result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
     } catch (err) {
       set({ slots, error: String(err) });
     }
@@ -708,15 +505,15 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // =============================================
 
   removeNode: async (nodeId: number) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.removeNode(nodeId);
-      if (result.success) {
-        // Chain state applied via chainChanged event
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
         const openEditors = new Set(get().openEditors);
         openEditors.delete(nodeId);
-        set({ openEditors });
+        set({ ...applyState(chainState), loading: false, openEditors });
         return true;
       } else {
         set({ error: result.error || 'Failed to remove node', loading: false });
@@ -729,12 +526,13 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   duplicateNode: async (nodeId: number) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.duplicateNode(nodeId);
-      if (result.success) {
-        // Chain state applied via chainChanged event
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
         return true;
       } else {
         set({ error: result.error || 'Failed to duplicate node', loading: false });
@@ -747,11 +545,12 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   moveNode: async (nodeId: number, newParentId: number, newIndex: number) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     try {
       const result = await juceBridge.moveNode(nodeId, newParentId, newIndex);
-      if (result.success) {
-        // Chain state applied via chainChanged event
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
         return true;
       } else {
         set({ error: result.error || 'Failed to move node' });
@@ -766,17 +565,62 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   toggleNodeBypass: async (nodeId: number) => {
     const { nodes } = get();
     const node = findNodeById(nodes, nodeId);
-    if (!node) return;
-    // Allow both plugin and group bypass
-    if (node.type !== 'plugin' && node.type !== 'group') return;
-    await get()._pushHistory();
+    if (!node || node.type !== 'plugin') return;
+    get()._pushHistory();
 
     try {
-      await juceBridge.setNodeBypassed(nodeId, !node.bypassed);
-      // Chain state applied via chainChanged event
+      const result = await juceBridge.setNodeBypassed(nodeId, !node.bypassed);
+      if (result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
     } catch (err) {
       set({ error: String(err) });
     }
+  },
+
+  setNodeSuspended: async (nodeId: number, suspended: boolean) => {
+    const result = await juceBridge.setNodeSuspended(nodeId, suspended);
+    if (result.chainState) set(applyState(result.chainState));
+    else if (!result.success) set({ error: result.error || 'Failed to update suspend state' });
+  },
+
+  setNodeRecallSafe: async (nodeId: number, recallSafe: boolean) => {
+    const result = await juceBridge.setNodeRecallSafe(nodeId, recallSafe);
+    if (result.chainState) set(applyState(result.chainState));
+    else if (!result.success) set({ error: result.error || 'Failed to update recall-safe lock' });
+  },
+
+  setNodeIgnoreLatency: async (nodeId: number, ignoreLatency: boolean) => {
+    const result = await juceBridge.setNodeIgnoreLatency(nodeId, ignoreLatency);
+    if (result.chainState) set(applyState(result.chainState));
+    else if (!result.success) set({ error: result.error || 'Failed to update latency setting' });
+  },
+
+  fetchAutomationBindings: async (nodeId: number) => {
+    try {
+      const result = await juceBridge.getAutomationBindings(nodeId);
+      if (result.success) set((state) => ({ automationByNode: { ...state.automationByNode, [nodeId]: result.bindings || [] } }));
+      else set({ error: result.error || 'Failed to read automation bindings' });
+    } catch (err) { set({ error: String(err) }); }
+  },
+
+  assignAutomation: async (nodeId: number, parameterIndex: number) => {
+    try {
+      const result = await juceBridge.assignAutomation(nodeId, parameterIndex);
+      if (!result.success) { set({ error: result.error || 'Failed to expose parameter' }); return false; }
+      await get().fetchAutomationBindings(nodeId);
+      return true;
+    } catch (err) { set({ error: String(err) }); return false; }
+  },
+
+  unassignAutomation: async (nodeId: number, proxyId: string) => {
+    try {
+      const result = await juceBridge.unassignAutomation(proxyId);
+      if (!result.success) { set({ error: result.error || 'Failed to remove automation' }); return false; }
+      await get().fetchAutomationBindings(nodeId);
+      return true;
+    } catch (err) { set({ error: String(err) }); return false; }
   },
 
   // =============================================
@@ -784,15 +628,14 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   // =============================================
 
   createGroup: async (childIds: number[], mode: 'serial' | 'parallel', name?: string) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
-      const result = await juceBridge.createGroup(childIds, mode, name || 'Send Bus');
-      if (result.success) {
-        const groupId = result.groupId ?? null;
-        // C++ createGroup auto-inserts dry path for parallel groups
-        // Chain state applied via chainChanged event
-        return groupId;
+      const result = await juceBridge.createGroup(childIds, mode, name || 'Group');
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
+        return (result as any).groupId ?? null;
       } else {
         set({ error: result.error || 'Failed to create group', loading: false });
         return null;
@@ -804,12 +647,13 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
   },
 
   dissolveGroup: async (groupId: number) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.dissolveGroup(groupId);
-      if (result.success) {
-        // Chain state applied via chainChanged event
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
         return true;
       } else {
         set({ error: result.error || 'Failed to dissolve group', loading: false });
@@ -827,8 +671,9 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ loading: true, error: null });
     try {
       const result = await juceBridge.dissolveGroup(groupId);
-      if (result.success) {
-        // Chain state applied via chainChanged event
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set({ ...applyState(chainState), loading: false });
         return true;
       } else {
         set({ error: result.error || 'Failed to dissolve group', loading: false });
@@ -840,189 +685,82 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     }
   },
 
-  setGroupMode: async (groupId: number, mode: 'serial' | 'parallel' | 'midside' | 'fxselector') => {
-    await get()._pushHistory();
+  setGroupMode: async (groupId: number, mode: 'serial' | 'parallel') => {
+    get()._pushHistory();
     try {
-      await juceBridge.setGroupMode(groupId, mode);
-      // Chain state applied via chainChanged event
-    } catch (err) {
-      set({ error: String(err) });
-    }
-  },
-
-  setActiveBranch: async (groupId: number, branchIndex: number) => {
-    try {
-      await juceBridge.setActiveBranch(groupId, branchIndex);
-      // Chain state applied via chainChanged event
+      const result = await juceBridge.setGroupMode(groupId, mode);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
     } catch (err) {
       set({ error: String(err) });
     }
   },
 
   setGroupDryWet: async (groupId: number, mix: number) => {
-    await get()._beginContinuousGesture();
-    // Optimistic local update for instant UI feedback
-    const nodes = get().nodes.map(n =>
-      n.id === groupId && n.type === 'group' ? { ...n, dryWetMix: mix } : n
-    );
-    set({ nodes });
-    // Throttle the actual bridge call
-    throttledBridgeCall(`groupDryWet_${groupId}`, async () => {
-      try {
-        await juceBridge.setGroupDryWet(groupId, mix);
-      } catch (err) {
-        set({ error: String(err) });
-      }
-    });
-  },
-
-  setGroupWetGain: async (groupId: number, gainDb: number) => {
-    await get()._beginContinuousGesture();
-    const nodes = get().nodes.map(n =>
-      n.id === groupId && n.type === 'group' ? { ...n, wetGainDb: gainDb } : n
-    );
-    set({ nodes });
-    throttledBridgeCall(`groupWetGain_${groupId}`, async () => {
-      try {
-        await juceBridge.setGroupWetGain(groupId, gainDb);
-      } catch (err) {
-        set({ error: String(err) });
-      }
-    });
-  },
-
-  setNodeDucking: async (nodeId: number, enabled: boolean, thresholdDb: number, attackMs: number, releaseMs: number) => {
-    await get()._beginContinuousGesture();
+    get()._pushHistory();
     try {
-      await juceBridge.setNodeDucking(nodeId, enabled, thresholdDb, attackMs, releaseMs);
+      const result = await juceBridge.setGroupDryWet(groupId, mix);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
     } catch (err) {
       set({ error: String(err) });
     }
   },
 
   setBranchGain: async (nodeId: number, gainDb: number) => {
-    await get()._beginContinuousGesture();
-    const nodes = get().nodes.map(n =>
-      n.id === nodeId ? { ...n, branchGainDb: gainDb } : n
-    );
-    set({ nodes });
-    throttledBridgeCall(`branchGain_${nodeId}`, async () => {
-      try {
-        await juceBridge.setBranchGain(nodeId, gainDb);
-      } catch (err) {
-        set({ error: String(err) });
-      }
-    });
-  },
-
-  setBranchMute: async (nodeId: number, mute: boolean) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     try {
-      await juceBridge.setBranchMute(nodeId, mute);
-      // Chain state applied via chainChanged event
+      const result = await juceBridge.setBranchGain(nodeId, gainDb);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
     } catch (err) {
       set({ error: String(err) });
     }
   },
 
   setBranchSolo: async (nodeId: number, solo: boolean) => {
-    await get()._pushHistory();
+    get()._pushHistory();
     try {
-      await juceBridge.setBranchSolo(nodeId, solo);
-      // Chain state applied via chainChanged event
-    } catch (err) {
-      set({ error: String(err) });
-    }
-  },
-
-  addDryPath: async (parentId: number, insertIndex = -1) => {
-    await get()._pushHistory();
-    try {
-      await juceBridge.addDryPath(parentId, insertIndex);
-      // Chain state applied via chainChanged event
-    } catch (err) {
-      set({ error: String(err) });
-    }
-  },
-
-  // =============================================
-  // Per-plugin controls
-  // =============================================
-
-  setNodeInputGain: async (nodeId: number, gainDb: number) => {
-    await get()._beginContinuousGesture();
-    const nodes = get().nodes.map(n =>
-      n.id === nodeId && n.type === 'plugin' ? { ...n, inputGainDb: gainDb } : n
-    );
-    set({ nodes });
-    throttledBridgeCall(`nodeInputGain_${nodeId}`, async () => {
-      try {
-        await juceBridge.setNodeInputGain(nodeId, gainDb);
-      } catch (err) {
-        set({ error: String(err) });
+      const result = await juceBridge.setBranchSolo(nodeId, solo);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
       }
-    });
-  },
-
-  setNodeOutputGain: async (nodeId: number, gainDb: number) => {
-    await get()._beginContinuousGesture();
-    const nodes = get().nodes.map(n =>
-      n.id === nodeId && n.type === 'plugin' ? { ...n, outputGainDb: gainDb } : n
-    );
-    set({ nodes });
-    throttledBridgeCall(`nodeOutputGain_${nodeId}`, async () => {
-      try {
-        await juceBridge.setNodeOutputGain(nodeId, gainDb);
-      } catch (err) {
-        set({ error: String(err) });
-      }
-    });
-  },
-
-  setNodeDryWet: async (nodeId: number, mix: number) => {
-    await get()._beginContinuousGesture();
-    // Optimistic local update for instant UI feedback
-    const nodes = get().nodes.map(n =>
-      n.id === nodeId && n.type === 'plugin' ? { ...n, pluginDryWet: mix } : n
-    );
-    set({ nodes });
-    // Throttle the actual bridge call
-    throttledBridgeCall(`nodeDryWet_${nodeId}`, async () => {
-      try {
-        await juceBridge.setNodeDryWet(nodeId, mix);
-      } catch (err) {
-        set({ error: String(err) });
-      }
-    });
-  },
-
-  setNodeMidSideMode: async (nodeId: number, mode: number) => {
-    await get()._pushHistory();
-    try {
-      await juceBridge.setNodeMidSideMode(nodeId, mode);
-      // Chain state applied via chainChanged event
     } catch (err) {
       set({ error: String(err) });
     }
   },
 
-  setNodeAutoGain: async (nodeId: number, enabled: boolean) => {
+  setBranchMute: async (nodeId: number, mute: boolean) => {
+    get()._pushHistory();
     try {
-      await juceBridge.setNodeAutoGain(nodeId, enabled);
-      // Chain state applied via chainChanged event
+      const result = await juceBridge.setBranchMute(nodeId, mute);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
     } catch (err) {
       set({ error: String(err) });
     }
   },
 
-  toggleNodeExpanded: (nodeId: number) => {
-    const expanded = new Set(get().expandedNodeIds);
-    if (expanded.has(nodeId)) {
-      expanded.delete(nodeId);
-    } else {
-      expanded.add(nodeId);
+  setBranchPolarity: async (nodeId: number, inverted: boolean) => {
+    get()._pushHistory();
+    try {
+      const result = await juceBridge.setBranchPolarity(nodeId, inverted);
+      if (result.success && result.chainState) {
+        const chainState = result.chainState as ChainStateV2;
+        set(applyState(chainState));
+      }
+    } catch (err) {
+      set({ error: String(err) });
     }
-    set({ expandedNodeIds: expanded });
   },
 
   // =============================================
@@ -1080,420 +818,30 @@ export const useChainStore = create<ChainStoreState & ChainActions>((set, get) =
     set({ nodes: toggleCollapsed(nodes, groupId) });
   },
 
-  // LUFS target (legacy)
+  // LUFS target
   setTargetInputLufs: (lufs: number | null) => {
     set({ targetInputLufs: lufs });
   },
 
-  // Peak range target
-  setTargetInputPeakRange: (min: number | null, max: number | null) => {
-    set({ targetInputPeakMin: min, targetInputPeakMax: max });
-  },
-
   setChainName: (name: string) => {
     set({ chainName: name });
-    // Sync with cloudChainStore if this chain has a cloud ID
-    const cloudId = get().lastCloudChainId;
-    if (cloudId) {
-      // Lazy import to avoid circular dependency — cloudChainStore may import chainStore
-      import('./cloudChainStore').then(({ useCloudChainStore }) => {
-        useCloudChainStore.getState().updateLocalChainName(cloudId, name);
-      }).catch(() => {
-        // Silently ignored — cross-store sync is best-effort
-      });
-    }
   },
 
   setLastCloudChainId: (id: string | null) => {
     set({ lastCloudChainId: id });
   },
-
-  // =============================================
-  // Plugin Settings Clipboard (copy/paste between slots)
-  // =============================================
-
-  pastePluginSettings: async (sourceNodeId: number, targetNodeId: number) => {
-    const { nodes } = get();
-
-    const sourceNode = findNodeInTree(nodes, sourceNodeId);
-    const targetNode = findNodeInTree(nodes, targetNodeId);
-
-    if (!sourceNode || sourceNode.type !== 'plugin') return false;
-    if (!targetNode || targetNode.type !== 'plugin') return false;
-
-    // Only paste to same plugin type
-    if (targetNode.fileOrIdentifier !== sourceNode.fileOrIdentifier) {
-      get().showToast('Cannot paste: different plugin type');
-      return false;
-    }
-
-    try {
-      const result = await juceBridge.copyNodeState(sourceNodeId, targetNodeId);
-      if (result.success) {
-        return true;
-      } else {
-        get().showToast(result.error || 'Failed to paste settings');
-        return false;
-      }
-    } catch {
-      get().showToast('Failed to paste plugin settings');
-      return false;
-    }
-  },
-
-  // =============================================
-  // Format substitutions
-  // =============================================
-
-  setFormatSubstitutions: (subs: FormatSubstitution[]) => {
-    set({ formatSubstitutions: subs });
-  },
-
-  clearFormatSubstitutions: () => {
-    set({ formatSubstitutions: [] });
-  },
-
-  // =============================================
-  // Toast notifications
-  // =============================================
-
-  showToast: (message: string, durationMs = 2000) => {
-    set({ toastMessage: message });
-    setTimeout(() => {
-      // Only clear if the message is still the same
-      if (useChainStore.getState().toastMessage === message) {
-        useChainStore.setState({ toastMessage: null });
-      }
-    }, durationMs);
-  },
-
-  // =============================================
-  // Inline plugin search
-  // =============================================
-
-  showInlineSearchBelow: (nodeId: number, parentId: number, insertIndex: number) => {
-    set({ inlineSearchState: { nodeId, parentId, insertIndex } });
-  },
-
-  hideInlineSearch: () => {
-    set({ inlineSearchState: null });
-  },
-
-  // =============================================
-  // Inline Editor Mode
-  // =============================================
-
-  openInlineEditor: async (nodeId: number) => {
-    // Already showing this plugin — nothing to do
-    if (get().inlineEditorNodeId === nodeId) return;
-    try {
-      const result = await juceBridge.openPluginInline(nodeId);
-      if (result.success) {
-        set({ inlineEditorNodeId: nodeId });
-      } else {
-        // Plugin has no GUI — fall back to external window
-        get().openPluginEditor(nodeId);
-      }
-    } catch (err) {
-      console.error('[chainStore] openInlineEditor failed:', err);
-      // Fallback to external window
-      get().openPluginEditor(nodeId);
-    }
-  },
-
-  closeInlineEditor: async () => {
-    try {
-      await juceBridge.closePluginInline();
-      set({ inlineEditorNodeId: null, searchOverlayActive: false });
-    } catch (err) {
-      console.error('[chainStore] closeInlineEditor failed:', err);
-    }
-  },
-
-  showSearchOverlay: async (mode: 'add' | 'replace' = 'add') => {
-    // Set state immediately so the overlay shows, then tell C++ to adjust layout
-    set({ searchOverlayActive: true, searchOverlayMode: mode });
-    juceBridge.showSearchOverlay().catch((err) => {
-      console.error('[chainStore] showSearchOverlay C++ call failed:', err);
-    });
-  },
-
-  hideSearchOverlay: async () => {
-    try {
-      await juceBridge.hideSearchOverlay();
-      set({ searchOverlayActive: false });
-    } catch (err) {
-      console.error('[chainStore] hideSearchOverlay failed:', err);
-    }
-  },
-
-  // =============================================
-  // AI Chat
-  // =============================================
-
-  openAiChat: () => {
-    // Close any open inline plugin editor first
-    const current = get().inlineEditorNodeId;
-    if (current !== null) {
-      juceBridge.closePluginInline().catch(() => {});
-    }
-    set({ aiChatActive: true, inlineEditorNodeId: null, searchOverlayActive: false });
-  },
-
-  closeAiChat: () => {
-    set({ aiChatActive: false });
-  },
-
-  // =============================================
-  // Chain source tracking & clear
-  // =============================================
-
-  clearChain: () => {
-    // Try to clear the C++ chain via import with empty data
-    juceBridge.importChain('').catch(() => {
-      // If native clear fails, just clear local state
-    });
-    set({
-      nodes: [],
-      slots: [],
-      chainName: 'Untitled Chain',
-      selectedNodeId: null,
-      selectedSlotIndex: null,
-      lastCloudChainId: null,
-      history: [],
-      future: [],
-      isDirty: false,
-      expandedNodeIds: new Set<number>(),
-      chainSource: null,
-      chainSourceList: [],
-      chainSourceIndex: -1,
-      slotColors: {},
-    });
-    // Reset meter data in the dedicated meter store
-    useMeterStore.setState((s) => ({
-      nodeMeterData: {},
-      peakMeterVersion: s.peakMeterVersion + 1,
-    }));
-  },
-
-  setChainSource: (source, list = [], index = -1) => {
-    set({ chainSource: source, chainSourceList: list, chainSourceIndex: index });
-  },
-
-  setIsDirty: (dirty: boolean) => {
-    set({ isDirty: dirty });
-  },
-
-  // =============================================
-  // Slot colors
-  // =============================================
-
-  setSlotColor: (nodeId, color) => {
-    set((s) => ({ slotColors: { ...s.slotColors, [nodeId]: color } }));
-  },
-
-  clearSlotColor: (nodeId) => {
-    set((s) => {
-      const next = { ...s.slotColors };
-      delete next[nodeId];
-      return { slotColors: next };
-    });
-  },
-
-  // =============================================
-  // Continuous gesture helpers (debounce sliders/knobs)
-  // =============================================
-
-  _beginContinuousGesture: async () => {
-    // Only capture once at the start of a drag
-    if (get()._continuousDragSnapshot !== null) {
-      // Already in a gesture — just update activity timestamp
-      set({ _continuousGestureLastActivity: Date.now() });
-      return;
-    }
-    if (get()._undoRedoInProgress) return;
-
-    try {
-      const binaryData = await juceBridge.captureSnapshot();
-      const snapshot: ChainSnapshot = {
-        binaryData,
-        nodes: [],
-        slots: [],
-      };
-      set({
-        _continuousDragSnapshot: snapshot,
-        _continuousGestureLastActivity: Date.now(),
-      });
-    } catch (_err) {
-      // Silently ignored — snapshot serialization failure is non-critical
-    }
-  },
-
-  _endContinuousGesture: () => {
-    const { _continuousDragSnapshot, history } = get();
-    if (!_continuousDragSnapshot) return;
-
-    const newHistory = [...history, _continuousDragSnapshot];
-    if (newHistory.length > MAX_HISTORY) {
-      newHistory.shift();
-    }
-    set({
-      history: newHistory,
-      future: [],
-      _continuousDragSnapshot: null,
-      _continuousGestureLastActivity: 0,
-    });
-  },
 }));
-
-// Stable actions selector — defined outside components so it's referentially stable.
-// Zustand action functions never change identity (created once in create()), so this
-// selector always returns the same object reference, avoiding unnecessary re-renders.
-const actionsSelector = (state: ChainStoreState & ChainActions) => ({
-  fetchChainState: state.fetchChainState,
-  addPlugin: state.addPlugin,
-  addPluginToGroup: state.addPluginToGroup,
-  removePlugin: state.removePlugin,
-  movePlugin: state.movePlugin,
-  toggleBypass: state.toggleBypass,
-  removeNode: state.removeNode,
-  moveNode: state.moveNode,
-  toggleNodeBypass: state.toggleNodeBypass,
-  duplicateNode: state.duplicateNode,
-  createGroup: state.createGroup,
-  dissolveGroup: state.dissolveGroup,
-  dissolveGroupSilent: state.dissolveGroupSilent,
-  setGroupMode: state.setGroupMode,
-  setGroupDryWet: state.setGroupDryWet,
-  setGroupWetGain: state.setGroupWetGain,
-  setNodeDucking: state.setNodeDucking,
-  setBranchGain: state.setBranchGain,
-  setBranchMute: state.setBranchMute,
-  setBranchSolo: state.setBranchSolo,
-  setActiveBranch: state.setActiveBranch,
-  addDryPath: state.addDryPath,
-  setNodeInputGain: state.setNodeInputGain,
-  setNodeOutputGain: state.setNodeOutputGain,
-  setNodeDryWet: state.setNodeDryWet,
-  setNodeMidSideMode: state.setNodeMidSideMode,
-  setNodeAutoGain: state.setNodeAutoGain,
-  toggleNodeExpanded: state.toggleNodeExpanded,
-  openPluginEditor: state.openPluginEditor,
-  closePluginEditor: state.closePluginEditor,
-  togglePluginEditor: state.togglePluginEditor,
-  selectNode: state.selectNode,
-  toggleGroupCollapsed: state.toggleGroupCollapsed,
-  selectSlot: state.selectSlot,
-  setTargetInputLufs: state.setTargetInputLufs,
-  setTargetInputPeakRange: state.setTargetInputPeakRange,
-  setChainName: state.setChainName,
-  setLastCloudChainId: state.setLastCloudChainId,
-  undo: state.undo,
-  redo: state.redo,
-  canUndo: state.canUndo,
-  canRedo: state.canRedo,
-  _pushHistory: state._pushHistory,
-  _beginContinuousGesture: state._beginContinuousGesture,
-  _endContinuousGesture: state._endContinuousGesture,
-  pastePluginSettings: state.pastePluginSettings,
-  showToast: state.showToast,
-  setFormatSubstitutions: state.setFormatSubstitutions,
-  clearFormatSubstitutions: state.clearFormatSubstitutions,
-  showInlineSearchBelow: state.showInlineSearchBelow,
-  hideInlineSearch: state.hideInlineSearch,
-  openInlineEditor: state.openInlineEditor,
-  closeInlineEditor: state.closeInlineEditor,
-  showSearchOverlay: state.showSearchOverlay,
-  hideSearchOverlay: state.hideSearchOverlay,
-  openAiChat: state.openAiChat,
-  closeAiChat: state.closeAiChat,
-  clearChain: state.clearChain,
-  setChainSource: state.setChainSource,
-  setIsDirty: state.setIsDirty,
-});
-
-// Hook for components to access chain actions without re-rendering on state changes.
-// Cached because action functions never change identity in Zustand (created once in create()).
-let _cachedActions: ReturnType<typeof actionsSelector> | null = null;
-export const useChainActions = () => useChainStore((state) => {
-  if (!_cachedActions) _cachedActions = actionsSelector(state);
-  return _cachedActions;
-});
 
 // Set up event listener - handles both V1 and V2 chain state
 juceBridge.onChainChanged((state: ChainStateV2) => {
-  const prev = useChainStore.getState();
-  const prevPluginIds = collectPluginNodeIds(prev.nodes);
-
-  // Always reset loading flag when receiving chain updates (e.g., from mirror sync)
-  useChainStore.setState({ ...applyState(state), loading: false });
-
-  // Auto-color new plugin nodes by their enriched category
-  const { enrichedData } = usePluginStore.getState();
-  if (enrichedData.size === 0) return;
-
-  const newColors: Record<number, string> = {};
-  const assignCategoryColors = (nodeList: ChainNodeUI[]) => {
-    for (const node of nodeList) {
-      if (node.type === 'plugin' && !prevPluginIds.has(node.id) && !prev.slotColors[node.id]) {
-        const enriched = enrichedData.get(node.uid);
-        if (enriched?.category) {
-          const color = getCategoryColor(enriched.category);
-          if (color !== 'rgba(255,255,255,0.15)') {
-            newColors[node.id] = color;
-          }
-        }
-      }
-      if (node.type === 'group') assignCategoryColors(node.children);
-    }
-  };
-  assignCategoryColors(state.nodes || []);
-
-  if (Object.keys(newColors).length > 0) {
-    useChainStore.setState((s) => ({
-      slotColors: { ...s.slotColors, ...newColors },
-    }));
-  }
+  useChainStore.setState(applyState(state));
 });
 
-// Per-node meter data for inline plugin meters.
-// Writes to the dedicated meterStore so that 30fps updates only trigger
-// selector evaluations in meter-displaying components, not all chainStore subscribers.
-// C++ sends packed string format: "nodeId,v0,v1,...;nodeId,v0,v1,..."
-// where floats are scaled to ints (×10000 for levels, ×100 for latency/lufs).
-juceBridge.onNodeMeterData((raw: string | Record<string, NodeMeterReadings>) => {
-  let data: Record<string, NodeMeterReadings>;
-  if (typeof raw === 'string') {
-    // Parse packed string format (fast path)
-    data = {};
-    const nodes = raw.split(';');
-    for (let i = 0; i < nodes.length; i++) {
-      const parts = nodes[i].split(',');
-      if (parts.length < 16) continue;
-      const S = 0.0001; // scale factor for level values (÷10000)
-      const L = 0.01;   // scale factor for latency/lufs (÷100)
-      data[parts[0]] = {
-        peakL: +parts[1] * S,
-        peakR: +parts[2] * S,
-        peakHoldL: +parts[3] * S,
-        peakHoldR: +parts[4] * S,
-        rmsL: +parts[5] * S,
-        rmsR: +parts[6] * S,
-        inputPeakL: +parts[7] * S,
-        inputPeakR: +parts[8] * S,
-        inputPeakHoldL: +parts[9] * S,
-        inputPeakHoldR: +parts[10] * S,
-        inputRmsL: +parts[11] * S,
-        inputRmsR: +parts[12] * S,
-        latencyMs: +parts[13] * L,
-        inputLufs: +parts[14] * L,
-        outputLufs: +parts[15] * L,
-      };
-    }
-  } else {
-    data = raw;
-  }
-  const prev = useMeterStore.getState().nodeMeterData;
+// Per-node meter data for inline plugin meters
+// Granular update: only replace entries whose values actually changed,
+// so Zustand selectors for unchanged nodes return the same reference.
+juceBridge.onNodeMeterData((data: Record<string, NodeMeterReadings>) => {
+  const prev = useChainStore.getState().nodeMeterData;
   const next: Record<string, NodeMeterReadings> = { ...prev };
   let changed = false;
   for (const key in data) {
@@ -1503,8 +851,6 @@ juceBridge.onNodeMeterData((raw: string | Record<string, NodeMeterReadings>) => 
       !p ||
       p.peakL !== n.peakL ||
       p.peakR !== n.peakR ||
-      p.rmsL !== n.rmsL ||
-      p.rmsR !== n.rmsR ||
       p.inputPeakL !== n.inputPeakL ||
       p.inputPeakR !== n.inputPeakR
     ) {
@@ -1520,51 +866,6 @@ juceBridge.onNodeMeterData((raw: string | Record<string, NodeMeterReadings>) => 
     }
   }
   if (changed) {
-    useMeterStore.setState({ nodeMeterData: next });
+    useChainStore.setState({ nodeMeterData: next });
   }
-});
-
-// Automation slot warning (Team 3)
-juceBridge.onAutomationSlotWarning((warning: AutomationSlotWarning | null) => {
-  useChainStore.setState({ automationWarning: warning });
-});
-
-// Latency warning (Team 4)
-juceBridge.onLatencyWarning((warning: LatencyWarning | null) => {
-  useChainStore.setState({ latencyWarning: warning });
-});
-
-// Inline editor mode changes (C++ → JS sync)
-juceBridge.onInlineEditorChanged((state: { mode: string; nodeId?: number }) => {
-  useChainStore.setState({
-    inlineEditorNodeId: state.mode === 'plugin' ? (state.nodeId ?? null) : null,
-  });
-});
-
-// Safety timer: auto-end continuous gesture if mouseUp was missed (e.g., pointer left window)
-setInterval(() => {
-  const { _continuousDragSnapshot, _continuousGestureLastActivity } = useChainStore.getState();
-  if (_continuousDragSnapshot && _continuousGestureLastActivity > 0) {
-    const elapsed = Date.now() - _continuousGestureLastActivity;
-    if (elapsed > 2000) {
-      useChainStore.getState()._endContinuousGesture();
-    }
-  }
-}, 500);
-
-// Phase 3: Handle child plugin parameter changes from C++
-juceBridge.on('pluginParameterChangeSettled', (data: { beforeSnapshot: string }) => {
-  const { _undoRedoInProgress, _continuousDragSnapshot, history } = useChainStore.getState();
-  if (_undoRedoInProgress) return;
-  if (_continuousDragSnapshot !== null) return; // Don't interfere with UI slider gestures
-
-  const snapshot: ChainSnapshot = {
-    binaryData: data.beforeSnapshot,
-    nodes: [],  // No cached UI state — C++ will provide on restore
-    slots: [],
-  };
-
-  const newHistory = [...history, snapshot];
-  if (newHistory.length > MAX_HISTORY) newHistory.shift();
-  useChainStore.setState({ history: newHistory, future: [] });
 });

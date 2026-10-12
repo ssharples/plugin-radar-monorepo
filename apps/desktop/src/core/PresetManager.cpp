@@ -1,12 +1,88 @@
 #include "PresetManager.h"
 #include "../utils/PlatformPaths.h"
+#include <mutex>
+#include <cmath>
+
+namespace {
+struct FileLoadRequest
+{
+    uint64_t id = 0;
+    juce::File file;
+    bool allowPartial = false;
+    PresetManager::LoadCompletion completion;
+    PresetManager::LoadProgress progress;
+};
+struct ParsedPreset
+{
+    PresetInfo info;
+    std::unique_ptr<juce::XmlElement> chain, wrapper;
+    juce::String error;
+};
+ParsedPreset parsePreset(const juce::XmlElement& xml, const juce::File& file = {})
+{
+    ParsedPreset parsed;
+    if (!xml.hasTagName("PluginChainPreset")) { parsed.error = "Unrecognised preset format"; return parsed; }
+    parsed.info.file = file; parsed.info.lastModified = file.getLastModificationTime();
+    parsed.info.name = file.getFileNameWithoutExtension(); parsed.info.category = "Uncategorized";
+    if (auto* meta = xml.getChildByName("MetaData"))
+    {
+        parsed.info.name = meta->getStringAttribute("name", parsed.info.name);
+        parsed.info.category = meta->getStringAttribute("category", parsed.info.category);
+    }
+    if (auto* wrapper = xml.getChildByName("PluginChainManagerState")) parsed.wrapper = std::make_unique<juce::XmlElement>(*wrapper);
+    else if (auto* wrapper = xml.getChildByName("WrapperState"))
+    { parsed.wrapper = std::make_unique<juce::XmlElement>(*wrapper); parsed.wrapper->setTagName("PluginChainManagerState"); }
+    if (parsed.wrapper)
+        for (auto key : { "inputGainDb", "outputGainDb", "gainMatchTargetDb" })
+            if (!std::isfinite(parsed.wrapper->getDoubleAttribute(key, 0.0))
+                || parsed.wrapper->getDoubleAttribute(key, 0.0) < -100.0
+                || parsed.wrapper->getDoubleAttribute(key, 0.0) > 24.0)
+            { parsed.error = "Preset contains an invalid gain setting"; return parsed; }
+    if (auto* tree = xml.getChildByName("ChainTree")) parsed.chain = std::make_unique<juce::XmlElement>(*tree);
+    else if (auto* legacy = xml.getChildByName("Chain"))
+    {
+        parsed.chain = std::make_unique<juce::XmlElement>("ChainTree"); parsed.chain->setAttribute("version", 2);
+        for (auto* slot : legacy->getChildWithTagNameIterator("Slot"))
+        {
+            auto* description = slot->getChildByName("Plugin");
+            if (!description) { parsed.error = "Legacy preset is missing an effect description"; return parsed; }
+            juce::PluginDescription desc;
+            desc.pluginFormatName = description->getStringAttribute("format"); desc.name = description->getStringAttribute("name");
+            desc.uniqueId = description->getIntAttribute("uid"); desc.fileOrIdentifier = description->getStringAttribute("fileOrIdentifier");
+            desc.manufacturerName = description->getStringAttribute("manufacturer");
+            auto* node = parsed.chain->createNewChildElement("Node"); node->setAttribute("type", "plugin");
+            node->setAttribute("bypassed", slot->getBoolAttribute("bypassed")); node->addChildElement(desc.createXml().release());
+            if (auto* state = slot->getChildByName("State")) node->setAttribute("state", state->getAllSubText());
+        }
+    }
+    else if (parsed.wrapper && parsed.wrapper->getChildByName("ChainTree"))
+        parsed.chain = std::make_unique<juce::XmlElement>(*parsed.wrapper->getChildByName("ChainTree"));
+    else parsed.error = "Preset does not contain a chain";
+    return parsed;
+}
+}
+
+struct PresetManager::FileLoadState
+{
+    std::atomic<bool> alive {true};
+    std::atomic<uint64_t> generation {0};
+    std::mutex mutex;
+    std::shared_ptr<FileLoadRequest> pending;
+    bool parsing = false;
+};
 
 PresetManager::PresetManager(ChainProcessor& chainProcessor)
-    : chain(chainProcessor)
+    : chain(chainProcessor), fileLoads(std::make_shared<FileLoadState>())
 {
-    // Ensure presets directory exists
-    getPresetsDirectory().createDirectory();
-    scanPresets();
+    getPresetsDirectory().createDirectory(); scanPresets();
+}
+PresetManager::~PresetManager()
+{
+    // File IO owns only this shared state. It may finish after the owner closes,
+    // but all application callbacks check the token on the message thread.
+    fileLoads->alive.store(false);
+    const std::lock_guard<std::mutex> lock(fileLoads->mutex);
+    fileLoads->pending.reset();
 }
 
 juce::File PresetManager::getPresetsDirectory() const
@@ -122,64 +198,6 @@ bool PresetManager::loadPreset(const juce::File& presetFile)
 
     lastMissingPlugins.clear();
 
-    // Check plugin availability before loading
-    juce::StringArray missingPlugins;
-    std::function<void(const juce::XmlElement&)> checkNode = [&](const juce::XmlElement& nodeXml)
-    {
-        auto type = nodeXml.getStringAttribute("type");
-        if (type == "plugin")
-        {
-            if (auto* descXml = nodeXml.getChildByName("PLUGIN"))
-            {
-                juce::PluginDescription desc;
-                desc.loadFromXml(*descXml);
-
-                if (!chain.getPluginManager().findPluginByIdentifier(desc.fileOrIdentifier))
-                {
-                    // Fallback: try matching by name+manufacturer (handles cross-format presets)
-                    bool foundByName = false;
-                    for (const auto& knownDesc : chain.getPluginManager().getKnownPlugins().getTypes())
-                    {
-                        if (knownDesc.name.equalsIgnoreCase(desc.name) &&
-                            knownDesc.manufacturerName.equalsIgnoreCase(desc.manufacturerName))
-                        {
-                            foundByName = true;
-                            break;
-                        }
-                    }
-                    if (!foundByName)
-                        missingPlugins.add(desc.name);
-                }
-            }
-        }
-        else if (type == "group")
-        {
-            for (auto* childXml : nodeXml.getChildWithTagNameIterator("Node"))
-                checkNode(*childXml);
-        }
-    };
-
-    if (auto* chainTree = xml->getChildByName("ChainTree"))
-    {
-        for (auto* nodeXml : chainTree->getChildWithTagNameIterator("Node"))
-            checkNode(*nodeXml);
-    }
-
-    if (missingPlugins.size() > 0)
-    {
-        juce::String msg = "Missing plugins:\n";
-        for (auto& name : missingPlugins)
-            msg += "- " + name + "\n";
-
-        juce::AlertWindow::showMessageBoxAsync(
-            juce::AlertWindow::WarningIcon,
-            "Incompatible Preset",
-            msg
-        );
-
-        return false;
-    }
-
     if (!parsePresetXml(*xml, lastMissingPlugins))
         return false;
 
@@ -207,6 +225,65 @@ bool PresetManager::loadPreset(const juce::File& presetFile)
     return true;
 }
 
+uint64_t PresetManager::loadPresetAsync(const juce::File& file, bool allowPartial,
+                                        LoadCompletion completion, LoadProgress progress)
+{
+    auto state = fileLoads;
+    auto request = std::make_shared<FileLoadRequest>();
+    request->id = state->generation.fetch_add(1) + 1; request->file = file; request->allowPartial = allowPartial;
+    request->completion = std::move(completion); request->progress = std::move(progress);
+    chain.cancelPendingLoads();
+    std::shared_ptr<FileLoadRequest> superseded;
+    bool launch = false;
+    {
+        const std::lock_guard<std::mutex> lock(state->mutex);
+        superseded = std::move(state->pending); state->pending = request;
+        if (!state->parsing) { state->parsing = true; launch = true; }
+    }
+    if (superseded && superseded->completion)
+    { ChainProcessor::RestoreResult result; result.requestId = superseded->id; result.status = "superseded"; superseded->completion(result); }
+    if (request->progress) request->progress(request->id, "loading", 0, 0, {});
+    if (launch) juce::Thread::launch([this, state] {
+        for (;;)
+        {
+            std::shared_ptr<FileLoadRequest> next;
+            {
+                const std::lock_guard<std::mutex> lock(state->mutex);
+                if (!state->alive.load() || !state->pending) { state->parsing = false; return; }
+                next = std::move(state->pending);
+            }
+            auto parsed = std::make_shared<ParsedPreset>();
+            if (auto xml = juce::XmlDocument::parse(next->file)) *parsed = parsePreset(*xml, next->file);
+            else parsed->error = "The preset file could not be read";
+            juce::MessageManager::callAsync([this, state, next, parsed] {
+                if (!state->alive.load()) return;
+                ChainProcessor::RestoreResult result; result.requestId = next->id;
+                if (next->id != state->generation.load())
+                { result.status = "superseded"; if (next->completion) next->completion(result); return; }
+                if (parsed->error.isNotEmpty())
+                { result.error = parsed->error; if (next->completion) next->completion(result); return; }
+                chain.requestRestore(*parsed->chain, next->allowPartial,
+                    [this, state, next, parsed](ChainProcessor::RestoreResult committed) {
+                        if (!state->alive.load()) return;
+                        committed.requestId = next->id;
+                        if (committed.success)
+                        {
+                            if (applyWrapperSettings && parsed->wrapper) applyWrapperSettings(*parsed->wrapper);
+                            currentPreset = std::make_unique<PresetInfo>(parsed->info);
+                            dirty = committed.status == "partial"; lastMissingPlugins = committed.missingPlugins;
+                            if (onPresetLoaded) onPresetLoaded(currentPreset.get());
+                        }
+                        if (next->completion) next->completion(committed);
+                    }, [state, next](uint64_t, const juce::String& stage, int count, int total, const juce::String& name) {
+                        if (state->alive.load() && next->id == state->generation.load() && next->progress)
+                            next->progress(next->id, stage, count, total, name);
+                    }, true);
+            });
+        }
+    });
+    return request->id;
+}
+
 bool PresetManager::deletePreset(const juce::File& presetFile)
 {
     if (!presetFile.existsAsFile())
@@ -218,47 +295,6 @@ bool PresetManager::deletePreset(const juce::File& presetFile)
     // Clear current preset if it was the deleted one
     if (currentPreset && currentPreset->file == presetFile)
         currentPreset.reset();
-
-    scanPresets();
-    return true;
-}
-
-bool PresetManager::renamePreset(const juce::File& presetFile, const juce::String& newName)
-{
-    if (!presetFile.existsAsFile())
-        return false;
-
-    // Parse the XML to update the metadata name
-    auto xml = juce::XmlDocument::parse(presetFile);
-    if (!xml || !xml->hasTagName("PluginChainPreset"))
-        return false;
-
-    // Update metadata name
-    if (auto* meta = xml->getChildByName("MetaData"))
-        meta->setAttribute("name", newName);
-
-    // Build new file path (same directory, new name)
-    auto parentDir = presetFile.getParentDirectory();
-    auto newFile = parentDir.getChildFile(newName + PRESET_EXTENSION);
-
-    // Don't overwrite a different file
-    if (newFile.existsAsFile() && newFile != presetFile)
-        return false;
-
-    // Write updated XML to new file
-    if (!xml->writeTo(newFile))
-        return false;
-
-    // Delete old file if name changed (different path)
-    if (newFile != presetFile)
-        presetFile.deleteFile();
-
-    // Update current preset if it was the renamed one
-    if (currentPreset && currentPreset->file == presetFile)
-    {
-        currentPreset->name = newName;
-        currentPreset->file = newFile;
-    }
 
     scanPresets();
     return true;
@@ -279,86 +315,20 @@ std::unique_ptr<juce::XmlElement> PresetManager::createPresetXml(const juce::Str
     if (auto chainTree = chain.serializeChainToXml())
         xml->addChildElement(chainTree.release());
 
+    if (captureWrapperState)
+        if (auto wrapper = captureWrapperState())
+            xml->addChildElement(wrapper.release());
+
     return xml;
 }
 
 bool PresetManager::parsePresetXml(const juce::XmlElement& xml, juce::StringArray& missingPlugins)
 {
-    // Capture snapshot for rollback on failure
-    auto snapshot = chain.captureSnapshot();
-
-    if (isV2Preset(xml))
-    {
-        // V2: restore from <ChainTree> element
-        auto* chainTree = xml.getChildByName("ChainTree");
-        auto result = chain.restoreChainFromXml(*chainTree);
-        missingPlugins = result.missingPlugins;
-
-        if (!result.success)
-        {
-            chain.restoreSnapshot(snapshot);
-            return false;
-        }
-    }
-    else
-    {
-        // V1 backward compat: old <Chain><Slot> format
-        // Old presets used <Plugin format="..." name="..." .../> + <State>base64</State>
-        // which differs from the DAW state format (<PLUGIN .../> + state="..."),
-        // so we convert each slot to the V2 Node format before calling restoreChainFromXml.
-        auto* chainXml = xml.getChildByName("Chain");
-        if (!chainXml)
-        {
-            chain.restoreSnapshot(snapshot);
-            return false;
-        }
-
-        auto wrapper = std::make_unique<juce::XmlElement>("ChainTree");
-        wrapper->setAttribute("version", 2);
-
-        for (auto* slotXml : chainXml->getChildWithTagNameIterator("Slot"))
-        {
-            auto* pluginXml = slotXml->getChildByName("Plugin");
-            if (!pluginXml)
-                continue;
-
-            // Build a PluginDescription and serialize it with createXml()
-            // so xmlToNode() can read it via loadFromXml()
-            juce::PluginDescription desc;
-            desc.pluginFormatName = pluginXml->getStringAttribute("format");
-            desc.name = pluginXml->getStringAttribute("name");
-            desc.uniqueId = pluginXml->getIntAttribute("uid");
-            desc.fileOrIdentifier = pluginXml->getStringAttribute("fileOrIdentifier");
-            desc.manufacturerName = pluginXml->getStringAttribute("manufacturer");
-
-            auto nodeXml = std::make_unique<juce::XmlElement>("Node");
-            nodeXml->setAttribute("type", "plugin");
-            nodeXml->setAttribute("bypassed", slotXml->getBoolAttribute("bypassed", false));
-
-            // Add JUCE-format <PLUGIN> element
-            if (auto descElement = desc.createXml())
-                nodeXml->addChildElement(descElement.release());
-
-            // Convert <State>base64</State> child to state="base64" attribute
-            if (auto* stateXml = slotXml->getChildByName("State"))
-            {
-                auto stateText = stateXml->getAllSubText();
-                if (stateText.isNotEmpty())
-                    nodeXml->setAttribute("state", stateText);
-            }
-
-            wrapper->addChildElement(nodeXml.release());
-        }
-
-        auto result = chain.restoreChainFromXml(*wrapper);
-        missingPlugins = result.missingPlugins;
-
-        if (!result.success)
-        {
-            chain.restoreSnapshot(snapshot);
-            return false;
-        }
-    }
-
+    auto parsed = parsePreset(xml);
+    if (parsed.error.isNotEmpty() || !parsed.chain) return false;
+    auto result = chain.restoreChainFromXml(*parsed.chain, false);
+    missingPlugins = result.missingPlugins;
+    if (!result.success) return false;
+    if (applyWrapperSettings && parsed.wrapper) applyWrapperSettings(*parsed.wrapper);
     return true;
 }

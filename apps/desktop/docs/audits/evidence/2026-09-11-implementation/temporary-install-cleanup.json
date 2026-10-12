@@ -1,0 +1,18 @@
+{
+  "completedUtc": "2026-09-11T12:35:12.328506+00:00",
+  "bundles": [
+    {
+      "temporaryInstallation": "/Users/test/Library/Audio/Plug-Ins/Components/Plugin Chain Manager.component",
+      "archivedTo": "/tmp/prochain-validation-uninstalled-20260911/Plugin Chain Manager.component",
+      "verifiedExecutableSha256": "bef1d670092ec5a05d3e42e2b3a58b247ed0b67a7a00e080532136c04c10d74a",
+      "removedFromPluginDiscoveryPath": true
+    },
+    {
+      "temporaryInstallation": "/Users/test/Library/Audio/Plug-Ins/VST3/Plugin Chain Manager.vst3",
+      "archivedTo": "/tmp/prochain-validation-uninstalled-20260911/Plugin Chain Manager.vst3",
+      "verifiedExecutableSha256": "ea1a0df89d8c76608f5b047f50113e95a3d5a52787afcf8cc8c503514fcfd01a",
+      "removedFromPluginDiscoveryPath": true
+    }
+  ],
+  "existingUserPluginsChanged": false
+}

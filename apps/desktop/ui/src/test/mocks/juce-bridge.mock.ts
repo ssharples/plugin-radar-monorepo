@@ -13,6 +13,7 @@ interface MockJuceBridge {
   onPluginBlacklisted: ReturnType<typeof vi.fn>
   startWaveformStream: ReturnType<typeof vi.fn>
   stopWaveformStream: ReturnType<typeof vi.fn>
+  setAnalysisSubscriptions: ReturnType<typeof vi.fn>
   getChainState: ReturnType<typeof vi.fn>
   exportChain: ReturnType<typeof vi.fn>
   // Event simulation helpers
@@ -43,6 +44,7 @@ export function createMockJuceBridge(): MockJuceBridge {
     onPluginBlacklisted: vi.fn((handler: EventHandler) => on('pluginBlacklisted', handler)),
     startWaveformStream: vi.fn().mockResolvedValue({ success: true }),
     stopWaveformStream: vi.fn().mockResolvedValue({ success: true }),
+    setAnalysisSubscriptions: vi.fn().mockResolvedValue({ success: true }),
     getChainState: vi.fn().mockResolvedValue({ nodes: [] }),
     exportChain: vi.fn().mockResolvedValue({ version: 1, numSlots: 0, slots: [] }),
     _eventHandlers: eventHandlers,

@@ -4,73 +4,76 @@ import { Slider } from '../Slider/Slider';
 
 interface ParallelBranchControlsProps {
   node: ChainNodeUI;
+  /** 0-based branch position, shown as "Branch N" */
+  branchIndex?: number;
 }
 
-export function ParallelBranchControls({ node }: ParallelBranchControlsProps) {
-  const { setBranchGain, setBranchSolo, setBranchMute, _endContinuousGesture } = useChainStore();
+/**
+ * Per-branch strip for a parallel group: solo, mute, phase invert and gain.
+ * Sits above each branch so the branch content keeps its full width.
+ */
+export function ParallelBranchControls({ node, branchIndex }: ParallelBranchControlsProps) {
+  const { setBranchGain, setBranchSolo, setBranchMute, setBranchPolarity } = useChainStore();
 
+  const isSoloed = node.type === 'plugin' ? node.solo : false;
+  const isMuted = node.type === 'plugin' ? node.mute : false;
   const gainDb = node.type === 'plugin' ? node.branchGainDb : 0;
-  const isSolo = node.type === 'plugin' ? node.solo : false;
-  const isMute = node.type === 'plugin' ? node.mute : false;
+  const isInverted = node.polarityInverted ?? false;
+
+  const toggle = 'w-6 h-5 inline-flex items-center justify-center rounded text-[11px] font-bold transition-colors border';
+  const off = 'bg-plugin-bg text-plugin-dim hover:text-plugin-text border-plugin-border';
 
   return (
-    <div className="flex flex-col items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-      {/* Solo/Mute buttons */}
-      <div className="flex items-center gap-0.5">
-        <button
-          onClick={() => setBranchSolo(node.id, !isSolo)}
-          className="px-1 py-0.5 rounded text-xxs font-bold"
-          style={{
-            fontFamily: 'var(--font-system)',
-            letterSpacing: 'var(--tracking-wide)',
-            background: isSolo ? 'rgba(222, 255, 10, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-            color: isSolo ? '#deff0a' : 'var(--color-text-tertiary)',
-            border: isSolo ? '1px solid rgba(222, 255, 10, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
-            transition: 'all var(--duration-fast) var(--ease-snap)',
-          }}
-          title={isSolo ? 'Unsolo branch' : 'Solo branch'}
-        >
-          S
-        </button>
-        <button
-          onClick={() => setBranchMute(node.id, !isMute)}
-          className="px-1 py-0.5 rounded text-xxs font-bold"
-          style={{
-            fontFamily: 'var(--font-system)',
-            letterSpacing: 'var(--tracking-wide)',
-            background: isMute ? 'rgba(255, 0, 51, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-            color: isMute ? '#ff0033' : 'var(--color-text-tertiary)',
-            border: isMute ? '1px solid rgba(255, 0, 51, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
-            transition: 'all var(--duration-fast) var(--ease-snap)',
-          }}
-          title={isMute ? 'Unmute branch' : 'Mute branch'}
-        >
-          M
-        </button>
-      </div>
+    <div className="flex items-center gap-1 h-6 pl-1" onClick={(e) => e.stopPropagation()}>
+      <span className="section-label !text-plugin-parallel/80 mr-1 whitespace-nowrap">
+        Branch {branchIndex != null ? branchIndex + 1 : ''}
+      </span>
 
-      {/* Gain slider */}
-      <div className="flex items-center gap-1">
+      {/* Solo */}
+      <button
+        onClick={() => setBranchSolo(node.id, !isSoloed)}
+        className={`${toggle} ${isSoloed ? 'bg-yellow-500/25 text-yellow-300 border-yellow-500/50' : off}`}
+        title={isSoloed ? 'Unsolo' : 'Solo'}
+        aria-pressed={isSoloed}
+      >
+        S
+      </button>
+
+      {/* Mute */}
+      <button
+        onClick={() => setBranchMute(node.id, !isMuted)}
+        className={`${toggle} ${isMuted ? 'bg-red-500/25 text-red-300 border-red-500/50' : off}`}
+        title={isMuted ? 'Unmute' : 'Mute'}
+        aria-pressed={isMuted}
+      >
+        M
+      </button>
+
+      {/* Phase invert */}
+      <button
+        onClick={() => setBranchPolarity(node.id, !isInverted)}
+        className={`${toggle} ${isInverted ? 'bg-plugin-accent/25 text-plugin-accent-bright border-plugin-accent/50' : off}`}
+        title={isInverted ? 'Restore phase' : 'Invert phase'}
+        aria-pressed={isInverted}
+      >
+        Ø
+      </button>
+
+      {/* Gain */}
+      <div className="flex items-center gap-1.5 ml-2">
+        <span className="section-label">Gain</span>
         <Slider
           value={gainDb}
           min={-60}
           max={12}
           step={0.5}
-          color="accent"
-          width="w-16"
+          color="orange"
+          width="w-20"
           onChange={(v) => setBranchGain(node.id, v)}
-          onDragEnd={_endContinuousGesture}
           title={`${gainDb.toFixed(1)} dB`}
         />
-        <span
-          className="text-xxs w-10 text-right tabular-nums"
-          style={{
-            fontFamily: 'var(--font-system)',
-            color: 'var(--color-text-tertiary)',
-            letterSpacing: 'var(--tracking-wide)',
-          }}
-        >
-          {gainDb >= 0 ? '+' : ''}{gainDb.toFixed(1)}
+        <span className="num text-[10px] text-plugin-muted w-14 text-right whitespace-nowrap">
+          {gainDb >= 0 ? '+' : ''}{gainDb.toFixed(1)} dB
         </span>
       </div>
     </div>

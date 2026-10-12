@@ -4,40 +4,36 @@ import App from './App'
 import './index.css'
 
 function initReact() {
+  console.log('main.tsx: Starting React initialization')
+  console.log('window.__JUCE__:', typeof window.__JUCE__, window.__JUCE__)
+
   try {
     const rootElement = document.getElementById('root')
-    console.log('[main.tsx] Root element found:', !!rootElement)
-    console.log('[main.tsx] React version:', React.version)
-    console.log('[main.tsx] ReactDOM version:', ReactDOM.version)
+    console.log('root element:', rootElement)
 
     if (rootElement) {
-      console.log('[main.tsx] Creating React root...')
       const root = ReactDOM.createRoot(rootElement)
+      console.log('ReactDOM root created')
 
-      console.log('[main.tsx] Rendering App...')
       root.render(
         <React.StrictMode>
           <App />
         </React.StrictMode>,
       )
-      console.log('[main.tsx] App render complete')
+      console.log('React render called')
     } else {
-      console.error('[main.tsx] Root element not found!')
+      console.error('Root element not found!')
       document.body.innerHTML = '<div style="color: white; padding: 20px;">Root element not found!</div>'
     }
   } catch (error) {
-    console.error('[main.tsx] Fatal error:', error)
+    console.error('React initialization error:', error)
     document.body.innerHTML = `<div style="color: white; padding: 20px;">React error: ${error}</div>`
   }
 }
 
 // Wait for DOM to be ready before initializing React
 if (document.readyState === 'loading') {
-  console.log('[main.tsx] Waiting for DOMContentLoaded...')
   document.addEventListener('DOMContentLoaded', initReact)
 } else {
-  console.log('[main.tsx] DOM already ready, initializing...')
   initReact()
 }
-
-console.log('[main.tsx] Script loaded, readyState:', document.readyState)

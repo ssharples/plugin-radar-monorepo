@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import * as convexClient from '../api/convex-client';
-import { clearEnrichmentCache } from '../api/convex-client';
 import type { PluginDescription } from '../api/types';
 
 interface SyncState {
@@ -20,7 +19,6 @@ interface SyncActions {
   register: (email: string, password: string, name?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   syncPlugins: (plugins: PluginDescription[]) => Promise<void>;
-  autoSync: () => Promise<void>;
 }
 
 const initialState: SyncState = {
@@ -108,24 +106,6 @@ export const useSyncStore = create<SyncState & SyncActions>((set, get) => ({
         inCatalog: result.inCatalog,
         newPlugins: result.newPlugins,
       });
-    }
-  },
-
-  autoSync: async () => {
-    const { isLoggedIn, isSyncing } = get();
-    if (!isLoggedIn || isSyncing) return;
-
-    // Access pluginStore at runtime to avoid circular import
-    const { usePluginStore } = await import('./pluginStore');
-    const plugins = usePluginStore.getState().plugins;
-    if (plugins.length === 0) return;
-
-    try {
-      await get().syncPlugins(plugins);
-      clearEnrichmentCache();
-      usePluginStore.getState().loadEnrichmentData();
-    } catch {
-      // Silent failure — enrichment will just be empty
     }
   },
 }));

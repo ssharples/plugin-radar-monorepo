@@ -29,6 +29,11 @@ public:
     // Setters (UI thread) - only store to atomics, never touch SmoothedValue
     void setInputGain(float dB);
     void setOutputGain(float dB);
+    void setGainMatchEnabled(bool enabled) { gainMatchEnabled.store(enabled, std::memory_order_release); }
+    bool isGainMatchEnabled() const { return gainMatchEnabled.load(std::memory_order_acquire); }
+    void setGainMatchTargetDB(float dB);
+    float getGainMatchTargetDB() const { return gainMatchTargetDB.load(std::memory_order_relaxed); }
+    void processGainMatch(juce::AudioBuffer<float>& buffer, float inputRms, float outputRms);
 
     // Getters (thread-safe for UI)
     float getInputGainDB() const { return inputGainDB.load(std::memory_order_relaxed); }
@@ -42,17 +47,16 @@ private:
     static float dbToLinear(float dB);
     static float clampGain(float dB);
 
-    void applySmoothedGain(juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative>& smoother,
-                           std::atomic<float>& pendingGainLinear,
-                           juce::AudioBuffer<float>& buffer);
-
     // SmoothedValue - ONLY accessed from the audio thread
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> inputGainSmoothed;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> outputGainSmoothed;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> gainMatchSmoothed;
 
     // Atomic targets: UI thread writes, audio thread reads
     std::atomic<float> pendingInputGainLinear{1.0f};
     std::atomic<float> pendingOutputGainLinear{1.0f};
+    std::atomic<float> gainMatchTargetDB{0.0f};
+    std::atomic<bool> gainMatchEnabled{false};
 
     // dB values for UI readback
     std::atomic<float> inputGainDB{DefaultGainDB};

@@ -33,13 +33,7 @@ void DryWetMixProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     if (numChannels < 4)
     {
         // Fallback passthrough — don't silently produce silence
-        jassertfalse;
-        return;
-    }
-
-    if (numSamples <= 0 || numSamples > 8192)
-    {
-        jassertfalse;
+        DBG("DryWetMixProcessor: expected 4 channels, got " + juce::String(numChannels));
         return;
     }
 
@@ -65,20 +59,14 @@ void DryWetMixProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
     else
     {
-        // PHASE 8: SIMD vectorization for constant mix value (non-smoothing path)
-        // Use JUCE's FloatVectorOperations for 2-3x speedup via SSE/AVX
         const float w = smoothedMix.getCurrentValue();
         const float d = 1.0f - w;
 
-        // outL = dryL * d + wetL * w
-        juce::FloatVectorOperations::copy(outL, dryL, numSamples);
-        juce::FloatVectorOperations::multiply(outL, d, numSamples);
-        juce::FloatVectorOperations::addWithMultiply(outL, wetL, w, numSamples);
-
-        // outR = dryR * d + wetR * w
-        juce::FloatVectorOperations::copy(outR, dryR, numSamples);
-        juce::FloatVectorOperations::multiply(outR, d, numSamples);
-        juce::FloatVectorOperations::addWithMultiply(outR, wetR, w, numSamples);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            outL[i] = dryL[i] * d + wetL[i] * w;
+            outR[i] = dryR[i] * d + wetR[i] * w;
+        }
     }
 
     // Clear the extra channels (wet inputs) so they don't bleed

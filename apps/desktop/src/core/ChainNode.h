@@ -3,64 +3,40 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <variant>
 #include <vector>
-#include <map>
 #include <memory>
 #include <functional>
 
 using ChainNodeId = int;
 
-// Parameter data from seeded chains (applied after plugin load when no binary presetData exists)
-struct PendingParameter
-{
-    juce::String name;           // "Band 1 Frequency"
-    juce::String semantic;       // "eq_band_1_freq"
-    juce::String unit;           // "hz"
-    float physicalValue = 0.f;   // 1000.0 (the actual physical value)
-    float normalizedValue = 0.f; // 0-1 fallback (seed's normalization)
-    bool hasPhysicalValue = false;
-};
-
 enum class GroupMode
 {
     Serial,
-    Parallel
+    Parallel,
+    Crossover   // Each child is one frequency band; the bands add back up flat
 };
 
-enum class MidSideMode
-{
-    Off = 0,       // Normal stereo L/R (default)
-    MidOnly = 1,   // Process mid only, bypass side
-    SideOnly = 2,  // Process side only, bypass mid
-    MidSide = 3    // Full M/S: mid on L input, side on R input
-};
+constexpr int kMaxCrossoverBands = 5;
+
+// "serial" / "parallel" / "crossover"
+const char* groupModeName(GroupMode mode);
+bool parseGroupMode(const juce::String& text, GroupMode& mode);
+// Parallel and crossover groups both split the signal into summed branches
+inline bool isBranchingMode(GroupMode mode) { return mode != GroupMode::Serial; }
 
 struct PluginLeaf
 {
+    juce::String persistentId = juce::Uuid().toString();
     juce::PluginDescription description;
     juce::AudioProcessorGraph::NodeID graphNodeId;
     juce::AudioProcessorGraph::NodeID meterNodeId;       // Output meter (after plugin)
     juce::AudioProcessorGraph::NodeID inputMeterNodeId;  // Input meter (before plugin)
     bool bypassed = false;
-    bool isDryPath = false;          // True for empty/passthrough branches in parallel groups
-    juce::String pendingPresetData;  // Preset data to apply after prepareToPlay (for safe import)
-
-    // Per-plugin controls (serialized in presets)
-    float inputGainDb = 0.0f;
-    float outputGainDb = 0.0f;
-    float dryWetMix = 1.0f;          // 0.0=dry, 1.0=wet
-    int sidechainSource = 0;          // 0=none, 1=external (host SC bus)
-    MidSideMode midSideMode = MidSideMode::Off;  // M/S processing mode
-
-    // Utility graph node IDs (created during wiring, NOT serialized)
-    juce::AudioProcessorGraph::NodeID inputGainNodeId;
-    juce::AudioProcessorGraph::NodeID outputGainNodeId;
-    juce::AudioProcessorGraph::NodeID pluginDryWetNodeId;
-    juce::AudioProcessorGraph::NodeID msEncodeNodeId;
-    juce::AudioProcessorGraph::NodeID msDecodeNodeId;
-    juce::AudioProcessorGraph::NodeID msBypassDelayNodeId;
-
-    // Pending parameter values from seeded chains (cleared after application)
-    std::vector<PendingParameter> pendingParameters;
+    bool suspended = false;
+    bool recallSafe = false;     // Chain/preset loads keep this slot as it is
+    bool ignoreLatency = false;  // Leave this plugin out of delay compensation
+    bool sidechain = false;      // Key the plugin from ProChain's sidechain input
+    juce::String retainedState;
+    juce::String loadError;
 };
 
 // Forward declare ChainNode so GroupData can hold unique_ptr<ChainNode>
@@ -70,24 +46,37 @@ struct GroupData
 {
     GroupMode mode = GroupMode::Serial;
     float dryWetMix = 1.0f;
-    float duckAmount = 0.0f;       // 0.0 = no ducking, 1.0 = full ducking (serial and parallel groups)
-    float duckReleaseMs = 200.0f;  // Envelope release time in ms (50-1000)
     std::vector<std::unique_ptr<ChainNode>> children;
 
     // Internal graph node IDs created during rebuildGraph (not serialized)
     juce::AudioProcessorGraph::NodeID dryWetMixNodeId;
     juce::AudioProcessorGraph::NodeID sumGainNodeId;
-    juce::AudioProcessorGraph::NodeID duckingNodeId;  // DuckingProcessor for serial and parallel group ducking
     std::vector<juce::AudioProcessorGraph::NodeID> branchGainNodeIds;
+    std::vector<juce::AudioProcessorGraph::NodeID> branchGateNodeIds;
+
+    // Crossover only: split points in Hz, one fewer than the bands (serialized)
+    std::vector<float> crossoverHz;
+    std::vector<juce::AudioProcessorGraph::NodeID> bandFilterNodeIds;
 };
+
+namespace CrossoverHelpers
+{
+    // Default split points for a number of bands
+    std::vector<float> defaultFrequencies(int numBands);
+    // Makes the split points fit the band count: keeps valid ones, else uses the defaults
+    void fitFrequencies(GroupData& group);
+    juce::String toString(const std::vector<float>& frequencies);
+    bool fromString(const juce::String& text, std::vector<float>& frequencies);
+}
 
 struct ChainNode
 {
     ChainNodeId id = 0;
     juce::String name;
     float branchGainDb = 0.0f;
-    std::atomic<bool> solo { false };
-    std::atomic<bool> mute { false };
+    bool solo = false;
+    bool mute = false;
+    bool polarityInverted = false;  // Flip the sign of this parallel branch
     bool collapsed = false;
     std::variant<PluginLeaf, GroupData> data;
 

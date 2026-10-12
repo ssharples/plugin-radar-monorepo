@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Download, X, RefreshCw, Inbox, Check } from 'lucide-react';
-import { convex, getStoredSession, recordChainLoadResult } from '../../api/convex-client';
+import * as convexClient from '../../api/convex-client';
 import { api } from '@convex/_generated/api';
 import { juceBridge } from '../../api/juce-bridge';
-import { autoDiscoverAllPlugins } from '../../stores/chainStore';
 
 interface ReceivedChain {
   _id: string;
@@ -18,13 +17,6 @@ interface ReceivedChain {
 interface ReceivedChainsProps {
   onBadgeCount?: (count: number) => void;
 }
-
-const cardStyle: React.CSSProperties = {
-  background: 'var(--color-bg-secondary)',
-  borderRadius: 'var(--radius-lg)',
-  padding: 'var(--space-4)',
-  border: '1px solid var(--color-border-default)',
-};
 
 export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
   const [chains, setChains] = useState<ReceivedChain[]>([]);
@@ -41,120 +33,66 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
   }, [chains.length, onBadgeCount]);
 
   const loadChains = async () => {
-    const token = getStoredSession();
+    const token = localStorage.getItem('pluginradar_session');
     if (!token) {
       setLoading(false);
       return;
     }
 
     try {
-      const res = await convex.query(api.privateChains.getReceivedChains, {
+      const res = await convexClient.convex.query(api.privateChains.getReceivedChains, {
         sessionToken: token,
       });
       setChains(res as ReceivedChain[]);
-    } catch {
-      // Error handled silently
+    } catch (err) {
+      console.error('Failed to load received chains:', err);
     }
     setLoading(false);
   };
 
   const handleAccept = async (shareId: string) => {
     setProcessing(shareId);
-    const token = getStoredSession();
+    const token = localStorage.getItem('pluginradar_session');
     if (!token) return;
 
     try {
-      const result = await convex.mutation(api.privateChains.acceptChain, {
+      const result = await convexClient.convex.mutation(api.privateChains.acceptChain, {
         sessionToken: token,
         shareId: shareId as any,
       });
 
+      // Parse the chain data and import it via the JUCE bridge
       if (result.chainData) {
-        let rawData;
+        const chainData = JSON.parse(result.chainData);
         try {
-          rawData = JSON.parse(result.chainData);
-        } catch {
-          // Invalid JSON — skip import
-          setProcessing(null);
-          return;
-        }
-        if (rawData) {
-          // Map Convex slot format to JUCE import format
-          const chainData = {
-            version: 1,
-            numSlots: rawData.slots?.length ?? 0,
-            slots: (rawData.slots ?? []).map((slot: any, idx: number) => ({
-              type: 'plugin',
-              id: idx + 1,
-              index: slot.position ?? idx,
-              name: slot.pluginName ?? slot.name ?? '',
-              manufacturer: slot.manufacturer ?? '',
-              format: slot.format || 'VST3',
-              uid: slot.uid || 0,
-              fileOrIdentifier: slot.fileOrIdentifier || '',
-              version: slot.version || '',
-              bypassed: slot.bypassed ?? false,
-              presetData: slot.presetData || '',
-              presetSizeBytes: slot.presetSizeBytes || 0,
-              parameters: slot.parameters ? slot.parameters.map((p: any) => ({
-                name: p.name || '',
-                semantic: p.semantic || '',
-                unit: p.unit || '',
-                value: String(p.value ?? ''),
-                normalizedValue: p.normalizedValue ?? 0,
-              })) : [],
-            })),
-          };
-          try {
-            const loadStart = performance.now();
-            const importResult = await juceBridge.importChain(chainData);
-            const loadTimeMs = Math.round(performance.now() - loadStart);
-
-            // Report load result (best-effort)
-            recordChainLoadResult({
-              chainId: result.chainId,
-              totalSlots: (importResult as any).totalSlots ?? chainData.numSlots,
-              loadedSlots: (importResult as any).loadedSlots ?? chainData.numSlots,
-              failedSlots: (importResult as any).failedSlots ?? 0,
-              substitutedSlots: 0,
-              failures: (importResult as any).failures,
-              loadTimeMs,
-            });
-
-            if (importResult.success) {
-              setImportedChain(result.chainName);
-              setTimeout(() => setImportedChain(null), 3000);
-              // Fire-and-forget: crowdpool parameter discovery
-              if (importResult.chainState?.nodes) {
-                autoDiscoverAllPlugins(importResult.chainState.nodes).catch(() => {});
-              }
-            }
-          } catch {
-            // Import failed silently
-          }
+          await juceBridge.importChain(chainData);
+          setImportedChain(result.chainName);
+          setTimeout(() => setImportedChain(null), 3000);
+        } catch (importErr) {
+          console.error('Failed to import chain into JUCE:', importErr);
         }
       }
 
       setChains((prev) => prev.filter((c) => c._id !== shareId));
-    } catch {
-      // Error handled silently
+    } catch (err) {
+      console.error('Failed to accept chain:', err);
     }
     setProcessing(null);
   };
 
   const handleReject = async (shareId: string) => {
     setProcessing(shareId);
-    const token = getStoredSession();
+    const token = localStorage.getItem('pluginradar_session');
     if (!token) return;
 
     try {
-      await convex.mutation(api.privateChains.rejectChain, {
+      await convexClient.convex.mutation(api.privateChains.rejectChain, {
         sessionToken: token,
         shareId: shareId as any,
       });
       setChains((prev) => prev.filter((c) => c._id !== shareId));
-    } catch {
-      // Error handled silently
+    } catch (err) {
+      console.error('Failed to reject chain:', err);
     }
     setProcessing(null);
   };
@@ -169,29 +107,27 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
 
   if (loading) {
     return (
-      <div style={cardStyle}>
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-system)' }}>Loading received chains...</div>
+      <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
+        <div className="text-plugin-muted text-sm">Loading received chains...</div>
       </div>
     );
   }
 
   return (
-    <div style={cardStyle}>
+    <div className="bg-plugin-surface rounded-lg p-4 border border-plugin-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Inbox size={18} style={{ color: 'var(--color-accent-cyan)' }} />
-          <h3 style={{ color: '#deff0a', fontFamily: 'var(--font-system)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Received Chains</h3>
+          <Inbox size={18} className="text-plugin-accent" />
+          <h3 className="text-plugin-text  font-medium">Received Chains</h3>
           {chains.length > 0 && (
-            <span className="badge badge-cyan" style={{ animation: 'neon-pulse 2s ease-in-out infinite' }}>
+            <span className="bg-plugin-accent text-plugin-on-accent font-semibold text-xs rounded-full px-2 py-0.5 animate-pulse">
               {chains.length}
             </span>
           )}
         </div>
         <button
           onClick={loadChains}
-          style={{ color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
+          className="text-plugin-muted hover:text-plugin-text p-1"
           title="Refresh"
         >
           <RefreshCw size={14} />
@@ -199,14 +135,14 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
       </div>
 
       {importedChain && (
-        <div className="flex items-center gap-2" style={{ background: 'rgba(0, 255, 65, 0.1)', border: '1px solid rgba(0, 255, 65, 0.3)', borderRadius: 'var(--radius-base)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)', color: 'var(--color-status-active)', fontSize: 'var(--text-sm)' }}>
+        <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded p-3 mb-3 text-green-400 text-sm">
           <Check size={14} />
           Imported "{importedChain}" into your chain!
         </div>
       )}
 
       {chains.length === 0 ? (
-        <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
+        <div className="text-plugin-dim text-sm text-center py-4">
           No pending chains. When friends share chains with you, they'll appear here.
         </div>
       ) : (
@@ -214,13 +150,13 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
           {chains.map((chain) => (
             <div
               key={chain._id}
-              style={{ background: 'var(--color-bg-input)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}
+              className="bg-black/20 rounded p-3"
             >
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <div style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-system)' }}>{chain.chainName}</div>
-                  <div style={{ color: 'var(--color-text-disabled)', fontSize: 'var(--text-xs)' }}>
-                    From <span style={{ color: 'var(--color-accent-cyan)' }}>{chain.senderUsername}</span> &bull; {formatTime(chain.sentAt)}
+                  <div className="text-plugin-text text-sm font-medium">{chain.chainName}</div>
+                  <div className="text-plugin-dim text-xs">
+                    From <span className="text-plugin-accent">{chain.senderUsername}</span> • {formatTime(chain.sentAt)}
                   </div>
                 </div>
               </div>
@@ -228,8 +164,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
                 <button
                   onClick={() => handleAccept(chain._id)}
                   disabled={processing === chain._id}
-                  className="btn btn-primary flex-1 flex items-center justify-center gap-1"
-                  style={{ fontSize: 'var(--text-sm)' }}
+                  className="flex-1 flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-plugin-text text-sm rounded px-3 py-1.5"
                 >
                   <Download size={14} />
                   Import
@@ -237,8 +172,7 @@ export function ReceivedChains({ onBadgeCount }: ReceivedChainsProps) {
                 <button
                   onClick={() => handleReject(chain._id)}
                   disabled={processing === chain._id}
-                  className="btn btn-danger flex items-center justify-center gap-1"
-                  style={{ fontSize: 'var(--text-sm)' }}
+                  className="flex items-center justify-center gap-1 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 text-sm rounded px-3 py-1.5"
                 >
                   <X size={14} />
                 </button>

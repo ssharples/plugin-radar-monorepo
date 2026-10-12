@@ -17,92 +17,74 @@ export function LoginStep() {
 
   const isDisabled = !email.trim() || !password.trim() || (authMode === 'register' && !name.trim())
 
+  const inputClass =
+    'w-full h-10 px-3 bg-plugin-bg border border-plugin-border rounded-md text-sm text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent transition-colors'
+
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-sm px-6 animate-fade-in">
-      {/* ProChain brand */}
-      <h1
-        className="font-brand crt-text mb-1"
-        style={{ fontSize: '1.875rem', color: 'var(--color-accent-cyan)', letterSpacing: 'var(--tracking-wider)' }}
-      >
-        ProChain
-      </h1>
-      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', textTransform: 'capitalize', letterSpacing: 'var(--tracking-widest)', marginBottom: '2rem' }}>
-        Plugin Chain Manager
+    <div className="flex flex-col w-full max-w-[360px] px-6 animate-fade-in">
+      <h1 className="text-2xl font-semibold text-plugin-text tracking-tight">ProChain</h1>
+      <p className="text-plugin-muted text-[13px] mt-1 mb-6">
+        {authMode === 'login'
+          ? 'Log in to sync your plugins and use the chain library.'
+          : 'Create a free account to share chains and follow creators.'}
       </p>
 
-      {/* Auth mode tabs */}
-      <div className="flex w-full mb-6" style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+      <div className="flex w-full mb-5 rounded-md bg-plugin-surface border border-plugin-border p-0.5" role="group" aria-label="Login or register">
         <button
           type="button"
+          aria-pressed={authMode === 'login'}
           onClick={() => setAuthMode('login')}
-          className="flex-1 fast-snap"
-          style={{
-            padding: '8px 0',
-            fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-system)',
-            textTransform: 'uppercase',
-            letterSpacing: 'var(--tracking-wider)',
-            border: 'none',
-            cursor: 'pointer',
-            background: authMode === 'login' ? 'var(--color-accent-cyan)' : 'rgba(0, 0, 0, 0.4)',
-            color: authMode === 'login' ? 'black' : 'var(--color-text-disabled)',
-            transition: 'all var(--duration-fast)',
-          }}
+          className={`flex-1 h-8 text-[13px] font-semibold rounded transition-colors ${
+            authMode === 'login' ? 'bg-plugin-raised text-plugin-text' : 'text-plugin-muted hover:text-plugin-text'
+          }`}
         >
           Login
         </button>
         <button
           type="button"
+          aria-pressed={authMode === 'register'}
           onClick={() => setAuthMode('register')}
-          className="flex-1 fast-snap"
-          style={{
-            padding: '8px 0',
-            fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-system)',
-            textTransform: 'uppercase',
-            letterSpacing: 'var(--tracking-wider)',
-            border: 'none',
-            cursor: 'pointer',
-            background: authMode === 'register' ? 'var(--color-accent-cyan)' : 'rgba(0, 0, 0, 0.4)',
-            color: authMode === 'register' ? 'black' : 'var(--color-text-disabled)',
-            transition: 'all var(--duration-fast)',
-          }}
+          className={`flex-1 h-8 text-[13px] font-semibold rounded transition-colors ${
+            authMode === 'register' ? 'bg-plugin-raised text-plugin-text' : 'text-plugin-muted hover:text-plugin-text'
+          }`}
         >
           Register
         </button>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="flex flex-col w-full gap-3">
+      <form onSubmit={handleSubmit} className="flex flex-col w-full gap-2.5">
         {authMode === 'register' && (
           <input
             type="text"
             placeholder="Name"
+            aria-label="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="input w-full"
+            className={inputClass}
             autoComplete="name"
           />
         )}
         <input
           type="email"
           placeholder="Email"
+          aria-label="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="input w-full"
+          className={inputClass}
           autoComplete="email"
         />
         <input
           type="password"
           placeholder="Password"
+          aria-label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="input w-full"
+          className={inputClass}
           autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
         />
 
         {authError && (
-          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '8px 12px' }}>
+          <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/25 rounded-md px-3 py-2" role="alert">
             {authError}
           </div>
         )}
@@ -110,8 +92,7 @@ export function LoginStep() {
         <button
           type="submit"
           disabled={isDisabled || authLoading}
-          className="btn btn-primary w-full"
-          style={{ marginTop: '4px', opacity: isDisabled || authLoading ? 0.4 : 1, cursor: isDisabled || authLoading ? 'not-allowed' : 'pointer' }}
+          className="w-full h-10 mt-1 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent text-sm font-semibold rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {authLoading ? 'Loading...' : authMode === 'login' ? 'Sign In' : 'Create Account'}
         </button>

@@ -1,0 +1,667 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-05T18:03:54Z",
+  "title": "Design System: Studio Time Machine",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Archive Ink",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#000000",
+          "#242424",
+          "#484848",
+          "#6D6D6D",
+          "#919191",
+          "#B6B6B6",
+          "#DADADA",
+          "#FFFFFF"
+        ]
+      },
+      "paper-ink": {
+        "role": "neutral",
+        "displayName": "Paper Ink",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#262626",
+          "#484848",
+          "#6A6A6A",
+          "#8D8D8D",
+          "#AFAFAF",
+          "#D2D2D2",
+          "#EEEEEE",
+          "#FFFFFF"
+        ]
+      },
+      "selection-faint": {
+        "role": "neutral",
+        "displayName": "Faint Selection",
+        "canonical": "rgba(0, 0, 0, 0.08)",
+        "tonalRamp": [
+          "rgba(0,0,0,0.90)",
+          "rgba(0,0,0,0.70)",
+          "rgba(0,0,0,0.50)",
+          "rgba(0,0,0,0.32)",
+          "rgba(0,0,0,0.20)",
+          "rgba(0,0,0,0.12)",
+          "rgba(0,0,0,0.08)",
+          "rgba(0,0,0,0.03)"
+        ]
+      },
+      "selection-soft": {
+        "role": "neutral",
+        "displayName": "Soft Selection",
+        "canonical": "rgba(0, 0, 0, 0.09)",
+        "tonalRamp": [
+          "rgba(0,0,0,0.90)",
+          "rgba(0,0,0,0.70)",
+          "rgba(0,0,0,0.50)",
+          "rgba(0,0,0,0.32)",
+          "rgba(0,0,0,0.20)",
+          "rgba(0,0,0,0.14)",
+          "rgba(0,0,0,0.09)",
+          "rgba(0,0,0,0.03)"
+        ]
+      },
+      "panel-soft": {
+        "role": "neutral",
+        "displayName": "Soft Panel",
+        "canonical": "rgba(0, 0, 0, 0.06)",
+        "tonalRamp": [
+          "rgba(0,0,0,0.86)",
+          "rgba(0,0,0,0.66)",
+          "rgba(0,0,0,0.46)",
+          "rgba(0,0,0,0.28)",
+          "rgba(0,0,0,0.17)",
+          "rgba(0,0,0,0.10)",
+          "rgba(0,0,0,0.06)",
+          "rgba(0,0,0,0.02)"
+        ]
+      },
+      "divider-soft": {
+        "role": "neutral",
+        "displayName": "Soft Divider",
+        "canonical": "rgba(0, 0, 0, 0.20)",
+        "tonalRamp": [
+          "rgba(0,0,0,0.92)",
+          "rgba(0,0,0,0.76)",
+          "rgba(0,0,0,0.60)",
+          "rgba(0,0,0,0.45)",
+          "rgba(0,0,0,0.32)",
+          "rgba(0,0,0,0.20)",
+          "rgba(0,0,0,0.10)",
+          "rgba(0,0,0,0.03)"
+        ]
+      },
+      "sleeve-rose": {
+        "role": "secondary",
+        "displayName": "Sleeve Rose",
+        "canonical": "#F04D6B",
+        "tonalRamp": [
+          "color-mix(in srgb, #F04D6B 32%, black)",
+          "color-mix(in srgb, #F04D6B 48%, black)",
+          "color-mix(in srgb, #F04D6B 66%, black)",
+          "#F04D6B",
+          "color-mix(in srgb, #F04D6B 82%, white)",
+          "color-mix(in srgb, #F04D6B 64%, white)",
+          "color-mix(in srgb, #F04D6B 42%, white)",
+          "color-mix(in srgb, #F04D6B 16%, white)"
+        ]
+      },
+      "sleeve-wine": {
+        "role": "secondary",
+        "displayName": "Sleeve Wine",
+        "canonical": "#8C1438",
+        "tonalRamp": [
+          "color-mix(in srgb, #8C1438 32%, black)",
+          "color-mix(in srgb, #8C1438 48%, black)",
+          "color-mix(in srgb, #8C1438 66%, black)",
+          "#8C1438",
+          "color-mix(in srgb, #8C1438 82%, white)",
+          "color-mix(in srgb, #8C1438 64%, white)",
+          "color-mix(in srgb, #8C1438 42%, white)",
+          "color-mix(in srgb, #8C1438 16%, white)"
+        ]
+      },
+      "sleeve-sky": {
+        "role": "secondary",
+        "displayName": "Sleeve Sky",
+        "canonical": "#47ABDB",
+        "tonalRamp": [
+          "color-mix(in srgb, #47ABDB 32%, black)",
+          "color-mix(in srgb, #47ABDB 48%, black)",
+          "color-mix(in srgb, #47ABDB 66%, black)",
+          "#47ABDB",
+          "color-mix(in srgb, #47ABDB 82%, white)",
+          "color-mix(in srgb, #47ABDB 64%, white)",
+          "color-mix(in srgb, #47ABDB 42%, white)",
+          "color-mix(in srgb, #47ABDB 16%, white)"
+        ]
+      },
+      "sleeve-ocean": {
+        "role": "secondary",
+        "displayName": "Sleeve Ocean",
+        "canonical": "#144A87",
+        "tonalRamp": [
+          "color-mix(in srgb, #144A87 32%, black)",
+          "color-mix(in srgb, #144A87 48%, black)",
+          "color-mix(in srgb, #144A87 66%, black)",
+          "#144A87",
+          "color-mix(in srgb, #144A87 82%, white)",
+          "color-mix(in srgb, #144A87 64%, white)",
+          "color-mix(in srgb, #144A87 42%, white)",
+          "color-mix(in srgb, #144A87 16%, white)"
+        ]
+      },
+      "sleeve-gold": {
+        "role": "secondary",
+        "displayName": "Sleeve Gold",
+        "canonical": "#F7BA38",
+        "tonalRamp": [
+          "color-mix(in srgb, #F7BA38 32%, black)",
+          "color-mix(in srgb, #F7BA38 48%, black)",
+          "color-mix(in srgb, #F7BA38 66%, black)",
+          "#F7BA38",
+          "color-mix(in srgb, #F7BA38 82%, white)",
+          "color-mix(in srgb, #F7BA38 64%, white)",
+          "color-mix(in srgb, #F7BA38 42%, white)",
+          "color-mix(in srgb, #F7BA38 16%, white)"
+        ]
+      },
+      "sleeve-amber": {
+        "role": "secondary",
+        "displayName": "Sleeve Amber",
+        "canonical": "#C44F12",
+        "tonalRamp": [
+          "color-mix(in srgb, #C44F12 32%, black)",
+          "color-mix(in srgb, #C44F12 48%, black)",
+          "color-mix(in srgb, #C44F12 66%, black)",
+          "#C44F12",
+          "color-mix(in srgb, #C44F12 82%, white)",
+          "color-mix(in srgb, #C44F12 64%, white)",
+          "color-mix(in srgb, #C44F12 42%, white)",
+          "color-mix(in srgb, #C44F12 16%, white)"
+        ]
+      },
+      "sleeve-leaf": {
+        "role": "secondary",
+        "displayName": "Sleeve Leaf",
+        "canonical": "#7AC287",
+        "tonalRamp": [
+          "color-mix(in srgb, #7AC287 32%, black)",
+          "color-mix(in srgb, #7AC287 48%, black)",
+          "color-mix(in srgb, #7AC287 66%, black)",
+          "#7AC287",
+          "color-mix(in srgb, #7AC287 82%, white)",
+          "color-mix(in srgb, #7AC287 64%, white)",
+          "color-mix(in srgb, #7AC287 42%, white)",
+          "color-mix(in srgb, #7AC287 16%, white)"
+        ]
+      },
+      "sleeve-forest": {
+        "role": "secondary",
+        "displayName": "Sleeve Forest",
+        "canonical": "#1A6645",
+        "tonalRamp": [
+          "color-mix(in srgb, #1A6645 32%, black)",
+          "color-mix(in srgb, #1A6645 48%, black)",
+          "color-mix(in srgb, #1A6645 66%, black)",
+          "#1A6645",
+          "color-mix(in srgb, #1A6645 82%, white)",
+          "color-mix(in srgb, #1A6645 64%, white)",
+          "color-mix(in srgb, #1A6645 42%, white)",
+          "color-mix(in srgb, #1A6645 16%, white)"
+        ]
+      },
+      "sleeve-lilac": {
+        "role": "secondary",
+        "displayName": "Sleeve Lilac",
+        "canonical": "#A380D9",
+        "tonalRamp": [
+          "color-mix(in srgb, #A380D9 32%, black)",
+          "color-mix(in srgb, #A380D9 48%, black)",
+          "color-mix(in srgb, #A380D9 66%, black)",
+          "#A380D9",
+          "color-mix(in srgb, #A380D9 82%, white)",
+          "color-mix(in srgb, #A380D9 64%, white)",
+          "color-mix(in srgb, #A380D9 42%, white)",
+          "color-mix(in srgb, #A380D9 16%, white)"
+        ]
+      },
+      "sleeve-violet": {
+        "role": "secondary",
+        "displayName": "Sleeve Violet",
+        "canonical": "#402982",
+        "tonalRamp": [
+          "color-mix(in srgb, #402982 32%, black)",
+          "color-mix(in srgb, #402982 48%, black)",
+          "color-mix(in srgb, #402982 66%, black)",
+          "#402982",
+          "color-mix(in srgb, #402982 82%, white)",
+          "color-mix(in srgb, #402982 64%, white)",
+          "color-mix(in srgb, #402982 42%, white)",
+          "color-mix(in srgb, #402982 16%, white)"
+        ]
+      },
+      "sleeve-dark-ink": {
+        "role": "neutral",
+        "displayName": "Dark Sleeve Ink",
+        "canonical": "#2E1405",
+        "tonalRamp": [
+          "color-mix(in srgb, #2E1405 32%, black)",
+          "color-mix(in srgb, #2E1405 48%, black)",
+          "color-mix(in srgb, #2E1405 66%, black)",
+          "#2E1405",
+          "color-mix(in srgb, #2E1405 82%, white)",
+          "color-mix(in srgb, #2E1405 64%, white)",
+          "color-mix(in srgb, #2E1405 42%, white)",
+          "color-mix(in srgb, #2E1405 16%, white)"
+        ]
+      },
+      "shell-ink": {
+        "role": "primary",
+        "displayName": "Shell Ink",
+        "canonical": "#131411",
+        "tonalRamp": [
+          "#131411",
+          "#383936",
+          "#5D5D5A",
+          "#82827E",
+          "#A7A7A2",
+          "#CCCCCA",
+          "#E5E5E2",
+          "#FFFFFF"
+        ]
+      },
+      "shell-muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#63635A",
+        "tonalRamp": [
+          "#191917",
+          "#33332F",
+          "#4D4D47",
+          "#63635A",
+          "#85857D",
+          "#A7A79F",
+          "#C9C9C2",
+          "#EBEBE7"
+        ]
+      },
+      "shell-signal": {
+        "role": "primary",
+        "displayName": "Lime Signal",
+        "canonical": "#CDF143",
+        "tonalRamp": [
+          "#29300D",
+          "#56651C",
+          "#83972C",
+          "#AFCB38",
+          "#CDF143",
+          "#D9F574",
+          "#E5FA9F",
+          "#F2FDC9"
+        ]
+      },
+      "shell-chrome-stroke": {
+        "role": "neutral",
+        "displayName": "Chrome Stroke",
+        "canonical": "rgba(255, 255, 255, 0.10)",
+        "tonalRamp": [
+          "rgba(255,255,255,0.02)",
+          "rgba(255,255,255,0.04)",
+          "rgba(255,255,255,0.06)",
+          "rgba(255,255,255,0.08)",
+          "rgba(255,255,255,0.10)",
+          "rgba(255,255,255,0.14)",
+          "rgba(255,255,255,0.20)",
+          "rgba(255,255,255,0.28)"
+        ]
+      },
+      "shell-canvas-stroke": {
+        "role": "neutral",
+        "displayName": "Canvas Stroke",
+        "canonical": "rgba(0, 0, 0, 0.08)",
+        "tonalRamp": [
+          "rgba(0,0,0,0.50)",
+          "rgba(0,0,0,0.35)",
+          "rgba(0,0,0,0.24)",
+          "rgba(0,0,0,0.16)",
+          "rgba(0,0,0,0.12)",
+          "rgba(0,0,0,0.08)",
+          "rgba(0,0,0,0.05)",
+          "rgba(0,0,0,0.02)"
+        ]
+      },
+      "shell-chrome": {
+        "role": "neutral",
+        "displayName": "Shell Chrome",
+        "canonical": "#0E0F0D",
+        "tonalRamp": [
+          "#0E0F0D",
+          "#282926",
+          "#42433F",
+          "#5C5D58",
+          "#767772",
+          "#90918C",
+          "#AAABA5",
+          "#C4C5BF"
+        ]
+      },
+      "shell-chrome-raised": {
+        "role": "neutral",
+        "displayName": "Raised Shell Chrome",
+        "canonical": "#181A17",
+        "tonalRamp": [
+          "#181A17",
+          "#30322E",
+          "#484A45",
+          "#60635C",
+          "#787B73",
+          "#90938A",
+          "#A8ABA2",
+          "#C0C3BA"
+        ]
+      },
+      "workspace-canvas": {
+        "role": "neutral",
+        "displayName": "Workspace Canvas",
+        "canonical": "#F6F4ED",
+        "tonalRamp": [
+          "#262521",
+          "#4C4A45",
+          "#73706A",
+          "#99968E",
+          "#B9B6AE",
+          "#D0CEC6",
+          "#E4E2DA",
+          "#F6F4ED"
+        ]
+      },
+      "workspace-raised": {
+        "role": "neutral",
+        "displayName": "Raised Workspace",
+        "canonical": "#FCFBF7",
+        "tonalRamp": [
+          "#292825",
+          "#514F4A",
+          "#797771",
+          "#A19F98",
+          "#BBB9B2",
+          "#D3D1C9",
+          "#E8E6DE",
+          "#FCFBF7"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "workspace-title": {
+        "displayName": "Workspace Title",
+        "purpose": "Helvetica Neue destination headings such as Studio Library, Locations, Loose audio, and Private chain browser."
+      },
+      "project-title": {
+        "displayName": "Project Title",
+        "purpose": "The selected project name beside its sleeve and disc."
+      },
+      "task-title": {
+        "displayName": "Task Title",
+        "purpose": "The centered first-run invitation."
+      },
+      "native-body": {
+        "displayName": "Native Body",
+        "purpose": "Runtime-sized San Francisco text for controls, evidence, and operational copy."
+      },
+      "native-label": {
+        "displayName": "Native Label",
+        "purpose": "Semibold San Francisco labels for compact hierarchy and state."
+      }
+    },
+    "shadows": [
+      {
+        "name": "disc-ambient",
+        "value": "SwiftUI black 14% opacity, radius 14, x 0, y 7",
+        "purpose": "Physical depth under the revealed version disc."
+      },
+      {
+        "name": "sleeve-ambient",
+        "value": "SwiftUI black 12% opacity, radius 12, x 0, y 6",
+        "purpose": "Physical depth under the project sleeve."
+      },
+      {
+        "name": "transport-ambient",
+        "value": "SwiftUI black 16% opacity, radius 20, x 0, y 10",
+        "purpose": "The one persistent floating layer above library content."
+      }
+    ],
+    "motion": [
+      {
+        "name": "disc-reveal",
+        "value": "SwiftUI spring(response: 0.36, dampingFraction: 0.82)",
+        "purpose": "Moves the disc from 14% to 24% of object size on hover or active selection; disabled when Reduce Motion is enabled."
+      },
+      {
+        "name": "content-lens",
+        "value": "SwiftUI easeOut(duration: 0.18)",
+        "purpose": "Restrained transition between Tracks, Devices, Clips, and Media evidence."
+      },
+      {
+        "name": "disclosure-reveal",
+        "value": "SwiftUI easeOut(duration: 0.18), disabled when Reduce Motion is enabled",
+        "purpose": "Reveals older Set families or nested backups only after an explicit user action."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "minimum-window-width",
+        "value": "980px"
+      },
+      {
+        "name": "minimum-window-height",
+        "value": "650px"
+      },
+      {
+        "name": "detail-reading-width",
+        "value": "980px"
+      },
+      {
+        "name": "evidence-reading-width",
+        "value": "920px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Prominent Native Action",
+      "kind": "button",
+      "description": "Illustrative preview only: Black-tinted primary action used for folder permission, retry, rescan, restore, and verified copy operations.",
+      "html": "<button class=\"ds-btn-prominent\">Choose Ableton Folder</button>",
+      "css": ".ds-btn-prominent { appearance: none; border: 0; border-radius: 7px; background: #000; color: #fff; padding: 8px 14px; font: 600 13px -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 1px 2px rgba(0,0,0,.14); } .ds-btn-prominent:hover { background: #202020; } .ds-btn-prominent:active { transform: translateY(1px); } .ds-btn-prominent:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }"
+    },
+    {
+      "name": "Selected Source Row",
+      "kind": "nav",
+      "refersTo": "source-selection",
+      "description": "Illustrative preview only: Two-line source-list destination with a soft black selected layer and quiet native metadata.",
+      "html": "<button class=\"ds-source-row\"><span class=\"ds-source-icon\">▦</span><span><strong>Studio Library</strong><small>4 projects</small></span></button>",
+      "css": ".ds-source-row { width: 212px; display: flex; gap: 10px; align-items: center; padding: 5px 7px; border: 0; border-radius: 7px; background: rgba(0,0,0,.09); color: CanvasText; text-align: left; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; } .ds-source-row strong, .ds-source-row small { display: block; } .ds-source-row strong { font-weight: 500; } .ds-source-row small { margin-top: 1px; color: GrayText; font-size: 11px; } .ds-source-icon { width: 16px; color: GrayText; } .ds-source-row:hover { background: rgba(0,0,0,.12); } .ds-source-row:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }"
+    },
+    {
+      "name": "Project Sleeve and Disc",
+      "kind": "custom",
+      "description": "Illustrative preview only: The signature deterministic project object; hover or active selection reveals more of the version disc.",
+      "html": "<button class=\"ds-project-object\" aria-label=\"Halogen Sky, 22 Sets\"><span class=\"ds-disc\"></span><span class=\"ds-sleeve\"><span class=\"ds-wave\"></span><b>HS</b></span></button>",
+      "css": ".ds-project-object { position: relative; width: 170px; height: 170px; border: 0; background: transparent; } .ds-disc { position: absolute; width: 132.6px; height: 132.6px; left: 50px; top: 18.7px; border-radius: 50%; background: conic-gradient(#ff5f76, #ff9f43, #fff, #a980d9, #ff5f76); box-shadow: 0 7px 28px rgba(0,0,0,.14); transition: transform .36s cubic-bezier(.2,.8,.2,1); } .ds-disc::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,.68); border-radius: 50%; } .ds-disc::after { content: ''; position: absolute; width: 15px; height: 15px; left: 59px; top: 59px; border-radius: 50%; background: rgba(255,255,255,.9); box-shadow: 0 0 0 1px rgba(0,0,0,.08); } .ds-sleeve { position: absolute; width: 139.4px; height: 139.4px; left: 0; top: 15.3px; overflow: hidden; border-radius: 10.5px; background: linear-gradient(135deg,#F04D6B,#8C1438); box-shadow: 0 6px 24px rgba(0,0,0,.12); } .ds-wave { position: absolute; left: -12px; right: -12px; bottom: -44px; height: 100px; border-radius: 50% 45% 0 0; background: rgba(255,255,255,.20); transform: rotate(-8deg); } .ds-sleeve b { position: absolute; left: 15px; bottom: 13px; color: #fff; font: 700 27px 'Helvetica Neue', Helvetica, sans-serif; } .ds-project-object:hover .ds-disc, .ds-project-object:focus-visible .ds-disc { transform: translateX(17px); } .ds-project-object:focus-visible { outline: 3px solid Highlight; outline-offset: 4px; border-radius: 12px; } @media (prefers-reduced-motion: reduce) { .ds-disc { transition: none; } }"
+    },
+    {
+      "name": "Set Content Lens",
+      "kind": "nav",
+      "description": "Illustrative preview only: Compact segmented control for switching among Tracks, Devices, Clips, and Media evidence.",
+      "html": "<div class=\"ds-lens\" role=\"tablist\"><button class=\"ds-lens-active\">Tracks</button><button>Devices</button><button>Clips</button><button>Media</button></div>",
+      "css": ".ds-lens { display: inline-grid; grid-template-columns: repeat(4, 1fr); width: 360px; padding: 2px; border-radius: 7px; background: rgba(0,0,0,.06); } .ds-lens button { border: 0; border-radius: 6px; background: transparent; color: CanvasText; padding: 5px 14px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; transition: background .18s ease-out, color .18s ease-out; } .ds-lens button:hover { background: rgba(0,0,0,.06); } .ds-lens .ds-lens-active { background: #000; color: #fff; } .ds-lens button:focus-visible { outline: 3px solid Highlight; outline-offset: 1px; }"
+    },
+    {
+      "name": "Evidence Row",
+      "kind": "custom",
+      "description": "Illustrative preview only: Flat, inset-divided evidence row for tracks, devices, clips, media, roots, and private chains.",
+      "html": "<div class=\"ds-evidence-row\"><span class=\"ds-evidence-icon\">◉</span><span class=\"ds-evidence-copy\"><strong>DRY LEAD</strong><small>Audio track · 1 device · 1 clip</small></span><span class=\"ds-evidence-state\">On · Armed</span></div>",
+      "css": ".ds-evidence-row { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px; align-items: center; min-width: 520px; padding: 10px 0; color: CanvasText; border-bottom: 1px solid rgba(0,0,0,.12); font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-evidence-icon, .ds-evidence-state, .ds-evidence-copy small { color: GrayText; } .ds-evidence-copy strong, .ds-evidence-copy small { display: block; } .ds-evidence-copy strong { font-size: 13px; font-weight: 500; } .ds-evidence-copy small, .ds-evidence-state { margin-top: 3px; font-size: 11px; } .ds-evidence-row:hover { background: rgba(0,0,0,.03); }"
+    },
+    {
+      "name": "Recovery Panel",
+      "kind": "card",
+      "refersTo": "recovery-panel",
+      "description": "Illustrative preview only: A bounded, flat decision panel for preview fidelity, immutable snapshots, or recovered audio.",
+      "html": "<section class=\"ds-recovery-panel\"><h3>Immutable snapshots</h3><strong>2 captured versions</strong><p>Restore plans create a new file and expose its destination before execution.</p><button>Plan Restore…</button></section>",
+      "css": ".ds-recovery-panel { width: 245px; min-height: 148px; padding: 15px; border-radius: 12px; background: rgba(0,0,0,.06); color: CanvasText; font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-recovery-panel h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; } .ds-recovery-panel strong { display: block; font-size: 13px; font-weight: 500; } .ds-recovery-panel p { margin: 5px 0 12px; color: GrayText; font-size: 11px; line-height: 1.35; } .ds-recovery-panel button { border: 1px solid rgba(0,0,0,.16); border-radius: 6px; background: Canvas; color: CanvasText; padding: 4px 9px; font: 12px -apple-system, BlinkMacSystemFont, sans-serif; } .ds-recovery-panel button:hover { background: rgba(0,0,0,.05); } .ds-recovery-panel button:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }"
+    },
+    {
+      "name": "Local Search Result",
+      "kind": "custom",
+      "description": "Illustrative preview only: A provenance-aware row for local project, Set, track, clip, device, locator, and audio matches across every cached registered root.",
+      "html": "<button class=\"ds-search-row\"><span>◉</span><span><strong>DRY LEAD</strong><small>Halogen Sky · Halogen Sky 07</small><small>Studio Archive</small></span><em>TRACK</em></button>",
+      "css": ".ds-search-row { width: 680px; display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start; padding: 10px 0; border: 0; border-bottom: 1px solid rgba(0,0,0,.12); background: transparent; color: CanvasText; text-align: left; font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-search-row strong, .ds-search-row small { display: block; } .ds-search-row small { margin-top: 4px; color: GrayText; font-size: 12px; } .ds-search-row em { border-radius: 999px; background: rgba(0,0,0,.08); padding: 3px 7px; color: GrayText; font-size: 10px; font-style: normal; font-weight: 600; } .ds-search-row:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }"
+    },
+    {
+      "name": "Plan Review Sheet",
+      "kind": "custom",
+      "description": "Illustrative preview only: A focused native sheet that exposes snapshot, recovered-audio, approximate-preview, or Open-in-Live evidence; exact local paths; immutable-copy or user-controlled boundaries; and a final confirmation action.",
+      "html": "<section class=\"ds-plan\"><h3>Review restore plan</h3><p>Nothing is written until you confirm this new-file operation.</p><dl><dt>Source snapshot</dt><dd>Halogen Sky 07.als</dd><dt>New destination</dt><dd>/Restores/Halogen Sky restored.als</dd></dl><button>Restore New Copy</button></section>",
+      "css": ".ds-plan { width: 560px; padding: 26px; border-radius: 12px; background: Canvas; color: CanvasText; box-shadow: 0 10px 40px rgba(0,0,0,.16); font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-plan h3 { margin: 0 0 6px; font-size: 20px; } .ds-plan p, .ds-plan dt { color: GrayText; } .ds-plan dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 14px; padding: 14px; background: rgba(0,0,0,.06); border-radius: 10px; } .ds-plan button { float: right; border: 0; border-radius: 7px; padding: 8px 14px; background: #000; color: #fff; font-weight: 600; } .ds-plan button:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }"
+    },
+    {
+      "name": "Private Chain Modes",
+      "kind": "nav",
+      "description": "Illustrative preview only: A native segmented evidence switch for deterministic recommendations, families, source occurrences, and local plug-in usage.",
+      "html": "<div class=\"ds-chain-modes\"><button class=\"active\">Recommendations</button><button>Families</button><button>Occurrences</button><button>Plug-ins</button></div>",
+      "css": ".ds-chain-modes { display: inline-grid; grid-template-columns: repeat(4, 1fr); padding: 2px; border-radius: 7px; background: rgba(0,0,0,.06); } .ds-chain-modes button { border: 0; border-radius: 6px; background: transparent; color: CanvasText; padding: 5px 12px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; } .ds-chain-modes .active { background: #000; color: #fff; } .ds-chain-modes button:focus-visible { outline: 3px solid Highlight; outline-offset: 1px; }"
+    },
+    {
+      "name": "Evidence Status Tag",
+      "kind": "chip",
+      "description": "Illustrative preview only: Compact all-caps capsule for SAMPLE, ACTIVE, CURRENT, and BACKUP; operational states still use explicit icon and text.",
+      "html": "<span class=\"ds-status-tag\">CURRENT</span>",
+      "css": ".ds-status-tag { display: inline-block; padding: 3px 7px; border-radius: 999px; background: rgba(0,0,0,.08); color: CanvasText; font: 700 10px -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: .01em; }"
+    },
+    {
+      "name": "Floating Preview Transport",
+      "kind": "custom",
+      "description": "Illustrative preview only: The single floating material layer. The shipped SwiftUI transport expands into a range editor with trim handles, In/Out seconds, zoom, loop audition and Copy Clip. Completed local WAVs support file dragging and Finder reveal; Location exposes the full destination. Actions wrap at compact widths. The browser specimen shows only the collapsed transport.",
+      "html": "<div class=\"ds-preview\"><button aria-label=\"Play\">▶</button><span><strong>Halogen Sky Mix 07.wav</strong><small>Existing artifact · Other audio · Likely render</small></span><button aria-label=\"Close\">×</button></div>",
+      "css": ".ds-preview { display: grid; grid-template-columns: 28px 1fr 28px; gap: 13px; align-items: center; width: 620px; padding: 11px 16px; border-radius: 18px; background: rgba(245,245,245,.82); color: CanvasText; backdrop-filter: blur(18px) saturate(1.2); box-shadow: 0 10px 40px rgba(0,0,0,.16); font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-preview button { width: 28px; height: 28px; border: 0; background: transparent; color: CanvasText; border-radius: 6px; } .ds-preview button:hover { background: rgba(0,0,0,.07); } .ds-preview button:focus-visible { outline: 3px solid Highlight; outline-offset: 1px; } .ds-preview strong, .ds-preview small { display: block; } .ds-preview strong { font-size: 13px; font-weight: 500; } .ds-preview small { margin-top: 2px; color: GrayText; font-size: 11px; }"
+    },
+    {
+      "name": "Studio Library Browse Controls",
+      "kind": "nav",
+      "description": "Illustrative preview only: native SwiftUI controls for Song-first filtering and quiet sorting in Studio Library, labelled All Songs, Recently opened, Needs organising, Last saved, and Name.",
+      "html": "<div class=\"ds-browse-controls\" aria-label=\"Studio Library browse controls\"><div class=\"ds-focus\" role=\"tablist\"><button class=\"active\">All Songs</button><button>Recently opened</button><button>Needs organising</button></div><button class=\"ds-sort\" aria-label=\"Sort Songs: Last saved or Name\">Last saved <span aria-hidden=\"true\">⌄</span></button></div>",
+      "css": ".ds-browse-controls { display: flex; gap: 14px; align-items: center; width: 520px; color: CanvasText; font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-focus { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(0,0,0,.06); } .ds-focus button, .ds-sort { border: 0; border-radius: 7px; background: transparent; color: CanvasText; padding: 6px 11px; font: 600 12px -apple-system, BlinkMacSystemFont, sans-serif; } .ds-focus button:hover, .ds-sort:hover { background: rgba(0,0,0,.06); } .ds-focus .active { background: #000; color: #fff; } .ds-sort { margin-left: auto; } .ds-focus button:focus-visible, .ds-sort:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; } .ds-sort-option { border: 0; background: transparent; color: GrayText; padding: 6px 8px; font: 600 12px -apple-system, BlinkMacSystemFont, sans-serif; }"
+    },
+    {
+      "name": "Song Project File Group",
+      "kind": "custom",
+      "description": "Illustrative preview only: Song-first list row showing the latest Set file and explicit disclosures for older Set families and backups.",
+      "html": "<section class=\"ds-song-group\"><button class=\"ds-song-header\"><span class=\"ds-object\" aria-hidden=\"true\"></span><span><strong>Halogen Sky</strong><small>Unassigned Artist · 3 project files · 2 Sessions · 4 backups</small></span><span class=\"ds-chevron\" aria-hidden=\"true\">›</span></button><div class=\"ds-set-row\"><span class=\"ds-set-icon\" aria-hidden=\"true\">▤</span><span><b>Halogen Sky 07</b><small>Halogen Sky 07.als</small></span><em>LATEST</em><button class=\"ds-disclosure\">Show 2 more Set files⌄</button></div></section>",
+      "css": ".ds-song-group { width: 720px; overflow: hidden; border: 1px solid rgba(0,0,0,.14); border-radius: 16px; background: rgba(0,0,0,.025); color: CanvasText; font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-song-header, .ds-set-row { width: 100%; display: flex; align-items: center; gap: 12px; border: 0; text-align: left; color: CanvasText; } .ds-song-header { padding: 13px 18px; background: transparent; } .ds-song-header:hover, .ds-set-row:hover { background: rgba(0,0,0,.035); } .ds-object { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg,#F04D6B,#8C1438); } .ds-song-header strong, .ds-song-header small, .ds-set-row b, .ds-set-row small { display: block; } .ds-song-header strong { font-size: 16px; } .ds-song-header small, .ds-set-row small { margin-top: 3px; color: GrayText; font-size: 11px; } .ds-chevron { margin-left: auto; color: GrayText; font-size: 20px; } .ds-set-row { padding: 9px 18px; border-top: 1px solid rgba(0,0,0,.14); } .ds-set-icon { width: 36px; color: GrayText; text-align: center; } .ds-set-row em { margin-left: auto; border-radius: 999px; background: rgba(0,0,0,.08); padding: 4px 7px; color: CanvasText; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .04em; } .ds-disclosure { border: 0; border-radius: 7px; background: transparent; color: GrayText; padding: 5px 7px; font: 600 11px -apple-system, BlinkMacSystemFont, sans-serif; } .ds-disclosure:hover { background: rgba(0,0,0,.06); } .ds-song-header:focus-visible, .ds-set-row:focus-visible, .ds-disclosure:focus-visible { outline: 3px solid Highlight; outline-offset: -3px; } @media (prefers-reduced-motion: reduce) { .ds-song-header, .ds-set-row, .ds-disclosure { transition: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Private Studio Archive",
+    "overview": "Studio Time Machine uses the Codex and ChatGPT desktop applications as its structural shell reference and the [untitled]-informed Mobbin world for the archive objects inside it. The pinned direction is `pinned-codex-shell-native-2026-08-13`. A compact dark navigation rail frames one quiet matte workspace; project identity and history live inside that workspace rather than competing with window chrome. The thesis remains that a private archive becomes a calm studio object that can be heard and inspected; dashboard chrome is refused.\n\nThe application is an Operate surface. A custom but macOS-literate sidebar, Song-first Spotlight overlay, breadcrumb command bar, optional inspector, settings scene, keyboard commands, review sheets, context menus, disclosure groups, segmented pickers, and system status semantics do the interaction work. Library status and location management sit in the sidebar footer, leaving the command bar for context and inspection. Generous negative space keeps archive-scale evidence legible. The sleeve-and-disc object remains the memorable expression: it carries project and version lineage while the shell stays near-monochrome.\n\nStudio Library browsing is Song-first: a segmented Show Songs control switches between All Songs, Recently opened, and Needs organising views, while a quiet sort menu orders by Last saved or Name. List mode presents each Song as a single project-file group; the newest Set file is visible first, older Set families sit behind an explicit disclosure, and backups remain nested beneath their owning family. Grid mode keeps the same work identity and density tokens. These controls are native SwiftUI surfaces and should remain subordinate to the archive objects.\n\nOpening a Song leads directly to its working contents. A compact selected-Set row keeps Versions, Open in Live and a secondary actions menu nearby. Tracks and Audio files are the two primary views. The track list keeps parsed group nesting and pairs each selection with referenced audio and ordered devices. Arrangement and Session-view source audio stays visible; take-lane-only audio, clip detail and device sample resources expand on demand. Available audio rows use one shared player and expose a real file drag plus Copy Audio File and Reveal actions. Audio-file browsing covers the selected physical project folder across saved versions, and Possible bounces is explicitly a filename suggestion. Track and device reuse uses an exact-source guide for Live’s Browser. History is a version chooser, while detailed diagnostics, export plans and recovery remain secondary. Narrow workspaces stack the track list and its contents and put search on its own row.\n\nThe light workspace is shipped and reviewed. Semantic SwiftUI foreground styles, `NSColor.textBackgroundColor`, `.bar`, `.regularMaterial`, native dividers, standard controls, and system status colors are runtime-resolved macOS materials—not fixed color tokens. The frontmatter therefore records only literal colors found in the implementation. Dark Mode, final product naming, future project-object generation, compare-window treatment, and the boundary between the main window and auxiliary preview or inspection windows remain unresolved visual decisions.",
+    "keyCharacteristics": [
+      "Compact charcoal navigation framing one uninterrupted matte workspace.",
+      "A compact sidebar search action and Command-F open a Song-first Spotlight overlay; breadcrumb context remains quiet in the command bar.",
+      "Small, singular tasks surrounded by deliberate negative space.",
+      "Helvetica Neue for workspace headings and object monograms; native San Francisco text styles for controls, metadata, and evidence.",
+      "Deterministic sleeve-and-disc identities carry almost all expressive color.",
+      "Evidence appears as quiet rows, disclosures, inspectors, and compact panels—not dashboard cards.",
+      "Every recovery, compatibility, preview, provenance, and lifecycle state says what is known and what is not."
+    ],
+    "rules": [
+      {
+        "name": "The Color Belongs to the Object Rule.",
+        "body": "Project and version sleeves and discs carry expression; navigation, controls, metadata, and evidence remain neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Shell Rule.",
+        "body": "Preserve macOS semantic colors and materials so contrast and system rendering stay truthful; only literal implementation colors belong in the token layer.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Is More Than Color Rule.",
+        "body": "Available, missing, disconnected, permission-required, mismatch, and unknown states always pair native status color with an SF Symbol and explicit label.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Family Rule.",
+        "body": "Use Helvetica Neue only for workspace-scale headings and sleeve monograms. Everything interactive, evidential, or metadata-heavy remains in native San Francisco styles.",
+        "section": "typography"
+      },
+      {
+        "name": "The Evidence Numeral Rule.",
+        "body": "Use native monospaced digits when changing widths would impair comparison; do not introduce a separate decorative mono family.",
+        "section": "typography"
+      },
+      {
+        "name": "The Workspace, Not Dashboard Rule.",
+        "body": "Prefer wide reading lanes, rows, and native inspectors. Add cards only when a bounded decision genuinely needs a shared container.",
+        "section": "layout"
+      },
+      {
+        "name": "The Focused Task Rule.",
+        "body": "Permission, indexing, failure, and empty states get one clear action in a small central composition rather than a field of competing choices.",
+        "section": "layout"
+      },
+      {
+        "name": "The Physical Exception Rule.",
+        "body": "Sleeves, discs, and the active floating transport may cast ambient shadow because they behave like physical studio objects. Evidence rows, navigation, inspectors, and recovery panels stay flat.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One Floating Layer Rule.",
+        "body": "The preview transport is the only persistent floating surface in the main window; keep it restrained, centered, and no wider than 690 points.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Continuous Geometry Rule.",
+        "body": "Custom rectangles use continuous corners; pills use true capsule geometry. Do not mix in sharp web-card rectangles or arbitrary radius values.",
+        "section": "shapes"
+      },
+      {
+        "title": "Audio Clip Range and Transfer",
+        "body": "Review source audio and selected In/Out range inline. Location exposes the full selectable local WAV destination and retention explanation. Keep completed files for DAW references, invalidate pending exports when the source or range changes, and preserve Approximate provenance. Copy uses a file URL; direct Command-V import into Ableton Live is unverified.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do let project and version objects carry the expressive color while native chrome and evidence remain quiet.",
+      "Do use native macOS focus, keyboard navigation, menus, toolbar behavior, text selection, VoiceOver semantics, and standard control states.",
+      "Do respect Reduce Motion and Increased Contrast, and keep labels and symbols alongside every status color.",
+      "Do separate provenance from the likely-render filename heuristic, and separate inspectability, previewability, compatibility, and recoverability.",
+      "Do label approximate playback before and during playback; keep experimental Ableton-controlled rendering visibly distinct.",
+      "Do explain persistent-root lifecycle truth: cached inspection, drive disconnection, permission loss, scan progress, reused data, and watcher state.",
+      "Do show restore and recovered-audio destinations before action, create new output only, and preserve collision-safe filenames.",
+      "Do keep browsing-path preference separate from safety-critical plan destinations, which always show the full local path.",
+      "Do explain local search and chain recommendation provenance, keep their heavy work off the main actor, and never imply a cloud AI dependency.",
+      "Do keep deterministic sample arguments working as repeatable visual-review fixtures.",
+      "Do keep Song browsing controls quiet, explicit, and derived from the resolved local Work catalogue; make older Set files and backups discoverable through disclosures.",
+      "Do keep automatic watching separate from one-off updates, and show paused, unavailable, indexing, and monitoring states with text and symbols.",
+      "Do preserve unresolved product decisions as unresolved: release boundary; supported Live versions and future-format behavior; retention, cross-volume moves, root priority, and broader merged-library browsing beyond the fixed global-search behavior; future semantic-search scope and opt-in boundary; extraction formats and safe-restore contract; preview thresholds; Ableton render viability; plug-in catalogue integration; naming, pricing, cloud, community, and account timing; Dark Mode; generated object art; compare windows; and auxiliary-window boundaries."
+    ],
+    "donts": [
+      "Don't turn the archive into a generic dashboard of statistic cards, saturated navigation, or decorative control chrome.",
+      "Don't replace semantic SwiftUI colors and materials with fixed web-style tokens or automatic dark-mode inversion.",
+      "Don't use Helvetica Neue for controls, metadata, file paths, tables, or dense evidence.",
+      "Don't encode availability, severity, compatibility, or provenance with color alone.",
+      "Don't imply that structure counts prove a device, sidechain, automation lane, or clip is active.",
+      "Don't present a likely user render as provenance, an approximate reconstruction as exact, or an experimental render as dependable.",
+      "Don't overwrite originals, conceal output destinations, copy unavailable media, or claim whole-Set merge.",
+      "Don't allow deterministic sample review plans to execute filesystem writes.",
+      "Don't present inspect-only chains as recoverable racks or fabricate native chain files.",
+      "Don't imply cached roots are connected, sample data is live, or unresolved lifecycle contracts are guaranteed.",
+      "Don't introduce account, cloud, AI, sharing, or community pressure into the private local-first archive without explicit opt-in and a resolved product decision.",
+      "Don't hide older Set files behind an implied destructive “cleanup,” or make a list row suggest that virtual grouping moved anything on disk."
+    ]
+  }
+}

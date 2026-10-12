@@ -1,26 +1,21 @@
+import { CheckCircle2 } from 'lucide-react'
 import { useOnboardingStore } from '../../stores/onboardingStore'
 import type { BlacklistedPlugin, ScanFailureReason } from '../../stores/onboardingTypes'
 
-const reasonConfig: Record<ScanFailureReason, { label: string; bg: string; border: string; color: string; description: string }> = {
+const reasonConfig: Record<ScanFailureReason, { label: string; color: string; description: string }> = {
   crash: {
     label: 'Crashed',
-    bg: 'rgba(255, 0, 51, 0.1)',
-    border: 'rgba(255, 0, 51, 0.2)',
-    color: 'var(--color-status-error)',
+    color: 'text-red-300 bg-red-500/10 border-red-500/20',
     description: 'Crashed during scanning and was blacklisted',
   },
   'scan-failure': {
     label: 'Authorization Required',
-    bg: 'rgba(255, 170, 0, 0.1)',
-    border: 'rgba(255, 170, 0, 0.2)',
-    color: 'var(--color-status-warning)',
+    color: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20',
     description: 'May need authorization (iLok) or a valid license',
   },
   timeout: {
     label: 'Timed Out',
-    bg: 'var(--color-bg-input)',
-    border: 'var(--color-border-default)',
-    color: 'var(--color-text-disabled)',
+    color: 'text-plugin-muted bg-plugin-surface-alt border-plugin-border',
     description: 'Took too long — may have been waiting for a license dialog',
   },
 }
@@ -44,22 +39,22 @@ export function ScanResults() {
   const hasIssues = scanResult.totalBlacklisted > 0
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
-      {/* Headline */}
-      <h2
-        className="crt-text mb-1"
-        style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-lg)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
-      >
-        Found {scanResult.totalDiscovered} Plugins
-      </h2>
-      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', marginBottom: '1.5rem' }}>
-        Completed in {durationSec}s
-      </p>
+    <div className="flex flex-col w-full max-w-[420px] px-6 animate-fade-in">
+      <div className="flex items-center gap-2.5">
+        <span className="w-8 h-8 rounded-full bg-green-500/15 text-green-400 inline-flex items-center justify-center">
+          <CheckCircle2 className="w-4.5 h-4.5" />
+        </span>
+        <div>
+          <h2 className="text-xl font-semibold text-plugin-text tracking-tight leading-tight">
+            Found {scanResult.totalDiscovered} Plugins
+          </h2>
+          <p className="num text-plugin-dim text-xs">Completed in {durationSec}s</p>
+        </div>
+      </div>
 
-      {/* Issues section */}
-      {hasIssues && (
-        <div className="w-full mb-6">
-          <h3 style={{ color: '#deff0a', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', marginBottom: '12px' }}>
+      {hasIssues ? (
+        <div className="w-full mt-5 rounded-lg border border-plugin-border bg-plugin-surface p-3 max-h-[240px] overflow-y-auto">
+          <h3 className="section-label mb-2">
             {scanResult.totalBlacklisted} {scanResult.totalBlacklisted === 1 ? 'issue' : 'issues'} found
           </h3>
 
@@ -67,17 +62,13 @@ export function ScanResults() {
             const config = reasonConfig[reason]
             const plugins = grouped[reason]!
             return (
-              <div key={reason} style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '10px', fontFamily: 'var(--font-system)', padding: '8px 12px', borderRadius: 'var(--radius-base)', border: `1px solid ${config.border}`, background: config.bg, color: config.color, marginBottom: '4px' }}>
-                  <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{config.label}</span>
-                  <span style={{ marginLeft: '8px', opacity: 0.7 }}>{config.description}</span>
+              <div key={reason} className="mb-2.5 last:mb-0">
+                <div className={`text-xs px-2.5 py-1.5 rounded-md border ${config.color}`}>
+                  <span className="font-semibold">{config.label}</span>
+                  <span className="ml-2 opacity-75">{config.description}</span>
                 </div>
                 {plugins.map((p, i) => (
-                  <div
-                    key={i}
-                    className="truncate"
-                    style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', paddingLeft: '16px', paddingTop: '2px', paddingBottom: '2px' }}
-                  >
+                  <div key={i} className="text-plugin-muted text-xs pl-3 pt-1 truncate">
                     {p.name}
                   </div>
                 ))}
@@ -85,19 +76,20 @@ export function ScanResults() {
             )
           })}
         </div>
+      ) : (
+        <p className="text-[13px] text-plugin-muted mt-4">Every plugin scanned cleanly.</p>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-col w-full gap-2">
+      <div className="flex flex-col w-full gap-2 mt-5">
         <button
           onClick={continueFromResults}
-          className="btn btn-primary w-full"
+          className="w-full h-10 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent text-sm font-semibold rounded-md transition-colors"
         >
-          Continue to Propane
+          Continue to ProChain
         </button>
         <button
           onClick={rescan}
-          className="btn w-full"
+          className="w-full h-9 bg-transparent border border-plugin-border hover:border-plugin-border-bright text-plugin-muted hover:text-plugin-text text-xs font-semibold rounded-md transition-colors"
         >
           Rescan All
         </button>

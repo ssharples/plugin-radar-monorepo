@@ -41,13 +41,11 @@ public:
 
     // Thread-safe meter readings
     AudioMeter::Readings getReadings() const { return meter.getReadings(); }
+    void setAnalysisMode(AudioMeter::AnalysisMode mode) { meter.setAnalysisMode(mode); }
 
     // Associate with a chain node for identification
     void setAssociatedNodeId(ChainNodeId id) { associatedNodeId = id; }
     ChainNodeId getAssociatedNodeId() const { return associatedNodeId; }
-
-    // PHASE 2: Conditional metering - enable/disable LUFS calculation
-    void setEnableLUFS(bool enabled) { meter.setEnableLUFS(enabled); }
 
 private:
     AudioMeter meter;

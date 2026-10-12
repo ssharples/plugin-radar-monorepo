@@ -82,7 +82,7 @@ describe('ScanResults', () => {
       scanResult: { totalDiscovered: 10, totalBlacklisted: 0, blacklistedPlugins: [], scanDurationMs: 1000 },
     })
     render(<ScanResults />)
-    expect(screen.getByText('Continue to Propane')).toBeInTheDocument()
+    expect(screen.getByText('Continue to ProChain')).toBeInTheDocument()
     expect(screen.getByText('Rescan All')).toBeInTheDocument()
   })
 
@@ -96,7 +96,7 @@ describe('ScanResults', () => {
     })
     render(<ScanResults />)
 
-    await user.click(screen.getByText('Continue to Propane'))
+    await user.click(screen.getByText('Continue to ProChain'))
     expect(continueSpy).toHaveBeenCalled()
   })
 

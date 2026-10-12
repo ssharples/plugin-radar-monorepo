@@ -1,0 +1,37 @@
+{
+  "capturedUtc": "2026-09-11T12:28:44.373346+00:00",
+  "gitHead": "89cbc0bd420cc75cbaf311b2f7f95e87cbfd0906",
+  "dirtyWorkingTree": true,
+  "baselineBackup": "/var/folders/jk/rkr6mq411ng57bdt50q1s89w0000gn/T/prochain-implementation-20260911-1wki25nj",
+  "hardware": {
+    "hw.model": "Mac14,6",
+    "hw.memsize": "68719476736",
+    "machdep.cpu.brand_string": "Apple M2 Max"
+  },
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.1\nBuildVersion:\t\t25F80",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "buildType": "Release",
+  "architecture": "arm64",
+  "juceVersion": "8.0.4",
+  "pluginvalVersion": "1.0.4",
+  "artifactHashes": {
+    "AU": {
+      "path": "/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/AU/Plugin Chain Manager.component/Contents/MacOS/Plugin Chain Manager",
+      "sha256": "bef1d670092ec5a05d3e42e2b3a58b247ed0b67a7a00e080532136c04c10d74a"
+    },
+    "VST3": {
+      "path": "/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/VST3/Plugin Chain Manager.vst3/Contents/MacOS/Plugin Chain Manager",
+      "sha256": "ea1a0df89d8c76608f5b047f50113e95a3d5a52787afcf8cc8c503514fcfd01a"
+    },
+    "Standalone": {
+      "path": "/tmp/prochain-release-build-20260911/PluginChainManager_artefacts/Release/Standalone/Plugin Chain Manager.app/Contents/MacOS/Plugin Chain Manager",
+      "sha256": "162393093793a0b60c03fb5f76ed38d032cb2bfcb98ad62fc1c0feca90d70674"
+    },
+    "ui.zip": {
+      "path": "/Users/test/Development/Projects/plugin-radar-monorepo/apps/desktop/resources/ui.zip",
+      "sha256": "1a2301fd7f82cd3003b1fa0a263800e2d85179aaf6f220449e6503e9a5553714"
+    }
+  },
+  "sanitizerScope": "PluginChainManager_Tests tagged chain, automation, analysis; not the full wrapper/WebView",
+  "releaseCertified": false
+}

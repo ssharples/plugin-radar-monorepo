@@ -1,0 +1,5 @@
+Filters: [chain],[automation],[analysis]
+Randomness seeded to: 2980856422
+===============================================================================
+All tests passed (187 assertions in 35 test cases)
+

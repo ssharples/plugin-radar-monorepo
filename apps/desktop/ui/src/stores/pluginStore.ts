@@ -1,18 +1,10 @@
 import { create } from 'zustand';
-import type {
-  PluginDescription,
-  ScanProgress,
-  DeactivatedPlugin,
-  CustomScanPath,
-  AutoScanState,
-  NewPluginsDetectedEvent,
-} from '../api/types';
+import type { PluginDescription, ScanProgress } from '../api/types';
 import { juceBridge } from '../api/juce-bridge';
 import { useUsageStore } from './usageStore';
 import {
   getScannedPlugins,
   fetchEnrichedPluginData,
-  fetchManufacturerLogos,
   clearEnrichmentCache,
   type EnrichedPluginData,
 } from '../api/convex-client';
@@ -36,7 +28,6 @@ interface PluginState {
 
   // Enrichment data
   enrichedData: Map<number, EnrichedPluginData>; // keyed by plugin UID
-  manufacturerLogos: Map<string, string>; // manufacturer name → logo URL (fallback)
   enrichmentLoading: boolean;
   enrichmentLoaded: boolean;
 
@@ -45,15 +36,6 @@ interface PluginState {
   effectTypeFilter: string | null;
   tonalCharacterFilter: string[];
   priceFilter: PriceFilter;
-
-  // Scanner management
-  deactivatedPlugins: DeactivatedPlugin[];
-  showDeactivated: boolean;
-  customScanPaths: CustomScanPath[];
-  autoScanState: AutoScanState;
-  newPluginsDetected: NewPluginsDetectedEvent | null;
-  scanSettingsOpen: boolean;
-  blacklistedPlugins: string[];
 }
 
 interface PluginActions {
@@ -72,27 +54,7 @@ interface PluginActions {
   applyFilters: () => void;
   loadEnrichmentData: () => Promise<void>;
   getEnrichedDataForPlugin: (uid: number) => EnrichedPluginData | undefined;
-  getManufacturerLogoUrl: (name: string) => string | undefined;
   hasActiveFilters: () => boolean;
-
-  // Scanner management actions
-  deactivatePlugin: (identifier: string) => Promise<void>;
-  reactivatePlugin: (identifier: string) => Promise<void>;
-  removePlugin: (identifier: string) => Promise<void>;
-  setShowDeactivated: (show: boolean) => void;
-  loadDeactivatedPlugins: () => Promise<void>;
-  addCustomScanPath: (path: string, format: string) => Promise<boolean>;
-  removeCustomScanPath: (path: string, format: string) => Promise<boolean>;
-  loadCustomScanPaths: () => Promise<void>;
-  enableAutoScan: (intervalMs: number) => Promise<void>;
-  disableAutoScan: () => Promise<void>;
-  loadAutoScanState: () => Promise<void>;
-  checkForNewPlugins: () => Promise<void>;
-  dismissNewPlugins: () => void;
-  setScanSettingsOpen: (open: boolean) => void;
-  fetchBlacklist: () => Promise<void>;
-  removeFromBlacklist: (path: string) => Promise<void>;
-  clearBlacklist: () => Promise<void>;
 }
 
 const initialState: PluginState = {
@@ -109,7 +71,6 @@ const initialState: PluginState = {
   error: null,
 
   enrichedData: new Map(),
-  manufacturerLogos: new Map(),
   enrichmentLoading: false,
   enrichmentLoaded: false,
 
@@ -117,17 +78,7 @@ const initialState: PluginState = {
   effectTypeFilter: null,
   tonalCharacterFilter: [],
   priceFilter: 'all',
-
-  deactivatedPlugins: [],
-  showDeactivated: false,
-  customScanPaths: [],
-  autoScanState: { enabled: false, intervalMs: 300000, lastCheckTime: 0 },
-  newPluginsDetected: null,
-  scanSettingsOpen: false,
-  blacklistedPlugins: [],
 };
-
-let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const usePluginStore = create<PluginState & PluginActions>((set, get) => ({
   ...initialState,
@@ -156,10 +107,7 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
 
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceTimer = setTimeout(() => {
-      usePluginStore.getState().applyFilters();
-    }, 150);
+    get().applyFilters();
   },
 
   setFormatFilter: (format: string | null) => {
@@ -230,176 +178,14 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
     );
   },
 
-  // Scanner management actions
-  deactivatePlugin: async (identifier: string) => {
-    await juceBridge.deactivatePlugin(identifier);
-  },
-
-  reactivatePlugin: async (identifier: string) => {
-    await juceBridge.reactivatePlugin(identifier);
-  },
-
-  removePlugin: async (identifier: string) => {
-    await juceBridge.removeKnownPlugin(identifier);
-  },
-
-  setShowDeactivated: (show: boolean) => {
-    set({ showDeactivated: show });
-    // Re-fetch plugin list to include/exclude deactivated
-    if (show) {
-      juceBridge.getPluginListIncludingDeactivated().then((plugins) => {
-        set({ plugins: plugins || [] });
-        get().applyFilters();
-      });
-    } else {
-      juceBridge.getPluginList().then((plugins) => {
-        set({ plugins: plugins || [] });
-        get().applyFilters();
-      });
-    }
-  },
-
-  loadDeactivatedPlugins: async () => {
-    try {
-      const deactivated = await juceBridge.getDeactivatedPlugins();
-      set({ deactivatedPlugins: deactivated || [] });
-    } catch {
-      // Ignore errors if feature not available
-    }
-  },
-
-  addCustomScanPath: async (path: string, format: string) => {
-    try {
-      const result = await juceBridge.addCustomScanPath(path, format);
-      if (result.success) {
-        await get().loadCustomScanPaths();
-      }
-      return result.success;
-    } catch {
-      return false;
-    }
-  },
-
-  removeCustomScanPath: async (path: string, format: string) => {
-    try {
-      const result = await juceBridge.removeCustomScanPath(path, format);
-      if (result.success) {
-        await get().loadCustomScanPaths();
-      }
-      return result.success;
-    } catch {
-      return false;
-    }
-  },
-
-  loadCustomScanPaths: async () => {
-    try {
-      const result = await juceBridge.getCustomScanPaths();
-      set({ customScanPaths: result.paths || [] });
-    } catch {
-      // Ignore errors if feature not available
-    }
-  },
-
-  enableAutoScan: async (intervalMs: number) => {
-    try {
-      await juceBridge.enableAutoScan(intervalMs);
-      await get().loadAutoScanState();
-    } catch {
-      // Ignore
-    }
-  },
-
-  disableAutoScan: async () => {
-    try {
-      await juceBridge.disableAutoScan();
-      await get().loadAutoScanState();
-    } catch {
-      // Ignore
-    }
-  },
-
-  loadAutoScanState: async () => {
-    try {
-      const state = await juceBridge.getAutoScanState();
-      set({ autoScanState: state });
-    } catch {
-      // Ignore
-    }
-  },
-
-  checkForNewPlugins: async () => {
-    try {
-      const result = await juceBridge.checkForNewPlugins();
-      if (result.newCount > 0) {
-        set({ newPluginsDetected: { count: result.newCount, plugins: result.newPlugins } });
-      }
-    } catch {
-      // Ignore
-    }
-  },
-
-  dismissNewPlugins: () => {
-    set({ newPluginsDetected: null });
-  },
-
-  setScanSettingsOpen: (open: boolean) => {
-    set({ scanSettingsOpen: open });
-    // Load data when opening
-    if (open) {
-      get().loadCustomScanPaths();
-      get().loadAutoScanState();
-      get().loadDeactivatedPlugins();
-      get().fetchBlacklist();
-    }
-  },
-
-  fetchBlacklist: async () => {
-    try {
-      const blacklist = await juceBridge.getBlacklist();
-      set({ blacklistedPlugins: Array.isArray(blacklist) ? blacklist : [] });
-    } catch {
-      // Ignore errors if feature not available
-    }
-  },
-
-  removeFromBlacklist: async (path: string) => {
-    try {
-      await juceBridge.removeFromBlacklist(path);
-      // Re-fetch to get updated list
-      await get().fetchBlacklist();
-    } catch {
-      // Ignore
-    }
-  },
-
-  clearBlacklist: async () => {
-    try {
-      await juceBridge.clearBlacklist();
-      set({ blacklistedPlugins: [] });
-    } catch {
-      // Ignore
-    }
-  },
-
   loadEnrichmentData: async () => {
     const { enrichmentLoading } = get();
     if (enrichmentLoading) return;
 
     set({ enrichmentLoading: true });
     try {
-      // Collect unique manufacturer names from all scanned plugins (no auth needed)
-      const uniqueManufacturerNames = [...new Set(get().plugins.map((p) => p.manufacturer))];
-
-      // Run manufacturer logo fetch and auth-gated scanned plugin fetch in parallel
-      const [scannedPlugins, manufacturerLogos] = await Promise.all([
-        getScannedPlugins(),
-        fetchManufacturerLogos(uniqueManufacturerNames),
-      ]);
-
-      // Manufacturer logos are available regardless of auth state
-      set({ manufacturerLogos });
-
+      // Get user's scanned plugins with match data from Convex
+      const scannedPlugins = await getScannedPlugins();
       if (!scannedPlugins || scannedPlugins.length === 0) {
         set({ enrichmentLoading: false, enrichmentLoaded: true });
         return;
@@ -443,16 +229,13 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
       // Re-apply filters so enrichment-based filters work
       get().applyFilters();
     } catch (err) {
+      console.error('[pluginStore] Failed to load enrichment data:', err);
       set({ enrichmentLoading: false, enrichmentLoaded: true });
     }
   },
 
   getEnrichedDataForPlugin: (uid: number) => {
     return get().enrichedData.get(uid);
-  },
-
-  getManufacturerLogoUrl: (name: string) => {
-    return get().manufacturerLogos.get(name);
   },
 
   applyFilters: () => {
@@ -578,11 +361,13 @@ export const usePluginStore = create<PluginState & PluginActions>((set, get) => 
 
 // Set up event listeners
 juceBridge.onPluginListChanged((plugins) => {
+  console.log('pluginListChanged received, plugins count:', plugins?.length);
   usePluginStore.setState({ plugins: plugins || [] });
   usePluginStore.getState().applyFilters();
 });
 
 juceBridge.onScanProgress((progress: ScanProgress) => {
+  console.log('scanProgress received:', progress);
   const wasScanningBefore = usePluginStore.getState().scanning;
   usePluginStore.setState({
     scanning: progress.scanning ?? true,
@@ -591,48 +376,7 @@ juceBridge.onScanProgress((progress: ScanProgress) => {
   });
   // Reload enrichment data when scanning completes
   if (wasScanningBefore && !(progress.scanning ?? true)) {
-    // Auto-sync to Convex if logged in, otherwise just reload enrichment
-    import('./syncStore').then(({ useSyncStore }) => {
-      const { isLoggedIn, autoSync } = useSyncStore.getState();
-      if (isLoggedIn) {
-        autoSync().catch(() => {
-          // P2-4: If autoSync fails, still reload enrichment data
-          clearEnrichmentCache();
-          usePluginStore.getState().loadEnrichmentData();
-        });
-      } else {
-        clearEnrichmentCache();
-        usePluginStore.getState().loadEnrichmentData();
-      }
-    }).catch(() => {
-      // P2-4: If syncStore import fails (circular dep timing), still load enrichment
-      clearEnrichmentCache();
-      usePluginStore.getState().loadEnrichmentData();
-    });
+    clearEnrichmentCache();
+    usePluginStore.getState().loadEnrichmentData();
   }
-});
-
-// Scanner management event listeners
-juceBridge.onDeactivationChanged((deactivated) => {
-  usePluginStore.setState({ deactivatedPlugins: deactivated || [] });
-  // Refresh plugin list to reflect deactivation changes
-  const { showDeactivated } = usePluginStore.getState();
-  if (showDeactivated) {
-    juceBridge.getPluginListIncludingDeactivated().then((plugins) => {
-      usePluginStore.setState({ plugins: plugins || [] });
-      usePluginStore.getState().applyFilters();
-    });
-  }
-});
-
-juceBridge.onNewPluginsDetected((event) => {
-  usePluginStore.setState({ newPluginsDetected: event });
-});
-
-juceBridge.onAutoScanStateChanged((state) => {
-  usePluginStore.setState({ autoScanState: state });
-});
-
-juceBridge.onBlacklistChanged(() => {
-  usePluginStore.getState().fetchBlacklist();
 });

@@ -1,87 +1,82 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(ProChain VERSION 1.0.0)
+project(PluginChainManager VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Prefer a vendored JUCE checkout when present. Fresh clones of this repo may
-# not have that directory populated, so fall back to the official JUCE source.
-set(PROCHAIN_VENDORED_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/JUCE")
+# Fetch JUCE
+include(FetchContent)
+FetchContent_Declare(
+    JUCE
+    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+    GIT_TAG 8.0.4
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(JUCE)
 
-if (EXISTS "${PROCHAIN_VENDORED_JUCE_DIR}/CMakeLists.txt")
-    message(STATUS "Using vendored JUCE from ${PROCHAIN_VENDORED_JUCE_DIR}")
-    add_subdirectory(JUCE/JUCE)
-else()
-    message(STATUS "Vendored JUCE not found; fetching JUCE 8.0.12 from GitHub")
-    include(FetchContent)
-    FetchContent_Declare(
-        JUCE
-        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-        GIT_TAG 8.0.12
-        GIT_SHALLOW TRUE
-    )
-    FetchContent_MakeAvailable(JUCE)
-endif()
-
+# Development builds must not overwrite an installed plugin implicitly.
+option(PROCHAIN_COPY_PLUGIN_AFTER_BUILD "Install plugin bundles after building" OFF)
 # Plugin target
-juce_add_plugin(ProChain
+juce_add_plugin(PluginChainManager
     COMPANY_NAME "ProChain"
+    # Kept from the old name so hosts treat this as the same plugin
+    BUNDLE_ID com.PluginChainManager.PluginChainManager
     IS_SYNTH FALSE
-    NEEDS_MIDI_INPUT FALSE
-    NEEDS_MIDI_OUTPUT FALSE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT TRUE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    COPY_PLUGIN_AFTER_BUILD TRUE
-    PLUGIN_MANUFACTURER_CODE Prcn
-    PLUGIN_CODE PrCh
-    FORMATS AU VST3 AAX Standalone
-    AAX_CATEGORY AAX_ePlugInCategory_None
+    COPY_PLUGIN_AFTER_BUILD FALSE
+    PLUGIN_MANUFACTURER_CODE Pcmr
+    PLUGIN_CODE Pcmg
+    FORMATS AU VST3 Standalone
     PRODUCT_NAME "ProChain"
-    HARDENED_RUNTIME_ENABLED TRUE
-    HARDENED_RUNTIME_OPTIONS "com.apple.security.cs.disable-library-validation"
 )
 
 # Source files
-target_sources(ProChain
+target_sources(PluginChainManager
     PRIVATE
         src/PluginProcessor.cpp
         src/PluginEditor.cpp
         src/core/PluginManager.cpp
         src/core/ChainProcessor.cpp
+        src/core/ChainRenderGraph.cpp
+        src/core/ChainTransactions.cpp
+        src/audio/HostedPluginProcessor.cpp
         src/core/ChainNode.cpp
         src/core/PresetManager.cpp
-        src/core/GroupTemplateManager.cpp
         src/core/ParameterDiscovery.cpp
         src/core/InstanceRegistry.cpp
         src/core/MirrorManager.cpp
+        src/core/UserProfile.cpp
+        src/core/ChainSharingManager.cpp
         src/bridge/WebViewBridge.cpp
         src/bridge/ResourceProvider.cpp
+        src/ui/PluginEditorHost.cpp
+        src/ui/PluginCanvas.cpp
+        src/audio/WaveformCapture.cpp
         src/audio/GainProcessor.cpp
         src/audio/AudioMeter.cpp
-        src/audio/SignalAnalyzer.cpp
-        src/audio/PluginWithMeterWrapper.cpp
         src/audio/NodeMeterProcessor.cpp
+        src/audio/FFTProcessor.cpp
         src/audio/DryWetMixProcessor.cpp
         src/audio/BranchGainProcessor.cpp
-        src/audio/MidSideMatrixProcessor.cpp
-        src/audio/DuckingProcessor.cpp
+        src/audio/CrossoverBandProcessor.cpp
         src/audio/LatencyCompensationProcessor.cpp
-        src/audio/PluginParameterWatcher.cpp
-        src/audio/FFTProcessor.cpp
-        src/audio/WaveformCapture.cpp
         src/automation/ProxyParameter.cpp
+        src/automation/AutomationBinding.cpp
         src/automation/ParameterProxyPool.cpp
-        src/platform/KeyboardInterceptor.mm
+        src/automation/MacroManager.cpp
 )
 
 # Binary resources - embed the UI
-juce_add_binary_data(ProChainData
+juce_add_binary_data(PluginChainManagerData
     SOURCES
         resources/ui.zip
 )
 
-target_compile_definitions(ProChain
+target_compile_definitions(PluginChainManager
     PUBLIC
         JUCE_WEB_BROWSER=1
         JUCE_USE_CURL=0
@@ -91,9 +86,9 @@ target_compile_definitions(ProChain
         JUCE_DISPLAY_SPLASH_SCREEN=0
 )
 
-target_link_libraries(ProChain
+target_link_libraries(PluginChainManager
     PRIVATE
-        ProChainData
+        PluginChainManagerData
         juce::juce_audio_utils
         juce::juce_audio_processors
         juce::juce_gui_extra
@@ -104,18 +99,8 @@ target_link_libraries(ProChain
         juce::juce_recommended_warning_flags
 )
 
-target_link_options(ProChain PUBLIC -ObjC)
-
-# Enable fast-math optimizations in Release builds, but NOT -ffinite-math-only.
-# -ffinite-math-only lets the compiler assume no NaN/Inf values exist, which
-# causes std::isfinite() checks (used in sanitiseBuffer) to be optimized away,
-# letting NaN propagate through the signal chain.
-target_compile_options(ProChain PRIVATE
-    $<$<CONFIG:Release>:-funsafe-math-optimizations -fno-math-errno -fno-trapping-math>
-)
-
 # Include directories
-target_include_directories(ProChain
+target_include_directories(PluginChainManager
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
@@ -125,7 +110,7 @@ target_include_directories(ProChain
 #==============================================================================
 juce_add_console_app(PluginScannerHelper
     PRODUCT_NAME "PluginScannerHelper"
-    COMPANY_NAME "ProChain"
+    COMPANY_NAME "PluginChainManager"
 )
 
 target_sources(PluginScannerHelper
@@ -150,49 +135,27 @@ target_link_libraries(PluginScannerHelper
         juce::juce_recommended_config_flags
 )
 
-# Copy scanner helper to the standalone app bundle's Resources folder
-add_custom_command(TARGET PluginScannerHelper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "$<TARGET_FILE:PluginScannerHelper>"
-        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/Standalone/ProChain.app/Contents/Resources/PluginScannerHelper"
-    COMMENT "Copying PluginScannerHelper to Standalone bundle"
-)
-
-# Copy scanner helper to AU component bundle's Resources folder
-add_custom_command(TARGET PluginScannerHelper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/AU/ProChain.component/Contents/Resources"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "$<TARGET_FILE:PluginScannerHelper>"
-        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/AU/ProChain.component/Contents/Resources/PluginScannerHelper"
-    COMMENT "Copying PluginScannerHelper to AU bundle"
-)
-
-# Copy scanner helper to VST3 bundle's Resources folder
-add_custom_command(TARGET PluginScannerHelper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/VST3/ProChain.vst3/Contents/Resources"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "$<TARGET_FILE:PluginScannerHelper>"
-        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/VST3/ProChain.vst3/Contents/Resources/PluginScannerHelper"
-    COMMENT "Copying PluginScannerHelper to VST3 bundle"
-)
-
-# Copy scanner helper to AAX bundle's Resources folder
-add_custom_command(TARGET PluginScannerHelper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/AAX/ProChain.aaxplugin/Contents/Resources"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "$<TARGET_FILE:PluginScannerHelper>"
-        "${CMAKE_BINARY_DIR}/ProChain_artefacts/$<CONFIG>/AAX/ProChain.aaxplugin/Contents/Resources/PluginScannerHelper"
-    COMMENT "Copying PluginScannerHelper to AAX bundle"
-)
-
-# Make sure scanner is built before the main plugin
-add_dependencies(ProChain_Standalone PluginScannerHelper)
-add_dependencies(ProChain_AU PluginScannerHelper)
-add_dependencies(ProChain_VST3 PluginScannerHelper)
-add_dependencies(ProChain_AAX PluginScannerHelper)
+# Embed the helper after each bundle exists, then seal the complete development
+# bundle. Linker-only signatures do not cover AU resources and CoreAudio rejects
+# those bundles even when the raw Mach-O loads in another validator.
+foreach(format IN ITEMS Standalone AU VST3)
+    set(bundle_target PluginChainManager_${format})
+    add_dependencies(${bundle_target} PluginScannerHelper)
+    set_property(TARGET ${bundle_target} APPEND PROPERTY LINK_DEPENDS "$<TARGET_FILE:PluginScannerHelper>")
+    if(APPLE)
+        add_custom_command(TARGET ${bundle_target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_DIR:${bundle_target}>/Contents/Resources"
+            COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:PluginScannerHelper>"
+                "$<TARGET_BUNDLE_DIR:${bundle_target}>/Contents/Resources/PluginScannerHelper"
+            COMMAND /usr/bin/codesign --force --sign - "$<TARGET_BUNDLE_DIR:${bundle_target}>/Contents/Resources/PluginScannerHelper"
+            COMMAND /usr/bin/codesign --force --sign - "$<TARGET_BUNDLE_DIR:${bundle_target}>"
+            COMMENT "Embedding scanner and signing ${format} development bundle"
+            VERBATIM)
+    endif()
+endforeach()
+if(PROCHAIN_COPY_PLUGIN_AFTER_BUILD)
+    juce_enable_copy_plugin_step(PluginChainManager)
+endif()
 
 #==============================================================================
 # Tests - Catch2 unit tests for scanner and plugin management logic
@@ -205,80 +168,61 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(ProChain_Tests
+add_executable(PluginChainManager_Tests
+    tests/ChainIntegrationTests.cpp
+    tests/ChainPerformanceBenchmark.cpp
+    tests/AnalysisRegressionTests.cpp
+    tests/AutomationBindingTests.cpp
     tests/ScannerUtilsTests.cpp
     tests/BlacklistTests.cpp
     tests/ChainNodeTests.cpp
     tests/DSPTests.cpp
+    tests/PresetSerializationTests.cpp
     tests/ParameterDiscoveryTests.cpp
-    tests/ScannerStressTests.cpp
-    tests/MirrorManagerTests.cpp
-    tests/PerformanceTests.cpp
-    tests/PluginWithMeterWrapperTests.cpp
-    tests/ChainProcessorTests.cpp
-    tests/OversamplingTests.cpp
-    tests/PluginProcessorLifecycleTests.cpp
-    tests/CrashPathChainProcessorTests.cpp
-    tests/SerializationCrashTests.cpp
-    tests/PluginLoadUnloadTests.cpp
+    tests/MacroTests.cpp
+    tests/CrossoverTests.cpp
     src/core/PluginManager.cpp
     src/core/ChainNode.cpp
     src/core/ChainProcessor.cpp
+    src/core/ChainRenderGraph.cpp
+    src/core/ChainTransactions.cpp
+    src/audio/HostedPluginProcessor.cpp
+    src/audio/NodeMeterProcessor.cpp
+    src/audio/FFTProcessor.cpp
+    src/audio/WaveformCapture.cpp
+    src/automation/AutomationBinding.cpp
+    src/automation/ParameterProxyPool.cpp
+    src/automation/MacroManager.cpp
+    src/automation/ProxyParameter.cpp
     src/core/ParameterDiscovery.cpp
-    src/core/InstanceRegistry.cpp
-    src/core/MirrorManager.cpp
-    src/core/PresetManager.cpp
-    src/core/GroupTemplateManager.cpp
-    src/PluginProcessor.cpp
-    src/PluginEditor.cpp
-    src/bridge/WebViewBridge.cpp
-    src/bridge/ResourceProvider.cpp
-    src/platform/KeyboardInterceptor.mm
     src/audio/DryWetMixProcessor.cpp
     src/audio/BranchGainProcessor.cpp
-    src/audio/MidSideMatrixProcessor.cpp
-    src/audio/DuckingProcessor.cpp
+    src/audio/CrossoverBandProcessor.cpp
     src/audio/LatencyCompensationProcessor.cpp
     src/audio/GainProcessor.cpp
     src/audio/AudioMeter.cpp
-    src/audio/SignalAnalyzer.cpp
-    src/audio/PluginWithMeterWrapper.cpp
-    src/audio/NodeMeterProcessor.cpp
-    src/audio/PluginParameterWatcher.cpp
-    src/audio/FFTProcessor.cpp
-    src/audio/WaveformCapture.cpp
-    src/automation/ProxyParameter.cpp
-    src/automation/ParameterProxyPool.cpp
 )
 
-target_include_directories(ProChain_Tests
+target_include_directories(PluginChainManager_Tests
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_compile_definitions(ProChain_Tests
+target_compile_definitions(PluginChainManager_Tests
     PRIVATE
         JUCE_PLUGINHOST_VST3=1
         JUCE_PLUGINHOST_AU=1
-        JUCE_WEB_BROWSER=1
+        JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_DISPLAY_SPLASH_SCREEN=0
-        JUCE_MODAL_LOOPS_PERMITTED=1
-        JucePlugin_Name="ProChain"
-        JucePlugin_Desc="Plugin Chain Host"
-        JucePlugin_Manufacturer="ProChain"
-        JucePlugin_ManufacturerCode=0x5072636e
-        JucePlugin_PluginCode=0x50724368
 )
 
-target_link_libraries(ProChain_Tests
+target_link_libraries(PluginChainManager_Tests
     PRIVATE
         Catch2::Catch2WithMain
-        ProChainData
         juce::juce_audio_processors
         juce::juce_audio_utils
         juce::juce_dsp
-        juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
 )
@@ -286,4 +230,21 @@ target_link_libraries(ProChain_Tests
 include(CTest)
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(Catch)
-catch_discover_tests(ProChain_Tests)
+catch_discover_tests(PluginChainManager_Tests)
+
+# Exercise the actual wrapper and its state adapter without opening an editor.
+add_executable(PluginChainManager_WrapperTests tests/WrapperStateTests.cpp tests/ChainPerformanceBenchmark.cpp)
+target_compile_definitions(PluginChainManager_WrapperTests PRIVATE PROCHAIN_WRAPPER_BENCHMARK=1)
+target_include_directories(PluginChainManager_WrapperTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(PluginChainManager_WrapperTests PRIVATE
+    PluginChainManager Catch2::Catch2WithMain juce::juce_audio_utils juce::juce_dsp)
+catch_discover_tests(PluginChainManager_WrapperTests)
+
+set(PROCHAIN_SANITIZER "" CACHE STRING "Optional address or thread sanitizer for native regression tests")
+if(PROCHAIN_SANITIZER)
+    if(NOT PROCHAIN_SANITIZER MATCHES "^(address|thread)$")
+        message(FATAL_ERROR "PROCHAIN_SANITIZER must be address or thread")
+    endif()
+    target_compile_options(PluginChainManager_Tests PRIVATE -fsanitize=${PROCHAIN_SANITIZER} -fno-omit-frame-pointer -gline-tables-only)
+    target_link_options(PluginChainManager_Tests PRIVATE -fsanitize=${PROCHAIN_SANITIZER})
+endif()

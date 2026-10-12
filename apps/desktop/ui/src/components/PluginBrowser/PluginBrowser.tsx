@@ -1,11 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Search, RefreshCw, Filter, X, PanelLeftOpen, Settings, Eye, EyeOff } from 'lucide-react';
+import { Search, RefreshCw, X, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useChainStore } from '../../stores/chainStore';
 import { PluginItem } from './PluginItem';
 import { PluginFilters } from './PluginFilters';
-import { NewPluginsBanner } from './NewPluginsBanner';
-import { ScanSettings } from './ScanSettings';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 interface PluginBrowserProps {
@@ -31,11 +29,6 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
     enrichmentLoaded,
     hasActiveFilters,
     clearAllFilters,
-    showDeactivated,
-    setShowDeactivated,
-    deactivatedPlugins,
-    scanSettingsOpen,
-    setScanSettingsOpen,
   } = usePluginStore();
 
   const { addPlugin, addPluginToGroup, selectNode, selectedNodeId, slots, nodes } = useChainStore();
@@ -54,6 +47,13 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
   // Wire up global keyboard shortcuts (Cmd+F, Delete/Backspace)
   useKeyboardShortcuts({ searchInputRef, isSearchFocused });
 
+  // "Add plugin" buttons elsewhere ask the browser to open: put the cursor in search
+  useEffect(() => {
+    const focus = () => setTimeout(() => searchInputRef.current?.focus(), 30);
+    window.addEventListener('openPluginBrowser', focus);
+    return () => window.removeEventListener('openPluginBrowser', focus);
+  }, []);
+
   // Reset highlight when results change
   useEffect(() => {
     setHighlightedIndex(-1);
@@ -62,7 +62,7 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
   // Scroll highlighted item into view
   useEffect(() => {
     if (highlightedIndex < 0 || !listRef.current) return;
-    const wrapper = listRef.current.querySelector('.plugin-list-inner');
+    const wrapper = listRef.current.querySelector('.space-y-px');
     if (!wrapper) return;
     const item = wrapper.children[highlightedIndex] as HTMLElement | undefined;
     item?.scrollIntoView({ block: 'nearest' });
@@ -172,337 +172,167 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
   const formats = ['VST3', 'AudioUnit'];
   const activeFilters = hasActiveFilters();
 
-  // Collapsed state — thin sidebar with vertical label
+  // Collapsed state: a thin rail with the count (docked mode only)
   if (collapsed && !onClose) {
     return (
-      <div
-        className="flex flex-col h-full items-center py-2"
-        style={{ background: 'var(--color-bg-secondary)' }}
-      >
+      <div className="flex flex-col h-full w-full bg-plugin-surface items-center py-2 gap-2">
         <button
           onClick={onToggle}
-          className="p-1 rounded fast-snap"
-          style={{ color: 'var(--color-text-tertiary)' }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; e.currentTarget.style.background = 'var(--color-bg-elevated)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.background = 'transparent'; }}
-          title="Expand plugin browser"
+          className="w-8 h-8 inline-flex items-center justify-center rounded-md hover:bg-plugin-raised text-plugin-muted hover:text-plugin-text transition-colors"
+          title="Show plugins (⌘B)"
+          aria-label="Show plugins"
         >
           <PanelLeftOpen className="w-4 h-4" />
         </button>
+        <button
+          onClick={() => {
+            onToggle?.();
+            setTimeout(() => searchInputRef.current?.focus(), 0);
+          }}
+          className="w-8 h-8 inline-flex items-center justify-center rounded-md hover:bg-plugin-raised text-plugin-muted hover:text-plugin-text transition-colors"
+          title="Search plugins"
+          aria-label="Search plugins"
+        >
+          <Search className="w-4 h-4" />
+        </button>
         <div className="flex-1 flex items-center justify-center">
           <span
-            className="select-none"
-            style={{
-              writingMode: 'vertical-rl',
-              textOrientation: 'mixed',
-              fontFamily: 'var(--font-system)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: 'var(--tracking-widest)',
-              color: 'var(--color-text-tertiary)',
-            }}
+            className="text-[11px] font-semibold text-plugin-dim uppercase tracking-[0.15em] select-none"
+            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
           >
             Plugins
           </span>
         </div>
-        <div
-          style={{
-            fontFamily: 'var(--font-system)',
-            fontSize: '9px',
-            color: 'var(--color-accent-cyan)',
-          }}
-        >
-          {filteredPlugins.length}
-        </div>
+        <div className="num text-[10px] text-plugin-dim">{filteredPlugins.length}</div>
       </div>
     );
   }
 
   return (
-    <div
-      className="flex flex-col h-full overflow-hidden"
-      style={{ background: 'var(--color-bg-secondary)' }}
-    >
+    <div className="flex flex-col h-full bg-plugin-surface overflow-hidden">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-3 py-1.5"
-        style={{ borderBottom: '1px solid var(--color-border-default)' }}
-      >
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={onClose || onToggle}
-            className="p-0.5 rounded fast-snap"
-            style={{ color: 'var(--color-text-tertiary)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-            title="Close"
-          >
-            {onClose ? <X className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5 rotate-180" />}
-          </button>
-          <h2
-            style={{
-              fontFamily: 'var(--font-system)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: 'var(--tracking-wider)',
-              color: 'var(--color-accent-cyan)',
-            }}
-          >
-            Plugins
-          </h2>
-          {enrichmentLoading && (
-            <span
-              className="animate-pulse"
-              style={{
-                fontFamily: 'var(--font-system)',
-                fontSize: '9px',
-                color: 'var(--color-accent-magenta)',
-              }}
-            >
-              syncing...
-            </span>
-          )}
-          {enrichmentLoaded && !enrichmentLoading && (
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: 'var(--color-status-active)' }}
-              title="Catalog synced"
-            />
-          )}
-        </div>
-        <div className="flex items-center gap-0.5 relative">
-          <button
-            onClick={() => setScanSettingsOpen(!scanSettingsOpen)}
-            className="p-1 rounded fast-snap"
-            style={{ color: scanSettingsOpen ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
-            onMouseLeave={(e) => { if (!scanSettingsOpen) e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-            title="Scan settings"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => startScan(false)}
-            disabled={scanning}
-            className="p-1 rounded fast-snap disabled:opacity-40"
-            style={{ color: 'var(--color-text-tertiary)' }}
-            onMouseEnter={(e) => { if (!scanning) e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-            title="Rescan plugins"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} style={scanning ? { color: 'var(--color-accent-cyan)' } : {}} />
-          </button>
-          {scanSettingsOpen && <ScanSettings onClose={() => setScanSettingsOpen(false)} />}
-        </div>
+      <div className="flex items-center gap-1.5 h-10 pl-3 pr-1.5 border-b border-plugin-border flex-shrink-0">
+        <h2 className="section-label !text-plugin-muted">Plugins</h2>
+        <span className="num text-[10px] text-plugin-dim">{filteredPlugins.length}</span>
+        {enrichmentLoading && (
+          <span className="text-[10px] text-plugin-accent animate-pulse-soft">syncing catalogue…</span>
+        )}
+        {enrichmentLoaded && !enrichmentLoading && (
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500/70" title="Catalogue synced" />
+        )}
+        <span className="flex-1" />
+        <button
+          onClick={() => startScan(false)}
+          disabled={scanning}
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-plugin-raised text-plugin-muted hover:text-plugin-text transition-colors disabled:opacity-40"
+          title="Rescan plugins"
+          aria-label="Rescan plugins"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin text-plugin-accent' : ''}`} />
+        </button>
+        <button
+          onClick={onClose || onToggle}
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-plugin-raised text-plugin-muted hover:text-plugin-text transition-colors"
+          title={onClose ? 'Close (⌘B)' : 'Hide plugins (⌘B)'}
+          aria-label={onClose ? 'Close plugin browser' : 'Hide plugins'}
+        >
+          {onClose ? <X className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
+        </button>
       </div>
 
       {/* Search and filters */}
-      <div
-        className="px-2.5 py-2 space-y-1.5"
-        style={{ borderBottom: '1px solid var(--color-border-default)' }}
-      >
+      <div className="px-2.5 pt-2.5 pb-2 space-y-2 border-b border-plugin-border flex-shrink-0">
         <div className="relative">
-          <Search
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
-            style={{ color: 'var(--color-text-tertiary)' }}
-          />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-plugin-dim" />
           <input
             ref={searchInputRef}
             type="text"
-            placeholder={isSearchFocused ? "Type to search... (Enter to add)" : "Search plugins..."}
+            placeholder={isSearchFocused ? 'Type, ↑↓ to pick, Enter to add' : 'Search plugins  ⌘F'}
+            aria-label="Search plugins"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleSearchKeyDown}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
-            className="input w-full pl-7 pr-3 py-1"
-            style={{
-              fontSize: 'var(--text-sm)',
-              ...(isSearchFocused ? {
-                borderColor: 'var(--color-accent-cyan)',
-                boxShadow: '0 0 0 1px var(--color-accent-cyan), 0 0 12px rgba(222, 255, 10, 0.3)',
-              } : {}),
-            }}
+            className={`w-full h-8 pl-8 pr-3 bg-plugin-bg rounded-md text-[13px] text-plugin-text placeholder:text-plugin-dim border transition-colors focus:outline-none ${
+              isSearchFocused ? 'border-plugin-accent/60' : 'border-plugin-border'
+            }`}
           />
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
-            <div className="flex gap-0.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center rounded-md bg-plugin-bg border border-plugin-border p-0.5" role="group" aria-label="Plugin format">
+            {[{ v: null as string | null, l: 'All' }, ...formats.map((f) => ({ v: f as string | null, l: f === 'AudioUnit' ? 'AU' : f }))].map(({ v, l }) => (
               <button
-                onClick={() => setFormatFilter(null)}
-                className="fast-snap"
-                style={{
-                  padding: '2px 8px',
-                  fontFamily: 'var(--font-system)',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: 'var(--tracking-wide)',
-                  borderRadius: 'var(--radius-base)',
-                  border: '1px solid',
-                  ...(formatFilter === null ? {
-                    background: 'var(--color-accent-cyan)',
-                    color: 'var(--color-bg-primary)',
-                    borderColor: 'var(--color-accent-cyan)',
-                    boxShadow: '0 0 8px rgba(222, 255, 10, 0.3)',
-                  } : {
-                    background: 'var(--color-bg-input)',
-                    color: 'var(--color-text-secondary)',
-                    borderColor: 'var(--color-border-default)',
-                  }),
-                }}
+                key={l}
+                onClick={() => setFormatFilter(v)}
+                aria-pressed={formatFilter === v}
+                className={`h-6 px-2 text-[11px] font-semibold rounded transition-colors ${
+                  formatFilter === v ? 'bg-plugin-raised text-plugin-text' : 'text-plugin-dim hover:text-plugin-text'
+                }`}
               >
-                All
+                {l}
               </button>
-              {formats.map((format) => (
-                <button
-                  key={format}
-                  onClick={() => setFormatFilter(format)}
-                  className="fast-snap"
-                  style={{
-                    padding: '2px 8px',
-                    fontFamily: 'var(--font-system)',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: 'var(--tracking-wide)',
-                    borderRadius: 'var(--radius-base)',
-                    border: '1px solid',
-                    ...(formatFilter === format ? {
-                      background: 'var(--color-accent-cyan)',
-                      color: 'var(--color-bg-primary)',
-                      borderColor: 'var(--color-accent-cyan)',
-                      boxShadow: '0 0 8px rgba(222, 255, 10, 0.3)',
-                    } : {
-                      background: 'var(--color-bg-input)',
-                      color: 'var(--color-text-secondary)',
-                      borderColor: 'var(--color-border-default)',
-                    }),
-                  }}
-                >
-                  {format}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
           <PluginFilters />
         </div>
 
-        {/* Active filters indicator + show deactivated toggle */}
-        <div className="flex items-center justify-between">
-          {activeFilters ? (
-            <div className="flex items-center gap-1">
-              <span style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-accent-magenta)' }}>
-                Filtered
-              </span>
-              <button
-                onClick={clearAllFilters}
-                className="flex items-center gap-0.5 fast-snap"
-                style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-text-tertiary)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-              >
-                <X className="w-2.5 h-2.5" />
-                Clear
-              </button>
-            </div>
-          ) : <div />}
-          <button
-            onClick={() => setShowDeactivated(!showDeactivated)}
-            className="flex items-center gap-1 fast-snap"
-            style={{
-              fontFamily: 'var(--font-system)',
-              fontSize: '9px',
-              color: showDeactivated ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
-            onMouseLeave={(e) => { if (!showDeactivated) e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-            title={showDeactivated ? "Hide deactivated plugins" : "Show deactivated plugins"}
-          >
-            {showDeactivated ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-            {showDeactivated ? 'Showing all' : 'Show deactivated'}
-          </button>
-        </div>
+        {activeFilters && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-plugin-accent-bright">Filters on</span>
+            <button
+              onClick={clearAllFilters}
+              className="flex items-center gap-0.5 text-[11px] text-plugin-muted hover:text-plugin-text"
+            >
+              <X className="w-3 h-3" />
+              Clear
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* New plugins detected banner */}
-      <NewPluginsBanner />
 
       {/* Scan progress */}
       {scanning && (
-        <div
-          className="px-2.5 py-1.5"
-          style={{
-            background: 'var(--color-bg-primary)',
-            borderBottom: '1px solid var(--color-border-default)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-accent-cyan)' }}>
-              Scanning...
-            </span>
-            <span style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-              {Math.round(scanProgress * 100)}%
-            </span>
+        <div className="px-3 py-2 bg-plugin-bg border-b border-plugin-border flex-shrink-0">
+          <div className="flex items-center justify-between text-[11px] text-plugin-muted mb-1">
+            <span className="text-plugin-accent-bright font-medium">Scanning…</span>
+            <span className="num">{Math.round(scanProgress * 100)}%</span>
           </div>
-          <div
-            className="h-0.5 rounded overflow-hidden"
-            style={{ background: 'var(--color-border-default)' }}
-          >
+          <div className="h-1 bg-plugin-raised rounded-full overflow-hidden">
             <div
-              className="h-full"
-              style={{
-                background: 'var(--color-accent-cyan)',
-                width: `${scanProgress * 100}%`,
-                boxShadow: '0 0 8px rgba(222, 255, 10, 0.5)',
-                transition: 'width 300ms ease',
-              }}
+              className="h-full bg-plugin-accent transition-all duration-300"
+              style={{ width: `${scanProgress * 100}%` }}
             />
           </div>
           {currentlyScanning && (
-            <p style={{ fontFamily: 'var(--font-system)', fontSize: '9px', color: 'var(--color-text-tertiary)', marginTop: '2px' }} className="truncate">
-              {currentlyScanning}
-            </p>
+            <p className="text-[10px] text-plugin-dim mt-1 truncate">{currentlyScanning}</p>
           )}
         </div>
       )}
 
       {/* Plugin list */}
-      <div className="flex-1 overflow-y-auto p-1.5 scrollbar-cyber" ref={listRef}>
+      <div className="flex-1 overflow-y-auto p-1" ref={listRef}>
         {loading && !scanning ? (
-          <div className="flex items-center justify-center h-24" style={{ color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)' }}>
-            Loading...
+          <div className="flex items-center justify-center h-24 text-plugin-muted text-xs">
+            Loading…
           </div>
         ) : filteredPlugins.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-24">
-            <p style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
-              No plugins found
-            </p>
+          <div className="flex flex-col items-center justify-center h-28 text-plugin-muted text-xs gap-2">
+            <p>No plugins found</p>
             {activeFilters && (
-              <button
-                onClick={clearAllFilters}
-                className="mt-2 fast-snap"
-                style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)' }}
-              >
+              <button onClick={clearAllFilters} className="text-plugin-accent-bright hover:underline text-xs">
                 Clear filters
               </button>
             )}
             {!scanning && !activeFilters && (
-              <button
-                onClick={() => startScan(true)}
-                className="mt-2 fast-snap"
-                style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)' }}
-              >
+              <button onClick={() => startScan(true)} className="text-plugin-accent-bright hover:underline text-xs">
                 Scan for plugins
               </button>
             )}
           </div>
         ) : (
-          <div className="plugin-list-inner" style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          <div className="space-y-px">
             {filteredPlugins.map((plugin, index) => (
               <PluginItem
                 key={plugin.id}
@@ -517,47 +347,18 @@ export function PluginBrowser({ collapsed = false, onToggle, onClose }: PluginBr
         )}
       </div>
 
-      {/* Footer count */}
-      <div
-        className="px-3 py-1 flex items-center"
-        style={{
-          borderTop: '1px solid var(--color-border-default)',
-          fontFamily: 'var(--font-system)',
-          fontSize: 'var(--text-xs)',
-          color: 'var(--color-text-tertiary)',
-        }}
-      >
-        <span style={{ color: 'var(--color-accent-cyan)' }}>{filteredPlugins.length}</span>
-        <span style={{ marginLeft: '4px' }}>plugin{filteredPlugins.length !== 1 ? 's' : ''}</span>
-        {deactivatedPlugins.length > 0 && showDeactivated && (
-          <span style={{ color: 'var(--color-accent-magenta)', marginLeft: '6px' }}>
-            {deactivatedPlugins.length} deactivated
-          </span>
-        )}
-        {highlightedIndex >= 0 && isSearchFocused && (
-          <span style={{ color: 'var(--color-text-secondary)', marginLeft: '6px' }}>
-            {highlightedIndex + 1}/{filteredPlugins.length}
-          </span>
+      {/* Hint */}
+      <div className="px-3 h-7 flex items-center border-t border-plugin-border text-[11px] text-plugin-dim flex-shrink-0">
+        {highlightedIndex >= 0 && isSearchFocused ? (
+          <span className="num">{highlightedIndex + 1} of {filteredPlugins.length}</span>
+        ) : (
+          <span className="truncate">Double-click or + to add after the selected slot</span>
         )}
       </div>
 
-      {/* Toast notification */}
       {toast && (
-        <div className="fixed z-[200] bottom-6 left-1/2 -translate-x-1/2 slide-in">
-          <div
-            style={{
-              padding: '8px 16px',
-              background: 'var(--color-accent-cyan)',
-              color: 'var(--color-bg-primary)',
-              fontFamily: 'var(--font-system)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: 'var(--tracking-wide)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: '0 0 20px rgba(222, 255, 10, 0.5)',
-            }}
-          >
+        <div className="fixed z-[200] bottom-16 left-1/2 -translate-x-1/2 animate-slide-up" role="status">
+          <div className="px-3 h-8 inline-flex items-center bg-plugin-raised border border-plugin-border-bright text-plugin-text text-xs font-medium rounded-md shadow-panel">
             {toast}
           </div>
         </div>

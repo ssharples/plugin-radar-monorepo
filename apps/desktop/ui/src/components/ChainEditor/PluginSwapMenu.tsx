@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeftRight, Dice5, X, Loader2, ScanLine, Users } from 'lucide-react';
-import { findCompatibleSwaps, translateParameters, getParameterMap, contributeParameterDiscovery } from '../../api/convex-client';
+import { ArrowLeftRight, Dice5, X, Loader2, ScanLine } from 'lucide-react';
+import { findCompatibleSwaps, translateParameters, getParameterMap, uploadDiscoveredParameterMap } from '../../api/convex-client';
 import { juceBridge } from '../../api/juce-bridge';
 
 interface SwapCandidate {
@@ -25,11 +25,11 @@ interface PluginSwapMenuProps {
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
   if (confidence > 80) {
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" />{confidence}%</span>;
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400">🟢 {confidence}%</span>;
   } else if (confidence > 50) {
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />{confidence}%</span>;
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">🟡 {confidence}%</span>;
   } else {
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />{confidence}%</span>;
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">🔴 {confidence}%</span>;
   }
 }
 
@@ -49,29 +49,29 @@ function MapSourceIndicator({
   switch (source) {
     case 'manual':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-green-400">
+        <div className="flex items-center gap-1.5 text-[11px] text-green-400">
           <span className="w-2 h-2 rounded-full bg-green-500" />
           Manual map{confidence ? ` (${confidence}%)` : ''}
         </div>
       );
     case 'juce-scanned':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-yellow-400">
+        <div className="flex items-center gap-1.5 text-[11px] text-yellow-400">
           <span className="w-2 h-2 rounded-full bg-yellow-500" />
           Auto-discovered{confidence ? ` (${confidence}%)` : ''}
         </div>
       );
     case 'ai-analyzed':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-plugin-accent">
+        <div className="flex items-center gap-1.5 text-[11px] text-plugin-accent">
           <span className="w-2 h-2 rounded-full bg-plugin-accent" />
           AI-analyzed{confidence ? ` (${confidence}%)` : ''}
         </div>
       );
     case 'none':
       return (
-        <div className="flex items-center gap-1.5 text-[10px] text-white">
-          <span className="w-2 h-2 rounded-full bg-neutral-600" />
+        <div className="flex items-center gap-1.5 text-[11px] text-plugin-muted">
+          <span className="w-2 h-2 rounded-full bg-plugin-border-bright" />
           No map yet
           {onScan && (
             <button
@@ -111,7 +111,6 @@ export function PluginSwapMenu({
   const [error, setError] = useState<string | null>(null);
   const [mapSource, setMapSource] = useState<MapSource>('none');
   const [mapConfidence, setMapConfidence] = useState<number | undefined>();
-  const [mapContributorCount, setMapContributorCount] = useState<number>(0);
   const [scanning, setScanning] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -137,7 +136,6 @@ export function PluginSwapMenu({
       if (map) {
         setMapSource((map.source || 'manual') as MapSource);
         setMapConfidence(map.confidence);
-        setMapContributorCount(map.contributorCount ?? 0);
       } else {
         setMapSource('none');
       }
@@ -154,20 +152,10 @@ export function PluginSwapMenu({
       const result = await juceBridge.discoverPluginParameters(nodeId);
       if (result.success && result.map) {
         if (result.map.confidence >= 30) {
-          const matchedCount = result.map.parameters?.filter(
-            (p: any) => p.semantic !== 'unknown'
-          ).length ?? result.map.matchedCount;
-
-          const contribResult = await contributeParameterDiscovery(matchedPluginId, {
-            ...result.map,
-            matchedCount,
-            totalCount: result.map.parameters?.length ?? result.map.totalCount,
-            source: 'juce-scanned',
-          });
-          if (contribResult) {
+          const uploadResult = await uploadDiscoveredParameterMap(result.map, matchedPluginId);
+          if (uploadResult.success) {
             setMapSource('juce-scanned');
             setMapConfidence(result.map.confidence);
-            setMapContributorCount(contribResult.contributorCount);
             // Refresh swaps list since we now have a map
             const newSwaps = await findCompatibleSwaps(matchedPluginId);
             setSwaps(newSwaps);
@@ -296,7 +284,7 @@ export function PluginSwapMenu({
               <button
                 onClick={handleRandomize}
                 disabled={!!swapping}
-                className="p-1 rounded hover:bg-plugin-accent/20 text-white hover:text-plugin-accent transition-colors"
+                className="p-1 rounded hover:bg-plugin-accent/20 text-plugin-muted hover:text-plugin-accent transition-colors"
                 title="Random swap"
               >
                 <Dice5 className="w-4 h-4" />
@@ -304,7 +292,7 @@ export function PluginSwapMenu({
             )}
             <button
               onClick={onClose}
-              className="p-1 rounded hover:bg-plugin-border text-white hover:text-plugin-text transition-colors"
+              className="p-1 rounded hover:bg-plugin-border text-plugin-muted hover:text-plugin-text transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -318,19 +306,13 @@ export function PluginSwapMenu({
             onScan={mapSource === 'none' ? handleScanParameters : undefined}
             scanning={scanning}
           />
-          {mapContributorCount > 0 && (
-            <div className="flex items-center gap-1 text-[10px] text-white">
-              <Users className="w-3 h-3" />
-              {mapContributorCount} contributor{mapContributorCount > 1 ? 's' : ''}
-            </div>
-          )}
         </div>
       </div>
 
       {/* Content */}
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-6 text-white">
+          <div className="flex items-center justify-center py-6 text-plugin-muted">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             <span className="text-sm">Finding compatible plugins...</span>
           </div>
@@ -340,8 +322,8 @@ export function PluginSwapMenu({
           </div>
         ) : swaps.length === 0 ? (
           <div className="px-3 py-4 text-center">
-            <p className="text-sm text-white">No compatible plugins found.</p>
-            <p className="text-xs text-white mt-1">
+            <p className="text-sm text-plugin-muted">No compatible plugins found.</p>
+            <p className="text-xs text-plugin-muted/60 mt-1">
               You need owned plugins in the same category with parameter maps.
             </p>
           </div>
@@ -357,7 +339,7 @@ export function PluginSwapMenu({
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-plugin-text truncate">{swap.pluginName}</p>
-                <p className="text-xs text-white">
+                <p className="text-xs text-plugin-muted">
                   {swap.parameterCount} params
                   {swap.eqBandCount ? ` • ${swap.eqBandCount} bands` : ''}
                 </p>
@@ -376,13 +358,8 @@ export function PluginSwapMenu({
       {/* Footer */}
       {swaps.length > 0 && (
         <div className="px-3 py-1.5 border-t border-plugin-border bg-plugin-bg/50">
-          <p className="text-[10px] text-white/70 flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />&gt;80%</span>
-            <span className="opacity-30">|</span>
-            <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block" />50-80%</span>
-            <span className="opacity-30">|</span>
-            <span className="inline-flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />&lt;50%</span>
-            match confidence
+          <p className="text-[11px] text-plugin-muted/50">
+            🟢 &gt;80% • 🟡 50-80% • 🔴 &lt;50% match confidence
           </p>
         </div>
       )}

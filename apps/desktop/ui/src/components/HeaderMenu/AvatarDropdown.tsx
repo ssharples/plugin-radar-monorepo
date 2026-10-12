@@ -2,40 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { User, LogOut, Mail, Lock, UserPlus, ChevronDown, Inbox, Bell, Settings } from 'lucide-react';
 import { useSyncStore } from '../../stores/syncStore';
 import * as convexClient from '../../api/convex-client';
-const { getStoredSession } = convexClient;
 import { ReceivedChains } from '../ChainSharing/ReceivedChains';
 import { FriendRequests } from '../Friends/FriendRequests';
 import { AddFriend } from '../Friends/AddFriend';
 import { api } from '@convex/_generated/api';
-
-/* Shared glass panel style */
-const glassPanel: React.CSSProperties = {
-  background: 'rgba(15, 15, 15, 0.9)',
-  backdropFilter: 'blur(12px)',
-  border: '1px solid var(--color-border-default)',
-  boxShadow: 'var(--shadow-elevated)',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 'var(--text-xs)',
-  fontFamily: 'var(--font-system)',
-  color: 'var(--color-text-tertiary)',
-  textTransform: 'uppercase',
-  letterSpacing: 'var(--tracking-wide)',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--color-bg-input)',
-  border: '1px solid var(--color-border-default)',
-  borderRadius: 'var(--radius-base)',
-  fontFamily: 'var(--font-system)',
-  fontSize: 'var(--text-sm)',
-  color: 'var(--color-text-primary)',
-  padding: '6px 10px',
-  outline: 'none',
-  transition: 'border-color 150ms, box-shadow 150ms',
-};
 
 interface AvatarDropdownProps {
   isOpen: boolean;
@@ -72,42 +42,26 @@ export function AvatarDropdown({ isOpen, onToggle, onClose }: AvatarDropdownProp
   }, [isLoggedIn]);
 
   return (
-    <div className="relative flex items-center gap-1.5 mr-1">
+    <div className="relative flex items-center">
       <button
         onClick={onToggle}
-        className="relative w-7 h-7 rounded-full flex items-center justify-center transition-all duration-150"
+        className="relative w-7 h-7 rounded-full flex items-center justify-center transition-all hover:ring-2 hover:ring-plugin-border-bright"
         title={isLoggedIn ? 'Profile & Notifications' : 'Log in'}
-        style={{
-          border: isOpen ? '1px solid var(--color-accent-cyan)' : '1px solid transparent',
-          boxShadow: isOpen ? '0 0 8px rgba(222, 255, 10, 0.3)' : 'none',
-        }}
       >
         {isLoggedIn ? (
           <LoggedInAvatar />
         ) : (
-          <div
-            className="w-6 h-6 rounded-full flex items-center justify-center"
-            style={{
-              background: 'var(--color-bg-elevated)',
-              border: '1px solid var(--color-border-default)',
-            }}
-          >
-            <User className="w-3 h-3" style={{ color: 'var(--color-text-secondary)' }} />
+          <div className="w-7 h-7 rounded-full bg-plugin-raised border border-plugin-border flex items-center justify-center">
+            <User className="w-3 h-3 text-plugin-muted" />
           </div>
         )}
         {badgeCount > 0 && (
-          <span
-            className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full animate-pulse"
-            style={{
-              background: 'var(--color-accent-magenta)',
-              border: '1px solid var(--color-bg-primary)',
-            }}
-          />
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-plugin-surface animate-pulse" />
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1.5">
+        <div className="absolute right-0 top-full z-50 mt-1.5">
           {isLoggedIn ? (
             <LoggedInPanel onClose={onClose} onBadgeUpdate={setBadgeCount} />
           ) : (
@@ -140,23 +94,8 @@ function LoggedInAvatar() {
   };
 
   return (
-    <div
-      className="w-6 h-6 rounded-full flex items-center justify-center"
-      style={{
-        background: 'linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-purple))',
-      }}
-    >
-      <span
-        style={{
-          fontSize: 'var(--text-xs)',
-          fontFamily: 'var(--font-system)',
-          fontWeight: 700,
-          color: 'var(--color-bg-primary)',
-          lineHeight: 1,
-        }}
-      >
-        {initial}
-      </span>
+    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-plugin-accent-bright to-plugin-accent-dim flex items-center justify-center">
+      <span className="text-xs font-bold text-plugin-on-accent leading-none">{initial}</span>
     </div>
   );
 }
@@ -198,29 +137,24 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
 
   const displayError = localError || error;
 
-  const tabStyle = (isActive: boolean): React.CSSProperties => ({
-    fontSize: 'var(--text-xs)',
-    fontFamily: 'var(--font-system)',
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: 'var(--tracking-wide)',
-    padding: '2px 8px',
-    borderRadius: 'var(--radius-base)',
-    color: isActive ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
-    background: isActive ? 'rgba(222, 255, 10, 0.1)' : 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'all 150ms',
-  });
-
   return (
-    <div className="w-80 rounded-md scale-in" style={glassPanel}>
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border-default)' }}>
+    <div className="w-72 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up">
+      <div className="px-4 py-3 border-b border-plugin-border">
         <div className="flex gap-2">
-          <button onClick={() => setMode('login')} style={tabStyle(mode === 'login')}>
+          <button
+            onClick={() => setMode('login')}
+            className={`text-xs  uppercase font-semibold px-2 py-0.5 rounded transition-colors ${
+              mode === 'login' ? 'text-plugin-text bg-white/10' : 'text-plugin-dim hover:text-plugin-muted'
+            }`}
+          >
             Login
           </button>
-          <button onClick={() => setMode('register')} style={tabStyle(mode === 'register')}>
+          <button
+            onClick={() => setMode('register')}
+            className={`text-xs  uppercase font-semibold px-2 py-0.5 rounded transition-colors ${
+              mode === 'register' ? 'text-plugin-text bg-white/10' : 'text-plugin-dim hover:text-plugin-muted'
+            }`}
+          >
             Register
           </button>
         </div>
@@ -228,15 +162,7 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
 
       <form onSubmit={handleSubmit} className="p-4 space-y-2.5">
         {displayError && (
-          <div
-            className="rounded px-2 py-1.5"
-            style={{
-              fontSize: 'var(--text-xs)',
-              color: 'var(--color-status-error)',
-              background: 'rgba(255, 0, 51, 0.1)',
-              border: '1px solid rgba(255, 0, 51, 0.2)',
-            }}
-          >
+          <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
             {displayError}
           </div>
         )}
@@ -247,63 +173,38 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"
-            style={inputStyle}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-accent-cyan)';
-              e.currentTarget.style.boxShadow = '0 0 0 1px var(--color-accent-cyan)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border-default)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
+            className="w-full bg-plugin-bg border border-plugin-border rounded  px-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
           />
         )}
 
         <div className="relative">
-          <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
+          <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-plugin-dim" />
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             required
-            style={{ ...inputStyle, paddingLeft: '28px' }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-accent-cyan)';
-              e.currentTarget.style.boxShadow = '0 0 0 1px var(--color-accent-cyan)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border-default)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
+            className="w-full bg-plugin-bg border border-plugin-border rounded  pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
           />
         </div>
 
         <div className="relative">
-          <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
+          <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-plugin-dim" />
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             required
-            style={{ ...inputStyle, paddingLeft: '28px' }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-accent-cyan)';
-              e.currentTarget.style.boxShadow = '0 0 0 1px var(--color-accent-cyan)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border-default)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
+            className="w-full bg-plugin-bg border border-plugin-border rounded  pl-7 pr-2.5 py-1.5 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:ring-1 focus:ring-plugin-accent"
           />
         </div>
 
         <button
           type="submit"
           disabled={submitting || !email || !password}
-          className="btn btn-primary w-full"
-          style={{ opacity: submitting || !email || !password ? 0.4 : 1 }}
+          className="w-full bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded px-3 py-1.5 text-xs  uppercase font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Please wait...' : mode === 'login' ? 'Log In' : 'Create Account'}
         </button>
@@ -343,60 +244,29 @@ function LoggedInPanel({ onClose, onBadgeUpdate }: { onClose: () => void; onBadg
     onClose();
   };
 
-  const tabBtnStyle = (isActive: boolean): React.CSSProperties => ({
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    padding: '8px 12px',
-    fontSize: 'var(--text-xs)',
-    fontFamily: 'var(--font-system)',
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: 'var(--tracking-wide)',
-    color: isActive ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
-    borderBottom: isActive ? '2px solid var(--color-accent-cyan)' : '2px solid transparent',
-    background: 'transparent',
-    border: 'none',
-    borderBottomStyle: 'solid',
-    borderBottomWidth: '2px',
-    borderBottomColor: isActive ? 'var(--color-accent-cyan)' : 'transparent',
-    cursor: 'pointer',
-    transition: 'all 150ms',
-  });
-
   return (
-    <div
-      className="w-80 rounded-md scale-in max-h-[70vh] flex flex-col"
-      style={glassPanel}
-    >
+    <div className="w-80 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel animate-slide-up max-h-[70vh] flex flex-col">
       {/* Tab bar */}
-      <div className="flex flex-shrink-0" style={{ borderBottom: '1px solid var(--color-border-default)' }}>
-        <button onClick={() => setTab('account')} style={tabBtnStyle(tab === 'account')}>
+      <div className="flex border-b border-plugin-border flex-shrink-0">
+        <button
+          onClick={() => setTab('account')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs  uppercase font-semibold transition-colors ${
+            tab === 'account' ? 'text-plugin-text border-b-2 border-plugin-accent' : 'text-plugin-dim hover:text-plugin-muted'
+          }`}
+        >
           <User className="w-3 h-3" />
           Account
         </button>
         <button
           onClick={() => setTab('inbox')}
-          style={{ ...tabBtnStyle(tab === 'inbox'), position: 'relative' }}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs  uppercase font-semibold transition-colors relative ${
+            tab === 'inbox' ? 'text-plugin-text border-b-2 border-plugin-accent' : 'text-plugin-dim hover:text-plugin-muted'
+          }`}
         >
           <Inbox className="w-3 h-3" />
           Inbox
           {inboxCount > 0 && (
-            <span
-              className="rounded-full flex items-center justify-center"
-              style={{
-                background: 'var(--color-accent-magenta)',
-                color: '#fff',
-                fontSize: '9px',
-                fontFamily: 'var(--font-system)',
-                padding: '0 4px',
-                minWidth: '14px',
-                height: '14px',
-                lineHeight: 1,
-              }}
-            >
+            <span className="bg-red-500 text-plugin-text text-[10px] rounded-full px-1 min-w-[14px] h-[14px] flex items-center justify-center leading-none">
               {inboxCount}
             </span>
           )}
@@ -404,7 +274,7 @@ function LoggedInPanel({ onClose, onBadgeUpdate }: { onClose: () => void; onBadg
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-cyber">
+      <div className="flex-1 overflow-y-auto">
         {tab === 'account' ? (
           <AccountTab onLogout={handleLogout} />
         ) : (
@@ -437,7 +307,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   const loadProfile = async () => {
-    const token = getStoredSession();
+    const token = localStorage.getItem('pluginradar_session');
     if (!token) {
       setLoading(false);
       return;
@@ -464,7 +334,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
     setSuccess(false);
     setSaving(true);
 
-    const token = getStoredSession();
+    const token = localStorage.getItem('pluginradar_session');
     if (!token) {
       setError('Not logged in');
       setSaving(false);
@@ -493,110 +363,71 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
       {/* Username display */}
       <div className="flex items-center justify-between">
         <div>
-          <div
-            style={{
-              fontSize: 'var(--text-sm)',
-              fontFamily: 'var(--font-system)',
-              fontWeight: 700,
-              color: 'var(--color-text-primary)',
-            }}
-          >
+          <div className="text-xs  text-plugin-text font-medium">
             {loading ? '...' : username || 'No username set'}
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{email}</div>
+          <div className="text-[11px] text-plugin-dim">{email}</div>
         </div>
       </div>
 
       {/* Edit profile toggle */}
       <button
         onClick={() => setShowProfile(!showProfile)}
-        className="w-full flex items-center justify-between rounded px-2.5 py-1.5 transition-all duration-150"
-        style={{
-          fontSize: 'var(--text-xs)',
-          fontFamily: 'var(--font-system)',
-          color: 'var(--color-text-secondary)',
-          border: '1px solid var(--color-border-default)',
-          background: 'transparent',
-          textTransform: 'uppercase',
-          letterSpacing: 'var(--tracking-wide)',
-        }}
+        className="w-full flex items-center justify-between text-xs  text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2.5 py-1.5 transition-colors"
       >
         <span className="flex items-center gap-1.5">
           <Settings className="w-3 h-3" />
           Edit Profile
         </span>
-        <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${showProfile ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 transition-transform ${showProfile ? 'rotate-180' : ''}`} />
       </button>
 
       {showProfile && (
         <div className="space-y-2 pl-1">
           {error && (
-            <div
-              className="rounded px-2 py-1"
-              style={{
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-status-error)',
-                background: 'rgba(255, 0, 51, 0.1)',
-                border: '1px solid rgba(255, 0, 51, 0.2)',
-              }}
-            >
+            <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
               {error}
             </div>
           )}
           {success && (
-            <div
-              className="rounded px-2 py-1"
-              style={{
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-status-active)',
-                background: 'rgba(0, 255, 136, 0.1)',
-                border: '1px solid rgba(0, 255, 136, 0.2)',
-              }}
-            >
+            <div className="text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1">
               Profile saved!
             </div>
           )}
           <div>
-            <label className="block mb-0.5" style={labelStyle}>Username</label>
+            <label className="block text-[11px]  text-plugin-dim mb-0.5">Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="your_username"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent-cyan)'; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; }}
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
           <div>
-            <label className="block mb-0.5" style={labelStyle}>Phone</label>
+            <label className="block text-[11px]  text-plugin-dim mb-0.5">Phone</label>
             <input
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="+1 555-0123"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent-cyan)'; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; }}
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
           <div>
-            <label className="block mb-0.5" style={labelStyle}>Instagram</label>
+            <label className="block text-[11px]  text-plugin-dim mb-0.5">Instagram</label>
             <input
               type="text"
               value={instagramHandle}
               onChange={(e) => setInstagramHandle(e.target.value)}
               placeholder="@yourhandle"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent-cyan)'; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; }}
+              className="w-full bg-plugin-bg border border-plugin-border rounded  px-2 py-1 text-xs text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
           <button
             onClick={handleSave}
             disabled={saving || !username.trim()}
-            className="btn btn-primary w-full"
-            style={{ opacity: saving || !username.trim() ? 0.4 : 1 }}
+            className="w-full bg-plugin-accent hover:bg-plugin-accent-dim text-plugin-on-accent rounded px-2 py-1 text-[11px]  uppercase font-bold transition-colors disabled:opacity-40"
           >
             {saving ? 'Saving...' : 'Save Profile'}
           </button>
@@ -606,17 +437,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
       {/* Logout */}
       <button
         onClick={onLogout}
-        className="w-full flex items-center justify-center gap-1.5 rounded px-2.5 py-1.5 transition-all duration-150"
-        style={{
-          fontSize: 'var(--text-xs)',
-          fontFamily: 'var(--font-system)',
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: 'var(--tracking-wide)',
-          color: 'var(--color-status-error)',
-          border: '1px solid rgba(255, 0, 51, 0.2)',
-          background: 'transparent',
-        }}
+        className="w-full flex items-center justify-center gap-1.5 text-xs  text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded px-2.5 py-1.5 transition-colors"
       >
         <LogOut className="w-3 h-3" />
         Log Out
@@ -652,22 +473,13 @@ function InboxTab({
       <div>
         <button
           onClick={onToggleAddFriend}
-          className="w-full flex items-center justify-between rounded px-2.5 py-1.5 transition-all duration-150"
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-system)',
-            color: 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border-default)',
-            background: 'transparent',
-            textTransform: 'uppercase',
-            letterSpacing: 'var(--tracking-wide)',
-          }}
+          className="w-full flex items-center justify-between text-xs  text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2.5 py-1.5 transition-colors"
         >
           <span className="flex items-center gap-1.5">
             <UserPlus className="w-3 h-3" />
             Add Friend
           </span>
-          <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${showAddFriend ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-3 h-3 transition-transform ${showAddFriend ? 'rotate-180' : ''}`} />
         </button>
         {showAddFriend && (
           <div className="mt-2 [&>div]:border-0 [&>div]:p-0 [&>div]:bg-transparent">

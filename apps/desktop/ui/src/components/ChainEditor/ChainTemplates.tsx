@@ -1,36 +1,23 @@
-import { Mic, Volume2, Headphones, Zap, Plus } from 'lucide-react';
+import { Mic, Drum, Disc3, Sparkles, Plus, Library, ArrowRight } from 'lucide-react';
 import { OtherInstancesList } from './OtherInstancesList';
 
-const TEMPLATES = [
-  {
-    name: 'Vocal Chain',
-    description: 'EQ \u2192 Comp \u2192 De-esser \u2192 Reverb',
-    icon: Mic,
-    classes: 'bg-plugin-card border-plugin-accent/25 hover:border-plugin-accent/40',
-  },
-  {
-    name: 'Drum Bus',
-    description: 'EQ \u2192 Comp \u2192 Saturation \u2192 Limiter',
-    icon: Volume2,
-    classes: 'bg-plugin-card border-plugin-accent/25 hover:border-plugin-accent/40',
-  },
-  {
-    name: 'Master Chain',
-    description: 'EQ \u2192 Multiband \u2192 Limiter \u2192 Meter',
-    icon: Headphones,
-    classes: 'bg-plugin-card border-plugin-accent/25 hover:border-plugin-accent/40',
-  },
-  {
-    name: 'Creative FX',
-    description: 'Filter \u2192 Modulation \u2192 Delay \u2192 Reverb',
-    icon: Zap,
-    classes: 'bg-plugin-card border-plugin-accent/25 hover:border-plugin-accent/40',
-  },
+const STARTERS = [
+  { name: 'Vocals', search: 'vocal', description: 'EQ → Comp → De-esser → Reverb', icon: Mic },
+  { name: 'Drum bus', search: 'drum', description: 'EQ → Comp → Saturation → Limiter', icon: Drum },
+  { name: 'Mastering', search: 'master', description: 'EQ → Multiband → Limiter', icon: Disc3 },
+  { name: 'Creative FX', search: 'creative', description: 'Filter → Mod → Delay → Reverb', icon: Sparkles },
 ];
 
+/** Ask the app shell to switch to the chain library, optionally with a search. */
+export function openChainLibrary(search?: string) {
+  window.dispatchEvent(new CustomEvent('openChainLibrary', { detail: { search } }));
+}
+
 /**
- * Empty-state component shown when no plugins are in the chain.
- * Displays other running instances (copy/mirror), then inspirational template cards.
+ * Empty state for the chain canvas.
+ * Two clear ways in: start from scratch (add a plugin) or start from a
+ * community chain in the library. Other running instances sit on top so a
+ * chain can be copied from another track.
  */
 export function ChainTemplates() {
   const openBrowser = () => {
@@ -38,52 +25,67 @@ export function ChainTemplates() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6">
-      {/* Other instances section — shown above templates when other tracks exist */}
-      <div className="w-full max-w-xs">
+    <div className="flex flex-col items-center justify-center min-h-full py-6">
+      <div className="w-full max-w-[520px]">
         <OtherInstancesList />
       </div>
 
-      <div className="w-12 h-12 rounded-xl bg-plugin-accent/10 border border-plugin-accent/20 flex items-center justify-center mb-3">
-        <Plus className="w-6 h-6 text-plugin-accent" />
-      </div>
-      <h2 className="text-sm font-semibold font-sans uppercase text-[#deff0a] mb-1">Build your chain</h2>
-      <p className="text-xs font-sans uppercase text-white mb-5 text-center">
-        Double-click a plugin from the browser, or get inspired
-      </p>
-
-      <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
-        {TEMPLATES.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.name}
-              onClick={openBrowser}
-              className={`
-                group flex flex-col gap-1 p-2.5 rounded-lg border
-                ${t.classes}
-                hover:scale-[1.02] active:scale-[0.98]
-                transition-all duration-150 text-left
-              `}
-            >
-              <div className="flex items-center gap-1.5">
-                <Icon className="w-3.5 h-3.5 text-plugin-text" />
-                <span className="text-[11px] font-medium font-sans uppercase text-plugin-text">{t.name}</span>
-              </div>
-              <span className="text-[10px] font-sans uppercase text-white leading-tight">
-                {t.description}
-              </span>
-            </button>
-          );
-        })}
+      <div className="w-full max-w-[520px] text-center mb-4">
+        <h2 className="text-lg font-semibold text-plugin-text">Start a chain</h2>
+        <p className="text-[13px] text-plugin-muted mt-0.5">
+          Add plugins from any brand, or load a chain someone else built.
+        </p>
       </div>
 
-      <button
-        onClick={openBrowser}
-        className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-plugin-accent hover:bg-plugin-accent/10 transition-colors"
-      >
-        <span className="font-sans uppercase">Browse All Plugins</span>
-      </button>
+      <div className="grid grid-cols-2 gap-2 w-full max-w-[520px]">
+        <button
+          onClick={openBrowser}
+          className="flex flex-col items-start gap-2 p-3 rounded-lg border border-plugin-border bg-plugin-surface hover:border-plugin-accent/50 hover:bg-plugin-surface-alt transition-colors text-left"
+        >
+          <span className="w-8 h-8 rounded-md bg-plugin-accent/15 text-plugin-accent inline-flex items-center justify-center">
+            <Plus className="w-4 h-4" />
+          </span>
+          <span>
+            <span className="block text-[13px] font-semibold text-plugin-text">Add a plugin</span>
+            <span className="block text-xs text-plugin-muted">Pick from your scanned plugins (⌘B)</span>
+          </span>
+        </button>
+        <button
+          onClick={() => openChainLibrary()}
+          className="flex flex-col items-start gap-2 p-3 rounded-lg border border-plugin-border bg-plugin-surface hover:border-plugin-accent/50 hover:bg-plugin-surface-alt transition-colors text-left"
+        >
+          <span className="w-8 h-8 rounded-md bg-plugin-accent/15 text-plugin-accent inline-flex items-center justify-center">
+            <Library className="w-4 h-4" />
+          </span>
+          <span>
+            <span className="block text-[13px] font-semibold text-plugin-text">Browse the library</span>
+            <span className="block text-xs text-plugin-muted">See what you can load with what you own</span>
+          </span>
+        </button>
+      </div>
+
+      <div className="w-full max-w-[520px] mt-5">
+        <p className="section-label mb-2">Popular starting points</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {STARTERS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.name}
+                onClick={() => openChainLibrary(t.search)}
+                className="group flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-plugin-border/70 bg-plugin-surface/60 hover:border-plugin-border-bright hover:bg-plugin-surface transition-colors text-left"
+              >
+                <Icon className="w-4 h-4 text-plugin-muted group-hover:text-plugin-accent flex-shrink-0" />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[13px] font-medium text-plugin-text">{t.name}</span>
+                  <span className="block text-[11px] text-plugin-dim truncate">{t.description}</span>
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-plugin-dim opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

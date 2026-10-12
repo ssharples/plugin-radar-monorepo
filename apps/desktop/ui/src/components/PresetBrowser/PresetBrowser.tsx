@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Folder, Save, Trash2, FileText } from 'lucide-react';
+import { Folder, Save, Trash2, FileText, ChevronDown } from 'lucide-react';
 import { usePresetStore } from '../../stores/presetStore';
 import { SavePresetModal } from './SavePresetModal';
-import { CustomDropdown } from '../Dropdown';
 
 export function PresetBrowser() {
   const {
@@ -11,9 +10,14 @@ export function PresetBrowser() {
     currentPreset,
     selectedCategory,
     loading,
+    pendingLoad,
+    loadProgress,
+    loadIssues,
+    loadStatus,
     fetchPresets,
     fetchCategories,
     loadPreset,
+    loadAvailableEffects,
     deletePreset,
     setSelectedCategory,
   } = usePresetStore();
@@ -46,11 +50,11 @@ export function PresetBrowser() {
       <div className="flex items-center justify-between p-3 border-b border-plugin-border">
         <div className="flex items-center gap-2">
           <Folder className="w-4 h-4 text-plugin-accent" />
-          <h2 className="text-sm font-semibold text-[#deff0a]">Presets</h2>
+          <h2 className="text-sm font-semibold text-plugin-text">Presets</h2>
         </div>
         <button
           onClick={() => setShowSaveModal(true)}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-plugin-accent hover:bg-plugin-accent/80 text-white transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-plugin-accent hover:bg-plugin-accent/80 text-plugin-on-accent font-semibold transition-colors"
         >
           <Save className="w-3 h-3" />
           Save
@@ -60,34 +64,54 @@ export function PresetBrowser() {
       {/* Current preset */}
       {currentPreset && (
         <div className="px-3 py-2 bg-plugin-accent/10 border-b border-plugin-border">
-          <p className="text-xs text-white">Current preset:</p>
+          <p className="text-xs text-plugin-muted">Current preset:</p>
           <p className="text-sm text-plugin-text font-medium truncate">
             {currentPreset.name}
           </p>
         </div>
       )}
 
+      {pendingLoad && loadProgress && (
+        <div className="px-3 py-2 bg-plugin-bg border-b border-plugin-border" role="status" aria-live="polite">
+          <div className="flex items-center justify-between gap-2 text-xs text-plugin-text"><span>Loading candidate…</span><span className=" text-plugin-muted">{loadProgress.completed} / {loadProgress.total || '—'}</span></div>
+          {loadProgress.currentPlugin && <p className="mt-1 truncate text-[11px] text-plugin-muted">{loadProgress.currentPlugin}</p>}
+        </div>
+      )}
+      {!pendingLoad && (loadStatus === 'failed' || loadStatus === 'partial') && loadIssues.length > 0 && loadProgress?.path && (
+        <div className="px-3 py-2 bg-plugin-bg border-b border-plugin-border" role="alert">
+          <p className={`text-xs ${loadStatus === 'partial' ? 'text-amber-300' : 'text-red-300'}`}>{loadStatus === 'partial' ? 'Loaded with unavailable effects.' : 'Preset load failed. Current preset is still active.'}</p>
+          {!!loadIssues.length && <ul className="mt-1 space-y-0.5 text-[11px] text-plugin-muted">{loadIssues.slice(0, 3).map((issue) => <li key={`${issue.name}-${issue.reason}`} className="truncate">{issue.name}: {issue.reason}</li>)}</ul>}
+          <button className="mt-2 text-[11px] uppercase tracking-wide text-plugin-accent hover:underline" onClick={() => loadAvailableEffects()}>Load available effects</button>
+        </div>
+      )}
+
       {/* Category filter */}
       <div className="p-3 border-b border-plugin-border">
-        <CustomDropdown
-          value={selectedCategory || ''}
-          options={[
-            { value: '', label: 'All Categories' },
-            ...categories.map((cat) => ({ value: cat, label: cat })),
-          ]}
-          onChange={(val) => setSelectedCategory(val || null)}
-          size="sm"
-        />
+        <div className="relative">
+          <select
+            value={selectedCategory || ''}
+            onChange={(e) => setSelectedCategory(e.target.value || null)}
+            className="w-full appearance-none px-3 py-1.5 pr-8 bg-plugin-bg rounded text-sm text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+          >
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-plugin-muted pointer-events-none" />
+        </div>
       </div>
 
       {/* Preset list */}
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-white">
+          <div className="flex items-center justify-center h-32 text-plugin-muted">
             Loading...
           </div>
         ) : filteredPresets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-white text-sm">
+          <div className="flex flex-col items-center justify-center h-32 text-plugin-muted text-sm">
             <FileText className="w-8 h-8 mb-2 opacity-20" />
             <p>No presets found</p>
           </div>
@@ -103,18 +127,18 @@ export function PresetBrowser() {
                     : 'hover:bg-plugin-bg border border-transparent'
                 }`}
               >
-                <FileText className="flex-shrink-0 w-4 h-4 text-white" />
+                <FileText className="flex-shrink-0 w-4 h-4 text-plugin-muted" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-plugin-text truncate">
                     {preset.name}
                   </p>
-                  <p className="text-xs text-white truncate">
+                  <p className="text-xs text-plugin-muted truncate">
                     {preset.category}
                   </p>
                 </div>
                 <button
                   onClick={(e) => handleDeletePreset(preset.path, e)}
-                  className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-white hover:text-red-500 transition-all"
+                  className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-plugin-muted hover:text-red-500 transition-all"
                   title="Delete preset"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -126,7 +150,7 @@ export function PresetBrowser() {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-plugin-border text-xs text-white">
+      <div className="px-3 py-2 border-t border-plugin-border text-xs text-plugin-muted">
         {filteredPresets.length} preset{filteredPresets.length !== 1 ? 's' : ''}
       </div>
 

@@ -1,20 +1,35 @@
 #include "ChainProcessor.h"
-#include "ParameterDiscovery.h"
+#include "HostRestoreAdapter.h"
 #include "../audio/DryWetMixProcessor.h"
 #include "../audio/BranchGainProcessor.h"
-#include "../audio/DuckingProcessor.h"
+#include "../audio/CrossoverBandProcessor.h"
 #include "../audio/NodeMeterProcessor.h"
 #include "../audio/LatencyCompensationProcessor.h"
-#include "../audio/MidSideMatrixProcessor.h"
-#include "../audio/PluginWithMeterWrapper.h"
-#include "../utils/ProChainLogger.h"
 #include <cmath>
-#include <set>
+#include <stdexcept>
 
 #if JUCE_MAC
  #include <objc/objc.h>
  #include <objc/message.h>
 #endif
+
+class ChainProcessor::BlockPlayhead final : public juce::AudioPlayHead
+{
+public:
+    juce::AudioPlayHead* source = nullptr;
+    int offset = 0;
+    double rate = 44100.0;
+    juce::Optional<PositionInfo> getPosition() const override
+    {
+        if (!source) return {};
+        auto p = source->getPosition(); if (!p) return {};
+        if (auto samples = p->getTimeInSamples()) p->setTimeInSamples(*samples + offset);
+        if (auto seconds = p->getTimeInSeconds()) p->setTimeInSeconds(*seconds + offset / rate);
+        if (auto ppq = p->getPpqPosition())
+            if (auto bpm = p->getBpm()) p->setPpqPosition(*ppq + offset / rate * *bpm / 60.0);
+        return p;
+    }
+};
 
 //==============================================================================
 // Plugin Window for showing native plugin UIs
@@ -36,36 +51,23 @@ public:
                        | juce::ComponentPeer::windowAppearsOnTaskbar;
         addToDesktop(styleFlags);
 
+        // On macOS, the DAW's plugin host window (containing our WebBrowserComponent
+        // with its native WKWebView) often sits at a floating window level. Child
+        // plugin windows created with addToDesktop are at the normal level by default,
+        // so they appear behind the main editor. Raise them to floating level so they
+        // can be dragged over the main window.
 #if JUCE_MAC
-        // Match this child window's NSWindow level to the DAW's host window.
-        //
-        // DAWs (Ableton, Logic) often place plugin editor windows at an elevated
-        // NSWindow level (e.g., floating = 3). Windows created with addToDesktop
-        // default to normal level (0). macOS strictly separates z-ordering by
-        // level, so toFront() cannot bring a level-0 window above a level-3
-        // window — the child plugin appears stuck behind the host editor.
-        //
-        // Fix: query the current key window's level (which is the DAW/host
-        // editor window at this point, before setVisible makes us key) and
-        // match it. This keeps child windows in the same z-order tier as the
-        // parent, so toFront() works naturally. Unlike the previous hardcoded
-        // NSFloatingWindowLevel approach, this adapts to whatever level the
-        // host uses and doesn't elevate windows when the host uses normal level.
         if (auto* peer = getPeer())
         {
+            // getNativeHandle() returns NSView* on macOS, not NSWindow*
             auto nsView = (id) peer->getNativeHandle();
             if (nsView)
             {
-                auto childNSWindow = ((id (*)(id, SEL))objc_msgSend)(nsView, sel_registerName("window"));
-                auto nsApp = ((id (*)(id, SEL))objc_msgSend)(
-                    (id)objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
-                auto keyWindow = ((id (*)(id, SEL))objc_msgSend)(nsApp, sel_registerName("keyWindow"));
-
-                if (childNSWindow && keyWindow && childNSWindow != keyWindow)
+                auto nsWindow = ((id (*)(id, SEL))objc_msgSend)(nsView, sel_registerName("window"));
+                if (nsWindow)
                 {
-                    auto parentLevel = ((long (*)(id, SEL))objc_msgSend)(keyWindow, sel_registerName("level"));
-                    if (parentLevel > 0)
-                        ((void (*)(id, SEL, long))objc_msgSend)(childNSWindow, sel_registerName("setLevel:"), parentLevel);
+                    // NSFloatingWindowLevel = 3 (CGWindowLevelForKey(kCGFloatingWindowLevelKey))
+                    ((void (*)(id, SEL, long))objc_msgSend)(nsWindow, sel_registerName("setLevel:"), 3);
                 }
             }
         }
@@ -76,7 +78,21 @@ public:
         toFront(true);
     }
 
-    void closeButtonPressed() override { setVisible(false); }
+    std::function<void()> onClose;
+    void closeButtonPressed() override { if (onClose) onClose(); }
+
+    void activeWindowStatusChanged() override
+    {
+        // When this window becomes active, ensure it's in front
+        if (isActiveWindow())
+            toFront(true);
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        toFront(true);
+        DocumentWindow::mouseDown(e);
+    }
 
     ChainNodeId getNodeID() const { return nodeID; }
 
@@ -90,93 +106,187 @@ ChainProcessor::ChainProcessor(PluginManager& pm)
 {
     enableAllBuses();
 
+    // JUCE host lifecycle calls (prepare/release/destruction) require stopped
+    // callbacks. Structural edits use prepared snapshots while audio is running.
     // Initialize root as an empty Serial group with id=0
     rootNode.id = 0;
     rootNode.name = "Root";
-    rootNode.data = GroupData{ GroupMode::Serial };
-
-    // Initialize parameter watcher for tracking child plugin knob changes
-    parameterWatcher = std::make_unique<PluginParameterWatcher>(
-        [this](const juce::String& beforeSnapshot) {
-            if (onPluginParameterChangeSettled)
-                onPluginParameterChangeSettled(beforeSnapshot);
-
-            // Capture new stable snapshot for next round of changes
-            auto alive = aliveFlag;
-            juce::Timer::callAfterDelay(100, [this, alive]() {
-                if (!alive->load(std::memory_order_acquire)) return;
-                auto snapshot = captureSnapshot();
-                auto base64 = juce::Base64::toBase64(snapshot.getData(), snapshot.getSize());
-                parameterWatcher->updateStableSnapshot(base64);
-            });
-        });
+    rootNode.data = GroupData{};
+    transitionGain.setCurrentAndTargetValue(1.0f);
+    chunkMidi.ensureSize(65536); collectedMidi.ensureSize(65536);
+    blockPlayhead = std::make_unique<BlockPlayhead>();
+    startTimerHz(60);
 }
 
-ChainProcessor::~ChainProcessor() noexcept
+ChainProcessor::~ChainProcessor()
 {
-    aliveFlag->store(false, std::memory_order_release);
-
-    // Destroy parameter watcher before anything else (it holds listeners)
-    parameterWatcher.reset();
-
+    *aliveFlag = false;
+    stopTimer();
+    cancelPendingLoads();
     hideAllPluginWindows();
-
-    // Clean up crash recovery temp file on normal exit
-    cleanupCrashRecoveryFile();
-}
-
-void ChainProcessor::setParameterWatcherSuppressed(bool suppressed)
-{
-    if (parameterWatcher)
-        parameterWatcher->setSuppressed(suppressed);
+    delete pendingRuntime.exchange(nullptr);
+    delete retiredRuntime.exchange(nullptr);
+    delete audioRuntime;
 }
 
 void ChainProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread())
+    { onHostControlThread([&] { prepareToPlay(sampleRate, samplesPerBlock); }); return; }
     currentSampleRate = sampleRate;
-    currentBlockSize = samplesPerBlock;
-    AudioProcessorGraph::prepareToPlay(sampleRate, samplesPerBlock);
+    currentBlockSize = juce::jmax(1, samplesPerBlock);
+    setRateAndBufferSizeDetails(sampleRate, currentBlockSize);
+    delete pendingRuntime.exchange(nullptr); delete retiredRuntime.exchange(nullptr);
+    delete audioRuntime; audioRuntime = nullptr;
+    activeRevision.store(0); acknowledgedRevision.store(0); lastAudioTime.store(0);
+    preparedNodes.clear(); prepared = true;
+    transitionGain.reset(sampleRate, 0.005); transitionGain.setCurrentAndTargetValue(1.0f);
+    for (auto n : getNodes())
+        if (auto* hosted = dynamic_cast<HostedPluginProcessor*>(n->getProcessor())) hosted->releaseResources();
     rebuildGraph();
 }
 
 void ChainProcessor::releaseResources()
 {
-    AudioProcessorGraph::releaseResources();
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread())
+    { onHostControlThread([&] { releaseResources(); }); return; }
+    lastAudioTime.store(0);
+    delete pendingRuntime.exchange(nullptr); delete retiredRuntime.exchange(nullptr);
+    delete audioRuntime; audioRuntime = nullptr;
+    for (auto n : getNodes()) n->getProcessor()->releaseResources();
+    preparedNodes.clear(); prepared = false;
+}
+
+void ChainProcessor::publishRuntime(std::unique_ptr<ChainRenderGraph> runtime)
+{
+    // Announce the compiled latency on the control thread before arming the
+    // fade. Rendering must never wait for a UI timer (including offline bounce).
+    setLatencySamples(runtime->latency());
+    if (onLatencyChanged) onLatencyChanged(runtime->latency());
+    acknowledgedRevision.store(runtime->revision);
+    delete pendingRuntime.exchange(runtime.release());
+    notificationDirty = true; bindingsDirty = true;
 }
 
 void ChainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
-    // CRITICAL: Set audioThreadBusy BEFORE checking isSuspended() to close the
-    // TOCTOU race — otherwise the message thread can slip suspendProcessing(true)
-    // between the check and the flag, then the rebuildGraph() spin-wait sees
-    // audioThreadBusy==false and proceeds to tear down the graph mid-render.
-    audioThreadBusy.store(true, std::memory_order_release);
-
-    if (isSuspended())
+    if (buffer.getNumSamples() == 0) return;
+    lastAudioTime.store(static_cast<int64_t>(juce::Time::getMillisecondCounterHiRes()));
+    collectedMidi.clear();
+    blockPlayhead->source = getPlayHead(); blockPlayhead->rate = currentSampleRate;
+    for (int offset = 0; offset < buffer.getNumSamples(); offset += currentBlockSize)
     {
-        buffer.clear();
-        audioThreadBusy.store(false, std::memory_order_release);
-        return;
-    }
-
-    AudioProcessorGraph::processBlock(buffer, midi);
-
-    // Check if any hosted plugin reported a latency change.
-    // Done inside the audioThreadBusy bracket so getNodes() is safe to iterate
-    // (the message thread spin-waits on this flag before modifying the graph).
-    if (!latencyRefreshNeeded.load(std::memory_order_relaxed))
-    {
-        for (const auto& [nodeId, wrapper] : cachedMeterWrappers)
+        const auto count = juce::jmin(currentBlockSize, buffer.getNumSamples() - offset);
+        if (pendingRuntime.load() != nullptr && audioRuntime != nullptr)
+            transitionGain.setTargetValue(0.0f);
+        if ((audioRuntime == nullptr || (!transitionGain.isSmoothing() && transitionGain.getCurrentValue() == 0.0f))
+            && retiredRuntime.load() == nullptr)
         {
-            if (wrapper->hasLatencyChanged())
+            if (auto* next = pendingRuntime.exchange(nullptr))
             {
-                latencyRefreshNeeded.store(true, std::memory_order_release);
-                break;
+                const bool hadAudio = audioRuntime != nullptr;
+                retiredRuntime.store(audioRuntime); audioRuntime = next;
+                activeRevision.store(next->revision); activeLatency.store(next->latency());
+                primeRemaining = hadAudio ? next->latency() : 0;
+                if (!hadAudio) transitionGain.setCurrentAndTargetValue(1.0f);
             }
         }
+        float* channels[] = { buffer.getWritePointer(0, offset), buffer.getWritePointer(1, offset) };
+        juce::AudioBuffer<float> chunk(channels, 2, count);
+        chunkMidi.clear(); chunkMidi.addEvents(midi, offset, count, -offset);
+        blockPlayhead->offset = offset; sidechainFeed->offset = offset;
+        if (audioRuntime)
+        {
+            if (resetPending.exchange(false)) audioRuntime->reset();
+            audioRuntime->process(chunk, chunkMidi, blockPlayhead->source ? blockPlayhead.get() : nullptr, isNonRealtime());
+            if (primeRemaining == 0 && pendingRuntime.load() == nullptr && acknowledgedRevision.load() >= audioRuntime->revision)
+                transitionGain.setTargetValue(1.0f);
+            if (primeRemaining > 0)
+            { chunk.clear(); primeRemaining = juce::jmax(0, primeRemaining - count); }
+            for (int i = 0; i < count; ++i)
+            {
+                const auto gain = transitionGain.getNextValue();
+                channels[0][i] *= gain; channels[1][i] *= gain;
+            }
+        }
+        collectedMidi.addEvents(chunkMidi, 0, count, offset);
     }
+    midi.swapWith(collectedMidi);
+    *sidechainFeed = {};
+}
 
-    audioThreadBusy.store(false, std::memory_order_release);
+void ChainProcessor::setSidechainInput(const float* left, const float* right, int numSamples) noexcept
+{
+    sidechainFeed->channels[0] = left; sidechainFeed->channels[1] = right;
+    sidechainFeed->numSamples = numSamples; sidechainFeed->offset = 0;
+}
+
+void ChainProcessor::reset() { resetPending.store(true); }
+void ChainProcessor::setNonRealtime(bool value) noexcept { juce::AudioProcessor::setNonRealtime(value); }
+void ChainProcessor::audioWorkgroupContextChanged(const juce::AudioWorkgroup& group)
+{
+    // Host context/lifecycle calls are serialized with preparation, as in JUCE's
+    // AudioProcessorGraph. Keep the context for every future prepared snapshot.
+    currentWorkgroup = group;
+    for (auto node : getNodes()) node->getProcessor()->audioWorkgroupContextChanged(group);
+}
+
+void ChainProcessor::timerCallback()
+{
+    const bool quiescent = !canRetireTargets || canRetireTargets();
+    // The single audio reader publishes this mailbox only AFTER its last call
+    // into the old graph. Acquiring it proves audio retirement; the additional
+    // pool gate protects independent DAW automation readers of hosted targets.
+    if (quiescent) { delete retiredRuntime.exchange(nullptr); retiredTargets.clear(); }
+    const auto last = lastAudioTime.load();
+    const bool stopped = last == 0 || juce::Time::getMillisecondCounterHiRes() - static_cast<double>(last) > 100.0;
+    auto revision = activeRevision.load();
+    if (stopped)
+        if (auto* next = pendingRuntime.load()) { revision = next->revision; }
+    if (revision > notifiedRevision)
+    {
+        notifiedRevision = revision;
+        if (bindingsDirty && onParameterBindingChanged) onParameterBindingChanged();
+        bindingsDirty = false;
+        if (onChainChanged) onChainChanged();
+        notificationDirty = false;
+        auto callbacks = std::move(commitCallbacks); commitCallbacks.clear();
+        for (auto& [version, callback] : callbacks)
+            if (version <= revision) callback();
+            else commitCallbacks.emplace(version, std::move(callback));
+    }
+    bool latencyChanged = false;
+    for (auto* leaf : getFlatPluginList())
+        if (auto* hosted = getHosted(*leaf); hosted && hosted->hasLatencyChange())
+        { hosted->refreshLatency(); latencyChanged = true; }
+    if (latencyChanged) rebuildGraph();
+}
+
+HostedPluginProcessor* ChainProcessor::getHosted(const PluginLeaf& leaf) const
+{
+    if (auto n = getNodeForId(leaf.graphNodeId)) return dynamic_cast<HostedPluginProcessor*>(n->getProcessor());
+    return nullptr;
+}
+
+juce::AudioProcessorGraph::Node::Ptr ChainProcessor::addHostedInstance(std::unique_ptr<juce::AudioPluginInstance> instance,
+                                                                    bool bypass, bool suspend, juce::String& error)
+{
+    if (!instance || !HostedPluginProcessor::configureStereo(*instance, error)) return {};
+    auto hosted = std::make_unique<HostedPluginProcessor>(std::move(instance));
+    hosted->setSidechainFeed(sidechainFeed);
+    hosted->setBypassed(bypass); hosted->setSuspended(suspend);
+    hosted->prepareToPlay(currentSampleRate, currentBlockSize);
+    auto node = addNode(std::move(hosted), {}, UpdateKind::none);
+    if (node) preparedNodes.insert(node->nodeID);
+    return node;
+}
+
+void ChainProcessor::retirePlugin(const PluginLeaf& leaf)
+{
+    if (onPluginRetiring) onPluginRetiring(leaf.persistentId);
+    if (auto node = AudioProcessorGraph::removeNode(leaf.graphNodeId, UpdateKind::none))
+        retiredTargets.emplace_back(leaf.persistentId, std::move(node));
+    preparedNodes.erase(leaf.graphNodeId);
 }
 
 //==============================================================================
@@ -185,711 +295,351 @@ void ChainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBu
 
 bool ChainProcessor::addPlugin(const juce::PluginDescription& desc, ChainNodeId parentId, int insertIndex)
 {
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-
-    // Validate parent BEFORE acquiring lock (read-only check)
-    ChainNode* parent = nullptr;
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-        parent = ChainNodeHelpers::findById(rootNode, parentId);
-        if (!parent || !parent->isGroup())
-            return false;
-    }
-
-    // Create plugin instance WITHOUT holding lock (can take seconds!)
-    PCLOG("addPlugin — loading " + desc.name + " (" + desc.pluginFormatName + ")");
-    juce::String errorMessage;
-    auto instance = pluginManager.createPluginInstance(desc, currentSampleRate, currentBlockSize, errorMessage);
-    if (!instance)
-    {
-        PCLOG("addPlugin — FAILED to create " + desc.name + ": " + errorMessage);
-        return false;
-    }
-
-    // Pre-prepare so the plugin initializes its bus layout (needed for sidechain plugins).
-    // Without this, PluginWithMeterWrapper defaults to stereo and the graph allocates
-    // 2-channel buffers — but sidechain plugins (Pro-L 2, etc.) expect 4 channels,
-    // causing a crash in AudioUnitPluginInstance::processAudio when it tries to clear
-    // channels that don't exist in the buffer.
-    instance->prepareToPlay(currentSampleRate, currentBlockSize);
-
-    // PHASE 7: Wrap plugin with integrated metering (reduces 3 nodes to 1)
-    auto wrapper = std::make_unique<PluginWithMeterWrapper>(std::move(instance));
-
-    auto node = std::make_unique<ChainNode>();
-    node->id = nextNodeId++;
-    node->name = desc.name;
-    PluginLeaf leaf;
-    leaf.description = desc;
-    leaf.bypassed = false;
-
-    if (auto graphNode = addNode(std::move(wrapper)))
-    {
-        leaf.graphNodeId = graphNode->nodeID;
-    }
-    else
-    {
-        return false;
-    }
-
-    node->data = std::move(leaf);
-
-    suspendProcessing(true);
-
-    // Acquire lock only for tree modification
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-
-        // Re-validate parent (it could have been deleted during plugin load)
-        parent = ChainNodeHelpers::findById(rootNode, parentId);
-        if (!parent || !parent->isGroup())
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        auto& children = parent->getGroup().children;
-        if (insertIndex < 0 || insertIndex >= static_cast<int>(children.size()))
-            children.push_back(std::move(node));
-        else
-            children.insert(children.begin() + insertIndex, std::move(node));
-
-        cachedSlotsDirty = true;
-    }
-
-    rebuildGraph();
-
-    PCLOG("addPlugin — resuming audio processing");
-    suspendProcessing(false);
-
-    PCLOG("addPlugin — notifying chain changed");
-    notifyChainChanged();
-    if (onParameterBindingChanged)
-    {
-        PCLOG("addPlugin — rebinding parameters");
-        onParameterBindingChanged();
-    }
-    PCLOG("addPlugin — done for " + desc.name);
-    return true;
-}
-
-ChainNodeId ChainProcessor::addDryPath(ChainNodeId parentId, int insertIndex)
-{
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    PCLOG("addDryPath — parentId=" + juce::String(parentId));
-
-    suspendProcessing(true);
-
-    ChainNodeId newId = -1;
-
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-
-        auto* parent = ChainNodeHelpers::findById(rootNode, parentId);
-        if (!parent || !parent->isGroup() || parent->getGroup().mode != GroupMode::Parallel)
-        {
-            suspendProcessing(false);
-            return -1;
-        }
-
-        auto node = std::make_unique<ChainNode>();
-        node->id = nextNodeId++;
-        node->name = "Dry Path";
-
-        PluginLeaf leaf;
-        leaf.isDryPath = true;
-        node->data = std::move(leaf);
-
-        newId = node->id;
-
-        auto& children = parent->getGroup().children;
-        if (insertIndex < 0 || insertIndex >= static_cast<int>(children.size()))
-            children.push_back(std::move(node));
-        else
-            children.insert(children.begin() + insertIndex, std::move(node));
-
-        cachedSlotsDirty = true;
-    }
-
-    rebuildGraph();
-    suspendProcessing(false);
-    notifyChainChanged();
-
-    PCLOG("addDryPath — done, new nodeId=" + juce::String(newId));
-    return newId;
+    cancelPendingLoads();
+    if (desc.isInstrument) { lastError = "This release supports stereo effects, not instruments"; return false; }
+    juce::String error;
+    auto instance = pluginManager.createPluginInstance(desc, currentSampleRate, currentBlockSize, error);
+    if (!instance) { lastError = error; return false; }
+    const auto success = addPreparedPlugin(desc, std::move(instance), parentId, insertIndex, error);
+    if (!success) lastError = error;
+    return success;
 }
 
 bool ChainProcessor::removeNode(ChainNodeId nodeId)
 {
+    cancelPendingLoads();
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    PCLOG("removeNode — nodeId=" + juce::String(nodeId));
 
     if (nodeId == 0)
         return false; // Can't remove root
 
-    suspendProcessing(true);
+    auto* parent = ChainNodeHelpers::findParent(rootNode, nodeId);
+    if (!parent || !parent->isGroup())
+        return false;
 
-    // Perform tree manipulation with lock held briefly
+    auto& children = parent->getGroup().children;
+    for (auto it = children.begin(); it != children.end(); ++it)
     {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-
-        auto* parent = ChainNodeHelpers::findParent(rootNode, nodeId);
-        if (!parent || !parent->isGroup())
+        if ((*it)->id == nodeId)
         {
-            suspendProcessing(false);
-            return false;
-        }
-
-        auto& children = parent->getGroup().children;
-        for (auto it = children.begin(); it != children.end(); ++it)
-        {
-            if ((*it)->id == nodeId)
+            // Close any open windows for plugins in this subtree
+            std::vector<const PluginLeaf*> plugins;
+            ChainNodeHelpers::collectPlugins(**it, plugins);
+            for (auto* plug : plugins)
             {
-                // Close any open windows for plugins in this subtree
-                std::vector<const PluginLeaf*> plugins;
-                ChainNodeHelpers::collectPlugins(**it, plugins);
-
-                // Collect all ChainNodeIds in the subtree for window cleanup
-                std::vector<ChainNodeId> nodeIdsToRemove;
-                std::function<void(const ChainNode&)> collectNodeIds = [&](const ChainNode& node) {
-                    nodeIdsToRemove.push_back(node.id);
-                    if (node.isGroup())
-                    {
-                        for (const auto& child : node.getGroup().children)
-                            collectNodeIds(*child);
-                    }
-                };
-                collectNodeIds(**it);
-
-                // Remove graph nodes
-                for (auto* plug : plugins)
-                    AudioProcessorGraph::removeNode(plug->graphNodeId);
-
-                // Close windows by direct ChainNodeId match
+                // Remove graph node
+                retirePlugin(*plug);
+                // Close windows by finding the ChainNode that owns this leaf
+                // We search by graphNodeId through open windows
                 for (int w = pluginWindows.size() - 1; w >= 0; --w)
                 {
-                    ChainNodeId windowNodeId = pluginWindows[w]->getNodeID();
-                    if (std::find(nodeIdsToRemove.begin(), nodeIdsToRemove.end(), windowNodeId) != nodeIdsToRemove.end())
-                    {
+                    // Find the node ID that owns this plugin
+                    auto* plugNode = ChainNodeHelpers::findById(rootNode, pluginWindows[w]->getNodeID());
+                    if (plugNode && plugNode->isPlugin() && plugNode->getPlugin().graphNodeId == plug->graphNodeId)
                         pluginWindows.remove(w);
-                    }
                 }
-
-                // If it's a group, remove all graph nodes in the subtree
-                // (Plugin graph nodes already removed above)
-
-                children.erase(it);
-                break;
             }
+
+            // If it's a group, remove all graph nodes in the subtree
+            // (Plugin graph nodes already removed above)
+
+            children.erase(it);
+            break;
         }
+    }
 
-        cachedSlotsDirty = true;
-    }  // Release lock before rebuildGraph
-
-    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
+    cachedSlotsDirty = true;
     rebuildGraph();
-
-    suspendProcessing(false);
-
     notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
+    bindingsDirty = true;
     return true;
+}
+
+static bool crossoverIsFull(const ChainNode& group)
+{
+    return group.isGroup() && group.getGroup().mode == GroupMode::Crossover
+        && static_cast<int>(group.getGroup().children.size()) >= kMaxCrossoverBands;
 }
 
 bool ChainProcessor::duplicateNode(ChainNodeId nodeId)
 {
+    cancelPendingLoads();
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
-    // Gather info WITHOUT holding lock
-    juce::PluginDescription description;
-    juce::String nodeName;
-    bool bypassed = false;
-    juce::AudioProcessorGraph::NodeID graphNodeId;
-    ChainNodeId parentId = 0;
-    int childIndex = -1;
+    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
+    if (!node || !node->isPlugin())
+        return false;
 
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
+    auto* parent = ChainNodeHelpers::findParent(rootNode, nodeId);
+    if (!parent || !parent->isGroup())
+        return false;
 
-        auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
-        if (!node || !node->isPlugin())
-            return false;
+    int childIndex = ChainNodeHelpers::findChildIndex(*parent, nodeId);
+    if (childIndex < 0 || crossoverIsFull(*parent))
+        return false;
 
-        auto* parent = ChainNodeHelpers::findParent(rootNode, nodeId);
-        if (!parent || !parent->isGroup())
-            return false;
+    const auto& srcLeaf = node->getPlugin();
 
-        parentId = parent->id;
-        childIndex = ChainNodeHelpers::findChildIndex(*parent, nodeId);
-        if (childIndex < 0)
-            return false;
-
-        const auto& srcLeaf = node->getPlugin();
-        description = srcLeaf.description;
-        nodeName = node->name;
-        bypassed = srcLeaf.bypassed;
-        graphNodeId = srcLeaf.graphNodeId;
-    }
-
-    // Capture source plugin state WITHOUT holding lock
+    // Capture source plugin state before modifying the graph
     juce::MemoryBlock stateBlock;
-    if (auto* srcGraphNode = getNodeForId(graphNodeId))
+    if (auto* srcGraphNode = getNodeForId(srcLeaf.graphNodeId))
     {
         if (auto* srcProc = srcGraphNode->getProcessor())
-        {
-            // Suspend processing during state capture to prevent corruption
-            srcProc->suspendProcessing(true);
             srcProc->getStateInformation(stateBlock);
-            srcProc->suspendProcessing(false);
-        }
     }
 
-    // Create a new plugin instance WITHOUT holding lock (can take seconds!)
+    // Create a new plugin instance with the same description
     juce::String errorMessage;
-    auto instance = pluginManager.createPluginInstance(description, currentSampleRate, currentBlockSize, errorMessage);
+    auto instance = pluginManager.createPluginInstance(srcLeaf.description, currentSampleRate, currentBlockSize, errorMessage);
     if (!instance)
         return false;
 
-    // Pre-prepare so bus layout is initialized (sidechain plugins need correct channel count)
-    instance->prepareToPlay(currentSampleRate, currentBlockSize);
-
-    auto wrapper = std::make_unique<PluginWithMeterWrapper>(std::move(instance));
+    // Apply source plugin's state to the new instance
+    if (stateBlock.getSize() > 0)
+        instance->setStateInformation(stateBlock.getData(), static_cast<int>(stateBlock.getSize()));
 
     auto newNode = std::make_unique<ChainNode>();
     newNode->id = nextNodeId++;
-    newNode->name = nodeName;
+    newNode->name = node->name;
     PluginLeaf newLeaf;
-    newLeaf.description = description;
-    newLeaf.bypassed = bypassed;
+    newLeaf.description = srcLeaf.description;
+    newLeaf.bypassed = srcLeaf.bypassed;
+    newLeaf.suspended = srcLeaf.suspended;
 
-    // Store state to be applied AFTER prepareToPlay (deferred state restoration)
-    if (stateBlock.getSize() > 0)
-        newLeaf.pendingPresetData = stateBlock.toBase64Encoding();
-
-    if (auto graphNode = addNode(std::move(wrapper)))
+    if (auto graphNode = addHostedInstance(std::move(instance), newLeaf.bypassed, newLeaf.suspended, errorMessage))
         newLeaf.graphNodeId = graphNode->nodeID;
     else
         return false;
 
     newNode->data = std::move(newLeaf);
 
-    suspendProcessing(true);
+    // Insert right after the source node
+    auto& children = parent->getGroup().children;
+    children.insert(children.begin() + childIndex + 1, std::move(newNode));
 
-    // Acquire lock only for tree modification
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-
-        // Re-validate parent (it could have changed during plugin load)
-        auto* parent = ChainNodeHelpers::findById(rootNode, parentId);
-        if (!parent || !parent->isGroup())
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        // Insert right after the source node
-        auto& children = parent->getGroup().children;
-        children.insert(children.begin() + childIndex + 1, std::move(newNode));
-
-        cachedSlotsDirty = true;
-    }
-
+    cachedSlotsDirty = true;
     rebuildGraph();
-
-    // CRITICAL: Apply pending preset data AFTER rebuildGraph() has called prepareToPlay() on all plugins.
-    // This ensures the duplicated plugin is fully initialized before state restoration.
-    std::vector<PluginLeaf*> allPluginsForState;
-    ChainNodeHelpers::collectPluginsMut(rootNode, allPluginsForState);
-    for (auto* plug : allPluginsForState)
-    {
-        if (plug->pendingPresetData.isNotEmpty())
-        {
-            if (auto gNode = getNodeForId(plug->graphNodeId))
-            {
-                if (auto* processor = gNode->getProcessor())
-                {
-                    juce::MemoryBlock state;
-                    state.fromBase64Encoding(plug->pendingPresetData);
-                    PCLOG("setStateInfo — " + plug->description.name + " (" + juce::String(static_cast<int>(state.getSize())) + " bytes)");
-                    processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-                    PCLOG("setStateInfo — " + plug->description.name + " done");
-                }
-            }
-            plug->pendingPresetData.clear();  // Clear after applying
-        }
-    }
-
-    suspendProcessing(false);
-
-    // Clear automation bindings for the duplicated slot
-    // The duplicated plugin is inserted at childIndex + 1, which becomes
-    // a new slot index after rebuildGraph() recalculates the flat list.
-    // We call onUnbindSlot to ensure the duplicated plugin starts without
-    // inherited DAW automation mappings.
-    if (onUnbindSlot)
-    {
-        // Calculate the flat slot index for the duplicated node
-        // This is approximate - the exact index depends on the tree structure
-        // The onParameterBindingChanged callback will do a full rebind anyway
-        onUnbindSlot(childIndex + 1);
-    }
-
     notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
+    bindingsDirty = true;
     return true;
 }
 
 bool ChainProcessor::moveNode(ChainNodeId nodeId, ChainNodeId newParentId, int newIndex)
 {
+    cancelPendingLoads();
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
     if (nodeId == 0)
         return false;
 
-    suspendProcessing(true);
+    // Can't move a node into its own subtree
+    auto* nodePtr = ChainNodeHelpers::findById(rootNode, nodeId);
+    if (!nodePtr)
+        return false;
 
-    // Perform tree manipulation with lock held briefly
+    if (ChainNodeHelpers::isDescendant(*nodePtr, newParentId))
+        return false;
+
+    auto* newParent = ChainNodeHelpers::findById(rootNode, newParentId);
+    if (!newParent || !newParent->isGroup())
+        return false;
+
+    auto* oldParent = ChainNodeHelpers::findParent(rootNode, nodeId);
+    if (!oldParent || !oldParent->isGroup())
+        return false;
+    if (oldParent != newParent && crossoverIsFull(*newParent))
+        return false;
+
+    // Extract the node from old parent
+    std::unique_ptr<ChainNode> extracted;
+    auto& oldChildren = oldParent->getGroup().children;
+    for (auto it = oldChildren.begin(); it != oldChildren.end(); ++it)
     {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-
-        // Can't move a node into its own subtree
-        auto* nodePtr = ChainNodeHelpers::findById(rootNode, nodeId);
-        if (!nodePtr)
+        if ((*it)->id == nodeId)
         {
-            suspendProcessing(false);
-            return false;
-        }
-
-        if (ChainNodeHelpers::isDescendant(*nodePtr, newParentId))
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        auto* newParent = ChainNodeHelpers::findById(rootNode, newParentId);
-        if (!newParent || !newParent->isGroup())
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        auto* oldParent = ChainNodeHelpers::findParent(rootNode, nodeId);
-        if (!oldParent || !oldParent->isGroup())
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        // Extract the node from old parent
-        std::unique_ptr<ChainNode> extracted;
-        auto& oldChildren = oldParent->getGroup().children;
-        for (auto it = oldChildren.begin(); it != oldChildren.end(); ++it)
-        {
-            if ((*it)->id == nodeId)
-            {
-                extracted = std::move(*it);
-                oldChildren.erase(it);
-                break;
-            }
-        }
-
-        if (!extracted)
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        // Insert into new parent
-        auto& newChildren = newParent->getGroup().children;
-        if (newIndex < 0 || newIndex >= static_cast<int>(newChildren.size()))
-            newChildren.push_back(std::move(extracted));
-        else
-            newChildren.insert(newChildren.begin() + newIndex, std::move(extracted));
-
-        cachedSlotsDirty = true;
-    }  // Release lock before rebuildGraph
-
-    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
-    rebuildGraph();
-
-    suspendProcessing(false);
-
-    notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
-    return true;
-}
-
-ChainNodeId ChainProcessor::insertNodeTree(std::unique_ptr<ChainNode> node, ChainNodeId parentId, int insertIndex)
-{
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-
-    if (!node)
-        return -1;
-
-    suspendProcessing(true);
-
-    ChainNodeId newNodeId = -1;
-
-    // Perform tree manipulation with lock held briefly
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-
-        auto* parent = ChainNodeHelpers::findById(rootNode, parentId);
-        if (!parent || !parent->isGroup())
-        {
-            suspendProcessing(false);
-            return -1;
-        }
-
-        // Reassign all IDs in the tree to avoid collisions
-        std::function<void(ChainNode&)> reassignIds = [&](ChainNode& n) {
-            n.id = nextNodeId++;
-            if (n.isGroup())
-            {
-                for (auto& child : n.getGroup().children)
-                    reassignIds(*child);
-            }
-        };
-        reassignIds(*node);
-        newNodeId = node->id;
-
-        // Insert into parent
-        auto& children = parent->getGroup().children;
-        if (insertIndex < 0 || insertIndex >= static_cast<int>(children.size()))
-            children.push_back(std::move(node));
-        else
-            children.insert(children.begin() + insertIndex, std::move(node));
-
-        cachedSlotsDirty = true;
-    }  // Release lock before rebuildGraph
-
-    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
-    rebuildGraph();
-
-    // Apply any pending preset data after graph is built
-    std::vector<PluginLeaf*> allPlugins;
-    ChainNodeHelpers::collectPluginsMut(rootNode, allPlugins);
-    for (auto* plug : allPlugins)
-    {
-        if (plug->pendingPresetData.isNotEmpty())
-        {
-            if (auto gNode = getNodeForId(plug->graphNodeId))
-            {
-                if (auto* processor = gNode->getProcessor())
-                {
-                    juce::MemoryBlock state;
-                    state.fromBase64Encoding(plug->pendingPresetData);
-                    PCLOG("setStateInfo — " + plug->description.name + " (" + juce::String(static_cast<int>(state.getSize())) + " bytes)");
-                    processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-                    PCLOG("setStateInfo — " + plug->description.name + " done");
-                }
-            }
-            plug->pendingPresetData.clear();
+            extracted = std::move(*it);
+            oldChildren.erase(it);
+            break;
         }
     }
 
-    suspendProcessing(false);
+    if (!extracted)
+        return false;
 
+    // Insert into new parent
+    auto& newChildren = newParent->getGroup().children;
+    if (newIndex < 0 || newIndex >= static_cast<int>(newChildren.size()))
+        newChildren.push_back(std::move(extracted));
+    else
+        newChildren.insert(newChildren.begin() + newIndex, std::move(extracted));
+
+    cachedSlotsDirty = true;
+    rebuildGraph();
     notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
-
-    return newNodeId;
+    bindingsDirty = true;
+    return true;
 }
 
 ChainNodeId ChainProcessor::createGroup(const std::vector<ChainNodeId>& childIds, GroupMode mode, const juce::String& name)
 {
+    cancelPendingLoads();
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
     if (childIds.empty())
         return -1;
 
-    suspendProcessing(true);
+    // All children must share the same parent
+    auto* firstParent = ChainNodeHelpers::findParent(rootNode, childIds[0]);
+    if (!firstParent || !firstParent->isGroup())
+        return -1;
 
-    ChainNodeId groupId = -1;
-
-    // Perform tree manipulation with lock held briefly
+    for (size_t i = 1; i < childIds.size(); ++i)
     {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
+        auto* parent = ChainNodeHelpers::findParent(rootNode, childIds[i]);
+        if (parent != firstParent)
+            return -1; // Children must share the same parent
+    }
 
-        // All children must share the same parent
-        auto* firstParent = ChainNodeHelpers::findParent(rootNode, childIds[0]);
-        if (!firstParent || !firstParent->isGroup())
-        {
-            suspendProcessing(false);
-            return -1;
-        }
+    // Find the earliest position among the children
+    auto& parentChildren = firstParent->getGroup().children;
+    int earliestIndex = static_cast<int>(parentChildren.size());
+    for (auto id : childIds)
+    {
+        int idx = ChainNodeHelpers::findChildIndex(*firstParent, id);
+        if (idx >= 0 && idx < earliestIndex)
+            earliestIndex = idx;
+    }
 
-        for (size_t i = 1; i < childIds.size(); ++i)
-        {
-            auto* parent = ChainNodeHelpers::findParent(rootNode, childIds[i]);
-            if (parent != firstParent)
-            {
-                suspendProcessing(false);
-                return -1; // Children must share the same parent
-            }
-        }
-
-        // Find the earliest position among the children
-        auto& parentChildren = firstParent->getGroup().children;
-        int earliestIndex = static_cast<int>(parentChildren.size());
+    // Extract the children (preserve their original order)
+    std::vector<std::unique_ptr<ChainNode>> extracted;
+    for (auto it = parentChildren.begin(); it != parentChildren.end(); )
+    {
+        bool found = false;
         for (auto id : childIds)
         {
-            int idx = ChainNodeHelpers::findChildIndex(*firstParent, id);
-            if (idx >= 0 && idx < earliestIndex)
-                earliestIndex = idx;
-        }
-
-        // Extract the children (preserve their original order)
-        std::vector<std::unique_ptr<ChainNode>> extracted;
-        for (auto it = parentChildren.begin(); it != parentChildren.end(); )
-        {
-            bool found = false;
-            for (auto id : childIds)
+            if ((*it)->id == id)
             {
-                if ((*it)->id == id)
-                {
-                    extracted.push_back(std::move(*it));
-                    it = parentChildren.erase(it);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                ++it;
-        }
-
-        // Create the group node
-        auto group = std::make_unique<ChainNode>();
-        group->id = nextNodeId++;
-        group->name = name.isEmpty() ? "Group" : name;
-
-        GroupData groupData;
-        groupData.mode = mode;
-        groupData.dryWetMix = 1.0f;
-        groupData.children = std::move(extracted);
-        group->data = std::move(groupData);
-
-        // Insert at the earliest position
-        if (earliestIndex >= static_cast<int>(parentChildren.size()))
-            parentChildren.push_back(std::move(group));
-        else
-            parentChildren.insert(parentChildren.begin() + earliestIndex, std::move(group));
-
-        groupId = parentChildren[static_cast<size_t>(earliestIndex)]->id;
-
-        // Auto-insert a dry path as the first child for parallel groups
-        if (mode == GroupMode::Parallel)
-        {
-            auto* groupNode = ChainNodeHelpers::findById(rootNode, groupId);
-            if (groupNode && groupNode->isGroup())
-            {
-                auto dryNode = std::make_unique<ChainNode>();
-                dryNode->id = nextNodeId++;
-                dryNode->name = "Dry Path";
-
-                PluginLeaf dryLeaf;
-                dryLeaf.isDryPath = true;
-                dryNode->data = std::move(dryLeaf);
-
-                groupNode->getGroup().children.insert(
-                    groupNode->getGroup().children.begin(), std::move(dryNode));
+                extracted.push_back(std::move(*it));
+                it = parentChildren.erase(it);
+                found = true;
+                break;
             }
         }
+        if (!found)
+            ++it;
+    }
 
-        cachedSlotsDirty = true;
-    }  // Release lock before rebuildGraph
+    // Create the group node
+    auto group = std::make_unique<ChainNode>();
+    group->id = nextNodeId++;
+    group->name = name.isEmpty() ? "Group" : name;
 
-    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
+    if (mode == GroupMode::Crossover && static_cast<int>(childIds.size()) > kMaxCrossoverBands)
+        return -1;
+
+    GroupData groupData;
+    groupData.mode = mode;
+    groupData.dryWetMix = 1.0f;
+    groupData.children = std::move(extracted);
+    if (mode == GroupMode::Crossover) CrossoverHelpers::fitFrequencies(groupData);
+    group->data = std::move(groupData);
+
+    // Insert at the earliest position
+    if (earliestIndex >= static_cast<int>(parentChildren.size()))
+        parentChildren.push_back(std::move(group));
+    else
+        parentChildren.insert(parentChildren.begin() + earliestIndex, std::move(group));
+
+    ChainNodeId groupId = parentChildren[static_cast<size_t>(earliestIndex)]->id;
+
+    cachedSlotsDirty = true;
     rebuildGraph();
-
-    suspendProcessing(false);
-
     notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
+    bindingsDirty = true;
     return groupId;
 }
 
 bool ChainProcessor::dissolveGroup(ChainNodeId groupId)
 {
+    cancelPendingLoads();
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
     if (groupId == 0)
         return false;
 
-    suspendProcessing(true);
+    auto* parent = ChainNodeHelpers::findParent(rootNode, groupId);
+    if (!parent || !parent->isGroup())
+        return false;
 
-    // Perform tree manipulation with lock held briefly
+    auto* groupNode = ChainNodeHelpers::findById(rootNode, groupId);
+    if (!groupNode || !groupNode->isGroup())
+        return false;
+
+    auto& parentChildren = parent->getGroup().children;
+
+    // Find the group's position
+    int groupIndex = ChainNodeHelpers::findChildIndex(*parent, groupId);
+    if (groupIndex < 0)
+        return false;
+
+    // Extract group's children
+    auto groupChildren = std::move(groupNode->getGroup().children);
+
+    // Remove the group from parent
+    parentChildren.erase(parentChildren.begin() + groupIndex);
+
+    // Insert the group's children at the same position
+    for (size_t i = 0; i < groupChildren.size(); ++i)
     {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
+        parentChildren.insert(parentChildren.begin() + groupIndex + static_cast<int>(i),
+                              std::move(groupChildren[i]));
+    }
 
-        auto* parent = ChainNodeHelpers::findParent(rootNode, groupId);
-        if (!parent || !parent->isGroup())
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        auto* groupNode = ChainNodeHelpers::findById(rootNode, groupId);
-        if (!groupNode || !groupNode->isGroup())
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        auto& parentChildren = parent->getGroup().children;
-
-        // Find the group's position
-        int groupIndex = ChainNodeHelpers::findChildIndex(*parent, groupId);
-        if (groupIndex < 0)
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        // Extract group's children
-        auto groupChildren = std::move(groupNode->getGroup().children);
-
-        // Remove the group from parent
-        parentChildren.erase(parentChildren.begin() + groupIndex);
-
-        // Insert the group's children at the same position
-        for (size_t i = 0; i < groupChildren.size(); ++i)
-        {
-            parentChildren.insert(parentChildren.begin() + groupIndex + static_cast<int>(i),
-                                  std::move(groupChildren[i]));
-        }
-
-        cachedSlotsDirty = true;
-    }  // Release lock before rebuildGraph
-
-    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
+    cachedSlotsDirty = true;
     rebuildGraph();
-
-    suspendProcessing(false);
-
     notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
+    bindingsDirty = true;
     return true;
 }
 
 bool ChainProcessor::setGroupMode(ChainNodeId groupId, GroupMode mode)
 {
+    cancelPendingLoads();
     auto* node = ChainNodeHelpers::findById(rootNode, groupId);
     if (!node || !node->isGroup())
         return false;
 
+    if (mode == GroupMode::Crossover && static_cast<int>(node->getGroup().children.size()) > kMaxCrossoverBands)
+        return false;
     node->getGroup().mode = mode;
+    if (mode == GroupMode::Crossover) CrossoverHelpers::fitFrequencies(node->getGroup());
 
-    // CRITICAL: Suspend audio processing before rebuilding graph to prevent crashes
-    suspendProcessing(true);
     rebuildGraph();
-    suspendProcessing(false);
+    notifyChainChanged();
+    return true;
+}
+
+bool ChainProcessor::setCrossoverFrequency(ChainNodeId groupId, int splitIndex, float frequencyHz)
+{
+    auto* node = ChainNodeHelpers::findById(rootNode, groupId);
+    if (!node || !node->isGroup() || node->getGroup().mode != GroupMode::Crossover || !std::isfinite(frequencyHz))
+        return false;
+    auto& group = node->getGroup();
+    CrossoverHelpers::fitFrequencies(group);
+    auto& hz = group.crossoverHz;
+    if (splitIndex < 0 || splitIndex >= static_cast<int>(hz.size()))
+        return false;
+    // Keep the split points in order, at least a few percent apart
+    const auto i = static_cast<size_t>(splitIndex);
+    const auto low = i > 0 ? hz[i - 1] * 1.05f : 20.0f;
+    const auto high = i + 1 < hz.size() ? hz[i + 1] / 1.05f : 20000.0f;
+    hz[i] = juce::jlimit(low, high, frequencyHz);
+
+    // Update the band filters in place (no rebuild needed)
+    for (auto filterId : group.bandFilterNodeIds)
+        if (auto gNode = getNodeForId(filterId))
+            if (auto* proc = dynamic_cast<CrossoverBandProcessor*>(gNode->getProcessor()))
+                proc->setFrequencies(hz);
 
     notifyChainChanged();
     return true;
@@ -918,39 +668,6 @@ bool ChainProcessor::setGroupDryWet(ChainNodeId groupId, float mix)
     return true;
 }
 
-bool ChainProcessor::setGroupDucking(ChainNodeId groupId, float amount, float relMs)
-{
-    auto* node = ChainNodeHelpers::findById(rootNode, groupId);
-    if (!node || !node->isGroup())
-        return false;
-
-    auto& group = node->getGroup();
-    group.duckAmount = juce::jlimit(0.0f, 1.0f, amount);
-    group.duckReleaseMs = juce::jlimit(50.0f, 1000.0f, relMs);
-
-    // Update the ducking processor if it exists (no rebuild needed)
-    if (group.duckingNodeId.uid != 0)
-    {
-        if (auto gNode = getNodeForId(group.duckingNodeId))
-        {
-            if (auto* proc = dynamic_cast<DuckingProcessor*>(gNode->getProcessor()))
-            {
-                proc->setDuckAmount(group.duckAmount);
-                proc->setReleaseMs(group.duckReleaseMs);
-            }
-        }
-    }
-    else if (group.duckAmount > 0.001f)
-    {
-        // Need to rebuild graph to insert the ducking processor — use deferred rebuild
-        scheduleRebuild();
-        return true;
-    }
-
-    notifyChainChanged();
-    return true;
-}
-
 bool ChainProcessor::setBranchGain(ChainNodeId nodeId, float gainDb)
 {
     auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
@@ -961,7 +678,7 @@ bool ChainProcessor::setBranchGain(ChainNodeId nodeId, float gainDb)
 
     // Update the branch gain processor if it exists (no rebuild needed)
     auto* parent = ChainNodeHelpers::findParent(rootNode, nodeId);
-    if (parent && parent->isGroup() && parent->getGroup().mode == GroupMode::Parallel)
+    if (parent && parent->isGroup() && isBranchingMode(parent->getGroup().mode))
     {
         int childIndex = ChainNodeHelpers::findChildIndex(*parent, nodeId);
         auto& branchGainIds = parent->getGroup().branchGainNodeIds;
@@ -985,55 +702,9 @@ bool ChainProcessor::setBranchSolo(ChainNodeId nodeId, bool solo)
     if (!node)
         return false;
 
-    node->solo.store(solo, std::memory_order_relaxed);
+    node->solo = solo;
 
-    // Solo by adjusting gain on ALL branches WITHOUT rebuilding the graph
-    // This allows smooth, DAW-automatable solo with no audio dropouts
-    // All plugins stay active and use CPU (unlike bypass which disconnects them)
-    auto* parent = ChainNodeHelpers::findParent(rootNode, nodeId);
-    if (parent && parent->isGroup() && parent->getGroup().mode == GroupMode::Parallel)
-    {
-        // Check if any branch is soloed
-        bool anySoloed = false;
-        for (const auto& child : parent->getGroup().children)
-        {
-            if (child->solo.load(std::memory_order_relaxed))
-            {
-                anySoloed = true;
-                break;
-            }
-        }
-
-        // Update gain for all branches based on solo/mute state
-        auto& branchGainIds = parent->getGroup().branchGainNodeIds;
-        for (size_t i = 0; i < parent->getGroup().children.size(); ++i)
-        {
-            auto& child = parent->getGroup().children[i];
-            if (i < branchGainIds.size())
-            {
-                if (auto gNode = getNodeForId(branchGainIds[i]))
-                {
-                    if (auto* proc = dynamic_cast<BranchGainProcessor*>(gNode->getProcessor()))
-                    {
-                        bool shouldMute = false;
-
-                        // If any branch is soloed, mute all non-soloed branches
-                        if (anySoloed && !child->solo.load(std::memory_order_relaxed))
-                            shouldMute = true;
-
-                        // Explicitly muted branches stay muted (unless soloed)
-                        if (child->mute.load(std::memory_order_relaxed) &&
-                            !(anySoloed && child->solo.load(std::memory_order_relaxed)))
-                            shouldMute = true;
-
-                        float targetGain = shouldMute ? -60.0f : child->branchGainDb;
-                        proc->setGainDb(targetGain);
-                    }
-                }
-            }
-        }
-    }
-
+    updateBranchGates(rootNode);
     notifyChainChanged();
     return true;
 }
@@ -1044,221 +715,98 @@ bool ChainProcessor::setBranchMute(ChainNodeId nodeId, bool mute)
     if (!node)
         return false;
 
-    node->mute.store(mute, std::memory_order_relaxed);
+    node->mute = mute;
 
-    // Per-plugin mute: set dry/wet mix to 0.0 (fully dry = effect disabled, signal passes through)
-    // The plugin stays loaded and uses CPU (unlike bypass which disconnects it entirely).
-    // This preserves latency compensation and allows instant A/B comparison.
-    if (node->isPlugin())
-    {
-        auto& leaf = node->getPlugin();
-        if (auto gNode = getNodeForId(leaf.pluginDryWetNodeId))
-        {
-            if (auto* proc = dynamic_cast<DryWetMixProcessor*>(gNode->getProcessor()))
-            {
-                // When muted: fully dry (0.0) — signal passes through unprocessed
-                // When unmuted: restore the user's configured dry/wet mix
-                proc->setMix(mute ? 0.0f : leaf.dryWetMix);
-            }
-        }
-    }
+    updateBranchGates(rootNode);
+    notifyChainChanged();
+    return true;
+}
 
-    // Parallel branch mute: also set branch gain to -∞ for branch-level silencing
+bool ChainProcessor::setBranchPolarity(ChainNodeId nodeId, bool inverted)
+{
+    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
+    if (!node)
+        return false;
+
+    node->polarityInverted = inverted;
+
+    // Update the branch gain processor if it exists (no rebuild needed)
     auto* parent = ChainNodeHelpers::findParent(rootNode, nodeId);
-    if (parent && parent->isGroup() && parent->getGroup().mode == GroupMode::Parallel)
+    if (parent && parent->isGroup() && isBranchingMode(parent->getGroup().mode))
     {
         int childIndex = ChainNodeHelpers::findChildIndex(*parent, nodeId);
         auto& branchGainIds = parent->getGroup().branchGainNodeIds;
         if (childIndex >= 0 && childIndex < static_cast<int>(branchGainIds.size()))
-        {
             if (auto gNode = getNodeForId(branchGainIds[static_cast<size_t>(childIndex)]))
-            {
                 if (auto* proc = dynamic_cast<BranchGainProcessor*>(gNode->getProcessor()))
-                {
-                    // Check if any branch is soloed
-                    bool anySoloed = false;
-                    for (const auto& child : parent->getGroup().children)
-                    {
-                        if (child->solo.load(std::memory_order_relaxed))
-                        {
-                            anySoloed = true;
-                            break;
-                        }
-                    }
-
-                    bool shouldMute = mute;
-                    // If soloed and this branch is NOT soloed, it should be muted
-                    if (anySoloed && !node->solo.load(std::memory_order_relaxed))
-                        shouldMute = true;
-                    // Unless this branch is soloed (solo overrides mute)
-                    if (anySoloed && node->solo.load(std::memory_order_relaxed))
-                        shouldMute = false;
-
-                    float targetGain = shouldMute ? -60.0f : node->branchGainDb;
-                    proc->setGainDb(targetGain);
-                }
-            }
-        }
+                    proc->setPolarityInverted(inverted);
     }
 
     notifyChainChanged();
     return true;
 }
 
-// =============================================
-// Per-plugin controls (gain staging, dry/wet, sidechain)
-// =============================================
+bool ChainProcessor::setNodeRecallSafe(ChainNodeId nodeId, bool recallSafe)
+{
+    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
+    if (!node || !node->isPlugin())
+        return false;
 
-bool ChainProcessor::setNodeInputGain(ChainNodeId nodeId, float gainDb)
+    node->getPlugin().recallSafe = recallSafe;
+    notifyChainChanged();
+    return true;
+}
+
+bool ChainProcessor::setNodeIgnoreLatency(ChainNodeId nodeId, bool ignore)
 {
     auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
     if (!node || !node->isPlugin())
         return false;
 
     auto& leaf = node->getPlugin();
-    leaf.inputGainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
-
-    // Gain nodes are always wired — just update the processor value (no rebuild needed)
-    if (auto gNode = getNodeForId(leaf.inputGainNodeId))
+    leaf.ignoreLatency = ignore;
+    if (auto* hosted = getHosted(leaf))
     {
-        if (auto* proc = dynamic_cast<BranchGainProcessor*>(gNode->getProcessor()))
-            proc->setGainDb(leaf.inputGainDb);
+        hosted->setIgnoreLatency(ignore);
+        if (hosted->hasLatencyChange()) { hosted->refreshLatency(); rebuildGraph(); }
     }
-
     notifyChainChanged();
     return true;
 }
 
-bool ChainProcessor::setNodeOutputGain(ChainNodeId nodeId, float gainDb)
+bool ChainProcessor::setNodeSidechain(ChainNodeId nodeId, bool useSidechain)
 {
     auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
     if (!node || !node->isPlugin())
         return false;
 
     auto& leaf = node->getPlugin();
-    leaf.outputGainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
-
-    // Gain nodes are always wired — just update the processor value (no rebuild needed)
-    if (auto gNode = getNodeForId(leaf.outputGainNodeId))
-    {
-        if (auto* proc = dynamic_cast<BranchGainProcessor*>(gNode->getProcessor()))
-            proc->setGainDb(leaf.outputGainDb);
-    }
-
-    notifyChainChanged();
-    return true;
-}
-
-bool ChainProcessor::setNodeDryWet(ChainNodeId nodeId, float mix)
-{
-    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
-    if (!node || !node->isPlugin())
+    auto* hosted = getHosted(leaf);
+    if (useSidechain && hosted && !hosted->hasSidechainInput())
         return false;
-
-    auto& leaf = node->getPlugin();
-    leaf.dryWetMix = juce::jlimit(0.0f, 1.0f, mix);
-
-    // Update existing DryWetMixProcessor (always wired since init)
-    // If muted, keep the processor at 0.0 (fully dry) — the stored value will be
-    // restored when the user unmutes
-    if (!node->mute.load(std::memory_order_relaxed))
-    {
-        if (auto gNode = getNodeForId(leaf.pluginDryWetNodeId))
-        {
-            if (auto* proc = dynamic_cast<DryWetMixProcessor*>(gNode->getProcessor()))
-                proc->setMix(leaf.dryWetMix);
-        }
-    }
-
-    notifyChainChanged();
-    return true;
-}
-
-bool ChainProcessor::setNodeSidechainSource(ChainNodeId nodeId, int source)
-{
-    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
-    if (!node || !node->isPlugin())
-        return false;
-
-    auto& leaf = node->getPlugin();
-    leaf.sidechainSource = juce::jlimit(0, 1, source);
-
-    // Update the wrapper's SC buffer assignment
-    if (auto gNode = getNodeForId(leaf.graphNodeId))
-    {
-        if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(gNode->getProcessor()))
-            wrapper->setSidechainBuffer(leaf.sidechainSource == 1 ? externalSidechainBuffer : nullptr);
-    }
-
-    notifyChainChanged();
-    return true;
-}
-
-bool ChainProcessor::setNodeMidSideMode(ChainNodeId nodeId, int mode)
-{
-    if (mode < 0 || mode > 3)
-        return false;
-
-    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
-    if (!node || !node->isPlugin())
-        return false;
-
-    auto& leaf = node->getPlugin();
-    leaf.midSideMode = static_cast<MidSideMode>(mode);
-
-    // Requires graph rebuild to insert/remove M/S encode/decode nodes
-    suspendProcessing(true);
-    rebuildGraph();
-    suspendProcessing(false);
-
+    leaf.sidechain = useSidechain;
+    if (hosted) hosted->setUseSidechain(useSidechain);
     notifyChainChanged();
     return true;
 }
 
 void ChainProcessor::setNodeBypassed(ChainNodeId nodeId, bool bypassed)
 {
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
-        auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
-        if (!node || !node->isPlugin())
-            return;
+    auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
+    if (!node || !node->isPlugin())
+        return;
 
-        node->getPlugin().bypassed = bypassed;
-    }
+    node->getPlugin().bypassed = bypassed;
 
-    // Deferred rebuild — coalesces rapid bypass toggles (e.g. setAllBypass).
-    // ~16ms delay is imperceptible. Full rebuild needed because bypassed plugins
-    // are disconnected in wireNode() for zero CPU and correct latency reporting.
-    scheduleRebuild();
+    if (auto* hosted = getHosted(node->getPlugin())) hosted->setBypassed(bypassed);
+    cachedTail.store(computeTail(rootNode));
+    notifyChainChanged();
 }
 
 std::vector<PluginLeaf*> ChainProcessor::getFlatPluginList()
 {
     std::vector<PluginLeaf*> result;
     ChainNodeHelpers::collectPluginsMut(rootNode, result);
-    return result;
-}
-
-std::vector<const PluginLeaf*> ChainProcessor::getFlatPluginList() const
-{
-    std::vector<const PluginLeaf*> result;
-    ChainNodeHelpers::collectPlugins(rootNode, result);
-    return result;
-}
-
-std::vector<ChainNodeId> ChainProcessor::getFlatPluginNodeIds() const
-{
-    std::vector<ChainNodeId> result;
-    struct Collector {
-        static void collect(const ChainNode& node, std::vector<ChainNodeId>& ids) {
-            if (node.isPlugin())
-                ids.push_back(node.id);
-            else if (node.isGroup())
-                for (const auto& child : node.getGroup().children)
-                    collect(*child, ids);
-        }
-    };
-    Collector::collect(rootNode, result);
     return result;
 }
 
@@ -1278,46 +826,31 @@ bool ChainProcessor::removePlugin(int slotIndex)
         return false;
 
     // Hide window by slot index before removing
-    hidePluginWindow(slotIndex);
+    hidePluginWindow(nodeId);
 
     return removeNode(nodeId);
 }
 
 bool ChainProcessor::movePlugin(int fromIndex, int toIndex)
 {
+    cancelPendingLoads();
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
-    suspendProcessing(true);
+    // For flat API compat, move within the root group
+    auto& rootChildren = rootNode.getGroup().children;
+    if (fromIndex < 0 || fromIndex >= static_cast<int>(rootChildren.size()) ||
+        toIndex < 0 || toIndex >= static_cast<int>(rootChildren.size()) ||
+        fromIndex == toIndex)
+        return false;
 
-    // Perform tree manipulation with lock held briefly
-    {
-        const juce::SpinLock::ScopedLockType lock(treeLock);
+    auto node = std::move(rootChildren[static_cast<size_t>(fromIndex)]);
+    rootChildren.erase(rootChildren.begin() + fromIndex);
+    rootChildren.insert(rootChildren.begin() + toIndex, std::move(node));
 
-        // For flat API compat, move within the root group
-        auto& rootChildren = rootNode.getGroup().children;
-        if (fromIndex < 0 || fromIndex >= static_cast<int>(rootChildren.size()) ||
-            toIndex < 0 || toIndex >= static_cast<int>(rootChildren.size()) ||
-            fromIndex == toIndex)
-        {
-            suspendProcessing(false);
-            return false;
-        }
-
-        auto node = std::move(rootChildren[static_cast<size_t>(fromIndex)]);
-        rootChildren.erase(rootChildren.begin() + fromIndex);
-        rootChildren.insert(rootChildren.begin() + toIndex, std::move(node));
-
-        cachedSlotsDirty = true;
-    }  // Release lock before rebuildGraph
-
-    // Rebuild graph WITHOUT holding lock (can take 100-500ms)
+    cachedSlotsDirty = true;
     rebuildGraph();
-
-    suspendProcessing(false);
-
     notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
+    bindingsDirty = true;
     return true;
 }
 
@@ -1326,6 +859,12 @@ void ChainProcessor::setSlotBypassed(int slotIndex, bool bypassed)
     auto nodeId = getNodeIdByFlatIndex(slotIndex);
     if (nodeId >= 0)
         setNodeBypassed(nodeId, bypassed);
+}
+
+bool ChainProcessor::isSlotBypassed(int slotIndex) const
+{
+    auto* leaf = getPluginByFlatIndex(slotIndex);
+    return leaf ? leaf->bypassed : false;
 }
 
 void ChainProcessor::showPluginWindow(ChainNodeId nodeId)
@@ -1363,24 +902,19 @@ void ChainProcessor::showPluginWindow(ChainNodeId nodeId)
 
     if (auto gNode = getNodeForId(node->getPlugin().graphNodeId))
     {
-        // PHASE 7: Unwrap to get the raw plugin for editor creation
-        juce::AudioProcessor* processor = nullptr;
-        if (auto* wrapperProc = dynamic_cast<PluginWithMeterWrapper*>(gNode->getProcessor()))
+        if (auto* processor = gNode->getProcessor())
         {
-            processor = wrapperProc->getWrappedPlugin();
-        }
-        else
-        {
-            // Fallback for non-wrapped plugins (shouldn't happen with Phase 7)
-            processor = gNode->getProcessor();
-        }
-
-        if (processor && processor->hasEditor())
-        {
-            if (auto* editor = processor->createEditor())
+            if (processor->hasEditor())
             {
-                auto windowName = node->getPlugin().description.name + " [" + node->name + "]";
-                pluginWindows.add(new PluginWindow(editor, windowName, nodeId));
+                if (auto* editor = processor->createEditor())
+                {
+                    auto windowName = node->getPlugin().description.name + " [" + node->name + "]";
+                    auto* window = pluginWindows.add(new PluginWindow(editor, windowName, nodeId));
+                    auto alive = aliveFlag;
+                    window->onClose = [this, alive, nodeId] {
+                        juce::MessageManager::callAsync([this, alive, nodeId] { if (*alive) hidePluginWindow(nodeId); });
+                    };
+                }
             }
         }
     }
@@ -1413,6 +947,15 @@ void ChainProcessor::hidePluginWindow(ChainNodeId nodeId)
     }
 }
 
+void ChainProcessor::closeRetiredPluginWindows(const ChainNode& previous, const std::set<NodeID>& retained)
+{
+    for (int i = pluginWindows.size() - 1; i >= 0; --i)
+    {
+        auto* before = ChainNodeHelpers::findById(previous, pluginWindows[i]->getNodeID());
+        if (!before || !before->isPlugin() || retained.count(before->getPlugin().graphNodeId) == 0) pluginWindows.remove(i);
+    }
+}
+
 void ChainProcessor::hideAllPluginWindows()
 {
     pluginWindows.clear();
@@ -1437,10 +980,8 @@ void ChainProcessor::setAllBypass(bool bypassed)
     ChainNodeHelpers::collectPluginsMut(rootNode, plugins);
 
     for (auto* leaf : plugins)
-        leaf->bypassed = bypassed;
-
-    // Single deferred rebuild for all bypass changes
-    scheduleRebuild();
+    { leaf->bypassed = bypassed; if (auto* hosted = getHosted(*leaf)) hosted->setBypassed(bypassed); }
+    notifyChainChanged();
 }
 
 ChainProcessor::BypassState ChainProcessor::getBypassState() const
@@ -1511,49 +1052,6 @@ ChainProcessor::WindowState ChainProcessor::getWindowState() const
     return state;
 }
 
-//==============================================================================
-// PHASE 2: Conditional Metering - Set global meter mode
-//==============================================================================
-
-void ChainProcessor::setGlobalMeterMode(MeterMode mode)
-{
-    // Only called from the message thread (via WebViewBridge), so no lock needed.
-    // Tree mutations also only happen on the message thread — no concurrent access.
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-
-    const bool enableLufs = (mode == MeterMode::FullLUFS);
-
-    // Collect meter node IDs from the tree (lightweight — just reading IDs)
-    std::vector<juce::AudioProcessorGraph::NodeID> meterNodeIds;
-    std::function<void(const ChainNode&)> collectMeterIds = [&](const ChainNode& node) {
-        if (node.isPlugin())
-        {
-            const auto& leaf = node.getPlugin();
-            if (leaf.meterNodeId != juce::AudioProcessorGraph::NodeID())
-                meterNodeIds.push_back(leaf.meterNodeId);
-            if (leaf.inputMeterNodeId != juce::AudioProcessorGraph::NodeID())
-                meterNodeIds.push_back(leaf.inputMeterNodeId);
-        }
-        else if (node.isGroup())
-        {
-            for (const auto& child : node.getGroup().children)
-                collectMeterIds(*child);
-        }
-    };
-
-    collectMeterIds(rootNode);
-
-    // Now do the heavyweight getNodeForId + dynamic_cast without any lock
-    for (auto nodeId : meterNodeIds)
-    {
-        if (auto* meterNode = getNodeForId(nodeId))
-        {
-            if (auto* meterProc = dynamic_cast<NodeMeterProcessor*>(meterNode->getProcessor()))
-                meterProc->setEnableLUFS(enableLufs);
-        }
-    }
-}
-
 int ChainProcessor::getNumSlots() const
 {
     return ChainNodeHelpers::countPlugins(rootNode);
@@ -1586,13 +1084,7 @@ juce::AudioProcessor* ChainProcessor::getSlotProcessor(int slotIndex)
         return nullptr;
 
     if (auto gNode = getNodeForId(leaf->graphNodeId))
-    {
-        // Unwrap PluginWithMeterWrapper to return the raw plugin instance
-        // (callers need parameter access which lives on the wrapped plugin)
-        if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(gNode->getProcessor()))
-            return wrapper->getWrappedPlugin();
-        return gNode->getProcessor();
-    }
+        return dynamic_cast<HostedPluginProcessor*>(gNode->getProcessor())->plugin();
 
     return nullptr;
 }
@@ -1604,12 +1096,7 @@ juce::AudioProcessor* ChainProcessor::getNodeProcessor(ChainNodeId nodeId)
         return nullptr;
 
     if (auto gNode = getNodeForId(node->getPlugin().graphNodeId))
-    {
-        // Unwrap PluginWithMeterWrapper to return the raw plugin instance
-        if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(gNode->getProcessor()))
-            return wrapper->getWrappedPlugin();
-        return gNode->getProcessor();
-    }
+        return dynamic_cast<HostedPluginProcessor*>(gNode->getProcessor())->plugin();
 
     return nullptr;
 }
@@ -1625,939 +1112,208 @@ void ChainProcessor::removeUtilityNodes(UpdateKind update)
     utilityNodes.clear();
 }
 
+juce::AudioProcessorGraph::NodeID ChainProcessor::utility(const juce::String& key, std::unique_ptr<juce::AudioProcessor> processor)
+{
+    usedUtilityKeys.insert(key);
+    if (auto found = utilityByKey.find(key); found != utilityByKey.end())
+        if (getNodeForId(found->second)) return found->second;
+    auto node = addNode(std::move(processor), {}, UpdateKind::none);
+    if (!node) throw std::runtime_error("Cannot create routing utility");
+    utilityByKey[key] = node->nodeID; utilityNodes.insert(node->nodeID);
+    return node->nodeID;
+}
+
+void ChainProcessor::connectAudio(NodeID from, NodeID to, int destinationChannel)
+{
+    for (int c = 0; c < 2; ++c)
+        if (!addConnection({{from, c}, {to, destinationChannel + c}}, UpdateKind::none))
+            throw std::runtime_error("Invalid stereo audio connection");
+}
+void ChainProcessor::connectMidi(NodeID from, NodeID to)
+{
+    if (!addConnection({{from, midiChannelIndex}, {to, midiChannelIndex}}, UpdateKind::none))
+        throw std::runtime_error("Invalid MIDI connection");
+}
+
 void ChainProcessor::rebuildGraph()
 {
-    PCLOG("rebuildGraph — start (nodes=" + juce::String(getNodes().size()) + ")");
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-
-    // JUCE's rebuild() uses RenderSequenceExchange which does a wait-free
-    // try-lock swap of the render sequence pointer. The audio thread finishes
-    // its current callback on the old sequence; the new one takes effect next call.
-    // No spin-wait needed — suspendProcessing(true) is sufficient.
-
-    // NOTE: Do NOT call releaseResources() here. The old render sequence may still
-    // be referenced by the audio thread until rebuild() atomically swaps it.
-    // Calling releaseResources() before that swap invalidates buffers mid-render → crash.
-    // prepareToPlay() after rebuild() handles reinitialization safely.
-
-    // Use UpdateKind::none for all intermediate operations to avoid rebuilding
-    // the internal render sequence after every single change. We call rebuild()
-    // once at the end for an atomic, glitch-free update.
-    constexpr auto deferred = UpdateKind::none;
-
-    // Remove all connections
-    for (auto& connection : getConnections())
-        removeConnection(connection, deferred);
-
-    // Remove utility nodes from previous wiring
-    removeUtilityNodes(deferred);
-
-    // Remove I/O nodes if they exist
-    if (audioInputNode.uid != 0)
-        AudioProcessorGraph::removeNode(audioInputNode, deferred);
-    if (audioOutputNode.uid != 0)
-        AudioProcessorGraph::removeNode(audioOutputNode, deferred);
-    // Create I/O nodes (audio only — no MIDI needed for an effects host)
-    if (auto audioIn = addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
-            juce::AudioProcessorGraph::AudioGraphIOProcessor::audioInputNode), {}, deferred))
-        audioInputNode = audioIn->nodeID;
-
-    if (auto audioOut = addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
-            juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode), {}, deferred))
-        audioOutputNode = audioOut->nodeID;
-
-    // Wire the root group (all wire* methods now use deferred updates)
-    auto result = wireNode(rootNode, audioInputNode);
-
-    // Connect last output to audio output
-    addConnection({{result.audioOut, 0}, {audioOutputNode, 0}}, deferred);
-    addConnection({{result.audioOut, 1}, {audioOutputNode, 1}}, deferred);
-
-    // Single atomic rebuild of the render sequence
-    rebuild();
-
-    // Assert no cycles in debug builds
-    jassert(!detectCycles());
-
-    // Re-prepare all plugin instances after rewiring
-    for (auto* node : getNodes())
+    lastError.clear();
+    try
     {
-        if (auto* proc = node->getProcessor())
-            proc->prepareToPlay(currentSampleRate, currentBlockSize);
-    }
-
-    // PHASE 5: Invalidate latency cache after graph rebuild
-    invalidateLatencyCache();
-
-    // CRITICAL FIX: Report updated total latency to DAW after graph changes
-    int totalLatency = getTotalLatencySamples();
-    setLatencySamples(totalLatency);
-
-    PCLOG("rebuildGraph — done (nodes=" + juce::String(getNodes().size())
-          + " latency=" + juce::String(totalLatency) + ")");
-
-    // Re-register parameter watcher on all plugin instances
-    if (parameterWatcher)
-    {
-        parameterWatcher->clearWatches();
-        auto plugins = getFlatPluginList();
-        for (auto* leaf : plugins)
+        for (auto c : getConnections()) removeConnection(c, UpdateKind::none);
+        usedUtilityKeys.clear();
+        using IO = AudioProcessorGraph::AudioGraphIOProcessor;
+        auto ensureIO = [&](NodeID& id, IO::IODeviceType type)
         {
-            if (leaf && leaf->graphNodeId.uid != 0)
+            if (getNodeForId(id)) return;
+            auto io = std::make_unique<IO>(type); io->setParentGraph(this);
+            auto n = addNode(std::move(io), {}, UpdateKind::none);
+            if (!n) throw std::runtime_error("Cannot create graph I/O");
+            id = n->nodeID;
+        };
+        ensureIO(audioInputNode, IO::audioInputNode); ensureIO(audioOutputNode, IO::audioOutputNode);
+        ensureIO(midiInputNode, IO::midiInputNode); ensureIO(midiOutputNode, IO::midiOutputNode);
+        const auto output = wireNode(rootNode, audioInputNode, midiInputNode);
+        connectAudio(output.audioOut, audioOutputNode); connectMidi(output.midiOut, midiOutputNode);
+        for (auto it = utilityByKey.begin(); it != utilityByKey.end();)
+        {
+            if (usedUtilityKeys.count(it->first) == 0)
             {
-                if (auto* graphNode = getNodeForId(leaf->graphNodeId))
-                {
-                    // Unwrap to watch the raw plugin's parameters (wrapper has none)
-                    if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(graphNode->getProcessor()))
-                        parameterWatcher->watchProcessor(wrapper->getWrappedPlugin());
-                    else if (auto* proc = graphNode->getProcessor())
-                        parameterWatcher->watchProcessor(proc);
-                }
+                AudioProcessorGraph::removeNode(it->second, UpdateKind::none);
+                preparedNodes.erase(it->second); utilityNodes.erase(it->second);
+                it = utilityByKey.erase(it);
+            }
+            else ++it;
+        }
+        for (auto node : getNodes())
+        {
+            if (dynamic_cast<IO*>(node->getProcessor())) continue;
+            if (preparedNodes.insert(node->nodeID).second)
+            {
+                node->getProcessor()->setRateAndBufferSizeDetails(currentSampleRate, currentBlockSize);
+                node->getProcessor()->prepareToPlay(currentSampleRate, currentBlockSize);
             }
         }
-
-        // Schedule deferred stable snapshot update (after prepareToPlay settles)
-        auto alive = aliveFlag;
-        juce::Timer::callAfterDelay(100, [this, alive]() {
-            if (!alive->load(std::memory_order_acquire)) return;
-            auto snapshot = captureSnapshot();
-            auto base64 = juce::Base64::toBase64(snapshot.getData(), snapshot.getSize());
-            parameterWatcher->updateStableSnapshot(base64);
-        });
+        cachedTail.store(computeTail(rootNode));
+        auto runtime = std::make_unique<ChainRenderGraph>(*this, currentSampleRate, currentBlockSize, renderRevision + 1);
+        runtime->audioWorkgroupContextChanged(currentWorkgroup);
+        ++renderRevision;
+        publishRuntime(std::move(runtime));
     }
-
-    // Update cached meter wrapper pointers (avoids DFS + dynamic_cast in processBlock)
-    updateMeterWrapperCache();
+    catch (const std::exception& e) { lastError = e.what(); }
 }
 
-// ---------------------------------------------------------------------------
-// Deferred rebuild — coalesces rapid graph mutations into a single rebuild.
-// Posts ONE callAsync callback. If multiple scheduleRebuild() calls happen
-// before the callback fires, only one rebuild occurs.
-// ---------------------------------------------------------------------------
-void ChainProcessor::scheduleRebuild()
-{
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-
-    // If inside a batch, just flag and let endBatch() handle it
-    if (batchDepth > 0)
-    {
-        rebuildNeeded.store(true, std::memory_order_relaxed);
-        return;
-    }
-
-    rebuildNeeded.store(true, std::memory_order_relaxed);
-
-    // Only post one callback — guard with rebuildScheduled
-    bool expected = false;
-    if (rebuildScheduled.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
-    {
-        auto alive = aliveFlag;
-        juce::MessageManager::callAsync([this, alive]() {
-            if (!alive->load(std::memory_order_acquire))
-                return;
-
-            rebuildScheduled.store(false, std::memory_order_release);
-
-            if (rebuildNeeded.exchange(false, std::memory_order_acq_rel))
-            {
-                suspendProcessing(true);
-                rebuildGraph();
-                suspendProcessing(false);
-                notifyChainChanged();
-            }
-        });
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Batch API — suppresses individual rebuilds during multi-operation sequences.
-// Nests: beginBatch() can be called multiple times; only the final endBatch()
-// triggers the rebuild.
-// ---------------------------------------------------------------------------
-void ChainProcessor::beginBatch()
-{
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-
-    if (batchDepth == 0)
-        suspendProcessing(true);
-
-    ++batchDepth;
-}
-
-void ChainProcessor::endBatch()
-{
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    jassert(batchDepth > 0);
-
-    --batchDepth;
-
-    if (batchDepth == 0)
-    {
-        if (rebuildNeeded.exchange(false, std::memory_order_acq_rel))
-        {
-            rebuildGraph();
-        }
-        suspendProcessing(false);
-        notifyChainChanged();
-    }
-}
-
-void ChainProcessor::updateMeterWrapperCache()
-{
-    cachedMeterWrappers.clear();
-
-    std::function<void(const ChainNode&)> collect = [&](const ChainNode& node)
-    {
-        if (node.isPlugin())
-        {
-            const auto& leaf = node.getPlugin();
-            if (leaf.graphNodeId != juce::AudioProcessorGraph::NodeID())
-            {
-                if (auto* graphNode = getNodeForId(leaf.graphNodeId))
-                {
-                    if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(graphNode->getProcessor()))
-                        cachedMeterWrappers.emplace_back(node.id, wrapper);
-                }
-            }
-        }
-        else if (node.isGroup())
-        {
-            for (const auto& child : node.getGroup().children)
-                collect(*child);
-        }
-    };
-
-    collect(rootNode);
-}
-
-void ChainProcessor::wireMidSidePlugin(
-    PluginLeaf& leaf, NodeID encodeNodeId, NodeID pluginNodeId, NodeID decodeNodeId,
-    int processChannel, int bypassChannel, int pluginLatency)
-{
-    // Route encode[processChannel] → plugin ch0 AND ch1 (mono-through-stereo)
-    addConnection({{encodeNodeId, processChannel}, {pluginNodeId, 0}}, UpdateKind::none);
-    addConnection({{encodeNodeId, processChannel}, {pluginNodeId, 1}}, UpdateKind::none);
-
-    // Plugin output ch0 → decode[processChannel]
-    addConnection({{pluginNodeId, 0}, {decodeNodeId, processChannel}}, UpdateKind::none);
-
-    // ALWAYS create a dedicated bypass delay node (even if latency=0).
-    // This guarantees the bypass signal gets its own buffer in the graph,
-    // preventing buffer aliasing when the graph reuses encode output buffers.
-    auto bypassProc = std::make_unique<LatencyCompensationProcessor>(pluginLatency);
-    if (auto bypassNode = addNode(std::move(bypassProc), {}, UpdateKind::none))
-    {
-        leaf.msBypassDelayNodeId = bypassNode->nodeID;
-        utilityNodes.insert(bypassNode->nodeID);
-
-        // Feed encode[bypassChannel] into bypass delay ch0 (mono is enough)
-        addConnection({{encodeNodeId, bypassChannel}, {bypassNode->nodeID, 0}}, UpdateKind::none);
-
-        // Bypass delay ch0 → decode[bypassChannel]
-        addConnection({{bypassNode->nodeID, 0}, {decodeNodeId, bypassChannel}}, UpdateKind::none);
-
-        DBG("M/S bypass node created: nodeID=" << (int)bypassNode->nodeID.uid
-            << " latency=" << pluginLatency
-            << " processChannel=" << processChannel
-            << " bypassChannel=" << bypassChannel);
-    }
-}
-
-WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn)
+WireResult ChainProcessor::wireNode(ChainNode& node, NodeID audioIn, NodeID midiIn)
 {
     if (node.isPlugin())
     {
         auto& leaf = node.getPlugin();
-
-        // Dry path nodes are empty passthrough branches (used in parallel groups)
-        if (leaf.isDryPath)
-            return { audioIn, 0 };
-
-        // Bypassed plugins: in parallel groups, disconnect entirely (mute).
-        // In serial groups, pass through (bypass).
-        if (leaf.bypassed)
-        {
-            if (isInParallelGroup(node.id))
-            {
-                return { {}, 0 };  // Disconnect entirely (mute)
-            }
-            else
-            {
-                return { audioIn, 0 };  // Passthrough in serial
-            }
-        }
-
-        auto pluginNodeId = leaf.graphNodeId;
-
-        // If plugin failed to instantiate, pass through like a bypassed plugin
-        if (pluginNodeId == juce::AudioProcessorGraph::NodeID())
-            return { audioIn, 0 };
-
-        // Reset utility node IDs (they are recreated each rebuild)
-        leaf.inputGainNodeId = {};
-        leaf.outputGainNodeId = {};
-        leaf.pluginDryWetNodeId = {};
-        leaf.msEncodeNodeId = {};
-        leaf.msDecodeNodeId = {};
-        leaf.msBypassDelayNodeId = {};
-
-        // Set sidechain buffer on the wrapper if SC source is external
-        if (auto gNode = getNodeForId(pluginNodeId))
-        {
-            if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(gNode->getProcessor()))
-                wrapper->setSidechainBuffer(leaf.sidechainSource == 1 ? externalSidechainBuffer : nullptr);
-        }
-
-        bool useInputGain = true;   // Always wire to avoid rebuild when gain changes from 0
-        bool useOutputGain = true;  // Always wire to avoid rebuild when gain changes from 0
-        bool useDryWet = true;      // Always wire DryWetMixProcessor to avoid audio dropout on first knob move
-        bool useMidSide = leaf.midSideMode != MidSideMode::Off;
-
-        // Query plugin latency once — used for dry/wet delay compensation and returned in WireResult
-        int pluginLatencySamples = 0;
-        if (auto gNode = getNodeForId(pluginNodeId))
-            if (auto* proc = gNode->getProcessor())
-                pluginLatencySamples = proc->getLatencySamples();
-
-        NodeID currentAudioIn = audioIn;
-
-        // --- Input Gain node ---
-        if (useInputGain)
-        {
-            auto inGainProc = std::make_unique<BranchGainProcessor>();
-            inGainProc->setGainDb(leaf.inputGainDb);
-            if (auto inGainNode = addNode(std::move(inGainProc), {}, UpdateKind::none))
-            {
-                leaf.inputGainNodeId = inGainNode->nodeID;
-                utilityNodes.insert(inGainNode->nodeID);
-
-                addConnection({{currentAudioIn, 0}, {inGainNode->nodeID, 0}}, UpdateKind::none);
-                addConnection({{currentAudioIn, 1}, {inGainNode->nodeID, 1}}, UpdateKind::none);
-                currentAudioIn = inGainNode->nodeID;
-            }
-        }
-
-        // --- Per-plugin dry/wet: save dry source before M/S encode ---
-        NodeID drySource = currentAudioIn;  // for dry path (original L/R)
-
-        // --- Mid/Side processing ---
-        if (useMidSide)
-        {
-            // Create M/S encode node (L/R → Mid/Side)
-            auto encodeProc = std::make_unique<MidSideMatrixProcessor>();
-            auto encodeNode = addNode(std::move(encodeProc), {}, UpdateKind::none);
-            if (encodeNode)
-            {
-                leaf.msEncodeNodeId = encodeNode->nodeID;
-                utilityNodes.insert(encodeNode->nodeID);
-
-                // Wire input → encoder
-                addConnection({{currentAudioIn, 0}, {encodeNode->nodeID, 0}}, UpdateKind::none);
-                addConnection({{currentAudioIn, 1}, {encodeNode->nodeID, 1}}, UpdateKind::none);
-
-                // Use pre-computed plugin latency for bypass delay
-                int pluginLatency = pluginLatencySamples;
-
-                // Create M/S decode node (Mid/Side → L/R)
-                auto decodeProc = std::make_unique<MidSideMatrixProcessor>();
-                auto decodeNode = addNode(std::move(decodeProc), {}, UpdateKind::none);
-                if (decodeNode)
-                {
-                    leaf.msDecodeNodeId = decodeNode->nodeID;
-                    utilityNodes.insert(decodeNode->nodeID);
-
-                    if (leaf.midSideMode == MidSideMode::MidSide)
-                    {
-                        // Full M/S: encode ch0(mid)→plugin ch0, encode ch1(side)→plugin ch1
-                        addConnection({{encodeNode->nodeID, 0}, {pluginNodeId, 0}}, UpdateKind::none);
-                        addConnection({{encodeNode->nodeID, 1}, {pluginNodeId, 1}}, UpdateKind::none);
-                        // Plugin L→decode ch0, plugin R→decode ch1
-                        addConnection({{pluginNodeId, 0}, {decodeNode->nodeID, 0}}, UpdateKind::none);
-                        addConnection({{pluginNodeId, 1}, {decodeNode->nodeID, 1}}, UpdateKind::none);
-                    }
-                    else if (leaf.midSideMode == MidSideMode::MidOnly)
-                    {
-                        // Mid Only: process mid (ch0), bypass side (ch1)
-                        wireMidSidePlugin(leaf, encodeNode->nodeID, pluginNodeId,
-                                          decodeNode->nodeID, /*processChannel=*/0,
-                                          /*bypassChannel=*/1, pluginLatency);
-                    }
-                    else // SideOnly
-                    {
-                        // Side Only: process side (ch1), bypass mid (ch0)
-                        wireMidSidePlugin(leaf, encodeNode->nodeID, pluginNodeId,
-                                          decodeNode->nodeID, /*processChannel=*/1,
-                                          /*bypassChannel=*/0, pluginLatency);
-                    }
-
-                    // M/S decode output becomes the audio output
-                    NodeID currentAudioOut = decodeNode->nodeID;
-
-                    // --- Per-plugin dry/wet mix (after M/S decode) ---
-                    if (useDryWet)
-                    {
-                        auto mixProc = std::make_unique<DryWetMixProcessor>();
-                        // If muted, force fully dry (0.0) so the effect is disabled
-                        mixProc->setMix(node.mute.load(std::memory_order_relaxed) ? 0.0f : leaf.dryWetMix);
-
-                        if (auto mixNode = addNode(std::move(mixProc), {}, UpdateKind::none))
-                        {
-                            leaf.pluginDryWetNodeId = mixNode->nodeID;
-                            utilityNodes.insert(mixNode->nodeID);
-
-                            // Compute total M/S path latency for dry delay
-                            int msPathLatency = pluginLatency; // encode/decode are zero-latency
-                            NodeID dryDelayOut = drySource;
-                            if (msPathLatency > 0)
-                            {
-                                auto delayProc = std::make_unique<LatencyCompensationProcessor>(msPathLatency);
-                                if (auto delayNode = addNode(std::move(delayProc), {}, UpdateKind::none))
-                                {
-                                    utilityNodes.insert(delayNode->nodeID);
-                                    addConnection({{drySource, 0}, {delayNode->nodeID, 0}}, UpdateKind::none);
-                                    addConnection({{drySource, 1}, {delayNode->nodeID, 1}}, UpdateKind::none);
-                                    dryDelayOut = delayNode->nodeID;
-                                }
-                            }
-
-                            // DryWetMixProcessor: ch0-1 = dry (original L/R), ch2-3 = wet (decoded L/R)
-                            addConnection({{dryDelayOut, 0}, {mixNode->nodeID, 0}}, UpdateKind::none);
-                            addConnection({{dryDelayOut, 1}, {mixNode->nodeID, 1}}, UpdateKind::none);
-                            addConnection({{decodeNode->nodeID, 0}, {mixNode->nodeID, 2}}, UpdateKind::none);
-                            addConnection({{decodeNode->nodeID, 1}, {mixNode->nodeID, 3}}, UpdateKind::none);
-
-                            currentAudioOut = mixNode->nodeID;
-                        }
-                    }
-
-                    // --- Output Gain node ---
-                    if (useOutputGain)
-                    {
-                        auto outGainProc = std::make_unique<BranchGainProcessor>();
-                        outGainProc->setGainDb(leaf.outputGainDb);
-                        if (auto outGainNode = addNode(std::move(outGainProc), {}, UpdateKind::none))
-                        {
-                            leaf.outputGainNodeId = outGainNode->nodeID;
-                            utilityNodes.insert(outGainNode->nodeID);
-
-                            addConnection({{currentAudioOut, 0}, {outGainNode->nodeID, 0}}, UpdateKind::none);
-                            addConnection({{currentAudioOut, 1}, {outGainNode->nodeID, 1}}, UpdateKind::none);
-                            currentAudioOut = outGainNode->nodeID;
-                        }
-                    }
-
-                    return { currentAudioOut, pluginLatencySamples };
-                }
-            }
-            // If M/S node creation failed, fall through to normal wiring
-        }
-
-        // --- Normal (non-M/S) wiring: connect audio to plugin ---
-        addConnection({{currentAudioIn, 0}, {pluginNodeId, 0}}, UpdateKind::none);
-        addConnection({{currentAudioIn, 1}, {pluginNodeId, 1}}, UpdateKind::none);
-
-        NodeID currentAudioOut = pluginNodeId;
-
-        // --- Per-plugin dry/wet mix ---
-        if (useDryWet)
-        {
-            auto mixProc = std::make_unique<DryWetMixProcessor>();
-            // If muted, force fully dry (0.0) so the effect is disabled
-            mixProc->setMix(node.mute.load(std::memory_order_relaxed) ? 0.0f : leaf.dryWetMix);
-
-            if (auto mixNode = addNode(std::move(mixProc), {}, UpdateKind::none))
-            {
-                leaf.pluginDryWetNodeId = mixNode->nodeID;
-                utilityNodes.insert(mixNode->nodeID);
-
-                // Use pre-computed plugin latency for dry path delay
-                NodeID dryDelayOut = drySource;
-                if (pluginLatencySamples > 0)
-                {
-                    auto delayProc = std::make_unique<LatencyCompensationProcessor>(pluginLatencySamples);
-                    if (auto delayNode = addNode(std::move(delayProc), {}, UpdateKind::none))
-                    {
-                        utilityNodes.insert(delayNode->nodeID);
-                        addConnection({{drySource, 0}, {delayNode->nodeID, 0}}, UpdateKind::none);
-                        addConnection({{drySource, 1}, {delayNode->nodeID, 1}}, UpdateKind::none);
-                        dryDelayOut = delayNode->nodeID;
-                    }
-                }
-
-                // DryWetMixProcessor: ch0-1 = dry, ch2-3 = wet
-                addConnection({{dryDelayOut, 0}, {mixNode->nodeID, 0}}, UpdateKind::none);
-                addConnection({{dryDelayOut, 1}, {mixNode->nodeID, 1}}, UpdateKind::none);
-                addConnection({{pluginNodeId, 0}, {mixNode->nodeID, 2}}, UpdateKind::none);
-                addConnection({{pluginNodeId, 1}, {mixNode->nodeID, 3}}, UpdateKind::none);
-
-                currentAudioOut = mixNode->nodeID;
-            }
-        }
-
-        // --- Output Gain node ---
-        if (useOutputGain)
-        {
-            auto outGainProc = std::make_unique<BranchGainProcessor>();
-            outGainProc->setGainDb(leaf.outputGainDb);
-            if (auto outGainNode = addNode(std::move(outGainProc), {}, UpdateKind::none))
-            {
-                leaf.outputGainNodeId = outGainNode->nodeID;
-                utilityNodes.insert(outGainNode->nodeID);
-
-                addConnection({{currentAudioOut, 0}, {outGainNode->nodeID, 0}}, UpdateKind::none);
-                addConnection({{currentAudioOut, 1}, {outGainNode->nodeID, 1}}, UpdateKind::none);
-                currentAudioOut = outGainNode->nodeID;
-            }
-        }
-
-        return { currentAudioOut, pluginLatencySamples };
+        auto* hosted = getHosted(leaf);
+        if (!hosted) return {audioIn, midiIn};
+        hosted->setBypassed(leaf.bypassed); hosted->setSuspended(leaf.suspended);
+        hosted->setIgnoreLatency(leaf.ignoreLatency);
+        hosted->setUseSidechain(leaf.sidechain);
+        if (hosted->hasLatencyChange()) hosted->refreshLatency();
+        leaf.inputMeterNodeId = utility("plugin:" + leaf.persistentId + ":input", std::make_unique<NodeMeterProcessor>());
+        leaf.meterNodeId = utility("plugin:" + leaf.persistentId + ":output", std::make_unique<NodeMeterProcessor>());
+        connectAudio(audioIn, leaf.inputMeterNodeId);
+        connectAudio(leaf.inputMeterNodeId, leaf.graphNodeId);
+        connectAudio(leaf.graphNodeId, leaf.meterNodeId);
+        if (hosted->acceptsMidi()) connectMidi(midiIn, leaf.graphNodeId);
+        return {leaf.meterNodeId, hosted->producesMidi() ? leaf.graphNodeId : midiIn};
     }
-    else if (node.isGroup())
-    {
-        auto& group = node.getGroup();
-        if (group.mode == GroupMode::Serial)
-            return wireSerialGroup(node, audioIn);
-        else
-            return wireParallelGroup(node, audioIn);
-    }
-
-    // Shouldn't reach here, but passthrough
-    return { audioIn, 0 };
+    // Parallel and crossover groups share the branch wiring
+    return node.getGroup().mode == GroupMode::Serial ? wireSerialGroup(node, audioIn, midiIn)
+                                                    : wireParallelGroup(node, audioIn, midiIn);
 }
 
-WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn)
+WireResult ChainProcessor::wireSerialGroup(ChainNode& node, NodeID audioIn, NodeID midiIn)
 {
     auto& group = node.getGroup();
-    auto& children = group.children;
-
-    // Empty group = passthrough
-    if (children.empty())
-        return { audioIn, 0 };
-
-    bool useDryWet = (node.id != 0); // Always wire DryWetMixProcessor for non-root groups to avoid dropout/silent failure on first knob move
-
-    if (!useDryWet)
-    {
-        // Root node: simple serial chain, no dry/wet
-        NodeID prevAudio = audioIn;
-        int totalLatency = 0;
-
-        for (auto& child : children)
-        {
-            auto result = wireNode(*child, prevAudio);
-            prevAudio = result.audioOut;
-            totalLatency += result.latency;
-        }
-
-        // Insert DuckingProcessor after last child if duck amount > 0
-        // Sidechain reference is the pre-group signal (audioIn)
-        if (group.duckAmount > 0.001f)
-        {
-            auto duckProc = std::make_unique<DuckingProcessor>();
-            duckProc->setDuckAmount(group.duckAmount);
-            duckProc->setReleaseMs(group.duckReleaseMs);
-
-            auto duckNode = addNode(std::move(duckProc), {}, UpdateKind::none);
-            if (duckNode)
-            {
-                group.duckingNodeId = duckNode->nodeID;
-                utilityNodes.insert(duckNode->nodeID);
-
-                // Connect chain output → ducking ch0-1 (audio to be ducked)
-                addConnection({{prevAudio, 0}, {duckNode->nodeID, 0}}, UpdateKind::none);
-                addConnection({{prevAudio, 1}, {duckNode->nodeID, 1}}, UpdateKind::none);
-
-                // Connect pre-group signal → ducking ch2-3 (sidechain reference)
-                addConnection({{audioIn, 0}, {duckNode->nodeID, 2}}, UpdateKind::none);
-                addConnection({{audioIn, 1}, {duckNode->nodeID, 3}}, UpdateKind::none);
-
-                return { duckNode->nodeID, totalLatency };
-            }
-        }
-
-        return { prevAudio, totalLatency };
-    }
-
-    // Dry/wet mode: create a DryWetMixProcessor
-    auto mixProc = std::make_unique<DryWetMixProcessor>();
-    mixProc->setMix(group.dryWetMix);
-
-    auto mixNode = addNode(std::move(mixProc), {}, UpdateKind::none);
-    if (!mixNode)
-        return { audioIn, 0 };
-
-    group.dryWetMixNodeId = mixNode->nodeID;
-    utilityNodes.insert(mixNode->nodeID);
-
-    // Wet path: wire children in series, accumulate latency from wireNode results
-    NodeID prevAudio = audioIn;
-    int wetLatency = 0;
-
-    for (auto& child : children)
-    {
-        auto result = wireNode(*child, prevAudio);
-        prevAudio = result.audioOut;
-        wetLatency += result.latency;
-    }
-
-    // Dry path: insert delay if wet path has latency
-    NodeID drySource = audioIn;
-    if (wetLatency > 0)
-    {
-        auto dryDelayProc = std::make_unique<LatencyCompensationProcessor>(wetLatency);
-        auto dryDelayNode = addNode(std::move(dryDelayProc), {}, UpdateKind::none);
-        if (dryDelayNode)
-        {
-            utilityNodes.insert(dryDelayNode->nodeID);
-            addConnection({{audioIn, 0}, {dryDelayNode->nodeID, 0}}, UpdateKind::none);
-            addConnection({{audioIn, 1}, {dryDelayNode->nodeID, 1}}, UpdateKind::none);
-            drySource = dryDelayNode->nodeID;
-        }
-    }
-
-    // Connect dry path to mix node channels 0-1
-    addConnection({{drySource, 0}, {mixNode->nodeID, 0}}, UpdateKind::none);
-    addConnection({{drySource, 1}, {mixNode->nodeID, 1}}, UpdateKind::none);
-
-    // Connect wet path to mix node channels 2-3
-    addConnection({{prevAudio, 0}, {mixNode->nodeID, 2}}, UpdateKind::none);
-    addConnection({{prevAudio, 1}, {mixNode->nodeID, 3}}, UpdateKind::none);
-
-    // Insert DuckingProcessor after DryWetMix if duck amount > 0
-    // Sidechain reference is the pre-group signal (audioIn)
-    if (group.duckAmount > 0.001f)
-    {
-        auto duckProc = std::make_unique<DuckingProcessor>();
-        duckProc->setDuckAmount(group.duckAmount);
-        duckProc->setReleaseMs(group.duckReleaseMs);
-
-        auto duckNode = addNode(std::move(duckProc), {}, UpdateKind::none);
-        if (duckNode)
-        {
-            group.duckingNodeId = duckNode->nodeID;
-            utilityNodes.insert(duckNode->nodeID);
-
-            // Connect DryWetMix output → ducking ch0-1 (audio to be ducked)
-            addConnection({{mixNode->nodeID, 0}, {duckNode->nodeID, 0}}, UpdateKind::none);
-            addConnection({{mixNode->nodeID, 1}, {duckNode->nodeID, 1}}, UpdateKind::none);
-
-            // Connect pre-group signal → ducking ch2-3 (sidechain reference)
-            addConnection({{audioIn, 0}, {duckNode->nodeID, 2}}, UpdateKind::none);
-            addConnection({{audioIn, 1}, {duckNode->nodeID, 3}}, UpdateKind::none);
-
-            return { duckNode->nodeID, wetLatency };
-        }
-    }
-
-    return { mixNode->nodeID, wetLatency };
+    WireResult wet {audioIn, midiIn};
+    for (auto& child : group.children) wet = wireNode(*child, wet.audioOut, wet.midiOut);
+    if (node.id == 0 || group.children.empty()) return wet;
+    group.dryWetMixNodeId = utility("group:" + juce::String(node.id) + ":mix", std::make_unique<DryWetMixProcessor>());
+    auto* mix = static_cast<DryWetMixProcessor*>(getNodeForId(group.dryWetMixNodeId)->getProcessor());
+    mix->setMix(group.dryWetMix);
+    connectAudio(audioIn, group.dryWetMixNodeId, 0); connectAudio(wet.audioOut, group.dryWetMixNodeId, 2);
+    return {group.dryWetMixNodeId, wet.midiOut};
 }
 
-WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn)
+WireResult ChainProcessor::wireParallelGroup(ChainNode& node, NodeID audioIn, NodeID midiIn)
 {
     auto& group = node.getGroup();
-    auto& children = group.children;
-
-    // Empty group = passthrough
-    if (children.empty())
-        return { audioIn, 0 };
-
-    // Determine solo state: if any child is soloed, only soloed children play
-    bool anySoloed = false;
-    for (const auto& child : children)
+    if (group.children.empty()) return {audioIn, midiIn};
+    const auto key = "group:" + juce::String(node.id);
+    group.sumGainNodeId = utility(key + ":sum", std::make_unique<BranchGainProcessor>());
+    group.branchGainNodeIds.clear(); group.branchGateNodeIds.clear(); group.bandFilterNodeIds.clear();
+    const bool crossover = group.mode == GroupMode::Crossover;
+    if (crossover) CrossoverHelpers::fitFrequencies(group);
+    const auto numBands = static_cast<int>(group.children.size());
+    for (int band = 0; band < numBands; ++band)
     {
-        if (child->solo)
+        auto& child = group.children[static_cast<size_t>(band)];
+        const auto branchKey = key + ":branch:" + juce::String(child->id);
+        auto branchIn = audioIn;
+        if (crossover)
         {
-            anySoloed = true;
-            break;
+            // The band layout is fixed per processor, so the key changes when it does
+            auto filter = utility(branchKey + ":band:" + juce::String(band) + "of" + juce::String(numBands),
+                                  std::make_unique<CrossoverBandProcessor>(band, numBands));
+            static_cast<CrossoverBandProcessor*>(getNodeForId(filter)->getProcessor())->setFrequencies(group.crossoverHz);
+            group.bandFilterNodeIds.push_back(filter);
+            connectAudio(audioIn, filter);
+            branchIn = filter;
         }
+        auto inputGain = utility(branchKey + ":gain", std::make_unique<BranchGainProcessor>());
+        auto* inputGainProc = static_cast<BranchGainProcessor*>(getNodeForId(inputGain)->getProcessor());
+        inputGainProc->setGainDb(child->branchGainDb);
+        inputGainProc->setPolarityInverted(child->polarityInverted);
+        auto gate = utility(branchKey + ":gate", std::make_unique<BranchGainProcessor>());
+        group.branchGainNodeIds.push_back(inputGain); group.branchGateNodeIds.push_back(gate);
+        connectAudio(branchIn, inputGain);
+        const auto branch = wireNode(*child, inputGain, midiIn);
+        connectAudio(branch.audioOut, gate); connectAudio(gate, group.sumGainNodeId);
     }
-
-    // Count active branches for gain compensation
-    int activeBranches = 0;
-    for (const auto& child : children)
-    {
-        bool isActive = true;
-        if (anySoloed && !child->solo)
-            isActive = false;
-        if (child->mute && !(anySoloed && child->solo))
-            isActive = false;
-        if (isActive)
-            activeBranches++;
-    }
-
-    if (activeBranches == 0)
-    {
-        // All branches muted/silenced - passthrough silence
-        auto silenceProc = std::make_unique<BranchGainProcessor>();
-        silenceProc->setGainDb(-60.0f);
-        auto silenceNode = addNode(std::move(silenceProc), {}, UpdateKind::none);
-        if (silenceNode)
-        {
-            utilityNodes.insert(silenceNode->nodeID);
-            addConnection({{audioIn, 0}, {silenceNode->nodeID, 0}}, UpdateKind::none);
-            addConnection({{audioIn, 1}, {silenceNode->nodeID, 1}}, UpdateKind::none);
-            return { silenceNode->nodeID, 0 };
-        }
-        return { audioIn, 0 };
-    }
-
-    // Create sum compensation gain node at the output
-    float compensationDb = -20.0f * std::log10(static_cast<float>(activeBranches));
-    auto sumGainProc = std::make_unique<BranchGainProcessor>();
-    sumGainProc->setGainDb(compensationDb);
-
-    auto sumGainNode = addNode(std::move(sumGainProc), {}, UpdateKind::none);
-    if (!sumGainNode)
-        return { audioIn, 0 };
-
-    group.sumGainNodeId = sumGainNode->nodeID;
-    utilityNodes.insert(sumGainNode->nodeID);
-
-    // Clear branch node ID vectors
-    group.branchGainNodeIds.clear();
-
-    // Wire all branches: input → branchGain → child → [delayComp] → sumGain
-    // Insert LatencyCompensationProcessor delay nodes on shorter branches
-    // so all branches arrive time-aligned at the sum point.
-
-    struct BranchInfo {
-        WireResult result;
-        bool active;
-    };
-    std::vector<BranchInfo> branchInfos;
-
-    // Pass 1: Wire all branches, collect per-branch results (latency is in WireResult)
-    for (size_t i = 0; i < children.size(); ++i)
-    {
-        auto& child = children[i];
-
-        bool isActive = true;
-        if (anySoloed && !child->solo)
-            isActive = false;
-        if (child->mute && !(anySoloed && child->solo))
-            isActive = false;
-
-        if (!isActive)
-        {
-            group.branchGainNodeIds.push_back({});
-            branchInfos.push_back({{}, false});
-            continue;
-        }
-
-        // Create per-branch gain processor
-        auto branchGainProc = std::make_unique<BranchGainProcessor>();
-        branchGainProc->setGainDb(child->branchGainDb);
-
-        auto branchGainNode = addNode(std::move(branchGainProc), {}, UpdateKind::none);
-        if (!branchGainNode)
-        {
-            group.branchGainNodeIds.push_back({});
-            branchInfos.push_back({{}, false});
-            continue;
-        }
-
-        group.branchGainNodeIds.push_back(branchGainNode->nodeID);
-        utilityNodes.insert(branchGainNode->nodeID);
-
-        // Fan-out: connect input to branch gain
-        addConnection({{audioIn, 0}, {branchGainNode->nodeID, 0}}, UpdateKind::none);
-        addConnection({{audioIn, 1}, {branchGainNode->nodeID, 1}}, UpdateKind::none);
-
-        // Wire child after branch gain — latency is returned in result
-        auto result = wireNode(*child, branchGainNode->nodeID);
-        branchInfos.push_back({result, true});
-    }
-
-    // Pass 2: Find max latency, insert compensation delays, connect to sumGain
-    int maxBranchLatency = 0;
-    for (const auto& bi : branchInfos)
-        if (bi.active)
-            maxBranchLatency = std::max(maxBranchLatency, bi.result.latency);
-
-    for (const auto& bi : branchInfos)
-    {
-        if (!bi.active)
-            continue;
-
-        NodeID connectFrom = bi.result.audioOut;
-        int delayNeeded = maxBranchLatency - bi.result.latency;
-
-        if (delayNeeded > 0)
-        {
-            auto delayProc = std::make_unique<LatencyCompensationProcessor>(delayNeeded);
-            auto delayNode = addNode(std::move(delayProc), {}, UpdateKind::none);
-            if (delayNode)
-            {
-                utilityNodes.insert(delayNode->nodeID);
-                addConnection({{bi.result.audioOut, 0}, {delayNode->nodeID, 0}}, UpdateKind::none);
-                addConnection({{bi.result.audioOut, 1}, {delayNode->nodeID, 1}}, UpdateKind::none);
-                connectFrom = delayNode->nodeID;
-            }
-        }
-
-        // Fan-in: connect branch output to sum gain node
-        // (AudioProcessorGraph auto-sums multiple connections to the same input)
-        addConnection({{connectFrom, 0}, {sumGainNode->nodeID, 0}}, UpdateKind::none);
-        addConnection({{connectFrom, 1}, {sumGainNode->nodeID, 1}}, UpdateKind::none);
-    }
-
-    // Insert DuckingProcessor after sumGain if duck amount > 0
-    // The ducking processor receives the group output on ch0-1 and
-    // the pre-group signal (audioIn) on ch2-3 as sidechain reference
-    if (group.duckAmount > 0.001f)
-    {
-        auto duckProc = std::make_unique<DuckingProcessor>();
-        duckProc->setDuckAmount(group.duckAmount);
-        duckProc->setReleaseMs(group.duckReleaseMs);
-
-        auto duckNode = addNode(std::move(duckProc), {}, UpdateKind::none);
-        if (duckNode)
-        {
-            group.duckingNodeId = duckNode->nodeID;
-            utilityNodes.insert(duckNode->nodeID);
-
-            // Connect sumGain output → ducking ch0-1 (audio to be ducked)
-            addConnection({{sumGainNode->nodeID, 0}, {duckNode->nodeID, 0}}, UpdateKind::none);
-            addConnection({{sumGainNode->nodeID, 1}, {duckNode->nodeID, 1}}, UpdateKind::none);
-
-            // Connect pre-group signal → ducking ch2-3 (sidechain reference)
-            addConnection({{audioIn, 0}, {duckNode->nodeID, 2}}, UpdateKind::none);
-            addConnection({{audioIn, 1}, {duckNode->nodeID, 3}}, UpdateKind::none);
-
-            return { duckNode->nodeID, maxBranchLatency };
-        }
-    }
-
-    return { sumGainNode->nodeID, maxBranchLatency };
+    updateBranchGates(node);
+    group.dryWetMixNodeId = utility(key + ":mix", std::make_unique<DryWetMixProcessor>());
+    static_cast<DryWetMixProcessor*>(getNodeForId(group.dryWetMixNodeId)->getProcessor())->setMix(group.dryWetMix);
+    connectAudio(audioIn, group.dryWetMixNodeId, 0); connectAudio(group.sumGainNodeId, group.dryWetMixNodeId, 2);
+    // Parallel branches receive MIDI for effect control. Only the original stream exits.
+    return {group.dryWetMixNodeId, midiIn};
 }
 
-//==============================================================================
-// Helper
-//==============================================================================
-
-bool ChainProcessor::isInParallelGroup(ChainNodeId id) const
+void ChainProcessor::updateBranchGates(ChainNode& node)
 {
-    // Find the parent of this node
-    auto* parent = ChainNodeHelpers::findParent(const_cast<ChainNode&>(rootNode), id);
-    if (!parent)
-        return false;  // Root node or not found
-
-    // Check if parent is a parallel group
-    if (parent->isGroup() && parent->getGroup().mode == GroupMode::Parallel)
-        return true;
-
-    return false;
+    if (!node.isGroup()) return;
+    auto& group = node.getGroup();
+    if (isBranchingMode(group.mode))
+    {
+        bool anySolo = false; for (auto& child : group.children) anySolo |= child->solo;
+        int active = 0;
+        for (size_t i = 0; i < group.children.size(); ++i)
+        {
+            const auto& child = group.children[i];
+            const bool audible = (!anySolo || child->solo) && (!child->mute || (anySolo && child->solo));
+            if (audible) ++active;
+            if (i < group.branchGateNodeIds.size())
+                if (auto n = getNodeForId(group.branchGateNodeIds[i]))
+                    static_cast<BranchGainProcessor*>(n->getProcessor())->setGainDb(audible ? 0.0f : -60.0f);
+        }
+        if (auto n = getNodeForId(group.sumGainNodeId))
+        {
+            // Parallel copies are scaled down by the branch count; crossover bands already add up to unity
+            const auto sumDb = group.mode == GroupMode::Crossover ? 0.0f : -20.0f * std::log10(static_cast<float>(juce::jmax(1, active)));
+            static_cast<BranchGainProcessor*>(n->getProcessor())->setGainDb(active > 0 ? sumDb : -60.0f);
+        }
+    }
+    for (auto& child : group.children) updateBranchGates(*child);
 }
 
-bool ChainProcessor::detectCycles() const
+double ChainProcessor::computeTail(const ChainNode& node) const
 {
-    // Build adjacency list once — O(E) — then DFS in O(V+E)
-    std::map<juce::AudioProcessorGraph::NodeID, std::vector<juce::AudioProcessorGraph::NodeID>> adj;
-
-    for (auto* node : getNodes())
-        adj[node->nodeID];  // ensure every node has an entry
-
-    for (const auto& conn : getConnections())
-        adj[conn.source.nodeID].push_back(conn.destination.nodeID);
-
-    // DFS with color marking (0=white/unvisited, 1=gray/visiting, 2=black/done)
-    std::map<juce::AudioProcessorGraph::NodeID, int> colors;
-    for (const auto& [id, _] : adj)
-        colors[id] = 0;
-
-    std::function<bool(juce::AudioProcessorGraph::NodeID)> dfs;
-    dfs = [&](juce::AudioProcessorGraph::NodeID id) -> bool
+    if (node.isPlugin()) { if (auto* p = getHosted(node.getPlugin())) return p->getTailLengthSeconds(); return 0; }
+    double result = 0;
+    for (const auto& child : node.getGroup().children)
     {
-        colors[id] = 1;  // gray (visiting)
-
-        for (auto dest : adj[id])
-        {
-            auto destColor = colors[dest];
-            if (destColor == 1)  // Back edge = cycle
-                return true;
-            if (destColor == 0 && dfs(dest))
-                return true;
-        }
-
-        colors[id] = 2;  // black (done)
-        return false;
-    };
-
-    for (const auto& [id, _] : adj)
-        if (colors[id] == 0 && dfs(id))
-            return true;
-
-    return false;
+        const auto tail = computeTail(*child);
+        if (!std::isfinite(tail)) return tail;
+        result = node.getGroup().mode == GroupMode::Serial ? result + tail : juce::jmax(result, tail);
+    }
+    return result;
 }
 
 //==============================================================================
 // Latency
 //==============================================================================
 
-// PHASE 5: Latency caching (eliminates redundant O(N) tree traversals at 500ms intervals)
 int ChainProcessor::getTotalLatencySamples() const
 {
-    // Check if cache is valid
-    if (!latencyCacheDirty.load(std::memory_order_acquire))
-    {
-        return cachedTotalLatency.load(std::memory_order_relaxed);
-    }
-
-    // Compute and cache
-    int latency = computeNodeLatency(rootNode, 0);
-    cachedTotalLatency.store(latency, std::memory_order_relaxed);
-    latencyCacheDirty.store(false, std::memory_order_release);
-
-    return latency;
+    return getLatencySamples();
 }
 
-void ChainProcessor::invalidateLatencyCache()
+int ChainProcessor::computeNodeLatency(const ChainNode& node) const
 {
-    latencyCacheDirty.store(true, std::memory_order_release);
-}
-
-void ChainProcessor::refreshLatencyCompensation()
-{
-    // PHASE 7: Handle dynamic latency changes (e.g., Auto-Tune mode toggle)
-    // This rebuilds the graph to update internal delay compensation
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-
-    // CRITICAL: Acknowledge all wrapper latency flags BEFORE rebuild.
-    // Otherwise the audio thread re-sets latencyRefreshNeeded during the rebuild,
-    // causing an infinite rebuild loop on the next timer tick.
-    for (auto* node : getNodes())
-    {
-        if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(node->getProcessor()))
-            wrapper->acknowledgeLatencyChange();
-    }
-
-    suspendProcessing(true);
-    rebuildGraph();
-    suspendProcessing(false);
-
-    // Note: rebuildGraph() already calls setLatencySamples() at the end
-}
-
-void ChainProcessor::clearGraph()
-{
-    // Remove all connections and nodes from the AudioProcessorGraph
-    // so the render sequence is empty before destruction.
-    constexpr auto deferred = UpdateKind::none;
-    for (auto& conn : getConnections())
-        removeConnection(conn, deferred);
-    clear();    // AudioProcessorGraph::clear() removes all nodes
-    rebuild();  // Rebuild render sequence (now empty)
-}
-
-int ChainProcessor::computeNodeLatency(const ChainNode& node, int depth) const
-{
-    if (depth > 64)
-    {
-        jassertfalse;  // Stack overflow prevention
-        return 0;
-    }
-
     if (node.isPlugin())
     {
         // Bypassed plugins are fully disconnected from the graph,
@@ -2583,7 +1339,7 @@ int ChainProcessor::computeNodeLatency(const ChainNode& node, int depth) const
         {
             int total = 0;
             for (const auto& child : group.children)
-                total += computeNodeLatency(*child, depth + 1);
+                total += computeNodeLatency(*child);
             return total;
         }
         else // Parallel
@@ -2592,7 +1348,7 @@ int ChainProcessor::computeNodeLatency(const ChainNode& node, int depth) const
             int maxLatency = 0;
             for (const auto& child : group.children)
             {
-                int branchLatency = computeNodeLatency(*child, depth + 1);
+                int branchLatency = computeNodeLatency(*child);
                 maxLatency = std::max(maxLatency, branchLatency);
             }
             return maxLatency;
@@ -2606,80 +1362,60 @@ int ChainProcessor::computeNodeLatency(const ChainNode& node, int depth) const
 // Per-node meter readings
 //==============================================================================
 
-const std::vector<ChainProcessor::NodeMeterData>& ChainProcessor::getNodeMeterReadings() const
+std::vector<ChainProcessor::NodeMeterData> ChainProcessor::getNodeMeterReadings() const
 {
-    // PHASE 3: Reuse preallocated cache instead of allocating new vector at 30Hz
-    cachedMeterReadings.clear();  // Doesn't deallocate capacity, just resets size
+    std::vector<NodeMeterData> results;
 
-    // Use cached wrapper pointers to avoid DFS + dynamic_cast at 30Hz
-    for (const auto& [nodeId, wrapper] : cachedMeterWrappers)
-    {
-        // Find the node to check bypassed state
-        auto* node = ChainNodeHelpers::findById(rootNode, nodeId);
-        if (!node || !node->isPlugin() || node->getPlugin().bypassed)
-            continue;
-
-        NodeMeterData entry { nodeId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0f };
-
-        // Output meter (from wrapper)
-        auto outputReadings = wrapper->getOutputMeter().getReadings();
-        entry.peakL = outputReadings.peakL;
-        entry.peakR = outputReadings.peakR;
-        entry.peakHoldL = outputReadings.peakHoldL;
-        entry.peakHoldR = outputReadings.peakHoldR;
-        entry.rmsL = outputReadings.rmsL;
-        entry.rmsR = outputReadings.rmsR;
-
-        // Input meter (from wrapper)
-        auto inputReadings = wrapper->getInputMeter().getReadings();
-        entry.inputPeakL = inputReadings.peakL;
-        entry.inputPeakR = inputReadings.peakR;
-        entry.inputPeakHoldL = inputReadings.peakHoldL;
-        entry.inputPeakHoldR = inputReadings.peakHoldR;
-        entry.inputRmsL = inputReadings.rmsL;
-        entry.inputRmsR = inputReadings.rmsR;
-
-        // Calculate latency in milliseconds
-        auto* plugin = wrapper->getWrappedPlugin();
-        if (plugin && getSampleRate() > 0)
-        {
-            int latencySamples = plugin->getLatencySamples();
-            entry.latencyMs = (latencySamples / static_cast<float>(getSampleRate())) * 1000.0f;
-        }
-
-        cachedMeterReadings.push_back(entry);
-    }
-
-    return cachedMeterReadings;
-}
-
-void ChainProcessor::resetAllNodePeaks()
-{
-    std::function<void(const ChainNode&)> resetNode = [&](const ChainNode& node)
+    std::function<void(const ChainNode&)> collect = [&](const ChainNode& node)
     {
         if (node.isPlugin())
         {
             const auto& leaf = node.getPlugin();
-            if (!leaf.bypassed && leaf.graphNodeId != juce::AudioProcessorGraph::NodeID())
+            if (!leaf.bypassed && leaf.meterNodeId != juce::AudioProcessorGraph::NodeID())
             {
-                if (auto* graphNode = getNodeForId(leaf.graphNodeId))
+                NodeMeterData entry { node.id, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+                // Output meter (after plugin)
+                if (auto* graphNode = getNodeForId(leaf.meterNodeId))
                 {
-                    if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(graphNode->getProcessor()))
+                    if (auto* meterProc = dynamic_cast<NodeMeterProcessor*>(graphNode->getProcessor()))
                     {
-                        wrapper->getOutputMeter().reset();
-                        wrapper->getInputMeter().reset();
+                        auto r = meterProc->getReadings();
+                        entry.peakL = r.peakL;
+                        entry.peakR = r.peakR;
+                        entry.peakHoldL = r.peakHoldL;
+                        entry.peakHoldR = r.peakHoldR;
                     }
                 }
+
+                // Input meter (before plugin)
+                if (leaf.inputMeterNodeId != juce::AudioProcessorGraph::NodeID())
+                {
+                    if (auto* inputGraphNode = getNodeForId(leaf.inputMeterNodeId))
+                    {
+                        if (auto* inputMeter = dynamic_cast<NodeMeterProcessor*>(inputGraphNode->getProcessor()))
+                        {
+                            auto ir = inputMeter->getReadings();
+                            entry.inputPeakL = ir.peakL;
+                            entry.inputPeakR = ir.peakR;
+                            entry.inputPeakHoldL = ir.peakHoldL;
+                            entry.inputPeakHoldR = ir.peakHoldR;
+                        }
+                    }
+                }
+
+                results.push_back(entry);
             }
         }
         else if (node.isGroup())
         {
             for (const auto& child : node.getGroup().children)
-                resetNode(*child);
+                collect(*child);
         }
     };
 
-    resetNode(rootNode);
+    collect(rootNode);
+    return results;
 }
 
 //==============================================================================
@@ -2690,22 +1426,24 @@ void ChainProcessor::nodeToXml(const ChainNode& node, juce::XmlElement& parent) 
 {
     auto* nodeXml = parent.createNewChildElement("Node");
     nodeXml->setAttribute("id", node.id);
+    nodeXml->setAttribute("branchGainDb", static_cast<double>(node.branchGainDb));
+    nodeXml->setAttribute("solo", node.solo);
+    nodeXml->setAttribute("mute", node.mute);
+    if (node.polarityInverted) nodeXml->setAttribute("polarityInverted", true);
 
     if (node.isPlugin())
     {
         nodeXml->setAttribute("type", "plugin");
         nodeXml->setAttribute("bypassed", node.getPlugin().bypassed);
-        nodeXml->setAttribute("isDryPath", node.getPlugin().isDryPath);
+        nodeXml->setAttribute("suspended", node.getPlugin().suspended);
+        if (node.getPlugin().recallSafe) nodeXml->setAttribute("recallSafe", true);
+        if (node.getPlugin().ignoreLatency) nodeXml->setAttribute("ignoreLatency", true);
+        if (node.getPlugin().sidechain) nodeXml->setAttribute("sidechain", true);
+        nodeXml->setAttribute("persistentId", node.getPlugin().persistentId);
+        nodeXml->setAttribute("state", node.getPlugin().retainedState);
         nodeXml->setAttribute("branchGainDb", static_cast<double>(node.branchGainDb));
-        nodeXml->setAttribute("solo", node.solo.load(std::memory_order_relaxed));
-        nodeXml->setAttribute("mute", node.mute.load(std::memory_order_relaxed));
-
-        // Per-plugin controls
-        nodeXml->setAttribute("inputGainDb", static_cast<double>(node.getPlugin().inputGainDb));
-        nodeXml->setAttribute("outputGainDb", static_cast<double>(node.getPlugin().outputGainDb));
-        nodeXml->setAttribute("pluginDryWet", static_cast<double>(node.getPlugin().dryWetMix));
-        nodeXml->setAttribute("sidechainSource", node.getPlugin().sidechainSource);
-        nodeXml->setAttribute("midSideMode", static_cast<int>(node.getPlugin().midSideMode));
+        nodeXml->setAttribute("solo", node.solo);
+        nodeXml->setAttribute("mute", node.mute);
 
         if (auto descXml = node.getPlugin().description.createXml())
             nodeXml->addChildElement(descXml.release());
@@ -2714,40 +1452,19 @@ void ChainProcessor::nodeToXml(const ChainNode& node, juce::XmlElement& parent) 
         {
             if (auto* processor = gNode->getProcessor())
             {
-                try
-                {
-                    juce::MemoryBlock state;
-                    processor->getStateInformation(state);
-                    // Only save state if it's not empty (prevents issues with uninitialized plugins)
-                    if (state.getSize() > 0)
-                    {
-                        nodeXml->setAttribute("state", state.toBase64Encoding());
-                    }
-                    else
-                    {
-                        DBG("WARNING: Plugin " + node.getPlugin().description.name + " returned empty state during snapshot");
-                    }
-                }
-                catch (const std::exception& e)
-                {
-                    DBG("ERROR: Plugin " + node.getPlugin().description.name + " crashed during state save: " + juce::String(e.what()));
-                    // Continue with other plugins - don't let one bad plugin crash the whole snapshot
-                }
-                catch (...)
-                {
-                    DBG("ERROR: Plugin " + node.getPlugin().description.name + " crashed during state save (unknown exception)");
-                    // Continue with other plugins
-                }
+                juce::MemoryBlock state;
+                processor->getStateInformation(state);
+                nodeXml->setAttribute("state", state.toBase64Encoding());
             }
         }
     }
     else if (node.isGroup())
     {
         nodeXml->setAttribute("type", "group");
-        nodeXml->setAttribute("mode", node.getGroup().mode == GroupMode::Serial ? "serial" : "parallel");
+        nodeXml->setAttribute("mode", groupModeName(node.getGroup().mode));
+        if (node.getGroup().mode == GroupMode::Crossover)
+            nodeXml->setAttribute("crossover", CrossoverHelpers::toString(node.getGroup().crossoverHz));
         nodeXml->setAttribute("dryWet", static_cast<double>(node.getGroup().dryWetMix));
-        nodeXml->setAttribute("duckAmount", static_cast<double>(node.getGroup().duckAmount));
-        nodeXml->setAttribute("duckReleaseMs", static_cast<double>(node.getGroup().duckReleaseMs));
         nodeXml->setAttribute("name", node.name);
         nodeXml->setAttribute("collapsed", node.collapsed);
 
@@ -2756,139 +1473,14 @@ void ChainProcessor::nodeToXml(const ChainNode& node, juce::XmlElement& parent) 
     }
 }
 
-std::unique_ptr<ChainNode> ChainProcessor::xmlToNode(const juce::XmlElement& xml)
-{
-    auto node = std::make_unique<ChainNode>();
-    node->id = xml.getIntAttribute("id", nextNodeId++);
-
-    // Track the highest ID seen so nextNodeId stays ahead
-    if (node->id >= nextNodeId)
-        nextNodeId = node->id + 1;
-
-    auto type = xml.getStringAttribute("type");
-
-    if (type == "plugin")
-    {
-        node->branchGainDb = static_cast<float>(xml.getDoubleAttribute("branchGainDb", 0.0));
-        node->solo.store(xml.getBoolAttribute("solo", false), std::memory_order_relaxed);
-        node->mute.store(xml.getBoolAttribute("mute", false), std::memory_order_relaxed);
-
-        PluginLeaf leaf;
-
-        // Per-plugin controls (backward-compatible: defaults for old presets)
-        leaf.inputGainDb = static_cast<float>(xml.getDoubleAttribute("inputGainDb", 0.0));
-        leaf.outputGainDb = static_cast<float>(xml.getDoubleAttribute("outputGainDb", 0.0));
-        leaf.dryWetMix = static_cast<float>(xml.getDoubleAttribute("pluginDryWet", 1.0));
-        leaf.sidechainSource = xml.getIntAttribute("sidechainSource", 0);
-        leaf.midSideMode = static_cast<MidSideMode>(xml.getIntAttribute("midSideMode", 0));
-        leaf.bypassed = xml.getBoolAttribute("bypassed", false);
-        leaf.isDryPath = xml.getBoolAttribute("isDryPath", false);
-
-        // Dry path nodes have no plugin to instantiate
-        if (leaf.isDryPath)
-        {
-            node->name = "Dry Path";
-            node->data = std::move(leaf);
-            return node;
-        }
-
-        if (auto* descXml = xml.getChildByName("PLUGIN"))
-        {
-            leaf.description.loadFromXml(*descXml);
-            node->name = leaf.description.name;
-
-            juce::String errorMessage;
-            auto instance = pluginManager.createPluginInstance(
-                leaf.description, currentSampleRate, currentBlockSize, errorMessage);
-
-            // Fallback: if direct instantiation failed, try matching by name+manufacturer
-            // from the known plugins list (handles cross-format presets, e.g. VST3→AU)
-            if (!instance)
-            {
-                PCLOG("xmlToNode — direct load failed for \"" + leaf.description.name
-                      + "\" (" + leaf.description.pluginFormatName + "): " + errorMessage
-                      + " — trying name match...");
-                for (const auto& knownDesc : pluginManager.getKnownPlugins().getTypes())
-                {
-                    if (knownDesc.name.equalsIgnoreCase(leaf.description.name) &&
-                        knownDesc.manufacturerName.equalsIgnoreCase(leaf.description.manufacturerName))
-                    {
-                        juce::String fallbackError;
-                        instance = pluginManager.createPluginInstance(
-                            knownDesc, currentSampleRate, currentBlockSize, fallbackError);
-                        if (instance)
-                        {
-                            PCLOG("xmlToNode — fallback matched: " + knownDesc.name
-                                  + " (" + knownDesc.pluginFormatName + ")");
-                            leaf.description = knownDesc;
-                            break;
-                        }
-                    }
-                }
-                if (!instance)
-                    PCLOG("xmlToNode — no match found for \"" + leaf.description.name + "\"");
-            }
-
-            if (instance)
-            {
-                // Pre-prepare so bus layout is initialized (sidechain plugins need correct channel count)
-                instance->prepareToPlay(currentSampleRate, currentBlockSize);
-
-                // Store preset data to be applied AFTER prepareToPlay (deferred state restoration)
-                auto stateBase64 = xml.getStringAttribute("state");
-                if (stateBase64.isNotEmpty())
-                {
-                    juce::MemoryBlock state;
-                    state.fromBase64Encoding(stateBase64);
-
-                    // Validate size (reject presets > 10MB)
-                    const size_t maxPresetSize = 10 * 1024 * 1024;
-                    if (state.getSize() > maxPresetSize)
-                    {
-                        DBG("Preset state too large: " + juce::String(state.getSize()) + " bytes");
-                    }
-                    else
-                    {
-                        // Store as base64 for deferred restoration
-                        leaf.pendingPresetData = stateBase64;
-                    }
-                }
-
-                auto wrapper = std::make_unique<PluginWithMeterWrapper>(std::move(instance));
-                if (auto graphNode = addNode(std::move(wrapper)))
-                    leaf.graphNodeId = graphNode->nodeID;
-            }
-        }
-
-        node->data = std::move(leaf);
-    }
-    else if (type == "group")
-    {
-        node->name = xml.getStringAttribute("name", "Group");
-        node->collapsed = xml.getBoolAttribute("collapsed", false);
-
-        GroupData group;
-        group.mode = xml.getStringAttribute("mode") == "parallel" ? GroupMode::Parallel : GroupMode::Serial;
-        group.dryWetMix = static_cast<float>(xml.getDoubleAttribute("dryWet", 1.0));
-        group.duckAmount = static_cast<float>(xml.getDoubleAttribute("duckAmount", 0.0));
-        group.duckReleaseMs = static_cast<float>(xml.getDoubleAttribute("duckReleaseMs", 200.0));
-
-        for (auto* childXml : xml.getChildWithTagNameIterator("Node"))
-        {
-            if (auto child = xmlToNode(*childXml))
-                group.children.push_back(std::move(child));
-        }
-
-        node->data = std::move(group);
-    }
-
-    return node;
-}
-
 juce::var ChainProcessor::nodeToJson(const ChainNode& node) const
 {
     auto* obj = new juce::DynamicObject();
     obj->setProperty("id", node.id);
+    obj->setProperty("branchGainDb", node.branchGainDb);
+    obj->setProperty("solo", node.solo);
+    obj->setProperty("mute", node.mute);
+    obj->setProperty("polarityInverted", node.polarityInverted);
 
     if (node.isPlugin())
     {
@@ -2898,36 +1490,36 @@ juce::var ChainProcessor::nodeToJson(const ChainNode& node) const
         obj->setProperty("uid", node.getPlugin().description.uniqueId);
         obj->setProperty("fileOrIdentifier", node.getPlugin().description.fileOrIdentifier);
         obj->setProperty("bypassed", node.getPlugin().bypassed);
-        obj->setProperty("isDryPath", node.getPlugin().isDryPath);
+        obj->setProperty("suspended", node.getPlugin().suspended);
+        obj->setProperty("recallSafe", node.getPlugin().recallSafe);
+        obj->setProperty("ignoreLatency", node.getPlugin().ignoreLatency);
+        obj->setProperty("sidechain", node.getPlugin().sidechain);
+        if (auto* hosted = getHosted(node.getPlugin()))
+        {
+            obj->setProperty("latencySamples", hosted->getPluginLatencySamples());
+            obj->setProperty("hasSidechainInput", hosted->hasSidechainInput());
+        }
+        obj->setProperty("persistentId", node.getPlugin().persistentId);
+        obj->setProperty("loadError", node.getPlugin().loadError);
+        obj->setProperty("available", getHosted(node.getPlugin()) != nullptr);
         obj->setProperty("manufacturer", node.getPlugin().description.manufacturerName);
         obj->setProperty("branchGainDb", node.branchGainDb);
-        obj->setProperty("solo", node.solo.load());
-        obj->setProperty("mute", node.mute.load());
-
-        // Per-plugin controls
-        auto& leaf = node.getPlugin();
-        obj->setProperty("inputGainDb", leaf.inputGainDb);
-        obj->setProperty("outputGainDb", leaf.outputGainDb);
-        obj->setProperty("pluginDryWet", leaf.dryWetMix);
-        obj->setProperty("sidechainSource", leaf.sidechainSource);
-        obj->setProperty("midSideMode", static_cast<int>(leaf.midSideMode));
-
-        // Detect SC support from wrapped plugin
-        bool hasSC = false;
-        if (auto gNode = getNodeForId(leaf.graphNodeId))
-            if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(gNode->getProcessor()))
-                if (auto* plugin = wrapper->getWrappedPlugin())
-                    hasSC = plugin->getTotalNumInputChannels() > 2;
-        obj->setProperty("hasSidechain", hasSC);
+        obj->setProperty("solo", node.solo);
+        obj->setProperty("mute", node.mute);
     }
     else if (node.isGroup())
     {
         obj->setProperty("type", "group");
         obj->setProperty("name", node.name);
-        obj->setProperty("mode", node.getGroup().mode == GroupMode::Serial ? "serial" : "parallel");
+        obj->setProperty("mode", juce::String(groupModeName(node.getGroup().mode)));
+        if (node.getGroup().mode == GroupMode::Crossover)
+        {
+            juce::Array<juce::var> frequencies;
+            for (auto f : node.getGroup().crossoverHz) frequencies.add(f);
+            obj->setProperty("crossoverFrequencies", frequencies);
+            obj->setProperty("crossover", CrossoverHelpers::toString(node.getGroup().crossoverHz));
+        }
         obj->setProperty("dryWet", node.getGroup().dryWetMix);
-        obj->setProperty("duckAmount", node.getGroup().duckAmount);
-        obj->setProperty("duckReleaseMs", node.getGroup().duckReleaseMs);
         obj->setProperty("collapsed", node.collapsed);
 
         juce::Array<juce::var> childrenArr;
@@ -2943,6 +1535,10 @@ juce::var ChainProcessor::nodeToJsonWithPresets(const ChainNode& node) const
 {
     auto* obj = new juce::DynamicObject();
     obj->setProperty("id", node.id);
+    obj->setProperty("branchGainDb", node.branchGainDb);
+    obj->setProperty("solo", node.solo);
+    obj->setProperty("mute", node.mute);
+    obj->setProperty("polarityInverted", node.polarityInverted);
 
     if (node.isPlugin())
     {
@@ -2955,20 +1551,18 @@ juce::var ChainProcessor::nodeToJsonWithPresets(const ChainNode& node) const
         obj->setProperty("fileOrIdentifier", leaf.description.fileOrIdentifier);
         obj->setProperty("version", leaf.description.version);
         obj->setProperty("bypassed", leaf.bypassed);
-        obj->setProperty("isDryPath", leaf.isDryPath);
+        obj->setProperty("suspended", leaf.suspended);
+        obj->setProperty("recallSafe", leaf.recallSafe);
+        obj->setProperty("ignoreLatency", leaf.ignoreLatency);
+        obj->setProperty("sidechain", leaf.sidechain);
+        obj->setProperty("persistentId", leaf.persistentId);
+        obj->setProperty("presetData", leaf.retainedState);
         obj->setProperty("isInstrument", leaf.description.isInstrument);
         obj->setProperty("numInputChannels", leaf.description.numInputChannels);
         obj->setProperty("numOutputChannels", leaf.description.numOutputChannels);
         obj->setProperty("branchGainDb", node.branchGainDb);
-        obj->setProperty("solo", node.solo.load());
-        obj->setProperty("mute", node.mute.load());
-
-        // Per-plugin controls
-        obj->setProperty("inputGainDb", leaf.inputGainDb);
-        obj->setProperty("outputGainDb", leaf.outputGainDb);
-        obj->setProperty("pluginDryWet", leaf.dryWetMix);
-        obj->setProperty("sidechainSource", leaf.sidechainSource);
-        obj->setProperty("midSideMode", static_cast<int>(leaf.midSideMode));
+        obj->setProperty("solo", node.solo);
+        obj->setProperty("mute", node.mute);
 
         if (auto gNode = getNodeForId(leaf.graphNodeId))
         {
@@ -2985,10 +1579,15 @@ juce::var ChainProcessor::nodeToJsonWithPresets(const ChainNode& node) const
     {
         obj->setProperty("type", "group");
         obj->setProperty("name", node.name);
-        obj->setProperty("mode", node.getGroup().mode == GroupMode::Serial ? "serial" : "parallel");
+        obj->setProperty("mode", juce::String(groupModeName(node.getGroup().mode)));
+        if (node.getGroup().mode == GroupMode::Crossover)
+        {
+            juce::Array<juce::var> frequencies;
+            for (auto f : node.getGroup().crossoverHz) frequencies.add(f);
+            obj->setProperty("crossoverFrequencies", frequencies);
+            obj->setProperty("crossover", CrossoverHelpers::toString(node.getGroup().crossoverHz));
+        }
         obj->setProperty("dryWet", node.getGroup().dryWetMix);
-        obj->setProperty("duckAmount", node.getGroup().duckAmount);
-        obj->setProperty("duckReleaseMs", node.getGroup().duckReleaseMs);
         obj->setProperty("collapsed", node.collapsed);
 
         juce::Array<juce::var> childrenArr;
@@ -3000,175 +1599,10 @@ juce::var ChainProcessor::nodeToJsonWithPresets(const ChainNode& node) const
     return juce::var(obj);
 }
 
-std::unique_ptr<ChainNode> ChainProcessor::jsonToNode(const juce::var& json)
-{
-    if (!json.isObject())
-        return nullptr;
-
-    auto* obj = json.getDynamicObject();
-    if (!obj)
-        return nullptr;
-
-    auto node = std::make_unique<ChainNode>();
-    node->id = static_cast<int>(obj->getProperty("id"));
-    if (node->id >= nextNodeId)
-        nextNodeId = node->id + 1;
-
-    auto type = obj->getProperty("type").toString();
-
-    if (type == "plugin")
-    {
-        node->name = obj->getProperty("name").toString();
-        node->branchGainDb = static_cast<float>(obj->getProperty("branchGainDb"));
-        node->solo.store(static_cast<bool>(obj->getProperty("solo")), std::memory_order_relaxed);
-        node->mute.store(static_cast<bool>(obj->getProperty("mute")), std::memory_order_relaxed);
-
-        PluginLeaf leaf;
-        leaf.bypassed = static_cast<bool>(obj->getProperty("bypassed"));
-        leaf.isDryPath = static_cast<bool>(obj->getProperty("isDryPath"));
-
-        // Dry path nodes have no plugin to instantiate
-        if (leaf.isDryPath)
-        {
-            node->name = "Dry Path";
-            node->data = std::move(leaf);
-            return node;
-        }
-
-        // Per-plugin controls (backward-compatible: defaults if missing)
-        leaf.inputGainDb = static_cast<float>(obj->getProperty("inputGainDb"));
-        leaf.outputGainDb = static_cast<float>(obj->getProperty("outputGainDb"));
-        leaf.dryWetMix = obj->hasProperty("pluginDryWet")
-            ? static_cast<float>(obj->getProperty("pluginDryWet")) : 1.0f;
-        leaf.sidechainSource = static_cast<int>(obj->getProperty("sidechainSource"));
-        leaf.midSideMode = obj->hasProperty("midSideMode")
-            ? static_cast<MidSideMode>(static_cast<int>(obj->getProperty("midSideMode"))) : MidSideMode::Off;
-
-        // Build plugin description
-        juce::PluginDescription desc;
-        desc.name = obj->getProperty("name").toString();
-        desc.manufacturerName = obj->getProperty("manufacturer").toString();
-        desc.pluginFormatName = obj->getProperty("format").toString();
-        desc.uniqueId = static_cast<int>(obj->getProperty("uid"));
-        desc.fileOrIdentifier = obj->getProperty("fileOrIdentifier").toString();
-        desc.version = obj->getProperty("version").toString();
-        desc.isInstrument = static_cast<bool>(obj->getProperty("isInstrument"));
-        desc.numInputChannels = static_cast<int>(obj->getProperty("numInputChannels"));
-        desc.numOutputChannels = static_cast<int>(obj->getProperty("numOutputChannels"));
-        leaf.description = desc;
-
-        // Try to find matching plugin in user's system
-        auto& knownPlugins = pluginManager.getKnownPlugins();
-        juce::PluginDescription* matchedDesc = nullptr;
-
-        for (auto& knownType : knownPlugins.getTypes())
-        {
-            if (knownType.name.equalsIgnoreCase(desc.name) &&
-                knownType.manufacturerName.equalsIgnoreCase(desc.manufacturerName))
-            {
-                matchedDesc = &knownType;
-                break;
-            }
-        }
-
-        const auto& descToUse = matchedDesc ? *matchedDesc : desc;
-
-        juce::String errorMessage;
-        auto instance = pluginManager.createPluginInstance(
-            descToUse, currentSampleRate, currentBlockSize, errorMessage);
-
-        if (instance)
-        {
-            // Pre-prepare so bus layout is initialized (sidechain plugins need correct channel count)
-            instance->prepareToPlay(currentSampleRate, currentBlockSize);
-
-            // Store preset data to be applied AFTER prepareToPlay (deferred state restoration)
-            auto presetData = obj->getProperty("presetData").toString();
-            if (presetData.isNotEmpty())
-            {
-                leaf.pendingPresetData = presetData;
-            }
-
-            // Parse parameter hints from seeded chains (only when no binary preset)
-            auto paramsVar = obj->getProperty("parameters");
-            if (paramsVar.isArray() && presetData.isEmpty())
-            {
-                for (const auto& pVar : *paramsVar.getArray())
-                {
-                    if (!pVar.isObject()) continue;
-                    PendingParameter pp;
-                    pp.name = pVar.getProperty("name", "").toString();
-                    pp.semantic = pVar.getProperty("semantic", "").toString();
-                    pp.unit = pVar.getProperty("unit", "").toString();
-                    auto valStr = pVar.getProperty("value", "").toString();
-                    if (valStr.isNotEmpty())
-                    {
-                        pp.physicalValue = valStr.getFloatValue();
-                        pp.hasPhysicalValue = true;
-                    }
-                    pp.normalizedValue = static_cast<float>(pVar.getProperty("normalizedValue", 0.0));
-                    leaf.pendingParameters.push_back(pp);
-                }
-            }
-
-            auto wrapper = std::make_unique<PluginWithMeterWrapper>(std::move(instance));
-            if (auto graphNode = addNode(std::move(wrapper)))
-                leaf.graphNodeId = graphNode->nodeID;
-        }
-        else
-        {
-            // Track failure for import result reporting
-            importFailures.push_back({ importSlotCounter, desc.name,
-                matchedDesc ? "load_error" : "not_found" });
-        }
-        importSlotCounter++;
-
-        node->data = std::move(leaf);
-    }
-    else if (type == "group")
-    {
-        node->name = obj->getProperty("name").toString();
-        node->collapsed = static_cast<bool>(obj->getProperty("collapsed"));
-
-        GroupData group;
-        group.mode = obj->getProperty("mode").toString() == "parallel" ? GroupMode::Parallel : GroupMode::Serial;
-        group.dryWetMix = static_cast<float>(obj->getProperty("dryWet"));
-        group.duckAmount = static_cast<float>(obj->getProperty("duckAmount"));
-        group.duckReleaseMs = obj->hasProperty("duckReleaseMs")
-            ? static_cast<float>(obj->getProperty("duckReleaseMs"))
-            : 200.0f;
-
-        auto childrenVar = obj->getProperty("children");
-        if (childrenVar.isArray())
-        {
-            for (const auto& childVar : *childrenVar.getArray())
-            {
-                if (auto child = jsonToNode(childVar))
-                    group.children.push_back(std::move(child));
-            }
-        }
-
-        node->data = std::move(group);
-    }
-
-    return node;
-}
-
 juce::var ChainProcessor::getChainStateAsJson() const
 {
     // Emit tree-structured JSON with backward compat
     auto* result = new juce::DynamicObject();
-
-    // Defensive check: rootNode should always be a group, but verify to avoid std::bad_variant_access
-    if (!rootNode.isGroup())
-    {
-        jassertfalse; // This should never happen! Log in debug builds.
-        DBG("ERROR: rootNode is not a group! This indicates memory corruption or a threading bug.");
-        result->setProperty("nodes", juce::Array<juce::var>());
-        result->setProperty("slots", juce::Array<juce::var>());
-        result->setProperty("numSlots", 0);
-        return juce::var(result);
-    }
 
     // Tree format (new)
     juce::Array<juce::var> nodesArray;
@@ -3201,165 +1635,19 @@ juce::var ChainProcessor::getChainStateAsJson() const
 
 void ChainProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    // Use mutex to prevent multiple concurrent saves (DAW save + manual export)
-    std::lock_guard<std::mutex> lock(stateMutex);
-
-    // Suspend audio processing to prevent concurrent tree modifications
-    // while we serialize. This ensures atomicity without holding SpinLock
-    // for 500-2000ms (which would freeze the audio thread).
-    suspendProcessing(true);
-
     auto xml = std::make_unique<juce::XmlElement>("ChainState");
     xml->setAttribute("version", 2);
 
-    // Serialize tree (can take 500-2000ms for many plugins)
-    // Safe because suspendProcessing() prevents concurrent modifications
-    if (rootNode.isGroup())
-    {
-        for (const auto& child : rootNode.getGroup().children)
-            nodeToXml(*child, *xml);
-    }
-    else
-    {
-        jassertfalse; // This should never happen!
-        DBG("ERROR: rootNode is not a group in getStateInformation!");
-    }
+    for (const auto& child : rootNode.getGroup().children)
+        nodeToXml(*child, *xml);
 
     copyXmlToBinary(*xml, destData);
-
-    suspendProcessing(false);
 }
 
 void ChainProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    // Check for crash recovery file first
-    // If it exists and is recent (less than 5 minutes old), it likely contains
-    // parameter changes that were made after the last DAW save
-    auto recoveryFile = getCrashRecoveryFile();
-    if (recoveryFile.existsAsFile())
-    {
-        auto fileAge = juce::Time::getCurrentTime() - recoveryFile.getLastModificationTime();
-        auto fiveMinutes = juce::RelativeTime::minutes(5);
-
-        if (fileAge < fiveMinutes)
-        {
-            // Recovery file is recent - try to restore from it
-            DBG("ProChain: Found recent crash recovery file, attempting restore...");
-
-            juce::MemoryBlock recoveryState;
-            if (recoveryFile.loadFileAsData(recoveryState) && recoveryState.getSize() > 0)
-            {
-                // Use the recovery file state instead of the DAW state
-                // This preserves parameter changes made after the last manual save
-                data = recoveryState.getData();
-                sizeInBytes = static_cast<int>(recoveryState.getSize());
-
-                DBG("ProChain: Successfully loaded crash recovery state (" +
-                    juce::String(sizeInBytes) + " bytes)");
-            }
-        }
-
-        // Clean up recovery file after successful restore (whether used or not)
-        recoveryFile.deleteFile();
-    }
-
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
-    {
-        if (xml->hasTagName("ChainState"))
-        {
-            // CRITICAL: Suspend audio BEFORE any graph modifications.
-            suspendProcessing(true);
-
-            // Clear existing chain
-            hideAllPluginWindows();
-
-            // Remove all plugin graph nodes
-            std::vector<PluginLeaf*> allPlugins;
-            ChainNodeHelpers::collectPluginsMut(rootNode, allPlugins);
-            for (auto* plug : allPlugins)
-                AudioProcessorGraph::removeNode(plug->graphNodeId);
-
-            // Defensive check: rootNode should always be a group
-            if (!rootNode.isGroup())
-            {
-                jassertfalse; // This should never happen!
-                DBG("ERROR: rootNode is not a group in setStateInformation! Reinitializing.");
-                rootNode.data = GroupData{ GroupMode::Serial };
-            }
-
-            rootNode.getGroup().children.clear();
-
-            int version = xml->getIntAttribute("version", 1);
-
-            if (version >= 2)
-            {
-                // V2: read recursive Node elements
-                for (auto* nodeXml : xml->getChildWithTagNameIterator("Node"))
-                {
-                    if (auto child = xmlToNode(*nodeXml))
-                        rootNode.getGroup().children.push_back(std::move(child));
-                }
-            }
-            else
-            {
-                // V1 backward compat: read flat <Slot> elements
-                for (auto* slotXml : xml->getChildWithTagNameIterator("Slot"))
-                {
-                    if (auto* descXml = slotXml->getChildByName("PLUGIN"))
-                    {
-                        juce::PluginDescription desc;
-                        desc.loadFromXml(*descXml);
-
-                        // Create as a simple V2 plugin node XML and parse it
-                        auto pluginXml = std::make_unique<juce::XmlElement>("Node");
-                        pluginXml->setAttribute("id", nextNodeId);
-                        pluginXml->setAttribute("type", "plugin");
-                        pluginXml->setAttribute("bypassed", slotXml->getBoolAttribute("bypassed", false));
-                        pluginXml->addChildElement(new juce::XmlElement(*descXml));
-
-                        auto stateBase64 = slotXml->getStringAttribute("state");
-                        if (stateBase64.isNotEmpty())
-                            pluginXml->setAttribute("state", stateBase64);
-
-                        if (auto child = xmlToNode(*pluginXml))
-                            rootNode.getGroup().children.push_back(std::move(child));
-                    }
-                }
-            }
-
-            cachedSlotsDirty = true;
-            rebuildGraph();
-
-            // CRITICAL: Apply pending preset data AFTER rebuildGraph() has called prepareToPlay() on all plugins.
-            // This ensures plugins are fully initialized before state restoration, preventing memory corruption.
-            std::vector<PluginLeaf*> allPluginsForState;
-            ChainNodeHelpers::collectPluginsMut(rootNode, allPluginsForState);
-            for (auto* plug : allPluginsForState)
-            {
-                if (plug->pendingPresetData.isNotEmpty())
-                {
-                    if (auto gNode = getNodeForId(plug->graphNodeId))
-                    {
-                        if (auto* processor = gNode->getProcessor())
-                        {
-                            juce::MemoryBlock state;
-                            state.fromBase64Encoding(plug->pendingPresetData);
-                            PCLOG("setStateInfo — " + plug->description.name + " (" + juce::String(static_cast<int>(state.getSize())) + " bytes)");
-                    processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-                    PCLOG("setStateInfo — " + plug->description.name + " done");
-                        }
-                    }
-                    plug->pendingPresetData.clear();  // Clear after applying
-                }
-            }
-
-            suspendProcessing(false);
-
-            notifyChainChanged();
-            if (onParameterBindingChanged)
-                onParameterBindingChanged();
-        }
-    }
+        restoreChainFromXml(*xml, false);
 }
 
 //==============================================================================
@@ -3371,124 +1659,10 @@ std::unique_ptr<juce::XmlElement> ChainProcessor::serializeChainToXml() const
     auto xml = std::make_unique<juce::XmlElement>("ChainTree");
     xml->setAttribute("version", 2);
 
-    // Defensive check: rootNode should always be a group
-    if (rootNode.isGroup())
-    {
-        for (const auto& child : rootNode.getGroup().children)
-            nodeToXml(*child, *xml);
-    }
-    else
-    {
-        jassertfalse; // This should never happen!
-        DBG("ERROR: rootNode is not a group in serializeChainToXml!");
-    }
+    for (const auto& child : rootNode.getGroup().children)
+        nodeToXml(*child, *xml);
 
     return xml;
-}
-
-ChainProcessor::RestoreResult ChainProcessor::restoreChainFromXml(const juce::XmlElement& chainXml)
-{
-    RestoreResult result;
-    int version = chainXml.getIntAttribute("version", 1);
-
-    // CRITICAL: Suspend audio processing BEFORE modifying the graph.
-    // xmlToNode() calls addNode() which triggers sync render-sequence updates;
-    // without suspending first, the audio thread processes partial chains → crash.
-    suspendProcessing(true);
-
-    // Clear existing chain (same logic as setStateInformation)
-    hideAllPluginWindows();
-
-    std::vector<PluginLeaf*> allPlugins;
-    ChainNodeHelpers::collectPluginsMut(rootNode, allPlugins);
-    for (auto* plug : allPlugins)
-        AudioProcessorGraph::removeNode(plug->graphNodeId);
-
-    // Defensive check: rootNode should always be a group
-    if (!rootNode.isGroup())
-    {
-        jassertfalse; // This should never happen!
-        DBG("ERROR: rootNode is not a group in restoreChainFromXml! Reinitializing.");
-        rootNode.data = GroupData{ GroupMode::Serial };
-    }
-
-    rootNode.getGroup().children.clear();
-
-    if (version >= 2)
-    {
-        // V2: read recursive Node elements
-        for (auto* nodeXml : chainXml.getChildWithTagNameIterator("Node"))
-        {
-            if (auto child = xmlToNode(*nodeXml))
-                rootNode.getGroup().children.push_back(std::move(child));
-        }
-    }
-    else
-    {
-        // V1 backward compat: read flat <Slot> elements
-        for (auto* slotXml : chainXml.getChildWithTagNameIterator("Slot"))
-        {
-            if (auto* descXml = slotXml->getChildByName("PLUGIN"))
-            {
-                auto pluginXml = std::make_unique<juce::XmlElement>("Node");
-                pluginXml->setAttribute("id", nextNodeId);
-                pluginXml->setAttribute("type", "plugin");
-                pluginXml->setAttribute("bypassed", slotXml->getBoolAttribute("bypassed", false));
-                pluginXml->addChildElement(new juce::XmlElement(*descXml));
-
-                auto stateBase64 = slotXml->getStringAttribute("state");
-                if (stateBase64.isNotEmpty())
-                    pluginXml->setAttribute("state", stateBase64);
-
-                if (auto child = xmlToNode(*pluginXml))
-                    rootNode.getGroup().children.push_back(std::move(child));
-            }
-        }
-    }
-
-    // Scan for missing plugins (failed to instantiate = no valid graph node)
-    std::vector<const PluginLeaf*> flatPlugins;
-    ChainNodeHelpers::collectPlugins(rootNode, flatPlugins);
-    for (const auto* plug : flatPlugins)
-    {
-        if (plug->graphNodeId == juce::AudioProcessorGraph::NodeID())
-            result.missingPlugins.add(plug->description.name);
-    }
-
-    cachedSlotsDirty = true;
-    rebuildGraph();
-
-    // CRITICAL: Apply pending preset data AFTER rebuildGraph() has called prepareToPlay() on all plugins.
-    // This ensures plugins are fully initialized before state restoration, preventing memory corruption.
-    std::vector<PluginLeaf*> allPluginsForState;
-    ChainNodeHelpers::collectPluginsMut(rootNode, allPluginsForState);
-    for (auto* plug : allPluginsForState)
-    {
-        if (plug->pendingPresetData.isNotEmpty())
-        {
-            if (auto gNode = getNodeForId(plug->graphNodeId))
-            {
-                if (auto* processor = gNode->getProcessor())
-                {
-                    juce::MemoryBlock state;
-                    state.fromBase64Encoding(plug->pendingPresetData);
-                    PCLOG("setStateInfo — " + plug->description.name + " (" + juce::String(static_cast<int>(state.getSize())) + " bytes)");
-                    processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-                    PCLOG("setStateInfo — " + plug->description.name + " done");
-                }
-            }
-            plug->pendingPresetData.clear();  // Clear after applying
-        }
-    }
-
-    suspendProcessing(false);
-
-    notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
-
-    result.success = true;
-    return result;
 }
 
 juce::MemoryBlock ChainProcessor::captureSnapshot() const
@@ -3512,17 +1686,6 @@ juce::var ChainProcessor::exportChainWithPresets() const
 {
     auto* result = new juce::DynamicObject();
     result->setProperty("version", 2);
-
-    // Defensive check: rootNode should always be a group
-    if (!rootNode.isGroup())
-    {
-        jassertfalse; // This should never happen!
-        DBG("ERROR: rootNode is not a group in exportChainWithPresets!");
-        result->setProperty("nodes", juce::Array<juce::var>());
-        result->setProperty("slots", juce::Array<juce::var>());
-        result->setProperty("numSlots", 0);
-        return juce::var(result);
-    }
 
     juce::Array<juce::var> nodesArray;
     for (const auto& child : rootNode.getGroup().children)
@@ -3568,251 +1731,6 @@ juce::var ChainProcessor::exportChainWithPresets() const
     return juce::var(result);
 }
 
-void ChainProcessor::applyPendingParameters(
-    juce::AudioProcessor* processor,
-    const std::vector<PendingParameter>& pending,
-    const juce::String& pluginName,
-    const juce::String& manufacturer)
-{
-    auto& params = processor->getParameters();
-    if (params.isEmpty()) return;
-
-    // Try semantic matching via ParameterDiscovery
-    auto discoveredMap = ParameterDiscovery::discoverParameterMap(
-        processor, pluginName, manufacturer);
-
-    // Build semantic→index lookup from discovered map
-    std::map<juce::String, int> semanticToIndex;
-    for (const auto& dp : discoveredMap.parameters)
-        if (dp.matched && dp.semantic.isNotEmpty())
-            semanticToIndex[dp.semantic] = dp.juceParamIndex;
-
-    PCLOG("applyPendingParameters: " + pluginName +
-          " — " + juce::String(static_cast<int>(pending.size())) + " pending, " +
-          juce::String(params.size()) + " plugin params, " +
-          juce::String(static_cast<int>(semanticToIndex.size())) + " semantic matches");
-
-    int applied = 0;
-
-    for (const auto& pp : pending)
-    {
-        int targetIndex = -1;
-        float targetValue = pp.normalizedValue; // fallback
-
-        // Tier 1: Semantic match
-        if (pp.semantic.isNotEmpty())
-        {
-            auto it = semanticToIndex.find(pp.semantic);
-            if (it != semanticToIndex.end())
-            {
-                targetIndex = it->second;
-                // If we have a physical value, renormalize using the plugin's actual range
-                if (pp.hasPhysicalValue && targetIndex >= 0 && targetIndex < params.size())
-                {
-                    auto* param = params[targetIndex];
-                    if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(param))
-                    {
-                        auto& range = ranged->getNormalisableRange();
-                        targetValue = range.convertTo0to1(
-                            juce::jlimit(range.start, range.end, pp.physicalValue));
-                    }
-                }
-            }
-        }
-
-        // Tier 2: Fuzzy name match fallback
-        if (targetIndex < 0 && pp.name.isNotEmpty())
-        {
-            auto ppName = pp.name.toLowerCase();
-            for (int i = 0; i < params.size(); ++i)
-            {
-                auto paramName = params[i]->getName(256).toLowerCase();
-                if (paramName == ppName ||
-                    paramName.contains(ppName) ||
-                    ppName.contains(paramName))
-                {
-                    targetIndex = i;
-                    break;
-                }
-            }
-        }
-
-        if (targetIndex >= 0 && targetIndex < params.size())
-        {
-            auto* param = params[targetIndex];
-            float clamped = juce::jlimit(0.0f, 1.0f, targetValue);
-            param->setValueNotifyingHost(clamped);
-            applied++;
-        }
-    }
-
-    // Auto-activate EQ bands that had parameters set.
-    // FabFilter Pro-Q (and similar) use a "Band N Used" parameter to activate bands —
-    // setting freq/gain/Q without activating the band has no visible effect.
-    std::set<int> activatedBands;
-    for (const auto& pp : pending)
-    {
-        if (pp.semantic.startsWith("eq_band_"))
-        {
-            // Extract band number from semantic like "eq_band_3_freq"
-            auto afterPrefix = pp.semantic.substring(8); // after "eq_band_"
-            int bandNum = afterPrefix.getIntValue();
-            if (bandNum > 0 && activatedBands.find(bandNum) == activatedBands.end())
-            {
-                // Search for "Band N Used" parameter
-                auto usedName = "Band " + juce::String(bandNum) + " Used";
-                for (int i = 0; i < params.size(); ++i)
-                {
-                    if (params[i]->getName(64).equalsIgnoreCase(usedName))
-                    {
-                        if (params[i]->getValue() < 0.5f)
-                            params[i]->setValueNotifyingHost(1.0f);
-                        activatedBands.insert(bandNum);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    PCLOG("applyPendingParameters: " + pluginName + " — applied " +
-          juce::String(applied) + "/" + juce::String(static_cast<int>(pending.size())) +
-          " bands activated: " + juce::String(static_cast<int>(activatedBands.size())));
-}
-
-ChainProcessor::ImportResult ChainProcessor::importChainWithPresets(const juce::var& data)
-{
-    ImportResult result;
-
-    if (!data.isObject())
-        return result;
-
-    auto* obj = data.getDynamicObject();
-    if (!obj)
-        return result;
-
-    int version = static_cast<int>(obj->getProperty("version"));
-
-    // Reset per-import failure tracking
-    importFailures.clear();
-    importSlotCounter = 0;
-
-    // CRITICAL: Suspend audio BEFORE any graph modifications.
-    suspendProcessing(true);
-
-    // Clear existing chain
-    hideAllPluginWindows();
-    std::vector<PluginLeaf*> allPlugins;
-    ChainNodeHelpers::collectPluginsMut(rootNode, allPlugins);
-    for (auto* plug : allPlugins)
-        AudioProcessorGraph::removeNode(plug->graphNodeId);
-
-    // Defensive check: rootNode should always be a group
-    if (!rootNode.isGroup())
-    {
-        jassertfalse; // This should never happen!
-        DBG("ERROR: rootNode is not a group in importChainWithPresets! Reinitializing.");
-        rootNode.data = GroupData{ GroupMode::Serial };
-    }
-
-    rootNode.getGroup().children.clear();
-
-    if (version >= 2 && obj->hasProperty("nodes"))
-    {
-        // V2: import tree structure
-        auto nodesVar = obj->getProperty("nodes");
-        if (nodesVar.isArray())
-        {
-            for (const auto& nodeVar : *nodesVar.getArray())
-            {
-                if (auto child = jsonToNode(nodeVar))
-                    rootNode.getGroup().children.push_back(std::move(child));
-            }
-        }
-    }
-    else
-    {
-        // V1: import flat slots
-        auto slotsVar = obj->getProperty("slots");
-        if (!slotsVar.isArray())
-        {
-            suspendProcessing(false);
-            return result;
-        }
-
-        for (const auto& slotVar : *slotsVar.getArray())
-        {
-            if (auto child = jsonToNode(slotVar))
-                rootNode.getGroup().children.push_back(std::move(child));
-        }
-    }
-
-    cachedSlotsDirty = true;
-    rebuildGraph();
-
-    // CRITICAL: Apply pending preset data AFTER rebuildGraph() has called prepareToPlay() on all plugins.
-    // This ensures plugins are fully initialized before state restoration, preventing memory corruption.
-    std::vector<PluginLeaf*> allPluginsForState;
-    ChainNodeHelpers::collectPluginsMut(rootNode, allPluginsForState);
-    for (auto* plug : allPluginsForState)
-    {
-        if (plug->pendingPresetData.isNotEmpty())
-        {
-            if (auto gNode = getNodeForId(plug->graphNodeId))
-            {
-                if (auto* processor = gNode->getProcessor())
-                {
-                    juce::MemoryBlock state;
-                    state.fromBase64Encoding(plug->pendingPresetData);
-                    PCLOG("setStateInfo — " + plug->description.name + " (" + juce::String(static_cast<int>(state.getSize())) + " bytes)");
-                    processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-                    PCLOG("setStateInfo — " + plug->description.name + " done");
-                }
-            }
-            plug->pendingPresetData.clear();  // Clear after applying
-        }
-    }
-
-    // Apply pending parameters for slots without binary presetData (seeded chains)
-    for (auto* plug : allPluginsForState)
-    {
-        if (!plug->pendingParameters.empty())
-        {
-            if (auto gNode = getNodeForId(plug->graphNodeId))
-            {
-                // Unwrap PluginWithMeterWrapper to access the real plugin's parameters
-                juce::AudioProcessor* proc = nullptr;
-                if (auto* wrapper = dynamic_cast<PluginWithMeterWrapper*>(gNode->getProcessor()))
-                    proc = wrapper->getWrappedPlugin();
-                else
-                    proc = gNode->getProcessor();
-
-                if (proc != nullptr)
-                {
-                    applyPendingParameters(proc, plug->pendingParameters,
-                                           plug->description.name,
-                                           plug->description.manufacturerName);
-                }
-            }
-            plug->pendingParameters.clear();
-        }
-    }
-
-    suspendProcessing(false);
-
-    // Build import result
-    result.totalSlots = importSlotCounter;
-    result.failures = std::move(importFailures);
-    result.failedSlots = static_cast<int>(result.failures.size());
-    result.loadedSlots = result.totalSlots - result.failedSlots;
-    result.success = true; // chain structure loaded (even if some plugins missing)
-
-    notifyChainChanged();
-    if (onParameterBindingChanged)
-        onParameterBindingChanged();
-    return result;
-}
-
 juce::String ChainProcessor::getSlotPresetData(int slotIndex) const
 {
     auto* leaf = getPluginByFlatIndex(slotIndex);
@@ -3830,127 +1748,6 @@ juce::String ChainProcessor::getSlotPresetData(int slotIndex) const
     }
 
     return {};
-}
-
-bool ChainProcessor::setSlotPresetData(int slotIndex, const juce::String& base64Data)
-{
-    auto* leaf = getPluginByFlatIndex(slotIndex);
-    if (!leaf || base64Data.isEmpty())
-        return false;
-
-    juce::MemoryBlock state;
-    state.fromBase64Encoding(base64Data);
-
-    if (auto gNode = getNodeForId(leaf->graphNodeId))
-    {
-        if (auto* processor = gNode->getProcessor())
-        {
-            processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-            return true;
-        }
-    }
-
-    return false;
-}
-
-//==============================================================================
-// Crash Recovery - Async State Persistence
-//==============================================================================
-
-juce::File ChainProcessor::getCrashRecoveryFile() const
-{
-    auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-
-    // Use unique identifier based on this processor's memory address
-    // This ensures each plugin instance has its own recovery file
-    auto uniqueId = juce::String::toHexString(reinterpret_cast<juce::pointer_sized_int>(this));
-
-    return tempDir.getChildFile("ProChain_Recovery_" + uniqueId + ".dat");
-}
-
-void ChainProcessor::saveCrashRecoveryStateAsync()
-{
-    // Throttle: Skip if we saved less than 2 seconds ago
-    auto now = juce::Time::currentTimeMillis();
-    auto lastSave = lastCrashRecoverySaveTime.load();
-
-    if (now - lastSave < kMinCrashRecoverySaveIntervalMs)
-    {
-        // Schedule a delayed save to catch the final state
-        juce::Timer::callAfterDelay(kMinCrashRecoverySaveIntervalMs, [this, alive = aliveFlag]() {
-            if (alive->load(std::memory_order_acquire) && !pendingCrashRecoverySave.load())
-                saveCrashRecoveryStateAsync();
-        });
-        return;
-    }
-
-    // Skip if already saving
-    if (pendingCrashRecoverySave.exchange(true))
-        return;
-
-    lastCrashRecoverySaveTime.store(now);
-
-    // Serialize on the message thread (safe — tree is not mutated concurrently)
-    juce::MemoryBlock crashState;
-    getStateInformation(crashState);
-
-    // Capture shared pointer to ensure ChainProcessor outlives the lambda
-    auto alive = aliveFlag;
-
-    // Only the file write happens on the background thread
-    juce::Thread::launch([this, capturedState = std::move(crashState), alive]() {
-        if (alive->load(std::memory_order_acquire))
-            performCrashRecoverySave(capturedState);
-    });
-}
-
-void ChainProcessor::performCrashRecoverySave(const juce::MemoryBlock& stateData)
-{
-    // Write to temp file (1-5ms on SSD)
-    auto file = getCrashRecoveryFile();
-
-    juce::FileOutputStream stream(file);
-    if (stream.openedOk())
-    {
-        stream.write(stateData.getData(), stateData.getSize());
-        stream.flush();
-    }
-
-    pendingCrashRecoverySave.store(false);
-}
-
-bool ChainProcessor::tryRestoreCrashRecoveryState()
-{
-    auto file = getCrashRecoveryFile();
-
-    if (!file.existsAsFile())
-        return false;
-
-    juce::MemoryBlock state;
-
-    if (!file.loadFileAsData(state))
-        return false;
-
-    if (state.getSize() == 0)
-        return false;
-
-    // Restore the state
-    setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-
-    DBG("ProChain: Restored chain state from crash recovery file");
-
-    return true;
-}
-
-void ChainProcessor::cleanupCrashRecoveryFile()
-{
-    auto file = getCrashRecoveryFile();
-
-    if (file.existsAsFile())
-    {
-        file.deleteFile();
-        DBG("ProChain: Cleaned up crash recovery file");
-    }
 }
 
 //==============================================================================
@@ -4034,25 +1831,11 @@ void ChainProcessor::rebuildCachedSlots() const
 
 void ChainProcessor::notifyChainChanged()
 {
-    auto weak = aliveFlag;
-
-    // Trigger async crash recovery save (throttled, runs on background thread)
-    saveCrashRecoveryStateAsync();
-
-    if (onLatencyChanged)
+    notificationDirty = true;
+    timerCallback();
+    if (notificationDirty && pendingRuntime.load() == nullptr)
     {
-        int latency = getTotalLatencySamples();
-        juce::MessageManager::callAsync([this, weak, latency]() {
-            if (*weak && onLatencyChanged)
-                onLatencyChanged(latency);
-        });
-    }
-
-    if (onChainChanged)
-    {
-        juce::MessageManager::callAsync([this, weak]() {
-            if (*weak && onChainChanged)
-                onChainChanged();
-        });
+        if (onChainChanged) onChainChanged();
+        notificationDirty = false;
     }
 }

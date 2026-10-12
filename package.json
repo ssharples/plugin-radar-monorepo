@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "PluginRadar — Audio plugin database, price tracker, and chain manager",
+  "description": "PluginRadar \u2014 Audio plugin database, price tracker, and chain manager",
   "author": "Scott Sharples",
   "license": "MIT",
   "scripts": {
@@ -14,7 +14,14 @@
     "build:web": "pnpm --filter web build",
     "dev:desktop-ui": "pnpm --filter desktop-ui dev",
     "build:desktop-ui": "pnpm --filter desktop-ui build",
-    "install:all": "pnpm install"
+    "install:all": "pnpm install",
+    "quality:setup": "python3 tools/quality/bootstrap.py",
+    "quality:test": "python3 tools/quality/run.py test",
+    "crap": "python3 tools/quality/run.py crap",
+    "mutate": "python3 tools/quality/run.py mutate",
+    "quality:gate": "python3 tools/quality/run.py gate",
+    "quality:scope": "python3 tools/quality/run.py scope",
+    "quality:mutation-config": "python3 tools/quality/run.py mutation-config"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.45",

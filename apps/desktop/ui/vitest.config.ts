@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import path from 'path'
 
 export default defineConfig({
@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   test: {
+    exclude: [...configDefaults.exclude, '**/.stryker-tmp/**'],
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],

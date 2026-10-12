@@ -1,13 +1,9 @@
-import { ChevronDown, ChevronRight, GitBranch, X, GripVertical, Save, Plus, Layers, Power } from 'lucide-react';
-import { useState, useCallback, memo } from 'react';
+import { ChevronDown, ChevronRight, Layers, GitBranch, X, GripVertical, Ungroup } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { useChainActions } from '../../stores/chainStore';
+import { useChainStore } from '../../stores/chainStore';
 import type { GroupNodeUI, ChainNodeUI } from '../../api/types';
 import { ChainNodeList } from './ChainNodeList';
-
-import { SaveGroupTemplateModal } from './SaveGroupTemplateModal';
-import { InlinePluginSearch } from './InlinePluginSearch';
-import { ContextMenu, buildGroupMenu } from '../ContextMenu';
+import { Slider } from '../Slider/Slider';
 
 interface GroupContainerProps {
   node: GroupNodeUI;
@@ -17,22 +13,15 @@ interface GroupContainerProps {
   selectedIds?: Set<number>;
   isDragActive?: boolean;
   draggedNodeId?: number | null;
+  shiftHeld?: boolean;
   groupSelectMode?: boolean;
   /** Set of node IDs whose drop targets should be disabled (self-drop prevention) */
   disabledDropIds?: Set<number>;
   /** Map of nodeId → 1-based DFS plugin slot number */
   slotNumbers?: Map<number, number>;
-  /** Whether this group is the source of the current drag (detach visual) */
-  isSourceGroup?: boolean;
-  /** ID of the source group for forwarding to nested ChainNodeList */
-  sourceGroupId?: number | null;
-  /** Whether this group is currently animating its collapse before dissolve */
-  isDissolvingGroup?: boolean;
-  /** ID of a group currently dissolving, forwarded to nested ChainNodeList */
-  dissolvingGroupId?: number | null;
 }
 
-export const GroupContainer = memo(function GroupContainer({
+export function GroupContainer({
   node,
   depth,
   parentId: _parentId,
@@ -40,29 +29,18 @@ export const GroupContainer = memo(function GroupContainer({
   selectedIds,
   isDragActive = false,
   draggedNodeId = null,
+  shiftHeld = false,
   groupSelectMode = false,
   disabledDropIds,
   slotNumbers,
-  isSourceGroup = false,
-  sourceGroupId = null,
-  isDissolvingGroup = false,
-  dissolvingGroupId = null,
 }: GroupContainerProps) {
   const {
+    setGroupMode,
+    setGroupDryWet,
     dissolveGroup,
     removeNode,
     toggleGroupCollapsed,
-    toggleNodeBypass,
-    showInlineSearchBelow,
-  } = useChainActions();
-
-  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
-  const [groupContextMenu, setGroupContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const handleGroupContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setGroupContextMenu({ x: e.clientX, y: e.clientY });
-  }, []);
+  } = useChainStore();
 
   // Make the group draggable
   const {
@@ -92,21 +70,14 @@ export const GroupContainer = memo(function GroupContainer({
     disabled: disabledDropIds?.has(node.id),
   });
 
+  const isSerial = node.mode === 'serial';
+  const isParallel = node.mode === 'parallel';
   const childCount = countNodes(node.children);
+  const isDropTarget = isGroupDropOver && isDragActive && !isDragging;
 
-  // Parallel-only color scheme
-  const groupBorderColor = isGroupDropOver && isDragActive
-    ? 'rgba(222, 255, 10, 0.5)'
-    : 'rgba(222, 255, 10, 0.2)';
-  const accentColor = 'var(--color-accent-cyan)';
-
-  // For "+ SEND" — insert after the last child
-  const handleAddBranch = useCallback(() => {
-    if (node.children.length > 0) {
-      const lastChild = node.children[node.children.length - 1];
-      showInlineSearchBelow(lastChild.id, node.id, node.children.length);
-    }
-  }, [node.children, node.id, showInlineSearchBelow]);
+  const tone = isSerial
+    ? { bar: 'bg-plugin-serial', text: 'text-plugin-serial', border: 'border-plugin-serial/25', bg: 'bg-plugin-serial/[0.035]', ring: 'ring-plugin-serial/50' }
+    : { bar: 'bg-plugin-parallel', text: 'text-plugin-parallel', border: 'border-plugin-parallel/25', bg: 'bg-plugin-parallel/[0.035]', ring: 'ring-plugin-parallel/50' };
 
   // Combine refs for both draggable and droppable
   const setRef = (el: HTMLElement | null) => {
@@ -114,142 +85,125 @@ export const GroupContainer = memo(function GroupContainer({
     setDropRef(el);
   };
 
+  const stop = {
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+  };
+
   return (
-    <>
     <div
       ref={setRef}
       className={`
-        rounded-lg dim-during-drag overflow-hidden
-        ${isDragging ? 'opacity-30 scale-[0.98]' : node.bypassed ? 'opacity-50' : ''}
-        ${isDragActive && !isDragging && node.id !== draggedNodeId
-          ? (isGroupDropOver ? 'drop-target-active' : 'drop-target-valid')
-          : ''}
-        ${isDissolvingGroup ? 'animate-group-collapse' : ''}
+        relative rounded-lg border transition-[border-color,background-color,opacity] duration-150 overflow-hidden
+        ${tone.border} ${tone.bg}
+        ${isDropTarget ? `ring-2 ${tone.ring}` : ''}
+        ${isDragging ? 'opacity-30' : ''}
       `}
-      style={{
-        position: 'relative' as const,
-        zIndex: 2,
-        border: isSourceGroup
-          ? '1px dashed rgba(222, 255, 10, 0.4)'
-          : `1px solid ${groupBorderColor}`,
-        background: 'linear-gradient(135deg, rgba(222, 255, 10, 0.04) 0%, rgba(255,255,255,0.02) 50%, rgba(222, 255, 10, 0.03) 100%)',
-        boxShadow: isGroupDropOver && isDragActive
-          ? '0 0 16px rgba(222, 255, 10, 0.15), inset 0 1px 0 rgba(255,255,255,0.08)'
-          : '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)',
-        transition: 'all var(--duration-fast) var(--ease-snap)',
-      }}
+      style={{ marginLeft: depth > 0 ? 4 : 0 }}
     >
-      {/* Group Header — entire row is draggable */}
+      {/* Mode colour bar */}
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${tone.bar} opacity-80`} />
+
+      {/* Group header — entire row is draggable (5px movement activates) */}
       <div
         {...dragAttributes}
         {...dragListeners}
-        className="flex items-center gap-1.5 px-2 py-1.5 cursor-grab active:cursor-grabbing"
-        onContextMenu={handleGroupContextMenu}
+        className="flex items-center gap-1.5 h-9 pl-2.5 pr-1.5 cursor-grab active:cursor-grabbing border-b border-white/[0.04]"
       >
-        {/* Drag handle */}
-        <div className="flex-shrink-0 p-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
-          <GripVertical className="w-3 h-3" />
-        </div>
+        <GripVertical className="w-3.5 h-3.5 text-plugin-dim flex-shrink-0" />
 
-        {/* Collapse toggle */}
         <button
           onClick={(e) => { e.stopPropagation(); toggleGroupCollapsed(node.id); }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="flex-shrink-0 p-0.5 rounded"
-          style={{ color: 'var(--color-text-secondary)', transition: 'all var(--duration-fast) var(--ease-snap)' }}
+          className="flex-shrink-0 w-5 h-5 inline-flex items-center justify-center rounded hover:bg-plugin-raised text-plugin-muted"
+          aria-label={node.collapsed ? 'Expand group' : 'Collapse group'}
         >
-          {node.collapsed ? (
-            <ChevronRight className="w-3 h-3" />
-          ) : (
-            <ChevronDown className="w-3 h-3" />
-          )}
+          {node.collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
 
-        {/* Group icon */}
-        <GitBranch className="w-3 h-3 flex-shrink-0" style={{ color: accentColor }} />
+        {isSerial ? (
+          <Layers className={`w-3.5 h-3.5 ${tone.text} flex-shrink-0`} />
+        ) : (
+          <GitBranch className={`w-3.5 h-3.5 ${tone.text} flex-shrink-0`} />
+        )}
 
-        {/* Group name */}
-        <span
-          className="text-body font-bold truncate min-w-0"
-          style={{
-            fontFamily: 'var(--font-extended)',
-            textTransform: 'uppercase' as const,
-            letterSpacing: 'var(--tracking-wider)',
-            color: 'var(--color-text-primary)',
-            maxWidth: '80px',
-          }}
-        >
+        <span className="text-[13px] font-semibold text-plugin-text truncate min-w-0">
           {node.name}
         </span>
+        <span className="num text-[10px] text-plugin-dim flex-shrink-0">{childCount}</span>
 
-        {/* Bypass toggle */}
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleNodeBypass(node.id); }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="flex-shrink-0 p-1 rounded"
-          style={{
-            color: node.bypassed ? 'var(--color-text-tertiary)' : accentColor,
-            background: node.bypassed ? 'rgba(255, 255, 255, 0.04)' : 'rgba(222, 255, 10, 0.12)',
-            transition: 'all var(--duration-fast) var(--ease-snap)',
-          }}
-          title={node.bypassed ? 'Enable bus' : 'Bypass bus'}
-        >
-          <Power className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex-1" />
 
-        {/* Spacer to push actions to the right */}
-        <div className="flex-1 min-w-0" />
-
-        {/* Actions */}
-        <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+        {/* Mode toggle */}
+        <div className="flex items-center p-0.5 rounded-md bg-plugin-bg border border-plugin-border flex-shrink-0" {...stop}>
           <button
-            onClick={() => setShowSaveTemplateModal(true)}
-            className="p-0.5 rounded"
-            style={{
-              color: 'var(--color-text-secondary)',
-              transition: 'all var(--duration-fast) var(--ease-snap)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; e.currentTarget.style.background = 'rgba(222, 255, 10, 0.1)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'transparent'; }}
-            title="Save send bus as template"
+            onClick={() => setGroupMode(node.id, 'serial')}
+            className={`h-5 px-1.5 rounded text-[11px] font-semibold transition-colors ${
+              isSerial ? 'bg-plugin-serial/20 text-plugin-serial' : 'text-plugin-dim hover:text-plugin-text'
+            }`}
+            title="Serial: plugins run one after another"
           >
-            <Save className="w-3 h-3" />
+            Serial
           </button>
           <button
-            onClick={() => dissolveGroup(node.id)}
-            className="p-0.5 rounded"
-            style={{
-              color: 'var(--color-text-secondary)',
-              transition: 'all var(--duration-fast) var(--ease-snap)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'transparent'; }}
-            title="Remove Bus"
+            onClick={() => setGroupMode(node.id, 'parallel')}
+            className={`h-5 px-1.5 rounded text-[11px] font-semibold transition-colors ${
+              isParallel ? 'bg-plugin-parallel/20 text-plugin-parallel' : 'text-plugin-dim hover:text-plugin-text'
+            }`}
+            title="Parallel: branches run side by side and are summed"
           >
-            <Layers className="w-3 h-3" />
+            Parallel
+          </button>
+        </div>
+
+        {/* Dry/Wet for serial groups */}
+        {isSerial && (
+          <div className="flex items-center gap-1.5 pl-1 flex-shrink-0" {...stop}>
+            <span className="section-label">Mix</span>
+            <Slider
+              value={node.dryWet}
+              min={0}
+              max={1}
+              step={0.01}
+              color="blue"
+              width="w-16"
+              onChange={(v) => setGroupDryWet(node.id, v)}
+              title={`Dry/Wet: ${Math.round(node.dryWet * 100)}%`}
+            />
+            <span className="num text-[10px] text-plugin-muted w-8 text-right">
+              {Math.round(node.dryWet * 100)}%
+            </span>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 pl-0.5 flex-shrink-0" {...stop}>
+          <button
+            onClick={() => dissolveGroup(node.id)}
+            className="w-6 h-6 inline-flex items-center justify-center rounded text-plugin-dim hover:text-plugin-text hover:bg-plugin-raised transition-colors"
+            title="Dissolve group (ungroup)"
+            aria-label="Dissolve group"
+          >
+            <Ungroup className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => removeNode(node.id)}
-            className="p-0.5 rounded"
-            style={{
-              color: 'var(--color-text-secondary)',
-              transition: 'all var(--duration-fast) var(--ease-snap)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-status-error)'; e.currentTarget.style.background = 'rgba(255, 0, 51, 0.1)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'transparent'; }}
-            title="Delete bus and all contents"
+            className="w-6 h-6 inline-flex items-center justify-center rounded text-plugin-dim hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            title="Remove group and all contents"
+            aria-label="Remove group"
           >
-            <X className="w-3 h-3" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Children */}
       {!node.collapsed && (
-        <div className="px-2 pb-2 pt-1">
+        <div className="pl-3 pr-1.5 pt-1 pb-1.5">
           {node.children.length === 0 ? (
             <EmptyGroupDropZone
               groupId={node.id}
+              isParallel={isParallel}
               isDragActive={isDragActive}
             />
           ) : (
@@ -257,198 +211,75 @@ export const GroupContainer = memo(function GroupContainer({
               nodes={node.children}
               depth={depth + 1}
               parentId={node.id}
-              isParallelParent={true}
+              isParallelParent={isParallel}
               onNodeSelect={onNodeSelect}
               selectedIds={selectedIds}
               isDragActive={isDragActive}
               draggedNodeId={draggedNodeId}
+              shiftHeld={shiftHeld}
               groupSelectMode={groupSelectMode}
               disabledDropIds={disabledDropIds}
               slotNumbers={slotNumbers}
-              sourceGroupId={sourceGroupId}
-              dissolvingGroupId={dissolvingGroupId}
             />
           )}
-
-          {/* Group action buttons */}
-          <div
-            className="mt-1.5 px-1"
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            {/* Action buttons row */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleAddBranch}
-                className="flex items-center gap-1 px-2 py-1 rounded text-body font-bold"
-                style={{
-                  letterSpacing: 'var(--tracking-wide)',
-                  color: 'var(--color-text-tertiary)',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px dashed rgba(255, 255, 255, 0.1)',
-                  transition: 'all var(--duration-fast) var(--ease-snap)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--color-accent-cyan)';
-                  e.currentTarget.style.borderColor = 'rgba(222, 255, 10, 0.3)';
-                  e.currentTarget.style.background = 'rgba(222, 255, 10, 0.06)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--color-text-tertiary)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                }}
-                title="Add a new send"
-              >
-                <Plus className="w-3 h-3" />
-                Send
-              </button>
-            </div>
-
-          </div>
         </div>
       )}
 
       {/* Collapsed summary */}
       {node.collapsed && (
-        <div
-          className="px-3 pb-2 text-body"
-          style={{
-            fontFamily: 'var(--font-system)',
-            color: 'var(--color-text-tertiary)',
-            letterSpacing: 'var(--tracking-wide)',
-          }}
-        >
-          {childCount} plugin{childCount !== 1 ? 's' : ''}
-        </div>
-      )}
-
-      {/* Drop target overlay when dragging over */}
-      {isGroupDropOver && isDragActive && !isDragging && (
-        <div
-          className="absolute inset-0 rounded-lg pointer-events-none z-10 animate-fade-in"
-          style={{
-            boxShadow: '0 0 0 2px rgba(222, 255, 10, 0.4)',
-            transition: 'all var(--duration-fast) var(--ease-snap)',
-          }}
-        >
-          <div
-            className="absolute bottom-0 left-0 right-0 flex items-center justify-center py-1 rounded-b-lg"
-            style={{ background: 'rgba(222, 255, 10, 0.1)' }}
-          >
-            <span
-              className="text-body font-bold"
-              style={{
-                letterSpacing: 'var(--tracking-wide)',
-                color: 'rgba(222, 255, 10, 0.7)',
-              }}
-            >
-              Drop to add to {node.name}
-            </span>
-          </div>
+        <div className="pl-9 pr-3 py-1.5 text-[11px] text-plugin-muted">
+          {childCount} plugin{childCount !== 1 ? 's' : ''} {isParallel ? 'in parallel' : 'in series'}
         </div>
       )}
     </div>
-
-      {/* Save Template Modal */}
-      {showSaveTemplateModal && (
-        <SaveGroupTemplateModal
-          groupId={node.id}
-          groupName={node.name}
-          onClose={() => setShowSaveTemplateModal(false)}
-        />
-      )}
-
-      {/* Group Context Menu */}
-      {groupContextMenu && (
-        <ContextMenu
-          x={groupContextMenu.x}
-          y={groupContextMenu.y}
-          items={buildGroupMenu(
-            {
-              node,
-              nodeId: node.id,
-              isSerial: false,
-              isCollapsed: !!node.collapsed,
-            },
-            {
-              addPlugin: handleAddBranch,
-              toggleBypass: () => toggleNodeBypass(node.id),
-              dissolveGroup: () => dissolveGroup(node.id),
-              toggleCollapsed: () => toggleGroupCollapsed(node.id),
-              saveAsTemplate: () => setShowSaveTemplateModal(true),
-              removeGroup: () => removeNode(node.id),
-            },
-          )}
-          onClose={() => setGroupContextMenu(null)}
-        />
-      )}
-    </>
   );
-});
+}
 
 /**
- * Empty group placeholder with drop target + inline search.
+ * Empty group placeholder with drop target.
  */
 function EmptyGroupDropZone({
   groupId,
+  isParallel,
   isDragActive,
 }: {
   groupId: number;
+  isParallel: boolean;
   isDragActive: boolean;
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `drop:${groupId}:0`,
   });
 
-  const [showSearch, setShowSearch] = useState(false);
-  const accentColor = 'var(--color-accent-cyan)';
+  const borderColor = isParallel ? 'border-plugin-parallel/40' : 'border-plugin-serial/40';
+  const bgColor = isParallel ? 'bg-plugin-parallel/10' : 'bg-plugin-serial/10';
+  const textColor = isParallel ? 'text-plugin-parallel' : 'text-plugin-serial';
 
   const handleClick = () => {
-    setShowSearch(true);
+    window.dispatchEvent(new Event('openPluginBrowser'));
   };
 
   return (
-    <>
-      <div
-        ref={setNodeRef}
-        onClick={handleClick}
-        className="mx-1 rounded-lg flex items-center justify-center gap-2 cursor-pointer"
-        style={{
-          border: isOver && isDragActive
-            ? `2px dashed ${accentColor}`
-            : '2px dashed var(--color-border-default)',
-          background: isOver && isDragActive
-            ? 'rgba(222, 255, 10, 0.08)'
-            : 'transparent',
-          padding: isOver && isDragActive ? '16px 0' : '12px 0',
-          transition: 'all var(--duration-fast) var(--ease-snap)',
-        }}
-      >
-        <span
-          className="text-body"
-          style={{
-            letterSpacing: 'var(--tracking-wide)',
-            color: isOver && isDragActive ? accentColor : 'var(--color-text-tertiary)',
-          }}
-        >
-          {isOver && isDragActive
-            ? 'Drop plugin here'
-            : 'Drop a plugin here or click to browse'
-          }
-        </span>
-      </div>
-      {showSearch && (
-        <div className="mt-2">
-          <InlinePluginSearch
-            parentId={groupId}
-            insertIndex={0}
-            onPluginAdded={() => setShowSearch(false)}
-            onClose={() => setShowSearch(false)}
-          />
-        </div>
-      )}
-    </>
+    <div
+      ref={setNodeRef}
+      onClick={handleClick}
+      className={`
+        rounded-lg border border-dashed transition-colors duration-150 h-10
+        ${isOver && isDragActive
+          ? `${borderColor} ${bgColor}`
+          : 'border-plugin-border-bright/70'
+        }
+        flex items-center justify-center gap-2 cursor-pointer
+        hover:border-plugin-accent/50
+      `}
+    >
+      <span className={`text-xs ${isOver && isDragActive ? textColor : 'text-plugin-muted'}`}>
+        {isOver && isDragActive
+          ? 'Drop plugin here'
+          : 'Drop a plugin here or click to browse'
+        }
+      </span>
+    </div>
   );
 }
 

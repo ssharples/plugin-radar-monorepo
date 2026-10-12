@@ -26,7 +26,6 @@ vi.mock('../../../api/convex-client', () => ({
 }))
 
 // Mock image imports
-vi.mock('../../../assets/ui-bg.png', () => ({ default: 'ui-bg.png' }))
 
 describe('OnboardingFlow Integration', () => {
   beforeEach(() => {
@@ -37,7 +36,7 @@ describe('OnboardingFlow Integration', () => {
 
   it('shows auth step initially', () => {
     render(<OnboardingFlow />)
-    expect(screen.getByText('PROPANE')).toBeInTheDocument()
+    expect(screen.getByText('ProChain')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Email')).toBeInTheDocument()
   })
 
@@ -148,7 +147,7 @@ describe('OnboardingFlow Integration', () => {
     const user = userEvent.setup()
     render(<OnboardingFlow />)
 
-    await user.click(screen.getByText('Continue to Propane'))
+    await user.click(screen.getByText('Continue to ProChain'))
 
     // Should show completion step
     expect(screen.getByText('Welcome to your signal chain')).toBeInTheDocument()

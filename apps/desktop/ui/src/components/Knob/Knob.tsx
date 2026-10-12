@@ -1,26 +1,20 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import knobImg from '../../assets/button-simple.png';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface KnobProps {
-  value: number;
-  min?: number;
-  max?: number;
-  defaultValue?: number;
-  size?: number;
-  label?: string;
-  formatValue?: (value: number) => string;
+  value: number;           // Value in dB
+  min?: number;            // Min dB (default -60)
+  max?: number;            // Max dB (default +24)
+  defaultValue?: number;   // Default value for double-click reset
+  size?: number;           // Size in pixels (default 48)
+  label?: string;          // Label below knob
+  step?: number;           // Value rounding (default 0.1)
+  formatValue?: (value: number) => string; // Custom value text
+  /** 'stack' puts value and label under the knob; 'side' puts them to the right */
+  layout?: 'stack' | 'side';
+  /** Arc colour (CSS colour). Defaults to the accent. */
+  color?: string;
   onChange: (value: number) => void;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
-  /** Hide the value display below the knob (render it yourself externally) */
-  hideValue?: boolean;
-  /** Hide the label display below the value */
-  hideLabel?: boolean;
 }
-
-const TICK_COUNT = 31;
-const ARC_SWEEP = 270;
-const START_ANGLE = -135;
 
 export function Knob({
   value,
@@ -29,40 +23,47 @@ export function Knob({
   defaultValue = 0,
   size = 48,
   label,
-  formatValue: formatValueProp,
+  step = 0.1,
+  formatValue: customFormat,
+  layout = 'stack',
+  color = '#8b7cff',
   onChange,
-  onDragStart,
-  onDragEnd,
-  hideValue = false,
-  hideLabel = false,
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ y: 0, value: 0 });
+  const shiftHeldRef = useRef(false);
   const knobRef = useRef<HTMLDivElement>(null);
+
+  // Convert dB value to rotation angle (0-270 degrees)
+  const valueToAngle = (dB: number): number => {
+    const normalized = (dB - min) / (max - min);
+    return normalized * 270 - 135; // -135 to +135 degrees
+  };
+
   const safeValue = value ?? defaultValue;
-  const normalized = Math.max(0, Math.min(1, (safeValue - min) / (max - min)));
-  const litTicks = Math.round(normalized * (TICK_COUNT - 1));
-  const knobRotation = START_ANGLE + normalized * ARC_SWEEP;
+  const angle = valueToAngle(safeValue);
+  const zeroAngle = valueToAngle(0);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
-    onDragStart?.();
     dragStartRef.current = { y: e.clientY, value };
-  }, [value, onDragStart]);
+    shiftHeldRef.current = e.shiftKey;
+  }, [value]);
 
   const handleDoubleClick = useCallback(() => {
     onChange(defaultValue);
   }, [defaultValue, onChange]);
 
+  // Scroll-to-change
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const fine = e.shiftKey;
     const sensitivity = fine ? (max - min) / 2000 : (max - min) / 400;
     const delta = -e.deltaY * sensitivity;
     const newValue = Math.max(min, Math.min(max, value + delta));
-    onChange(Math.round(newValue * 10) / 10);
-  }, [value, min, max, onChange]);
+    onChange(Math.round(newValue / step) * step);
+  }, [value, min, max, onChange, step]);
 
   useEffect(() => {
     const el = knobRef.current;
@@ -73,138 +74,157 @@ export function Knob({
 
   useEffect(() => {
     if (!isDragging) return;
+
     const handleMouseMove = (e: MouseEvent) => {
+      shiftHeldRef.current = e.shiftKey;
       const deltaY = dragStartRef.current.y - e.clientY;
       const sensitivity = e.shiftKey ? (max - min) / 1000 : (max - min) / 200;
       const newValue = dragStartRef.current.value + deltaY * sensitivity;
       const clampedValue = Math.max(min, Math.min(max, newValue));
-      onChange(Math.round(clampedValue * 10) / 10);
+      onChange(Math.round(clampedValue / step) * step);
     };
+
     const handleMouseUp = () => {
       setIsDragging(false);
-      onDragEnd?.();
     };
+
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, min, max, onChange, onDragEnd]);
+  }, [isDragging, min, max, onChange, step]);
 
-  const formatValue = (val: number): string => {
-    if (formatValueProp) return formatValueProp(val);
-    if (val == null) return '0.0';
-    if (val <= min) return '-inf';
-    if (val >= 0) return `+${val.toFixed(1)}`;
-    return val.toFixed(1);
+  // Format display value
+  const formatValue = (dB: number): string => {
+    if (dB == null) return '0.0';
+    if (dB <= min) return '-inf';
+    if (dB >= 0) return `+${dB.toFixed(1)}`;
+    return dB.toFixed(1);
   };
 
-  // SVG metering ticks sit in a slightly larger canvas around the knob
-  const outerSize = size * 1.4;
-  const center = outerSize / 2;
-  const tickOuterR = outerSize * 0.47;
-  const NEON = '#deff0a';
+  const center = size / 2;
+  const radius = size * 0.38;
 
-  const ticks = useMemo(() => {
-    const result: Array<{
-      x1: number; y1: number;
-      x2: number; y2: number;
-      isMajor: boolean;
-    }> = [];
-    for (let i = 0; i < TICK_COUNT; i++) {
-      const angleDeg = START_ANGLE + (i / (TICK_COUNT - 1)) * ARC_SWEEP;
-      const rad = (angleDeg - 90) * (Math.PI / 180);
-      const isMajor = i % 5 === 0;
-      const tickLen = isMajor ? outerSize * 0.07 : outerSize * 0.04;
-      const innerR = tickOuterR - tickLen;
-      result.push({
-        x1: center + Math.cos(rad) * innerR,
-        y1: center + Math.sin(rad) * innerR,
-        x2: center + Math.cos(rad) * tickOuterR,
-        y2: center + Math.sin(rad) * tickOuterR,
-        isMajor,
-      });
-    }
-    return result;
-  }, [outerSize, center, tickOuterR]);
+  // Arc path for track
+  const createArc = (startAngle: number, endAngle: number, r: number): string => {
+    const start = (startAngle - 90) * (Math.PI / 180);
+    const end = (endAngle - 90) * (Math.PI / 180);
+    const startX = center + Math.cos(start) * r;
+    const startY = center + Math.sin(start) * r;
+    const endX = center + Math.cos(end) * r;
+    const endY = center + Math.sin(end) * r;
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return `M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`;
+  };
 
+  // 0 dB tick mark position
+  const zeroTickAngle = (zeroAngle - 90) * (Math.PI / 180);
+  const tickInner = radius * 0.95;
+  const tickOuter = radius * 1.15;
+  const tickX1 = center + Math.cos(zeroTickAngle) * tickInner;
+  const tickY1 = center + Math.sin(zeroTickAngle) * tickInner;
+  const tickX2 = center + Math.cos(zeroTickAngle) * tickOuter;
+  const tickY2 = center + Math.sin(zeroTickAngle) * tickOuter;
+
+  const isAtZero = Math.abs(safeValue) < 0.05;
+
+  // Knob cap geometry
+  const capR = radius * 0.78;
+  const pointerAngle = (angle - 90) * (Math.PI / 180);
+  const pX1 = center + Math.cos(pointerAngle) * capR * 0.35;
+  const pY1 = center + Math.sin(pointerAngle) * capR * 0.35;
+  const pX2 = center + Math.cos(pointerAngle) * capR * 0.92;
+  const pY2 = center + Math.sin(pointerAngle) * capR * 0.92;
+  const gradId = `knob-cap-${size}`;
+
+  const valueText = customFormat ? customFormat(safeValue) : formatValue(safeValue);
+
+  const dial = (
+    <div
+      ref={knobRef}
+      className={`relative select-none flex-shrink-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      style={{ width: size, height: size }}
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
+      role="slider"
+      aria-label={label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.round(safeValue * 10) / 10}
+      title={label ? `${label}: ${valueText}. Drag or scroll; double-click to reset` : undefined}
+    >
+      <svg width={size} height={size} className="absolute inset-0 pointer-events-none">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3a3f48" />
+            <stop offset="100%" stopColor="#1b1e23" />
+          </linearGradient>
+        </defs>
+        {/* Track arc */}
+        <path
+          d={createArc(-135, 135, radius * 1.12)}
+          fill="none"
+          stroke="#2a2e35"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
+        {/* Value arc */}
+        {safeValue > min && (
+          <path
+            d={createArc(-135, angle, radius * 1.12)}
+            fill="none"
+            stroke={color}
+            strokeOpacity={isDragging ? 1 : 0.85}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+        )}
+        {/* 0 dB tick */}
+        <line
+          x1={tickX1 + (tickX1 - center) * 0.12}
+          y1={tickY1 + (tickY1 - center) * 0.12}
+          x2={tickX2 + (tickX2 - center) * 0.12}
+          y2={tickY2 + (tickY2 - center) * 0.12}
+          stroke={isAtZero ? color : '#5d636e'}
+          strokeWidth={1}
+          strokeLinecap="round"
+        />
+        {/* Cap */}
+        <circle cx={center} cy={center} r={capR} fill={`url(#${gradId})`} stroke="#0c0d10" strokeWidth={1} />
+        <circle cx={center} cy={center} r={capR - 1} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+        {/* Pointer */}
+        <line x1={pX1} y1={pY1} x2={pX2} y2={pY2} stroke="#eceef2" strokeWidth={1.75} strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+
+  if (layout === 'side') {
+    return (
+      <div className="flex items-center gap-1.5">
+        {dial}
+        <div className="flex flex-col leading-none gap-1">
+          {label && (
+            <span className="text-[10px] font-semibold text-plugin-dim uppercase tracking-wider">{label}</span>
+          )}
+          <span className={`num text-[11px] transition-colors ${isDragging ? 'text-plugin-accent' : 'text-plugin-text'}`}>
+            {valueText}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-0.5 relative">
-      <div
-        ref={knobRef}
-        className={`relative select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        style={{ width: outerSize, height: outerSize }}
-        onMouseDown={handleMouseDown}
-        onDoubleClick={handleDoubleClick}
-      >
-        {/* SVG metering ticks */}
-        <svg
-          width={outerSize}
-          height={outerSize}
-          className="absolute inset-0"
-          viewBox={`0 0 ${outerSize} ${outerSize}`}
-          style={{ pointerEvents: 'none' }}
-        >
-          {ticks.map((tick, i) => {
-            const isLit = i <= litTicks;
-            return (
-              <line
-                key={i}
-                x1={tick.x1} y1={tick.y1}
-                x2={tick.x2} y2={tick.y2}
-                stroke={isLit ? NEON : '#2a2a2a'}
-                strokeWidth={tick.isMajor ? 1.5 : 0.8}
-                strokeLinecap="butt"
-                opacity={isLit ? 1 : 0.5}
-              />
-            );
-          })}
-        </svg>
-
-        {/* Combined knob + glow PNG (square, no shadow) */}
-        <img
-          src={knobImg}
-          alt=""
-          draggable={false}
-          style={{
-            position: 'absolute',
-            width: size,
-            height: size,
-            left: (outerSize - size) / 2,
-            top: (outerSize - size) / 2,
-            transform: `rotate(${knobRotation}deg)`,
-            pointerEvents: 'none',
-          }}
-        />
+      {dial}
+      <div className={`num text-[11px] transition-colors ${isDragging ? 'text-plugin-accent' : 'text-plugin-text'}`}>
+        {valueText}
       </div>
-
-      {/* Value */}
-      {!hideValue && (
-        <div
-          className="tabular-nums leading-tight transition-colors"
-          style={{
-            fontFamily: "var(--font-brand)",
-            fontSize: 'var(--text-xs, 10px)',
-            color: isDragging ? NEON : 'var(--color-text-secondary, #a0a0a0)',
-            textShadow: isDragging ? `0 0 8px rgba(222, 255, 10, 0.5)` : 'none',
-          }}
-        >
-          {formatValue(safeValue)}
-        </div>
-      )}
-
-      {label && !hideLabel && (
-        <div
-          className="uppercase tracking-widest font-medium"
-          style={{
-            fontFamily: "var(--font-system)",
-            fontSize: 'var(--text-xs, 10px)',
-            letterSpacing: 'var(--tracking-wider, 0.1em)',
-            color: 'var(--color-text-tertiary, #606060)',
-          }}
-        >
+      {label && (
+        <div className="text-[10px] text-plugin-muted uppercase tracking-wider font-semibold">
           {label}
         </div>
       )}

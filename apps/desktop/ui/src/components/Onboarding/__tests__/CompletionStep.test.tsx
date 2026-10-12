@@ -16,7 +16,7 @@ describe('CompletionStep', () => {
 
   it('shows welcome message', () => {
     render(<CompletionStep />)
-    expect(screen.getByText('PROPANE')).toBeInTheDocument()
+    expect(screen.getByText('ProChain')).toBeInTheDocument()
     expect(screen.getByText('Welcome to your signal chain')).toBeInTheDocument()
   })
 
@@ -35,7 +35,7 @@ describe('CompletionStep', () => {
     const user = userEvent.setup()
 
     render(<CompletionStep />)
-    await user.click(screen.getByText('PROPANE'))
+    await user.click(screen.getByText('ProChain'))
 
     expect(useOnboardingStore.getState().isOnboardingComplete).toBe(true)
   })

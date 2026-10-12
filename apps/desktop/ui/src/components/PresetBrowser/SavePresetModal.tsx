@@ -1,35 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Save } from 'lucide-react';
 import { usePresetStore } from '../../stores/presetStore';
-import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
-import { CustomDropdown } from '../Dropdown';
 
 interface SavePresetModalProps {
   onClose: () => void;
 }
-
-const modalOverlayStyle: React.CSSProperties = {
-  background: 'rgba(0, 0, 0, 0.75)',
-  backdropFilter: 'blur(4px)',
-};
-
-const modalPanelStyle: React.CSSProperties = {
-  maxWidth: '28rem',
-  width: '100%',
-  margin: '0 1rem',
-  borderRadius: 'var(--radius-xl)',
-  border: '1px solid rgba(222, 255, 10, 0.15)',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 'var(--text-xs)',
-  color: 'var(--color-text-tertiary)',
-  fontFamily: 'var(--font-system)',
-  textTransform: 'uppercase',
-  letterSpacing: 'var(--tracking-wide)',
-  marginBottom: '4px',
-};
 
 export function SavePresetModal({ onClose }: SavePresetModalProps) {
   const { categories, saving, savePreset } = usePresetStore();
@@ -48,90 +23,72 @@ export function SavePresetModal({ onClose }: SavePresetModalProps) {
     }
   };
 
-  // Escape closes (modal priority)
-  useEffect(() => {
-    const registerShortcut = useKeyboardStore.getState().registerShortcut;
-    return registerShortcut({
-      id: 'save-preset-modal-escape',
-      key: 'Escape',
-      priority: ShortcutPriority.MODAL,
-      allowInInputs: true,
-      handler: (e) => {
-        e.preventDefault();
-        onClose();
-      }
-    });
-  }, [onClose]);
-
-  // Enter saves (modal priority)
-  useEffect(() => {
-    const registerShortcut = useKeyboardStore.getState().registerShortcut;
-    return registerShortcut({
-      id: 'save-preset-modal-enter',
-      key: 'Enter',
-      priority: ShortcutPriority.MODAL,
-      allowInInputs: true,
-      handler: (e) => {
-        if (!saving) {
-          e.preventDefault();
-          handleSave();
-        }
-      }
-    });
-  }, [saving, handleSave]);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !saving) {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center fade-in" style={modalOverlayStyle}>
-      <div className="glass scale-in" style={modalPanelStyle}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div
+        className="w-full max-w-md bg-plugin-surface rounded-lg shadow-xl border border-plugin-border"
+        onKeyDown={handleKeyDown}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between" style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-default)' }}>
-          <h3 style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-lg)', fontWeight: 700, color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>Save Preset</h3>
+        <div className="flex items-center justify-between p-4 border-b border-plugin-border">
+          <h3 className="text-lg font-semibold text-plugin-text">Save Preset</h3>
           <button
             onClick={onClose}
-            style={{ padding: '4px', borderRadius: 'var(--radius-base)', color: 'var(--color-text-disabled)', background: 'none', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-disabled)')}
+            className="p-1 rounded hover:bg-plugin-border transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-plugin-muted" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="space-y-4" style={{ padding: 'var(--space-4)' }}>
+        <div className="p-4 space-y-4">
           {/* Name input */}
           <div>
-            <label style={labelStyle}>Preset Name</label>
+            <label className="block text-sm text-plugin-muted mb-1">
+              Preset Name
+            </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My Preset"
               autoFocus
-              className="input w-full"
+              className="w-full px-3 py-2 bg-plugin-bg rounded text-plugin-text placeholder:text-plugin-muted focus:outline-none focus:ring-1 focus:ring-plugin-accent"
             />
           </div>
 
           {/* Category selection */}
           <div>
-            <label style={labelStyle}>Category</label>
+            <label className="block text-sm text-plugin-muted mb-1">
+              Category
+            </label>
 
             {/* Existing categories */}
             {categories.length > 0 && !useNewCategory && (
               <div className="space-y-2">
-                <CustomDropdown
+                <select
                   value={category}
-                  options={[
-                    { value: '', label: 'Select a category...' },
-                    ...categories.map((cat) => ({ value: cat, label: cat })),
-                  ]}
-                  onChange={setCategory}
-                  size="sm"
-                />
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2 bg-plugin-bg rounded text-plugin-text focus:outline-none focus:ring-1 focus:ring-plugin-accent"
+                >
+                  <option value="">Select a category...</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => setUseNewCategory(true)}
-                  style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                  onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                  className="text-xs text-plugin-accent hover:underline"
                 >
                   Create new category
                 </button>
@@ -146,14 +103,12 @@ export function SavePresetModal({ onClose }: SavePresetModalProps) {
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   placeholder="New category name"
-                  className="input w-full"
+                  className="w-full px-3 py-2 bg-plugin-bg rounded text-plugin-text placeholder:text-plugin-muted focus:outline-none focus:ring-1 focus:ring-plugin-accent"
                 />
                 {categories.length > 0 && (
                   <button
                     onClick={() => setUseNewCategory(false)}
-                    style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent-cyan)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                    onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                    onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                    className="text-xs text-plugin-accent hover:underline"
                   >
                     Use existing category
                   </button>
@@ -164,8 +119,13 @@ export function SavePresetModal({ onClose }: SavePresetModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3" style={{ padding: 'var(--space-4)', borderTop: '1px solid var(--color-border-default)' }}>
-          <button onClick={onClose} className="btn">Cancel</button>
+        <div className="flex items-center justify-end gap-2 p-4 border-t border-plugin-border">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded text-sm text-plugin-muted hover:text-plugin-text hover:bg-plugin-border transition-colors"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleSave}
             disabled={
@@ -174,16 +134,7 @@ export function SavePresetModal({ onClose }: SavePresetModalProps) {
               (!useNewCategory && !category) ||
               (useNewCategory && !newCategory.trim())
             }
-            className={`btn flex items-center gap-1.5 ${
-              saving || !name.trim() || (!useNewCategory && !category) || (useNewCategory && !newCategory.trim())
-                ? ''
-                : 'btn-primary'
-            }`}
-            style={
-              saving || !name.trim() || (!useNewCategory && !category) || (useNewCategory && !newCategory.trim())
-                ? { opacity: 0.5, cursor: 'not-allowed' }
-                : undefined
-            }
+            className="flex items-center gap-1.5 px-4 py-2 rounded-md text-sm bg-plugin-accent hover:bg-plugin-accent/80 text-plugin-on-accent font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Preset'}

@@ -1,18 +1,78 @@
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Mic2, Drum, Guitar, Piano, Sparkles, SlidersHorizontal } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { USE_CASE_GROUPS } from '../../constants/useCaseGroups';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 
-// Icon mapping per group
-const GROUP_ICONS: Record<string, LucideIcon> = {
-  vocals: Mic2,
-  drums: Drum,
-  bass: Guitar,
-  'keys-synths': Piano,
-  guitar: Guitar,
-  'fx-creative': Sparkles,
-  'mixing-mastering': SlidersHorizontal,
-};
+// Inline taxonomy — matches packages/shared/src/chainUseCases.ts
+const CHAIN_USE_CASE_GROUPS = [
+  {
+    value: 'vocals', label: 'Vocals', emoji: '🎤',
+    useCases: [
+      { value: 'rap-vocals', label: 'Rap Vocals' },
+      { value: 'female-vocals', label: 'Female Vocals' },
+      { value: 'male-vocals', label: 'Male Vocals' },
+      { value: 'backings', label: 'Backings' },
+      { value: 'adlibs', label: 'Adlibs' },
+      { value: 'harmonies', label: 'Harmonies' },
+      { value: 'spoken-word', label: 'Spoken Word' },
+    ],
+  },
+  {
+    value: 'drums', label: 'Drums', emoji: '🥁',
+    useCases: [
+      { value: 'kick', label: 'Kick' },
+      { value: 'snare', label: 'Snare' },
+      { value: 'hats', label: 'Hats' },
+      { value: 'drum-bus', label: 'Drum Bus' },
+      { value: 'overheads', label: 'Overheads' },
+      { value: 'toms', label: 'Toms' },
+      { value: 'percussion', label: 'Percussion' },
+    ],
+  },
+  {
+    value: 'bass', label: 'Bass', emoji: '🎸',
+    useCases: [
+      { value: 'bass-guitar', label: 'Bass Guitar' },
+      { value: 'sub-bass', label: 'Sub Bass' },
+      { value: '808', label: '808' },
+      { value: 'synth-bass', label: 'Synth Bass' },
+    ],
+  },
+  {
+    value: 'keys-synths', label: 'Keys & Synths', emoji: '🎹',
+    useCases: [
+      { value: 'piano', label: 'Piano' },
+      { value: 'pads', label: 'Pads' },
+      { value: 'leads', label: 'Leads' },
+      { value: 'organs', label: 'Organs' },
+      { value: 'strings', label: 'Strings' },
+    ],
+  },
+  {
+    value: 'guitar', label: 'Guitar', emoji: '🎸',
+    useCases: [
+      { value: 'electric-guitar', label: 'Electric Guitar' },
+      { value: 'acoustic-guitar', label: 'Acoustic Guitar' },
+      { value: 'guitar-bus', label: 'Guitar Bus' },
+    ],
+  },
+  {
+    value: 'fx-creative', label: 'FX & Creative', emoji: '✨',
+    useCases: [
+      { value: 'experimental', label: 'Experimental' },
+      { value: 'sound-design', label: 'Sound Design' },
+      { value: 'ambient', label: 'Ambient' },
+      { value: 'risers-impacts', label: 'Risers & Impacts' },
+    ],
+  },
+  {
+    value: 'mixing-mastering', label: 'Mixing & Mastering', emoji: '🎚️',
+    useCases: [
+      { value: 'mix-bus', label: 'Mix Bus' },
+      { value: 'master-chain', label: 'Master Chain' },
+      { value: 'stem-mixing', label: 'Stem Mixing' },
+      { value: 'live-performance', label: 'Live Performance' },
+    ],
+  },
+];
 
 interface UseCaseCategoryTreeProps {
   selectedGroup: string | null;
@@ -46,11 +106,13 @@ export function UseCaseCategoryTree({
   const handleGroupClick = useCallback(
     (groupValue: string) => {
       if (selectedGroup === groupValue && !selectedUseCase) {
+        // Deselect
         onSelectGroup(null);
       } else {
         onSelectGroup(groupValue);
         onSelectUseCase(null);
       }
+      // Expand/collapse
       toggleExpand(groupValue);
     },
     [selectedGroup, selectedUseCase, onSelectGroup, onSelectUseCase, toggleExpand]
@@ -59,6 +121,7 @@ export function UseCaseCategoryTree({
   const handleUseCaseClick = useCallback(
     (ucValue: string, groupValue: string) => {
       if (selectedUseCase === ucValue) {
+        // Deselect use case, keep group
         onSelectUseCase(null);
       } else {
         onSelectGroup(groupValue);
@@ -68,8 +131,6 @@ export function UseCaseCategoryTree({
     [selectedUseCase, onSelectGroup, onSelectUseCase]
   );
 
-  const isAllSelected = !selectedGroup && !selectedUseCase;
-
   return (
     <div className="space-y-0.5">
       {/* "All" button */}
@@ -78,77 +139,50 @@ export function UseCaseCategoryTree({
           onSelectGroup(null);
           onSelectUseCase(null);
         }}
-        style={{
-          width: '100%',
-          textAlign: 'left',
-          padding: '4px 8px',
-          borderRadius: 'var(--radius-base)',
-          fontSize: '10px',
-          fontFamily: 'var(--font-system)',
-          color: isAllSelected ? 'var(--color-accent-cyan)' : 'var(--color-text-tertiary)',
-          background: isAllSelected ? 'rgba(222, 255, 10, 0.15)' : 'transparent',
-          fontWeight: isAllSelected ? 600 : 400,
-          border: 'none',
-          cursor: 'pointer',
-          transition: 'all var(--duration-fast)',
-        }}
+        className={`w-full text-left px-2 h-7 rounded-md text-[13px] transition-colors ${
+          !selectedGroup && !selectedUseCase
+            ? 'bg-plugin-accent/15 text-plugin-accent-bright font-medium'
+            : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-raised'
+        }`}
       >
         All Categories
       </button>
 
-      {USE_CASE_GROUPS.map((group) => {
+      {CHAIN_USE_CASE_GROUPS.map((group) => {
         const isExpanded = expandedGroups.has(group.value);
         const isGroupSelected = selectedGroup === group.value && !selectedUseCase;
-        const isGroupActive = selectedGroup === group.value;
 
         return (
           <div key={group.value}>
             <button
               onClick={() => handleGroupClick(group.value)}
-              className="flex items-center gap-1.5"
-              style={{
-                width: '100%',
-                padding: '4px 8px',
-                borderRadius: 'var(--radius-base)',
-                fontSize: '10px',
-                fontFamily: 'var(--font-system)',
-                color: isGroupSelected ? 'var(--color-accent-cyan)' : isGroupActive ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                background: isGroupSelected ? 'rgba(222, 255, 10, 0.15)' : isGroupActive ? 'rgba(255,255,255,0.05)' : 'transparent',
-                fontWeight: isGroupSelected ? 600 : 400,
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'all var(--duration-fast)',
-              }}
+              className={`w-full flex items-center gap-1.5 px-2 h-7 rounded-md text-[13px] transition-colors ${
+                isGroupSelected
+                  ? 'bg-plugin-accent/15 text-plugin-accent-bright font-medium'
+                  : selectedGroup === group.value
+                    ? 'text-plugin-text bg-plugin-raised'
+                    : 'text-plugin-muted hover:text-plugin-text hover:bg-plugin-raised'
+              }`}
             >
               {isExpanded ? (
                 <ChevronDown className="w-3 h-3 flex-shrink-0" />
               ) : (
                 <ChevronRight className="w-3 h-3 flex-shrink-0" />
               )}
-              {(() => { const Icon = GROUP_ICONS[group.value]; return Icon ? <Icon className="w-3 h-3 flex-shrink-0 opacity-60" /> : null; })()}
               <span className="truncate">{group.label}</span>
             </button>
 
             {isExpanded && (
-              <div className="ml-4 mt-0.5 space-y-0.5">
+              <div className="ml-[11px] pl-2 border-l border-plugin-border mt-0.5 mb-1 space-y-0.5">
                 {group.useCases.map((uc) => (
                   <button
                     key={uc.value}
                     onClick={() => handleUseCaseClick(uc.value, group.value)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '4px 8px 4px 16px',
-                      borderRadius: 'var(--radius-base)',
-                      fontSize: '10px',
-                      fontFamily: 'var(--font-system)',
-                      color: selectedUseCase === uc.value ? 'var(--color-accent-cyan)' : 'var(--color-text-disabled)',
-                      background: selectedUseCase === uc.value ? 'rgba(222, 255, 10, 0.15)' : 'transparent',
-                      fontWeight: selectedUseCase === uc.value ? 600 : 400,
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'all var(--duration-fast)',
-                    }}
+                    className={`w-full text-left px-2 h-6 rounded-md text-xs transition-colors ${
+                      selectedUseCase === uc.value
+                        ? 'bg-plugin-accent/15 text-plugin-accent-bright font-medium'
+                        : 'text-plugin-dim hover:text-plugin-muted hover:bg-plugin-raised'
+                    }`}
                   >
                     {uc.label}
                   </button>

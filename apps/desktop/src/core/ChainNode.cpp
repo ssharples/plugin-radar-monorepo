@@ -1,4 +1,82 @@
 #include "ChainNode.h"
+#include <cmath>
+
+const char* groupModeName(GroupMode mode)
+{
+    switch (mode)
+    {
+        case GroupMode::Parallel: return "parallel";
+        case GroupMode::Crossover: return "crossover";
+        case GroupMode::Serial: break;
+    }
+    return "serial";
+}
+
+bool parseGroupMode(const juce::String& text, GroupMode& mode)
+{
+    if (text == "serial") { mode = GroupMode::Serial; return true; }
+    if (text == "parallel") { mode = GroupMode::Parallel; return true; }
+    if (text == "crossover") { mode = GroupMode::Crossover; return true; }
+    return false;
+}
+
+namespace CrossoverHelpers
+{
+std::vector<float> defaultFrequencies(int numBands)
+{
+    switch (numBands)
+    {
+        case 0: case 1: return {};
+        case 2: return { 1000.0f };
+        case 3: return { 200.0f, 2500.0f };
+        case 4: return { 120.0f, 1000.0f, 5000.0f };
+        default: break;
+    }
+    // Spread evenly on a log scale between 80 Hz and 8 kHz
+    std::vector<float> result;
+    const int splits = numBands - 1;
+    for (int s = 0; s < splits; ++s)
+        result.push_back(static_cast<float>(80.0 * std::pow(100.0, s / static_cast<double>(splits - 1))));
+    return result;
+}
+
+static bool valid(const std::vector<float>& frequencies)
+{
+    for (size_t i = 0; i < frequencies.size(); ++i)
+    {
+        const auto f = frequencies[i];
+        if (!std::isfinite(f) || f < 20.0f || f > 20000.0f) return false;
+        if (i > 0 && f <= frequencies[i - 1]) return false;
+    }
+    return true;
+}
+
+void fitFrequencies(GroupData& group)
+{
+    const auto splits = group.children.empty() ? size_t { 0 } : group.children.size() - 1;
+    if (group.crossoverHz.size() == splits && valid(group.crossoverHz)) return;
+    group.crossoverHz = defaultFrequencies(static_cast<int>(group.children.size()));
+}
+
+juce::String toString(const std::vector<float>& frequencies)
+{
+    juce::StringArray parts;
+    for (auto f : frequencies) parts.add(juce::String(f, 2));
+    return parts.joinIntoString(",");
+}
+
+bool fromString(const juce::String& text, std::vector<float>& frequencies)
+{
+    frequencies.clear();
+    if (text.trim().isEmpty()) return true;
+    for (auto& part : juce::StringArray::fromTokens(text, ",", ""))
+    {
+        if (!part.trim().containsOnly("0123456789.")) return false;
+        frequencies.push_back(part.trim().getFloatValue());
+    }
+    return valid(frequencies);
+}
+}
 
 namespace ChainNodeHelpers
 {
@@ -61,8 +139,7 @@ void collectPlugins(const ChainNode& node, std::vector<const PluginLeaf*>& resul
 {
     if (node.isPlugin())
     {
-        if (!node.getPlugin().isDryPath)
-            result.push_back(&node.getPlugin());
+        result.push_back(&node.getPlugin());
     }
     else if (node.isGroup())
     {
@@ -75,8 +152,7 @@ void collectPluginsMut(ChainNode& node, std::vector<PluginLeaf*>& result)
 {
     if (node.isPlugin())
     {
-        if (!node.getPlugin().isDryPath)
-            result.push_back(&node.getPlugin());
+        result.push_back(&node.getPlugin());
     }
     else if (node.isGroup())
     {
@@ -88,7 +164,7 @@ void collectPluginsMut(ChainNode& node, std::vector<PluginLeaf*>& result)
 int countPlugins(const ChainNode& node)
 {
     if (node.isPlugin())
-        return node.getPlugin().isDryPath ? 0 : 1;
+        return 1;
 
     int count = 0;
     if (node.isGroup())

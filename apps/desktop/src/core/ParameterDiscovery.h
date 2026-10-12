@@ -3,7 +3,6 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_core/juce_core.h>
 #include <regex>
-#include <unordered_map>
 
 /**
  * ParameterDiscovery — Auto-discovers and semantically classifies plugin parameters.
@@ -52,14 +51,10 @@ public:
         juce::String category;           // "eq", "compressor", "general"
         juce::Array<DiscoveredParameter> parameters;
         int eqBandCount = 0;
+        juce::String eqBandParameterPattern;
         bool compHasParallelMix = false;
-        bool reverbHasPredelay = false;
-        bool reverbHasDiffusion = false;
-        bool delayHasSync = false;
-        bool delayHasModulation = false;
-        bool satHasTypeSelector = false;
-        bool limiterHasLookahead = false;
-        bool gateHasHold = false;
+        bool compHasAutoMakeup = false;
+        bool compHasLookahead = false;
         int confidence = 0;              // 0-100
         int matchedCount = 0;
         int totalCount = 0;

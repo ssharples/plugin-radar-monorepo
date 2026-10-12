@@ -22,6 +22,7 @@ vi.mock('../../api/juce-bridge', () => ({
     setGroupMode: vi.fn(),
     setGroupDryWet: vi.fn(),
     setBranchGain: vi.fn(),
+    setBranchSolo: vi.fn(),
     setBranchMute: vi.fn(),
     openPluginUI: vi.fn().mockResolvedValue(undefined),
     closePluginUI: vi.fn().mockResolvedValue(undefined),
@@ -69,6 +70,7 @@ function makePlugin(id: number, name = `Plugin ${id}`): ChainNodeUI {
     bypassed: false,
     manufacturer: 'TestMfr',
     branchGainDb: 0,
+    solo: false,
     mute: false,
   };
 }
@@ -109,6 +111,7 @@ describe('chainStore', () => {
       _undoRedoInProgress: false,
       snapshots: [null, null, null],
       activeSnapshot: null,
+      nodeMeterData: {},
     });
   });
 

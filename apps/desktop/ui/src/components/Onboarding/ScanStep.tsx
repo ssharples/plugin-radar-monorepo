@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useOnboardingStore } from '../../stores/onboardingStore'
 import { juceBridge } from '../../api/juce-bridge'
 import type { BlacklistedPlugin } from '../../stores/onboardingTypes'
@@ -67,20 +68,15 @@ export function ScanStep() {
     : ''
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md px-6 animate-fade-in">
-      <h2
-        className="crt-text mb-2"
-        style={{ fontFamily: 'var(--font-system)', fontSize: 'var(--text-lg)', color: '#deff0a', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}
-      >
-        Scanning Your Plugins
-      </h2>
-      <p style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', textAlign: 'center', marginBottom: '2rem', maxWidth: '20rem', lineHeight: 1.6 }}>
+    <div className="flex flex-col w-full max-w-[420px] px-6 animate-fade-in">
+      <h2 className="text-xl font-semibold text-plugin-text tracking-tight">Scanning Your Plugins</h2>
+      <p className="text-plugin-muted text-[13px] mt-1 mb-6 leading-snug">
         Finding all AU & VST3 plugins on your system. Plugins that crash or need authorization will be noted.
       </p>
 
       {scanError ? (
         <div className="w-full">
-          <div style={{ color: 'var(--color-status-error)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-system)', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 0, 51, 0.2)', borderRadius: 'var(--radius-base)', padding: '12px 16px', marginBottom: '16px' }}>
+          <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/25 rounded-md px-3 py-2.5 mb-3" role="alert">
             {scanError}
           </div>
           <button
@@ -88,60 +84,46 @@ export function ScanStep() {
               startScan()
               juceBridge.startScan(false).catch((err) => handleScanError(String(err)))
             }}
-            className="btn btn-primary w-full"
+            className="w-full h-10 bg-plugin-accent hover:bg-plugin-accent-bright text-plugin-on-accent text-sm font-semibold rounded-md transition-colors"
           >
             Retry Scan
           </button>
         </div>
       ) : (
         <>
-          {/* Progress bar */}
-          <div className="meter w-full mb-3" style={{ height: '8px' }}>
-            <div
-              className="meter-fill"
-              style={{ width: `${progressPercent}%`, background: 'var(--color-accent-cyan)', transition: 'width 0.3s ease' }}
-            />
-          </div>
-
-          {/* Percentage */}
-          <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-system)', color: 'var(--color-accent-cyan)', marginBottom: '8px' }}>
-            {progressPercent}%
-          </div>
-
-          {/* Currently scanning */}
-          {scanActive && truncatedName && (
-            <div className="truncate max-w-full" style={{ color: 'var(--color-text-disabled)', fontFamily: 'var(--font-system)', fontSize: '10px', marginBottom: '16px' }}>
-              {truncatedName}
+          <div className="rounded-lg border border-plugin-border bg-plugin-surface p-4">
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="num text-3xl font-medium text-plugin-text">{progressPercent}%</span>
+              <span className="num text-xs text-plugin-muted">{pluginsDiscovered} plugins found</span>
             </div>
-          )}
-
-          {/* Discovered counter */}
-          <div style={{ color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-system)', fontSize: 'var(--text-xs)', marginBottom: '16px' }}>
-            {pluginsDiscovered} plugins found
+            <div className="w-full h-1.5 bg-plugin-raised rounded-full overflow-hidden" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
+              <div
+                className="h-full bg-plugin-accent rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="h-4 mt-2 text-[11px] text-plugin-dim truncate">
+              {scanActive && truncatedName ? truncatedName : null}
+            </div>
           </div>
 
-          {/* Blacklisted warnings */}
           {blacklistedPlugins.length > 0 && (
-            <div className="w-full max-h-24 overflow-y-auto scrollbar-cyber mb-4">
+            <div className="w-full max-h-28 overflow-y-auto mt-3 space-y-1">
               {blacklistedPlugins.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 truncate"
-                  style={{ fontSize: '10px', fontFamily: 'var(--font-system)', color: 'var(--color-status-warning)', background: 'rgba(255, 170, 0, 0.1)', border: '1px solid rgba(255, 170, 0, 0.2)', borderRadius: 'var(--radius-base)', padding: '6px 12px', marginBottom: '4px' }}
+                  className="flex items-center gap-2 text-xs text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-3 py-1.5"
                 >
-                  <span className="shrink-0">!</span>
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   <span className="truncate">{p.name}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Skip link */}
           <button
             onClick={skipScan}
-            style={{ color: 'var(--color-text-disabled)', fontSize: '10px', fontFamily: 'var(--font-system)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', transition: 'color var(--duration-fast)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-disabled)')}
+            className="self-start text-plugin-muted text-xs hover:text-plugin-text underline underline-offset-2 transition-colors mt-4"
           >
             Skip for now
           </button>

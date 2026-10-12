@@ -1,22 +1,12 @@
-import { useState, useCallback, useRef, useMemo, useEffect, memo, type PointerEvent as ReactPointerEvent } from 'react';
-import { useDraggable } from '@dnd-kit/core';
-import { Layers, GitBranch } from 'lucide-react';
+import { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { Layers, GitBranch, X, ArrowLeftRight, SlidersHorizontal, Pause, Lock, Timer, Power, Copy, GripVertical, AlertTriangle } from 'lucide-react';
 import type { PluginNodeUI, ChainSlot as ChainSlotType } from '../../api/types';
+import { useMacroStore } from '../../stores/macroStore';
 import { useChainStore } from '../../stores/chainStore';
-import { PluginSwapMenu } from './PluginSwapMenu';
-import { findCompatibleSwaps, translateParameters } from '../../api/convex-client';
 import { juceBridge } from '../../api/juce-bridge';
-import { ContextMenu, buildPluginSlotMenu } from '../ContextMenu';
-import sidePanelBg from '../../assets/side-panel.png';
-import rackmountBg from '../../assets/rackmount-bg.png';
-import bypassIconSvg from '../../assets/bypass-icon.svg';
-import duplicateIconSvg from '../../assets/duplicate-icon.svg';
-import closeIconSvg from '../../assets/close.svg';
-import soloButtonActive from '../../assets/solo-button-active.png';
-import soloButtonInactive from '../../assets/solo-button-inactive.png';
-import muteButtonActive from '../../assets/mute-button-active.png';
-import muteButtonInactive from '../../assets/mute-button-inactive.png';
-import ledLight from '../../assets/led-light-0-db-indication.png';
+import { PluginSwapMenu } from './PluginSwapMenu';
+import { CATEGORY_SWATCH, CATEGORY_LABELS } from '../../constants/categoryColors';
 
 // Convert linear to dB
 function linearToDb(linear: number): number {
@@ -38,6 +28,19 @@ function formatDb(db: number): string {
   return Math.round(db).toString();
 }
 
+// Meter gradient follows audio convention: green → yellow → red
+const METER_GRADIENT = `linear-gradient(to top,
+  #16a34a 0%,
+  #22c55e 55%,
+  #eab308 80%,
+  #ef4444 100%
+)`;
+
+// Module-level: last hover side communicated to ChainEditor's handleDragEnd
+let _lastSlotHoverSide: 'left' | 'right' = 'right';
+export function getLastSlotHoverSide() { return _lastSlotHoverSide; }
+export function resetLastSlotHoverSide() { _lastSlotHoverSide = 'right'; }
+
 interface ChainSlotProps {
   // V2: node-based
   node?: PluginNodeUI;
@@ -53,8 +56,6 @@ interface ChainSlotProps {
   onRemove: () => void;
   onToggleBypass: () => void;
   onToggleEditor: () => void;
-  /** Open plugin editor inline (embedded in host window). Falls back to onToggleEditor if not provided. */
-  onOpenInline?: () => void;
   /** Called when a plugin swap completes successfully */
   onSwapComplete?: (newPluginName: string, confidence: number) => void;
   /** Whether any drag is currently active (for dimming non-dragged items) */
@@ -65,10 +66,8 @@ interface ChainSlotProps {
   onSelect?: (e: React.MouseEvent) => void;
   /** Set of node IDs whose drop targets should be disabled (self-drop prevention) */
   disabledDropIds?: Set<number>;
-  /** Parent node ID (for inline plugin insertion) */
-  parentId?: number;
-  /** Index of this node in parent's children array (for inline plugin insertion) */
-  indexInParent?: number;
+  /** Effect category from the catalog (e.g. 'eq'), used for the colour stripe */
+  category?: string | null;
 }
 
 export const ChainSlot = memo(function ChainSlot({
@@ -82,37 +81,43 @@ export const ChainSlot = memo(function ChainSlot({
   onRemove,
   onToggleBypass,
   onToggleEditor,
-  onOpenInline,
   onSwapComplete,
   isDragActive: _isDragActive = false,
   groupSelectMode = false,
   onSelect,
-  parentId = 0,
-  indexInParent = -1,
+  disabledDropIds,
+  category,
 }: ChainSlotProps) {
   // Unified data access
   const id = node?.id ?? slot?.index ?? 0;
   const name = node?.name ?? slot?.name ?? '';
+  const manufacturer = node?.manufacturer ?? slot?.manufacturer ?? '';
   const bypassed = node?.bypassed ?? slot?.bypassed ?? false;
+  const suspended = node?.suspended ?? false;
+  const recallSafe = node?.recallSafe ?? false;
+  const ignoreLatency = node?.ignoreLatency ?? false;
+  const latencySamples = node?.latencySamples ?? 0;
   const uid = node?.uid ?? slot?.uid;
-  const isSoloed = node?.solo ?? false;
-  const isMuted = node?.mute ?? false;
 
   const duplicateNode = useChainStore((s) => s.duplicateNode);
-  const createGroup = useChainStore((s) => s.createGroup);
-  const setBranchSolo = useChainStore((s) => s.setBranchSolo);
-  const setBranchMute = useChainStore((s) => s.setBranchMute);
-  const togglePluginEditor = useChainStore((s) => s.togglePluginEditor);
-  const openInlineEditor = useChainStore((s) => s.openInlineEditor);
-  const pluginClipboard = useChainStore((s) => s.pluginClipboard);
-  const pastePluginSettings = useChainStore((s) => s.pastePluginSettings);
-  const moveNode = useChainStore((s) => s.moveNode);
-  
-  // Hover state for progressive disclosure
-  const [isHovered, setIsHovered] = useState(false);
+  const setNodeSuspended = useChainStore((s) => s.setNodeSuspended);
+  const setNodeRecallSafe = useChainStore((s) => s.setNodeRecallSafe);
+  const setNodeIgnoreLatency = useChainStore((s) => s.setNodeIgnoreLatency);
+  const automation = useChainStore((s) => s.automationByNode?.[String(id)]) || [];
+  const fetchAutomationBindings = useChainStore((s) => s.fetchAutomationBindings);
+  const assignAutomation = useChainStore((s) => s.assignAutomation);
+  const unassignAutomation = useChainStore((s) => s.unassignAutomation);
+  const addMacroLink = useMacroStore((s) => s.addLink);
+  const [showAutomation, setShowAutomation] = useState(false);
+  const automationTriggerRef = useRef<HTMLButtonElement>(null);
+  const automationFilterRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (showAutomation) automationFilterRef.current?.focus(); }, [showAutomation]);
+  const [parameters, setParameters] = useState<Array<{ index: number; name: string; value: number }>>([]);
+  const [parameterFilter, setParameterFilter] = useState('');
+  const [automationBusy, setAutomationBusy] = useState(false);
 
   // Subscribe to meter data for this specific node
-  const meterData = useChainStore((s) => s.nodeMeterData[String(id)]);
+  const meterData = useChainStore((s) => s.nodeMeterData?.[String(id)]);
 
   // Real-time meter bar fill percentages
   const meterValues = useMemo(() => {
@@ -125,26 +130,35 @@ export const ChainSlot = memo(function ChainSlot({
     };
   }, [meterData, bypassed]);
 
-  // Determine if plugin is processing (has meter activity)
-  const isProcessing = useMemo(() => {
-    if (!meterData || bypassed) return false;
-    const hasActivity = (meterData.peakL > 0.001 || meterData.peakR > 0.001);
-    return hasActivity;
-  }, [meterData, bypassed]);
-
   // Peak-hold dB values — tracked via refs + direct DOM mutation to avoid
   // 2N state updates per frame. Only the formatted string is checked so the
   // DOM is touched only when the displayed text actually changes.
+  const inputPeakRef = useRef(-Infinity);
   const outputPeakRef = useRef(-Infinity);
+  const inputPeakElRef = useRef<HTMLButtonElement>(null);
   const outputPeakElRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!meterData || bypassed) return;
+    const inDb = Math.max(
+      linearToDb(meterData.inputPeakL ?? 0),
+      linearToDb(meterData.inputPeakR ?? 0),
+    );
     const outDb = Math.max(
       linearToDb(meterData.peakL),
       linearToDb(meterData.peakR),
     );
+    const newIn = Math.max(inputPeakRef.current, inDb);
     const newOut = Math.max(outputPeakRef.current, outDb);
+    // Only touch DOM when the rounded display value changes
+    if (formatDb(newIn) !== formatDb(inputPeakRef.current)) {
+      inputPeakRef.current = newIn;
+      if (inputPeakElRef.current) {
+        inputPeakElRef.current.firstChild!.textContent = formatDb(newIn);
+      }
+    } else {
+      inputPeakRef.current = newIn;
+    }
     if (formatDb(newOut) !== formatDb(outputPeakRef.current)) {
       outputPeakRef.current = newOut;
       if (outputPeakElRef.current) {
@@ -155,10 +169,16 @@ export const ChainSlot = memo(function ChainSlot({
     }
   }, [meterData, bypassed]);
 
+  const resetInputPeak = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    inputPeakRef.current = -Infinity;
+    if (inputPeakElRef.current) {
+      inputPeakElRef.current.firstChild!.textContent = formatDb(-Infinity);
+    }
+  }, []);
+
   const resetOutputPeak = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    // Reset all peaks (input, output, and all node peaks)
-    juceBridge.resetAllNodePeaks();
     outputPeakRef.current = -Infinity;
     if (outputPeakElRef.current) {
       outputPeakElRef.current.firstChild!.textContent = formatDb(-Infinity);
@@ -167,35 +187,9 @@ export const ChainSlot = memo(function ChainSlot({
 
   const [showSwapMenu, setShowSwapMenu] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const showInlineSearchBelow = useChainStore((s) => s.showInlineSearchBelow);
   const [swapToast, setSwapToast] = useState<string | null>(null);
-
-  // Similar plugins for prev/next navigation
-  const [similarPlugins, setSimilarPlugins] = useState<Array<{pluginId: string; pluginName: string; uid?: number}>>([]);
-  const [currentPluginIndex, setCurrentPluginIndex] = useState(0);
-  const [isSwapping, setIsSwapping] = useState(false);
-
-  // Fetch similar plugins when matchedPluginId changes
-  useEffect(() => {
-    if (!matchedPluginId) {
-      setSimilarPlugins([]);
-      return;
-    }
-
-    findCompatibleSwaps(matchedPluginId).then((results) => {
-      if (results.length > 0) {
-      }
-      setSimilarPlugins(results.map(r => ({
-        pluginId: r.pluginId,
-        pluginName: r.pluginName,
-        uid: undefined, // We'll need to find this in the plugin list
-      })));
-      // Current plugin is at index 0
-      setCurrentPluginIndex(0);
-    }).catch(() => {
-      setSimilarPlugins([]);
-    });
-  }, [matchedPluginId]);
+  const [hoverSide, setHoverSide] = useState<'left' | 'right' | null>(null);
+  const slotRef = useRef<HTMLDivElement>(null);
 
   const {
     attributes,
@@ -211,34 +205,15 @@ export const ChainSlot = memo(function ChainSlot({
     },
   });
 
-  // Wrap dnd-kit listeners to intercept right-click before dnd-kit's
-  // pointer sensor captures it (which blocks contextmenu in JUCE WebView)
-  const wrappedListeners = useMemo(() => {
-    if (!listeners) return {};
-    return {
-      ...listeners,
-      onPointerDown: (e: ReactPointerEvent) => {
-        if (e.button === 2) {
-          e.preventDefault();
-          e.stopPropagation();
-          setShowContextMenu({ x: e.clientX, y: e.clientY });
-          return;
-        }
-        // Forward non-right-click to dnd-kit
-        (listeners as Record<string, Function>).onPointerDown?.(e);
-      },
-    };
-  }, [listeners]);
-
-  useEffect(() => {
-    if (!showContextMenu) return;
-
-    void juceBridge.setNativeWindowVisible(false);
-
-    return () => {
-      void juceBridge.setNativeWindowVisible(true);
-    };
-  }, [showContextMenu]);
+  // Also a drop target: dropping a plugin onto this slot creates a group
+  const {
+    isOver: isDropOver,
+    setNodeRef: setDropRef,
+  } = useDroppable({
+    id: `slot:${id}`,
+    data: { type: 'plugin-slot', nodeId: id },
+    disabled: disabledDropIds?.has(id),
+  });
 
   const handleSwapComplete = useCallback((newPluginName: string, confidence: number) => {
     setSwapToast(`Swapped \u2192 ${newPluginName} (${confidence}%)`);
@@ -246,189 +221,27 @@ export const ChainSlot = memo(function ChainSlot({
     onSwapComplete?.(newPluginName, confidence);
   }, [onSwapComplete]);
 
-  // Navigate to previous similar plugin
-  const handlePrevPlugin = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (similarPlugins.length === 0 || isSwapping || !matchedPluginId) return;
+  // Combine drag + drop refs
+  const combinedRef = useCallback((el: HTMLElement | null) => {
+    setDragRef(el);
+    setDropRef(el);
+    (slotRef as React.MutableRefObject<HTMLDivElement | null>).current = el as HTMLDivElement | null;
+  }, [setDragRef, setDropRef]);
 
-    const nextIndex = (currentPluginIndex - 1 + similarPlugins.length) % similarPlugins.length;
-    const targetPlugin = similarPlugins[nextIndex];
+  const isGroupDropTarget = isDropOver && _isDragActive && !isDragging;
 
-    setIsSwapping(true);
-    try {
-      // 1. Read current parameters from the loaded plugin
-      const readResult = await juceBridge.readPluginParameters(id);
-      if (!readResult.success || !readResult.parameters) {
-        setSwapToast('Failed to read parameters');
-        setTimeout(() => setSwapToast(null), 2000);
-        setIsSwapping(false);
-        return;
-      }
+  // Track left/right hover position for serial vs parallel
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!slotRef.current) return;
+    const rect = slotRef.current.getBoundingClientRect();
+    const relX = (e.clientX - rect.left) / rect.width;
+    const side = relX < 0.5 ? 'left' : 'right';
+    setHoverSide(side);
+    _lastSlotHoverSide = side;
+  }, []);
 
-      // 2. Translate parameters via Convex
-      const sourceParams = readResult.parameters.map((p) => ({
-        paramId: p.name,
-        paramIndex: p.index,
-        normalizedValue: p.normalizedValue,
-      }));
-
-      const translation = await translateParameters(
-        matchedPluginId,
-        targetPlugin.pluginId,
-        sourceParams
-      );
-
-      if (!translation) {
-        setSwapToast('Translation failed');
-        setTimeout(() => setSwapToast(null), 2000);
-        setIsSwapping(false);
-        return;
-      }
-
-      if (translation.unmappedParams.length > 0) {
-        }
-
-      // 3. Build translated params for JUCE bridge
-      const translatedParams = translation.targetParams
-        .filter((p) => p.paramIndex !== undefined)
-        .map((p) => ({
-          paramIndex: p.paramIndex!,
-          value: p.value,
-        }));
-
-      // 4. Find the JUCE plugin UID for the target
-      const pluginList = await juceBridge.getPluginList();
-      const targetJucePlugin = pluginList.find(
-        (p) => p.name.toLowerCase().includes(targetPlugin.pluginName.toLowerCase()) ||
-               targetPlugin.pluginName.toLowerCase().includes(p.name.toLowerCase())
-      );
-
-      if (!targetJucePlugin) {
-        setSwapToast(`Not installed: ${targetPlugin.pluginName}`);
-        setTimeout(() => setSwapToast(null), 2000);
-        setIsSwapping(false);
-        return;
-      }
-
-      // 5. Execute the swap with parameter translation
-      const result = await juceBridge.swapPluginInChain(
-        id,
-        targetJucePlugin.id,
-        translatedParams
-      );
-
-      if (result.success) {
-        setCurrentPluginIndex(nextIndex);
-        setSwapToast(`\u2190 ${targetPlugin.pluginName} (${Math.round(translation.confidence)}%)`);
-        setTimeout(() => setSwapToast(null), 3000);
-      } else {
-        setSwapToast(result.error || 'Swap failed');
-        setTimeout(() => setSwapToast(null), 2000);
-      }
-    } catch (err) {
-      setSwapToast('Swap error');
-      setTimeout(() => setSwapToast(null), 2000);
-    } finally {
-      setIsSwapping(false);
-    }
-  }, [similarPlugins, currentPluginIndex, id, isSwapping, matchedPluginId]);
-
-  // Navigate to next similar plugin
-  const handleNextPlugin = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (similarPlugins.length === 0 || isSwapping || !matchedPluginId) return;
-
-    const nextIndex = (currentPluginIndex + 1) % similarPlugins.length;
-    const targetPlugin = similarPlugins[nextIndex];
-
-    setIsSwapping(true);
-    try {
-      // 1. Read current parameters from the loaded plugin
-      const readResult = await juceBridge.readPluginParameters(id);
-      if (!readResult.success || !readResult.parameters) {
-        setSwapToast('Failed to read parameters');
-        setTimeout(() => setSwapToast(null), 2000);
-        setIsSwapping(false);
-        return;
-      }
-
-      // 2. Translate parameters via Convex
-      const sourceParams = readResult.parameters.map((p) => ({
-        paramId: p.name,
-        paramIndex: p.index,
-        normalizedValue: p.normalizedValue,
-      }));
-
-      const translation = await translateParameters(
-        matchedPluginId,
-        targetPlugin.pluginId,
-        sourceParams
-      );
-
-      if (!translation) {
-        setSwapToast('Translation failed');
-        setTimeout(() => setSwapToast(null), 2000);
-        setIsSwapping(false);
-        return;
-      }
-
-      if (translation.unmappedParams.length > 0) {
-        }
-
-      // 3. Build translated params for JUCE bridge
-      const translatedParams = translation.targetParams
-        .filter((p) => p.paramIndex !== undefined)
-        .map((p) => ({
-          paramIndex: p.paramIndex!,
-          value: p.value,
-        }));
-
-      // 4. Find the JUCE plugin UID for the target
-      const pluginList = await juceBridge.getPluginList();
-      const targetJucePlugin = pluginList.find(
-        (p) => p.name.toLowerCase().includes(targetPlugin.pluginName.toLowerCase()) ||
-               targetPlugin.pluginName.toLowerCase().includes(p.name.toLowerCase())
-      );
-
-      if (!targetJucePlugin) {
-        setSwapToast(`Not installed: ${targetPlugin.pluginName}`);
-        setTimeout(() => setSwapToast(null), 2000);
-        setIsSwapping(false);
-        return;
-      }
-
-      // 5. Execute the swap with parameter translation
-      const result = await juceBridge.swapPluginInChain(
-        id,
-        targetJucePlugin.id,
-        translatedParams
-      );
-
-      if (result.success) {
-        setCurrentPluginIndex(nextIndex);
-        setSwapToast(`${targetPlugin.pluginName} \u2192 (${Math.round(translation.confidence)}%)`);
-        setTimeout(() => setSwapToast(null), 3000);
-      } else {
-        setSwapToast(result.error || 'Swap failed');
-        setTimeout(() => setSwapToast(null), 2000);
-      }
-    } catch (err) {
-      setSwapToast('Swap error');
-      setTimeout(() => setSwapToast(null), 2000);
-    } finally {
-      setIsSwapping(false);
-    }
-  }, [similarPlugins, currentPluginIndex, id, isSwapping, matchedPluginId]);
-
-  const handleCreateSerialGroup = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    createGroup([id], 'serial');
-  }, [createGroup, id]);
-
-  const handleCreateParallelGroup = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    createGroup([id], 'parallel');
-  }, [createGroup, id]);
+  // Reset hover side when not a drop target
+  const effectiveHoverSide = isGroupDropTarget ? hoverSide : null;
 
   const handleDuplicate = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -440,10 +253,43 @@ export const ChainSlot = memo(function ChainSlot({
     onToggleBypass();
   }, [onToggleBypass]);
 
-  const handleMute = useCallback((e: React.MouseEvent) => {
+  const handleSuspend = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setBranchMute(id, !isMuted);
-  }, [setBranchMute, id, isMuted]);
+    setAutomationBusy(true);
+    try { await setNodeSuspended(id, !suspended); } finally { setAutomationBusy(false); }
+  }, [id, setNodeSuspended, suspended]);
+
+  const handleRecallSafe = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNodeRecallSafe(id, !recallSafe);
+  }, [id, setNodeRecallSafe, recallSafe]);
+
+  const handleIgnoreLatency = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNodeIgnoreLatency(id, !ignoreLatency);
+  }, [id, setNodeIgnoreLatency, ignoreLatency]);
+
+  const openAutomation = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowAutomation((open) => !open);
+    if (!showAutomation) {
+      setAutomationBusy(true);
+      try {
+        const [result] = await Promise.all([juceBridge.getPluginParameters(id), fetchAutomationBindings(id)]);
+        if (result.success) setParameters(result.parameters || []);
+      } finally { setAutomationBusy(false); }
+    }
+  }, [fetchAutomationBindings, id, showAutomation]);
+
+  const exposeParameter = useCallback(async (index: number) => {
+    setAutomationBusy(true);
+    try { await assignAutomation(id, index); } finally { setAutomationBusy(false); }
+  }, [assignAutomation, id]);
+
+  const removeAutomation = useCallback(async (proxyId: string) => {
+    setAutomationBusy(true);
+    try { await unassignAutomation(id, proxyId); } finally { setAutomationBusy(false); }
+  }, [id, unassignAutomation]);
 
   const handleRemove = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -456,427 +302,307 @@ export const ChainSlot = memo(function ChainSlot({
     setShowContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
-  // Build dynamic class names for state-aware styling
-  const slotClasses = useMemo(() => {
-    const classes = ['plugin-slot', 'plugin-slot-wrapper', 'relative', 'flex', 'cursor-grab', 'active:cursor-grabbing', 'select-none'];
-
-    if (bypassed) classes.push('plugin-slot-bypassed');
-    if (isSoloed) classes.push('plugin-slot-solo');
-    if (isSelected || isMultiSelected) classes.push('plugin-slot-selected');
-    if (isHovered && !isDragging) classes.push('plugin-slot-hover');
-    if (isDragging) classes.push('opacity-30', 'scale-[0.98]');
-
-    return classes.join(' ');
-  }, [bypassed, isSoloed, isSelected, isMultiSelected, isHovered, isDragging]);
+  const swatch = category ? CATEGORY_SWATCH[category] ?? CATEGORY_SWATCH.utility : null;
+  const unavailable = !!(node?.missing || node?.loadError);
+  const chipBase = 'h-6 inline-flex items-center gap-1 px-1.5 rounded text-[11px] font-medium transition-colors';
+  const chipOff = 'text-plugin-dim hover:text-plugin-text hover:bg-plugin-raised';
+  const chipOn = 'text-plugin-accent-bright bg-plugin-accent/15 ring-1 ring-inset ring-plugin-accent/30';
+  const iconBtn = 'w-6 h-6 inline-flex items-center justify-center rounded transition-colors';
 
   return (
-    <div
-      className="relative"
-      style={{ overflow: 'visible' }}
-      onContextMenu={handleContextMenu}
-    >
+    <div className="relative" style={{ overflow: 'visible' }}>
       <div
-        ref={setDragRef}
+        ref={combinedRef}
         {...attributes}
-        {...wrappedListeners}
-        title="Click to edit inline · Shift+Click for external window"
+        {...listeners}
         onClick={(e) => {
           e.stopPropagation();
           setShowContextMenu(null);
           if ((groupSelectMode || e.ctrlKey || e.metaKey) && onSelect) {
             onSelect(e);
-          } else if (e.shiftKey) {
-            // Shift+click: open external window (backward compat)
-            onToggleEditor();
-          } else if (onOpenInline) {
-            // Regular click: open inline editor
-            onOpenInline();
           } else {
             onToggleEditor();
           }
         }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        className={slotClasses}
-        style={{
-          width: '100%',
-          height: 42,
-          background: 'rgba(15, 15, 15, 0.95)',
-          borderRadius: 6,
-          border: `1px solid ${
-            bypassed
-              ? 'rgba(255, 255, 255, 0.03)'
-              : isEditorOpen
-                ? 'rgba(222, 255, 10, 0.25)'
-                : isHovered
-                  ? 'rgba(255,255,255,0.12)'
-                  : 'rgba(255,255,255,0.06)'
-          }`,
-          boxShadow: isEditorOpen
-            ? '0 0 12px rgba(222, 255, 10, 0.1), inset 0 1px 0 rgba(255,255,255,0.08)'
-            : 'inset 0 1px 0 rgba(255,255,255,0.06)',
-          opacity: bypassed ? 0.5 : 1,
-          transition: 'border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease',
-        }}
+        onContextMenu={handleContextMenu}
+        onPointerMove={isGroupDropTarget ? handlePointerMove : undefined}
+        onPointerLeave={() => setHoverSide(null)}
+        className={`
+          group/slot relative flex items-stretch h-[52px] w-full rounded-lg overflow-hidden
+          cursor-grab active:cursor-grabbing select-none
+          border transition-[border-color,background-color,box-shadow,opacity] duration-150
+          ${isDragging ? 'opacity-30' : ''}
+          ${bypassed ? 'bg-plugin-surface/70' : 'bg-plugin-surface-alt'}
+          ${isGroupDropTarget
+            ? 'border-plugin-accent/60'
+            : isMultiSelected
+              ? 'border-plugin-accent shadow-glow-accent'
+              : isSelected
+                ? 'border-plugin-accent/60'
+                : isEditorOpen
+                  ? 'border-plugin-accent/40'
+                  : 'border-plugin-border hover:border-plugin-border-bright'}
+        `}
       >
-        {/* Left side panel — slot number */}
-        <div
-          className="relative flex-shrink-0"
-          style={{
-            width: 16,
-            height: 42,
-            backgroundImage: `url(${sidePanelBg})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        >
+        {/* Category stripe */}
+        <div className={`w-[3px] flex-shrink-0 ${swatch ?? 'bg-plugin-border-bright'} ${bypassed ? 'opacity-30' : ''}`} title={category ? CATEGORY_LABELS[category] ?? category : undefined} />
+
+        {/* Slot number / grip */}
+        <div className="relative w-7 flex-shrink-0 flex items-center justify-center text-plugin-dim">
           {slotNumber != null && (
-            <div className="absolute inset-0 flex items-center justify-center font-sans text-white text-[10px] pointer-events-none">
-              {slotNumber}
-            </div>
+            <span className="num text-[11px] group-hover/slot:opacity-0 transition-opacity">{slotNumber}</span>
           )}
+          <GripVertical className="absolute w-3.5 h-3.5 opacity-0 group-hover/slot:opacity-100 transition-opacity" />
         </div>
 
-        {/* Center rackmount background */}
-        <div
-          className="relative flex-1"
-          style={{
-            height: 42,
-            backgroundImage: `url(${rackmountBg})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        >
-
-          {/* Plugin name with swap navigation arrows */}
-          <div
-            className="absolute flex items-center text-white capitalize"
-            style={{
-              left: 20,
-              top: 9,
-              height: 24,
-            }}
-          >
-            {/* Prev plugin swap arrow */}
-            {isHovered && similarPlugins.length > 0 && (
-              <button
-                className="flex items-center justify-center transition-opacity duration-150 opacity-50 hover:opacity-100"
-                style={{ width: 14, height: 24, flexShrink: 0 }}
-                onClick={handlePrevPlugin}
-                onPointerDown={(e) => e.stopPropagation()}
-                title={`Previous alternative${isSwapping ? ' (swapping...)' : ''}`}
-              >
-                <svg width="8" height="10" viewBox="0 0 8 10" fill="none">
-                  <path d="M6 1L2 5L6 9" stroke={isSwapping ? '#666' : '#c9944a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-
-            <div
-              className="flex items-center justify-center px-1"
-              style={{
-                width: Math.max(114, Math.min(280, name.length * 8 + 40)),
-                height: 24,
-                fontFamily: 'Eurostile, "Arial Black", "Helvetica Bold", sans-serif',
-                fontWeight: 700,
-                fontSize: name.length > 20 ? 10 : name.length > 15 ? 11 : name.length > 12 ? 12 : name.length > 10 ? 13 : 14,
-                lineHeight: name.length > 20 ? '11px' : name.length > 15 ? '12px' : name.length > 12 ? '13px' : name.length > 10 ? '14px' : '15px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {name.toLowerCase()}
-            </div>
-
-            {/* Next plugin swap arrow */}
-            {isHovered && similarPlugins.length > 0 && (
-              <button
-                className="flex items-center justify-center transition-opacity duration-150 opacity-50 hover:opacity-100"
-                style={{ width: 14, height: 24, flexShrink: 0 }}
-                onClick={handleNextPlugin}
-                onPointerDown={(e) => e.stopPropagation()}
-                title={`Next alternative${isSwapping ? ' (swapping...)' : ''}`}
-              >
-                <svg width="8" height="10" viewBox="0 0 8 10" fill="none">
-                  <path d="M2 1L6 5L2 9" stroke={isSwapping ? '#666' : '#c9944a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Visual meter bar with dB value */}
-          <div className="absolute flex items-center gap-1" style={{ left: 200, right: 170, top: 13 }}>
-            {/* Meter bar container */}
-            <div
-              className={`relative overflow-hidden ${isProcessing ? 'meter-processing' : ''}`}
-              style={{
-                width: 'min(60px, 100%)',
-                height: 16,
-                background: 'rgba(0, 0, 0, 0.5)',
-                borderRadius: '2px',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-              }}
-            >
-              {/* Green segment (-∞ to -18dB) */}
-              <div
-                className="absolute left-0 top-0 h-full transition-all duration-75"
-                style={{
-                  width: `${Math.min(meterValues.peakRPercent, dbToPercent(-18))}%`,
-                  background: 'linear-gradient(to right, #22c55e, #16a34a)',
-                }}
-              />
-              {/* Yellow segment (-18dB to -6dB) */}
-              {meterValues.peakRPercent > dbToPercent(-18) && (
-                <div
-                  className="absolute top-0 h-full transition-all duration-75"
-                  style={{
-                    left: `${dbToPercent(-18)}%`,
-                    width: `${Math.min(meterValues.peakRPercent - dbToPercent(-18), dbToPercent(-6) - dbToPercent(-18))}%`,
-                    background: 'linear-gradient(to right, #eab308, #f59e0b)',
-                  }}
-                />
-              )}
-              {/* Red segment (-6dB to 0dB) */}
-              {meterValues.peakRPercent > dbToPercent(-6) && (
-                <div
-                  className="absolute top-0 h-full transition-all duration-75"
-                  style={{
-                    left: `${dbToPercent(-6)}%`,
-                    width: `${Math.min(meterValues.peakRPercent - dbToPercent(-6), 100 - dbToPercent(-6))}%`,
-                    background: 'linear-gradient(to right, #ef4444, #dc2626)',
-                  }}
-                />
-              )}
-            </div>
-
-            {/* Peak dB value */}
-            <button
-              ref={outputPeakElRef}
-              className="font-sans lowercase text-white hover:text-plugin-accent transition-colors cursor-pointer text-[11px] min-w-[32px] text-right"
-              onClick={resetOutputPeak}
-              onPointerDown={(e) => e.stopPropagation()}
-              title="Click to reset all peak meters"
-            >
-              {formatDb(outputPeakRef.current)} db
-            </button>
-
-            {/* Red LED clip indicator */}
-            {meterValues.peakRPercent > 95 && (
-              <div
-                className="w-[5px] h-[5px]"
-                style={{
-                  backgroundImage: `url(${ledLight})`,
-                  backgroundSize: '100% 100%',
-                }}
-              />
-            )}
-          </div>
-
-          {/* Latency display */}
-          {meterData?.latencyMs !== undefined && meterData.latencyMs > 0.1 && (
-            <div className="absolute" style={{ left: 305, top: 16 }}>
-              <span className="font-sans text-[10px] text-white">
-                {meterData.latencyMs.toFixed(1)}ms
-              </span>
-            </div>
-          )}
-
-          {/* Persistent state indicators — always visible when active (like console LEDs) */}
-          {!isHovered && !isSelected && (isSoloed || isMuted) && (
-            <div className="absolute flex flex-row gap-[3px]" style={{ right: 84, top: 15 }}>
-              {isSoloed && (
-                <div
-                  className="flex items-center justify-center rounded-[2px]"
-                  style={{
-                    width: 14,
-                    height: 12,
-                    background: '#c9944a',
-                    fontSize: 8,
-                    fontWeight: 800,
-                    color: '#000',
-                    lineHeight: '12px',
-                    letterSpacing: '0.5px',
-                  }}
-                >
-                  S
-                </div>
-              )}
-              {isMuted && (
-                <div
-                  className="flex items-center justify-center rounded-[2px]"
-                  style={{
-                    width: 14,
-                    height: 12,
-                    background: '#dc2626',
-                    fontSize: 8,
-                    fontWeight: 800,
-                    color: '#000',
-                    lineHeight: '12px',
-                    letterSpacing: '0.5px',
-                  }}
-                >
-                  M
-                </div>
-              )}
-            </div>
-          )}
-
-          <div
-            className="absolute flex items-center justify-end gap-[6px]"
-            style={{ right: 22, top: 12, minWidth: 152, height: 18 }}
-          >
-            {/* Group creation icons - progressive disclosure */}
-            {(isHovered || isSelected) && (
-              <>
-                <button
-                  onClick={handleCreateSerialGroup}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="bg-plugin-serial/60 hover:bg-plugin-serial transition-all rounded-[2px] flex items-center justify-center"
-                  style={{ width: 15, height: 15 }}
-                  title="Create serial group from this plugin"
-                >
-                  <Layers className="w-2.5 h-2.5 text-black" strokeWidth={2.5} />
-                </button>
-                <button
-                  onClick={handleCreateParallelGroup}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="bg-plugin-parallel/60 hover:bg-plugin-parallel transition-all rounded-[2px] flex items-center justify-center"
-                  style={{ width: 15, height: 15 }}
-                  title="Create parallel group from this plugin"
-                >
-                  <GitBranch className="w-2.5 h-2.5 text-black" strokeWidth={2.5} />
-                </button>
-                <div className="bg-white/20" style={{ width: 1, height: 18 }} />
-                <button
-                  className="transition-opacity duration-200 hover:opacity-100"
-                  style={{ width: 15, height: 15 }}
-                  onClick={(e) => { e.stopPropagation(); setBranchSolo(id, !isSoloed); }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  title="Solo plugin"
-                >
-                  <img
-                    src={isSoloed ? soloButtonActive : soloButtonInactive}
-                    alt="S"
-                    className="w-full h-full"
-                    draggable={false}
-                  />
-                </button>
-                <button
-                  className="transition-opacity duration-200 hover:opacity-100"
-                  style={{ width: 15, height: 15 }}
-                  onClick={handleMute}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  title={isMuted ? 'Unmute' : 'Mute'}
-                >
-                  <img
-                    src={isMuted ? muteButtonActive : muteButtonInactive}
-                    alt="M"
-                    className="w-full h-full"
-                    draggable={false}
-                  />
-                </button>
-                <div className="bg-white/20" style={{ width: 1, height: 18 }} />
-                <button
-                  className="opacity-60 hover:opacity-100 transition-opacity duration-200"
-                  style={{ width: 13, height: 13 }}
-                  onClick={handleDuplicate}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  title="Duplicate plugin"
-                >
-                  <img src={duplicateIconSvg} alt="" className="w-full h-full" draggable={false} />
-                </button>
-              </>
-            )}
-
-            <button
-              className="font-sans uppercase text-white hover:text-plugin-accent transition-colors cursor-pointer text-[11px] min-w-[36px] text-center px-1"
-              onClick={handleMute}
-              onPointerDown={(e) => e.stopPropagation()}
-              title={isMuted ? 'Unmute input/output' : 'Mute input/output'}
-            >
-              I/O
-            </button>
-
-            <button
-              className={`transition-opacity ${bypassed ? 'brightness-150' : 'opacity-60 hover:opacity-100'}`}
-              style={{ width: 10, height: 12 }}
-              onClick={handleBypass}
-              onPointerDown={(e) => e.stopPropagation()}
-              title={bypassed ? 'Enable' : 'Bypass'}
-            >
-              <img src={bypassIconSvg} alt="" className="w-full h-full" draggable={false} />
-            </button>
-          </div>
-        </div>
-
-        {/* Right side panel — close/remove button */}
-        <div
-          className="relative flex-shrink-0"
-          style={{
-            width: 16,
-            height: 42,
-            backgroundImage: `url(${sidePanelBg})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        >
-          {/* Close X button to remove plugin */}
+        {/* Power (bypass) */}
+        <div className="flex items-center pr-2">
           <button
-            className="absolute inset-0 flex items-center justify-center text-white hover:text-red-400 transition-colors"
+            className={`w-7 h-7 rounded-full inline-flex items-center justify-center border transition-colors ${
+              bypassed
+                ? 'border-plugin-border-bright text-plugin-dim hover:text-plugin-muted'
+                : 'border-green-500/40 bg-green-500/10 text-green-400 hover:bg-green-500/20'
+            }`}
+            onClick={handleBypass}
+            onPointerDown={(e) => e.stopPropagation()}
+            title={bypassed ? 'Enable' : 'Bypass'}
+            aria-label={bypassed ? 'Enable plugin' : 'Bypass plugin'}
+            aria-pressed={!bypassed}
+          >
+            <Power className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Name + maker */}
+        <div className={`relative flex-1 min-w-0 flex flex-col justify-center pr-2 ${bypassed ? 'opacity-45' : ''}`}>
+          <div className="flex items-baseline gap-1.5 min-w-0">
+            <span className={`truncate text-[14px] leading-tight font-semibold ${bypassed ? 'text-plugin-muted line-through decoration-plugin-dim/60' : 'text-plugin-text'}`}>
+              {name}
+            </span>
+            {isEditorOpen && (
+              <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-plugin-accent" title="Plugin window open" />
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0 text-[11px] leading-tight">
+            {unavailable ? (
+              <span className="truncate text-amber-300 flex items-center gap-1" title={node?.loadError || 'Plugin unavailable'}>
+                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                {node?.missing ? 'Plugin unavailable' : node?.loadError}
+              </span>
+            ) : (
+              <span className="truncate text-plugin-muted">{manufacturer}</span>
+            )}
+            {suspended && (
+              <span className="flex-shrink-0 px-1 rounded bg-yellow-500/15 text-yellow-300 text-[10px] font-semibold uppercase tracking-wide">Suspended</span>
+            )}
+          </div>
+        </div>
+
+        {/* Per-slot options */}
+        <div className="flex items-center gap-0.5 pr-1.5">
+          {node && (
+            <>
+              <button
+                className={`${chipBase} ${recallSafe ? chipOn : chipOff}`}
+                onClick={handleRecallSafe}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-pressed={recallSafe}
+                aria-label="Safe"
+                title={recallSafe ? 'Recall-safe: loading a chain or preset keeps this slot. Click to unlock.' : 'Lock this slot so loading a chain or preset keeps it'}
+              ><Lock className="w-3 h-3" /><span className="hidden xl:inline">Safe</span></button>
+              <button
+                className={`${chipBase} ${ignoreLatency ? chipOn : chipOff}`}
+                onClick={handleIgnoreLatency}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-pressed={ignoreLatency}
+                aria-label="Ignore latency"
+                title={`${ignoreLatency ? 'Ignoring' : 'Ignore'} this plugin's reported latency (${latencySamples} samples) in delay compensation`}
+              ><Timer className="w-3 h-3" /><span className="hidden xl:inline">{ignoreLatency ? 'Lat off' : 'Lat'}</span></button>
+            </>
+          )}
+          <button
+            className={`${chipBase} ${suspended ? 'text-yellow-300 bg-yellow-500/15 ring-1 ring-inset ring-yellow-500/30' : chipOff}`}
+            onClick={handleSuspend}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-pressed={suspended}
+            aria-label={suspended ? 'Resume' : 'Suspend'}
+            title={suspended ? 'Resume processing' : 'Suspend processing (frees CPU)'}
+            disabled={automationBusy}
+          ><Pause className="w-3 h-3" /></button>
+          <button
+            className={`${chipBase} ${showAutomation || automation.length ? chipOn : chipOff}`}
+            onClick={openAutomation}
+            onPointerDown={(e) => e.stopPropagation()}
+            ref={automationTriggerRef}
+            aria-expanded={showAutomation}
+            title="Automation and macro links"
+          ><SlidersHorizontal className="w-3 h-3" /><span className="hidden lg:inline">Auto</span>{automation.length ? <span className="num text-[10px]">{automation.length}</span> : null}</button>
+        </div>
+
+        {/* Levels: IN/OUT peak + L/R meters */}
+        <div className={`flex items-center gap-2 pl-2 pr-2 border-l border-plugin-border/70 ${bypassed ? 'opacity-40' : ''}`}>
+          <div className="hidden sm:flex flex-col justify-center gap-0.5 w-[50px]">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-plugin-dim">In</span>
+              <button
+                ref={inputPeakElRef}
+                className="num text-[10px] text-plugin-muted hover:text-plugin-accent transition-colors"
+                onClick={resetInputPeak}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Input peak (dB). Click to reset"
+              ><span>{formatDb(inputPeakRef.current)}</span></button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-plugin-dim">Out</span>
+              <button
+                ref={outputPeakElRef}
+                className="num text-[10px] text-plugin-text hover:text-plugin-accent transition-colors"
+                onClick={resetOutputPeak}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Output peak (dB). Click to reset"
+              ><span>{formatDb(outputPeakRef.current)}</span></button>
+            </div>
+          </div>
+          <div className="flex gap-[2px] h-9" aria-hidden>
+            {[meterValues.peakLPercent, meterValues.peakRPercent].map((pct, i) => (
+              <div key={i} className="relative w-1 h-full rounded-sm overflow-hidden bg-plugin-bg shadow-meter">
+                <div
+                  className="absolute bottom-0 left-0 right-0"
+                  style={{
+                    height: '100%',
+                    background: METER_GRADIENT,
+                    clipPath: `inset(${100 - pct}% 0 0 0)`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 pr-1.5 pl-1 border-l border-plugin-border/70">
+          <button
+            className={`${iconBtn} text-plugin-dim hover:text-plugin-text hover:bg-plugin-raised`}
+            onClick={handleDuplicate}
+            onPointerDown={(e) => e.stopPropagation()}
+            title="Duplicate plugin"
+            aria-label="Duplicate plugin"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+          {matchedPluginId && (
+            <button
+              className={`${iconBtn} text-plugin-dim hover:text-plugin-accent hover:bg-plugin-raised`}
+              onClick={(e) => { e.stopPropagation(); setShowSwapMenu(true); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              title="Swap plugin"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            className={`${iconBtn} text-plugin-dim hover:text-red-400 hover:bg-red-500/10`}
             onClick={handleRemove}
             onPointerDown={(e) => e.stopPropagation()}
             title="Remove plugin"
+            aria-label="Remove plugin"
           >
-            <img src={closeIconSvg} alt="×" className="w-1.5 h-1.5" draggable={false} />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Left/right split highlight when dragging over */}
+        {isGroupDropTarget && (
+          <div className="absolute inset-0 flex pointer-events-none">
+            <div
+              className={`relative w-1/2 flex items-center justify-center transition-colors duration-150 ${
+                effectiveHoverSide === 'left'
+                  ? 'bg-plugin-serial/20 drop-zone-stripes-serial'
+                  : 'bg-plugin-bg/40'
+              }`}
+            >
+              <Layers className={`w-5 h-5 text-plugin-serial ${effectiveHoverSide === 'left' ? 'opacity-90' : 'opacity-30'}`} />
+            </div>
+            <div className="w-px bg-plugin-border-bright" />
+            <div
+              className={`relative w-1/2 flex items-center justify-center transition-colors duration-150 ${
+                effectiveHoverSide === 'right'
+                  ? 'bg-plugin-parallel/20 drop-zone-stripes-parallel'
+                  : 'bg-plugin-bg/40'
+              }`}
+            >
+              <GitBranch className={`w-5 h-5 text-plugin-parallel ${effectiveHoverSide === 'right' ? 'opacity-90' : 'opacity-30'}`} />
+            </div>
+          </div>
+        )}
       </div>
+
+      {showAutomation && (
+        <div role="region" aria-label={`Automation for ${name}`} className="absolute right-0 top-[56px] z-[70] w-[min(420px,100%)] rounded-lg border border-plugin-border-bright bg-plugin-raised p-3 shadow-panel animate-fade-in-up" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setShowAutomation(false); automationTriggerRef.current?.focus(); } }}>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div><p className="text-xs font-semibold text-plugin-text">Automation &amp; macros</p><p className="text-[11px] text-plugin-muted"><span className="num">{automation.length}</span> / 2048 exposed to the DAW</p></div>
+            <button className="text-[11px] text-plugin-muted hover:text-plugin-text" onClick={() => setShowAutomation(false)} aria-label="Close automation">Close</button>
+          </div>
+          {node?.missing ? <p className="text-xs text-amber-300">Plugin missing — parameters unavailable.</p> : <>
+            <input ref={automationFilterRef} className="w-full mb-2 h-7 rounded-md border border-plugin-border bg-plugin-bg px-2 text-xs text-plugin-text placeholder:text-plugin-dim focus:outline-none focus:border-plugin-accent/60" placeholder="Filter parameters" value={parameterFilter} onChange={(e) => setParameterFilter(e.target.value)} aria-label="Filter parameters" />
+            <div className="max-h-44 overflow-y-auto -mx-1">
+              {parameters.filter((p) => p.name.toLowerCase().includes(parameterFilter.toLowerCase())).map((parameter) => {
+                const binding = automation.find((item) => item.parameterIndex === parameter.index);
+                return <div key={parameter.index} className="flex items-center justify-between gap-2 px-1 h-7 rounded text-xs text-plugin-text hover:bg-plugin-surface-alt"><span className="truncate flex-1">{parameter.name}</span><select className="h-6 rounded border border-plugin-border bg-plugin-bg px-1 text-[11px] text-plugin-muted hover:border-plugin-border-bright" value="" aria-label={`Link ${parameter.name} to a macro`} onChange={(e) => { const macro = Number(e.target.value); if (e.target.value !== '') addMacroLink(macro, id, parameter.index); }}><option value="">Macro…</option>{Array.from({ length: 8 }, (_, m) => <option key={m} value={m}>Macro {m + 1}</option>)}</select>{binding ? <button className="w-[84px] text-right text-[11px] text-plugin-accent hover:text-plugin-accent-bright" onClick={() => removeAutomation(binding.proxyId)}>Remove</button> : <button className="w-[84px] text-right text-[11px] text-plugin-muted hover:text-plugin-accent" onClick={() => exposeParameter(parameter.index)}>Expose in DAW</button>}</div>;
+              })}
+              {!parameters.length && <p className="text-xs text-plugin-muted">No parameters reported.</p>}
+            </div>
+          </>}
+        </div>
+      )}
+
+      {/* Group creation hint when dragging over */}
+      {isGroupDropTarget && (
+        <div className="absolute -top-7 left-0 right-0 z-50 flex justify-center pointer-events-none animate-fade-in-up">
+          <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md shadow-lg text-[11px] font-medium whitespace-nowrap ${
+            effectiveHoverSide === 'left'
+              ? 'bg-plugin-serial text-plugin-on-accent'
+              : 'bg-plugin-parallel text-plugin-on-accent'
+          }`}>
+            {effectiveHoverSide === 'left' ? (
+              <>
+                <Layers className="w-3 h-3" />
+                Serial Group
+              </>
+            ) : (
+              <>
+                <GitBranch className="w-3 h-3" />
+                Parallel Group
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Context menu (right-click) */}
       {showContextMenu && (
-        <ContextMenu
-          x={showContextMenu.x}
-          y={showContextMenu.y}
-          items={buildPluginSlotMenu(
-            {
-              node: node as any,
-              nodeId: id,
-              parentId,
-              indexInParent,
-              hasMatchedPlugin: !!matchedPluginId,
-              isEditorOpen: !!isEditorOpen,
-              hasClipboard: !!pluginClipboard,
-              canMoveUp: indexInParent > 0,
-              canMoveDown: indexInParent >= 0, // will be refined by parent
-            },
-            {
-              toggleBypass: () => onToggleBypass(),
-              toggleSolo: () => setBranchSolo(id, !(node?.solo ?? false)),
-              remove: () => onRemove(),
-              duplicate: () => duplicateNode(id),
-              replaceWithSimilar: () => setShowSwapMenu(true),
-              moveUp: () => moveNode(id, parentId, Math.max(0, indexInParent - 1)),
-              moveDown: () => moveNode(id, parentId, indexInParent + 1),
-              savePreset: () => juceBridge.savePreset(name, ''),
-              loadPreset: () => { /* open preset browser */ },
-              openPluginWindow: () => togglePluginEditor(id),
-              openInlineEditor: () => openInlineEditor(id),
-              copyPluginSettings: () => {
-                useChainStore.setState({
-                  pluginClipboard: { name, fileOrIdentifier: node?.fileOrIdentifier ?? '', nodeId: id },
-                });
-              },
-              pastePluginSettings: () => {
-                if (pluginClipboard) pastePluginSettings(pluginClipboard.nodeId, id);
-              },
-              createSerialGroup: () => createGroup([id], 'serial'),
-              createParallelGroup: () => createGroup([id], 'parallel'),
-              insertBelow: () => showInlineSearchBelow(id, parentId, indexInParent + 1),
-            },
-          )}
-          onClose={() => setShowContextMenu(null)}
-        />
+        <>
+          <div className="fixed inset-0 z-[100]" onClick={() => setShowContextMenu(null)} />
+          <div
+            className="fixed z-[101] bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel py-1 min-w-[150px]"
+            style={{ left: showContextMenu.x, top: showContextMenu.y }}
+          >
+            {matchedPluginId && (
+              <button
+                onClick={() => { setShowContextMenu(null); setShowSwapMenu(true); }}
+                className="w-full px-3 py-1.5 text-left text-xs text-plugin-text hover:bg-plugin-border/50 "
+              >
+                Swap Plugin
+              </button>
+            )}
+            <button
+              onClick={() => { setShowContextMenu(null); onRemove(); }}
+              className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-red-500/10 "
+            >
+              Remove
+            </button>
+          </div>
+        </>
       )}
 
       {/* Swap Menu Dropdown */}
@@ -894,7 +620,7 @@ export const ChainSlot = memo(function ChainSlot({
       {/* Swap Toast */}
       {swapToast && (
         <div className="absolute -bottom-8 left-0 right-0 z-50 flex justify-center">
-          <div className="bg-plugin-accent/90 text-white text-xs px-3 py-1 rounded-full shadow-lg animate-fade-in-up">
+          <div className="bg-plugin-accent text-plugin-on-accent text-xs font-medium px-3 py-1 rounded-full shadow-panel animate-fade-in-up">
             {swapToast}
           </div>
         </div>

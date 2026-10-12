@@ -1,40 +1,37 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Save, FolderOpen, Settings, X, Send, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, FolderOpen, Settings, Check, X, Share2, Pencil, Workflow, Library } from 'lucide-react';
 import { SaveDropdown } from './SaveDropdown';
+import { LoadDropdown } from './LoadDropdown';
 import { AvatarDropdown } from './AvatarDropdown';
 import { QuickSharePanel } from './QuickSharePanel';
+import { ProChainMark } from '../Brand/ProChainMark';
 import { useChainStore } from '../../stores/chainStore';
 import { usePresetStore } from '../../stores/presetStore';
-import type { PresetInfo } from '../../api/types';
-import { useKeyboardStore, ShortcutPriority } from '../../stores/keyboardStore';
-import { juceBridge } from '../../api/juce-bridge';
-import prochainLogo from '../../assets/prochain-logo.png';
 
-type ActiveDropdown = 'save' | 'browse' | 'share' | 'settings' | 'avatar' | null;
+type ActiveDropdown = 'save' | 'load' | 'share' | 'settings' | 'avatar' | null;
 
-export function HeaderMenu() {
+export type AppView = 'chain' | 'library';
+
+interface HeaderMenuProps {
+  /** Which main view is showing */
+  view?: AppView;
+  /** Switch between the chain editor and the chain library */
+  onViewChange?: (view: AppView) => void;
+}
+
+/**
+ * App top bar: brand, Chain/Library switch, chain name, and chain actions
+ * (save, open, share, settings) plus the account menu.
+ */
+export function HeaderMenu({ view = 'chain', onViewChange }: HeaderMenuProps = {}) {
   const [active, setActive] = useState<ActiveDropdown>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
-  const { chainName, setChainName, targetInputPeakMin, targetInputPeakMax } = useChainStore();
-  const { presets, currentPreset, loadPreset } = usePresetStore();
-
-  const navigatePreset = useCallback((direction: -1 | 1) => {
-    if (presets.length === 0) return;
-    const currentIdx = currentPreset
-      ? presets.findIndex((p: PresetInfo) => p.path === currentPreset.path)
-      : -1;
-    let nextIdx: number;
-    if (currentIdx === -1) {
-      nextIdx = direction === 1 ? 0 : presets.length - 1;
-    } else {
-      nextIdx = (currentIdx + direction + presets.length) % presets.length;
-    }
-    loadPreset(presets[nextIdx].path);
-  }, [presets, currentPreset, loadPreset]);
+  const { chainName, setChainName, targetInputLufs } = useChainStore();
+  const { loadPreset } = usePresetStore();
 
   const toggle = useCallback((dropdown: ActiveDropdown) => {
     setActive((prev) => (prev === dropdown ? null : dropdown));
@@ -44,7 +41,7 @@ export function HeaderMenu() {
     setActive(null);
   }, []);
 
-  // Handle sharePreset event from LocalTab
+  // Handle sharePreset event from LoadDropdown
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -61,36 +58,24 @@ export function HeaderMenu() {
     return () => window.removeEventListener('sharePreset', handler);
   }, [loadPreset, setChainName]);
 
-  // Handle Cmd+S save shortcut from useChainEditorShortcuts
+  // Close on Escape
   useEffect(() => {
-    const handler = () => setActive('save');
-    window.addEventListener('showSaveDropdown', handler);
-    return () => window.removeEventListener('showSaveDropdown', handler);
-  }, []);
-
-  // Close on Escape (component priority)
-  useEffect(() => {
-    const registerShortcut = useKeyboardStore.getState().registerShortcut;
-    return registerShortcut({
-      id: 'header-menu-escape',
-      key: 'Escape',
-      priority: ShortcutPriority.COMPONENT,
-      allowInInputs: true, // Allow Escape when editing name
-      handler: (e) => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
         if (isEditingName) {
-          e.preventDefault();
           setIsEditingName(false);
-        } else if (active) {
-          e.preventDefault();
+        } else {
           close();
         }
       }
-    });
-  }, [close, isEditingName, active]);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [close, isEditingName]);
 
-  // Close dropdowns on outside click (but not for browse modal)
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!active || active === 'browse') return;
+    if (!active) return;
     const handler = (e: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
         close();
@@ -128,196 +113,149 @@ export function HeaderMenu() {
     setIsEditingName(false);
   };
 
-  const commitNameAndSave = () => {
-    const trimmed = editName.trim();
-    if (trimmed) {
-      setChainName(trimmed);
-    }
-    setIsEditingName(false);
-    setActive('save');
-  };
-
   const cancelEditName = () => {
     setIsEditingName(false);
   };
 
   const btnBase =
-    'flex items-center justify-center w-7 h-7 rounded transition-all duration-150 relative';
+    'h-8 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold rounded-md transition-colors relative';
   const btnInactive =
-    'text-[var(--color-text-secondary)] hover:text-[var(--color-accent-cyan)] hover:bg-[rgba(0,240,255,0.08)]';
-  const btnActive = 'text-[var(--color-accent-cyan)] bg-[rgba(0,240,255,0.12)] shadow-[0_0_8px_rgba(0,240,255,0.2)]';
+    'text-plugin-muted hover:text-plugin-text hover:bg-plugin-raised';
+  const btnActive = 'text-plugin-text bg-plugin-raised';
+
+  const tab = (id: AppView, label: string, Icon: typeof Workflow) => (
+    <button
+      onClick={() => onViewChange?.(id)}
+      className={`h-7 inline-flex items-center gap-1.5 px-3 rounded-md text-xs font-semibold transition-colors ${
+        view === id
+          ? 'bg-plugin-raised text-plugin-text shadow-card'
+          : 'text-plugin-muted hover:text-plugin-text'
+      }`}
+      aria-pressed={view === id}
+    >
+      <Icon className={`w-3.5 h-3.5 ${view === id ? 'text-plugin-accent' : ''}`} />
+      {label}
+    </button>
+  );
 
   return (
-    <div ref={headerRef} className="relative">
-      {/* Header bar — cyber command bar */}
-      <div
-        className="flex items-center gap-1 px-3 py-1.5"
-        style={{
-          background: 'var(--color-bg-primary)',
-          borderBottom: '1px solid var(--color-border-default)',
-          fontFamily: 'var(--font-system)',
-        }}
-      >
-        {/* Logo */}
-        <img src={prochainLogo} alt="ProChain" className="h-5 mr-2 opacity-80" />
+    <div ref={headerRef} className="relative z-40">
+      <div className="flex items-center gap-2 h-11 pl-3 pr-2 bg-plugin-surface border-b border-plugin-border">
+        {/* Brand */}
+        <ProChainMark className="flex-shrink-0" />
 
-        {/* Avatar / Profile */}
-        <AvatarDropdown isOpen={active === 'avatar'} onToggle={() => toggle('avatar')} onClose={close} />
-        <div className="w-px h-5 mx-1" style={{ background: 'var(--color-border-default)' }} />
+        {/* View switch */}
+        <div className="flex items-center p-0.5 rounded-lg bg-plugin-bg border border-plugin-border ml-1">
+          {tab('chain', 'Chain', Workflow)}
+          {tab('library', 'Library', Library)}
+        </div>
 
-        {/* Browse (includes local chains) */}
-        <button
-          onClick={() => {
-            window.dispatchEvent(new Event('openBrowser'));
-            close();
-          }}
-          className={`${btnBase} ${active === 'browse' ? btnActive : btnInactive}`}
-          title="Browse chains"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-        </button>
+        <div className="w-px h-5 bg-plugin-border mx-1" />
 
-        {/* Share */}
-        <button
-          onClick={() => toggle('share')}
-          className={`${btnBase} ${active === 'share' ? btnActive : btnInactive}`}
-          title="Share chain"
-        >
-          <Send className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Divider */}
-        <div className="w-px h-5 mx-1" style={{ background: 'var(--color-border-default)' }} />
-
-        {/* Chain Name */}
+        {/* Chain name */}
         {isEditingName ? (
-          <div className="flex items-center gap-1 flex-1 min-w-0">
+          <div className="flex items-center gap-1 flex-1 min-w-0 max-w-[360px]">
             <input
               ref={nameInputRef}
               type="text"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') commitNameAndSave();
+                if (e.key === 'Enter') commitName();
                 if (e.key === 'Escape') cancelEditName();
               }}
-              onBlur={commitName} /* blur just saves name, doesn't open modal */
-              className="flex-1 min-w-0 px-2 py-0.5 rounded text-xs font-medium focus:outline-none"
-              style={{
-                background: 'var(--color-bg-input)',
-                border: '1px solid var(--color-accent-cyan)',
-                color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-system)',
-                boxShadow: '0 0 8px rgba(222, 255, 10, 0.2)',
-              }}
+              onBlur={commitName}
+              className="flex-1 min-w-0 h-7 px-2 bg-plugin-bg border border-plugin-accent/60 rounded-md text-[13px] text-plugin-text font-semibold focus:outline-none"
               maxLength={64}
             />
-            <button
-              onClick={commitNameAndSave}
-              className="p-0.5 transition-colors duration-150"
-              style={{ color: 'var(--color-accent-cyan)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-accent-cyan)'; }}
-              title="Save chain"
-            >
-              <Save className="w-3.5 h-3.5" />
+            <button onClick={commitName} className="w-6 h-6 inline-flex items-center justify-center rounded text-green-400 hover:bg-green-500/10" title="Confirm">
+              <Check className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={cancelEditName}
-              className="p-0.5 transition-colors duration-150"
-              style={{ color: 'var(--color-text-tertiary)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-status-error)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-              title="Cancel"
-            >
+            <button onClick={cancelEditName} className="w-6 h-6 inline-flex items-center justify-center rounded text-red-400 hover:bg-red-500/10" title="Cancel">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
         ) : (
           <button
             onClick={startEditingName}
-            className="flex-1 min-w-0 px-2 py-0.5 text-left truncate transition-colors duration-150 group"
-            style={{
-              fontSize: 'var(--text-sm)',
-              fontFamily: 'var(--font-system)',
-              fontWeight: 700,
-              letterSpacing: 'var(--tracking-wide)',
-              color: 'var(--color-text-primary)',
-            }}
+            className="group min-w-0 flex items-center gap-1.5 h-7 px-1.5 -ml-0.5 rounded-md hover:bg-plugin-raised transition-colors"
             title="Click to rename chain"
           >
-            <span className="group-hover:underline decoration-dotted underline-offset-2" style={{ textDecorationColor: 'var(--color-accent-cyan)' }}>
-              {chainName}
-            </span>
-            {targetInputPeakMin !== null && targetInputPeakMax !== null && (
-              <span
-                className="ml-2"
-                style={{
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--color-text-tertiary)',
-                  fontWeight: 400,
-                }}
-              >
-                {targetInputPeakMin} to {targetInputPeakMax} dBpk
+            <span className="truncate text-[13px] font-semibold text-plugin-text">{chainName}</span>
+            <Pencil className="w-3 h-3 text-plugin-dim opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            {targetInputLufs !== null && (
+              <span className="num flex-shrink-0 text-[10px] text-plugin-muted px-1.5 py-0.5 rounded bg-plugin-bg border border-plugin-border">
+                {targetInputLufs} LUFS
               </span>
             )}
           </button>
         )}
 
-        {/* Preset prev/next */}
-        {presets.length > 0 && (
-          <div className="flex items-center -space-x-0.5">
-            <button
-              onClick={() => navigatePreset(-1)}
-              className={`${btnBase} ${btnInactive}`}
-              title="Previous preset"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => navigatePreset(1)}
-              className={`${btnBase} ${btnInactive}`}
-              title="Next preset"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+        <div className="flex-1" />
 
-        {/* Keyboard Shortcuts Help */}
-        <button
-          onClick={() => window.dispatchEvent(new Event('showKeyboardShortcuts'))}
-          className={`${btnBase} ${btnInactive}`}
-          title="Keyboard shortcuts (?)"
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-        </button>
+        {/* Chain actions */}
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => toggle('save')}
+            className={`${btnBase} ${active === 'save' ? btnActive : btnInactive}`}
+            title="Save chain"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Save</span>
+          </button>
+          <button
+            onClick={() => toggle('load')}
+            className={`${btnBase} ${active === 'load' ? btnActive : btnInactive}`}
+            title="Open a saved chain"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Open</span>
+          </button>
+          <button
+            onClick={() => toggle('share')}
+            className={`${btnBase} ${active === 'share' ? btnActive : btnInactive}`}
+            title="Share chain"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Share</span>
+          </button>
+          <button
+            onClick={() => toggle('settings')}
+            className={`${btnBase} !px-2 ${active === 'settings' ? btnActive : btnInactive}`}
+            title="Chain settings"
+            aria-label="Chain settings"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
-        {/* Settings */}
-        <button
-          onClick={() => toggle('settings')}
-          className={`${btnBase} ${active === 'settings' ? btnActive : btnInactive}`}
-          title="Chain settings"
-        >
-          <Settings className="w-3.5 h-3.5" />
-        </button>
+        <div className="w-px h-5 bg-plugin-border mx-1" />
+
+        {/* Account */}
+        <AvatarDropdown isOpen={active === 'avatar'} onToggle={() => toggle('avatar')} onClose={close} />
       </div>
 
       {/* Dropdown panels */}
       {active === 'save' && (
-        <div className="absolute left-0 top-full z-50 mt-0.5">
+        <div className="absolute right-2 top-full z-50 mt-1">
           <SaveDropdown onClose={close} />
         </div>
       )}
 
+      {active === 'load' && (
+        <div className="absolute right-2 top-full z-50 mt-1">
+          <LoadDropdown onClose={close} />
+        </div>
+      )}
+
       {active === 'share' && (
-        <div className="absolute left-0 top-full z-50 mt-0.5">
+        <div className="absolute right-2 top-full z-50 mt-1">
           <QuickSharePanel onClose={close} />
         </div>
       )}
 
       {active === 'settings' && (
-        <div className="absolute right-0 top-full z-50 mt-0.5">
+        <div className="absolute right-2 top-full z-50 mt-1">
           <SettingsDropdown onClose={close} />
         </div>
       )}
@@ -327,240 +265,77 @@ export function HeaderMenu() {
 
 /** Quick settings dropdown for chain-level metadata */
 function SettingsDropdown({ onClose }: { onClose: () => void }) {
-  const { targetInputPeakMin, targetInputPeakMax, setTargetInputPeakRange } = useChainStore();
-  const [peakMin, setPeakMin] = useState(targetInputPeakMin ?? -12);
-  const [peakMax, setPeakMax] = useState(targetInputPeakMax ?? -6);
-  const [oversamplingFactor, setOversamplingFactor] = useState(0);
-  const [oversamplingLatencyMs, setOversamplingLatencyMs] = useState(0);
-  const [isChangingOS, setIsChangingOS] = useState(false);
+  const { targetInputLufs, setTargetInputLufs } = useChainStore();
+  const [lufsValue, setLufsValue] = useState(targetInputLufs ?? -12);
 
-  // Fetch current oversampling state on mount
-  useEffect(() => {
-    juceBridge.getOversamplingFactor().then(setOversamplingFactor).catch(() => {});
-    juceBridge.getOversamplingLatencyMs().then(setOversamplingLatencyMs).catch(() => {});
-  }, []);
-
-  const handleOversamplingChange = async (factor: number) => {
-    if (isChangingOS || factor === oversamplingFactor) return;
-    setIsChangingOS(true);
-    try {
-      const result = await juceBridge.setOversamplingFactor(factor);
-      if (result.success) {
-        setOversamplingFactor(result.factor ?? factor);
-        setOversamplingLatencyMs(result.latencyMs ?? 0);
-      }
-    } catch {
-      // Silently handle — plugin may not support it yet
-    } finally {
-      setIsChangingOS(false);
-    }
-  };
-
-  const PEAK_PRESETS = [
-    { min: -24, max: -18, label: 'Quiet' },
-    { min: -18, max: -12, label: 'Conservative' },
-    { min: -12, max: -6, label: 'Standard' },
-    { min: -6, max: -3, label: 'Hot' },
+  const LUFS_PRESETS = [
+    { value: -24, label: '-24 (Quiet)' },
+    { value: -18, label: '-18 (Conservative)' },
+    { value: -14, label: '-14 (Moderate)' },
+    { value: -12, label: '-12 (Standard)' },
+    { value: -8, label: '-8 (Hot)' },
   ];
 
-  const OS_OPTIONS = [
-    { value: 0, label: 'Off' },
-    { value: 1, label: '2x' },
-    { value: 2, label: '4x' },
-  ];
-
-  const applyPeakRange = () => {
-    setTargetInputPeakRange(peakMin, peakMax);
+  const applyLufs = () => {
+    setTargetInputLufs(lufsValue);
     onClose();
   };
 
-  const clearPeakRange = () => {
-    setTargetInputPeakRange(null, null);
+  const clearLufs = () => {
+    setTargetInputLufs(null);
     onClose();
   };
 
   return (
-    <div
-      className="w-80 rounded-md shadow-xl p-4 scale-in"
-      style={{
-        background: 'rgba(15, 15, 15, 0.9)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid var(--color-border-default)',
-        boxShadow: 'var(--shadow-elevated)',
-      }}
-    >
-      <h3
-        className="mb-3"
-        style={{
-          fontSize: 'var(--text-sm)',
-          fontFamily: 'var(--font-extended)',
-          fontWeight: 900,
-          color: '#deff0a',
-          textTransform: 'uppercase',
-          letterSpacing: 'var(--tracking-wider)',
-        }}
-      >
-        Chain Settings
+    <div className="w-72 bg-plugin-raised border border-plugin-border-bright rounded-lg shadow-panel p-4 animate-slide-up">
+      <h3 className="text-[13px] font-semibold text-plugin-text mb-3">
+        Chain settings
       </h3>
 
-      {/* Target Input Peak Range */}
+      {/* Target LUFS */}
       <div className="mb-3">
-        <label
-          className="block mb-1.5"
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-system)',
-            color: 'var(--color-text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: 'var(--tracking-wide)',
-          }}
-        >
-          Target Input Peak (dBpk)
+        <label className="block text-xs  text-plugin-muted mb-1.5">
+          Target input loudness (LUFS)
         </label>
-        <div className="flex items-center gap-2 mb-1.5">
+        <div className="flex items-center gap-2">
           <input
             type="number"
-            value={peakMin}
-            onChange={(e) => setPeakMin(Number(e.target.value))}
-            min={-60}
+            value={lufsValue}
+            onChange={(e) => setLufsValue(Number(e.target.value))}
+            min={-40}
             max={0}
             step={1}
-            className="w-16 rounded px-2 py-1 text-center focus:outline-none"
-            style={{
-              background: 'var(--color-bg-input)',
-              border: '1px solid var(--color-border-default)',
-              color: 'var(--color-text-primary)',
-              fontFamily: 'var(--font-system)',
-              fontSize: 'var(--text-sm)',
-            }}
-          />
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>to</span>
-          <input
-            type="number"
-            value={peakMax}
-            onChange={(e) => setPeakMax(Number(e.target.value))}
-            min={-60}
-            max={0}
-            step={1}
-            className="w-16 rounded px-2 py-1 text-center focus:outline-none"
-            style={{
-              background: 'var(--color-bg-input)',
-              border: '1px solid var(--color-border-default)',
-              color: 'var(--color-text-primary)',
-              fontFamily: 'var(--font-system)',
-              fontSize: 'var(--text-sm)',
-            }}
-          />
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>dBpk</span>
-        </div>
-        <div className="flex gap-1 flex-wrap">
-          {PEAK_PRESETS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => { setPeakMin(p.min); setPeakMax(p.max); }}
-              className="rounded px-2 py-0.5 transition-all duration-150"
-              style={{
-                fontSize: '10px',
-                fontFamily: 'var(--font-system)',
-                color: peakMin === p.min && peakMax === p.max ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                background: peakMin === p.min && peakMax === p.max ? 'rgba(255,255,255,0.08)' : 'transparent',
-                border: `1px solid ${peakMin === p.min && peakMax === p.max ? 'var(--color-border-default)' : 'transparent'}`,
-                cursor: 'pointer',
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-1" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-          Recommended input peak level for this chain
-        </p>
-      </div>
+            className="w-16 bg-plugin-bg border border-plugin-border rounded px-2 py-1 text-xs text-plugin-text  text-center focus:outline-none focus:ring-1 focus:ring-plugin-accent"
 
-      {/* Oversampling */}
-      <div className="mb-3">
-        <label
-          className="block mb-1.5"
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-system)',
-            color: 'var(--color-text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: 'var(--tracking-wide)',
-          }}
-        >
-          Oversampling
-        </label>
-        <div
-          className="flex rounded overflow-hidden"
-          style={{
-            border: '1px solid var(--color-border-default)',
-          }}
-        >
-          {OS_OPTIONS.map((opt) => {
-            const isActive = oversamplingFactor === opt.value;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => handleOversamplingChange(opt.value)}
-                disabled={isChangingOS}
-                className="flex-1 py-1.5 text-center transition-all duration-150"
-                style={{
-                  fontSize: 'var(--text-xs)',
-                  fontFamily: 'var(--font-system)',
-                  fontWeight: isActive ? 700 : 400,
-                  color: isActive ? 'var(--color-accent-cyan)' : 'var(--color-text-secondary)',
-                  background: isActive ? 'rgba(0, 240, 255, 0.1)' : 'transparent',
-                  borderRight: opt.value < 2 ? '1px solid var(--color-border-default)' : 'none',
-                  boxShadow: isActive ? '0 0 12px rgba(0, 240, 255, 0.2) inset' : 'none',
-                  textTransform: 'uppercase',
-                  letterSpacing: 'var(--tracking-wide)',
-                  opacity: isChangingOS ? 0.5 : 1,
-                  cursor: isChangingOS ? 'wait' : 'pointer',
-                }}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+          />
+          <span className="text-[11px] text-plugin-dim">dB</span>
+          <select
+            value={lufsValue}
+            onChange={(e) => setLufsValue(Number(e.target.value))}
+            className="flex-1 bg-plugin-bg border border-plugin-border rounded px-2 py-1 text-xs  text-plugin-muted focus:outline-none"
+          >
+            {LUFS_PRESETS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
         </div>
-        {oversamplingFactor > 0 && (
-          <p className="mt-1" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-            +{oversamplingLatencyMs.toFixed(1)}ms latency
-          </p>
-        )}
-        <p className="mt-0.5" style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', opacity: 0.7 }}>
-          Reduces aliasing from non-linear plugins
+        <p className="text-[11px] text-plugin-dim mt-1">
+          Recommended input level for this chain
         </p>
       </div>
 
       <div className="flex gap-2">
         <button
-          onClick={clearPeakRange}
-          className="flex-1 rounded px-2 py-1.5 transition-all duration-150"
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontFamily: 'var(--font-system)',
-            color: 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border-default)',
-            background: 'transparent',
-            textTransform: 'uppercase',
-            letterSpacing: 'var(--tracking-wide)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-border-focus)';
-            e.currentTarget.style.color = 'var(--color-text-primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-border-default)';
-            e.currentTarget.style.color = 'var(--color-text-secondary)';
-          }}
+          onClick={clearLufs}
+          className="flex-1 text-xs text-plugin-muted hover:text-plugin-text border border-plugin-border rounded px-2 py-1.5 transition-colors"
         >
-          Clear
+          Clear Target
         </button>
         <button
-          onClick={applyPeakRange}
-          className="btn btn-primary flex-1"
+          onClick={applyLufs}
+          className="flex-1 text-xs text-plugin-on-accent bg-plugin-accent hover:bg-plugin-accent-bright rounded-md px-2 py-1.5 font-semibold transition-colors"
         >
           Apply
         </button>

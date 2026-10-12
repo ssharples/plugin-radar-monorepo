@@ -45,3 +45,12 @@ apps/desktop/ui/_deps/
 apps/desktop/ui/*_artefacts/
 apps/desktop/ui/juce_binarydata_*/
 apps/desktop/ui/*.cmake
+# Plugin quality tooling (dependencies and generated evidence)
+.quality-venv/
+.quality-cache/
+reports/quality/
+**/.stryker-tmp/
+apps/desktop/ui/reports/
+tools/quality/**/__pycache__/
+tools/quality/js/out/
+tools/quality/js/node_modules/

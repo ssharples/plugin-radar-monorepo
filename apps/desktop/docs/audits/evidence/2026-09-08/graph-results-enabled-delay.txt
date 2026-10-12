@@ -1,0 +1,11 @@
+delay_processor_inputs=2 delay_processor_outputs=2
+active_output=2
+bypass_output=1 bypass_process_calls=1
+first_drywet_zero_output=2
+after_rebuild_drywet_zero_output=1
+serial_drywet_pdc tree_latency=64 graph_latency=64 impulses=64:1 
+parallel_pdc tree_latency=64 graph_latency=64 impulses=64:1 
+muted_long_branch tree_latency=64 graph_latency=0 impulses=0:1 
+parallel_midi_notes=72 
+restored_group_branch_gain=0 restored_group_mute=0
+synthetic_add_timings_ms=1:0.137042 5:0.778542 10:3.77154 20:3.21521 

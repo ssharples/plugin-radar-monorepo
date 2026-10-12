@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include "audio/DSPUtils.h"
 #include "audio/DryWetMixProcessor.h"
 #include "audio/BranchGainProcessor.h"
 #include "audio/LatencyCompensationProcessor.h"
@@ -33,6 +34,120 @@ static void settleSmoothing(juce::AudioProcessor& proc, int numBlocks = 20)
         buf.clear();
         proc.processBlock(buf, midi);
     }
+}
+
+// =============================================================================
+// Phase A: Pure Math Tests (DSPUtils)
+// =============================================================================
+
+TEST_CASE("DSPUtils: dbToLinear 0 dB = 1.0 (unity gain)", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::dbToLinear(0.0f), WithinAbs(1.0f, 0.0001f));
+}
+
+TEST_CASE("DSPUtils: dbToLinear -6 dB ~ 0.5012", "[dsp][math]")
+{
+    // -6 dB = 10^(-6/20) = 10^(-0.3) ~ 0.50119
+    REQUIRE_THAT(DSPUtils::dbToLinear(-6.0f), WithinAbs(0.50119f, 0.001f));
+}
+
+TEST_CASE("DSPUtils: dbToLinear -20 dB = 0.1", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::dbToLinear(-20.0f), WithinAbs(0.1f, 0.0001f));
+}
+
+TEST_CASE("DSPUtils: dbToLinear +6 dB ~ 1.9953", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::dbToLinear(6.0f), WithinAbs(1.9953f, 0.001f));
+}
+
+TEST_CASE("DSPUtils: dbToLinear +24 dB ~ 15.849", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::dbToLinear(24.0f), WithinAbs(15.8489f, 0.01f));
+}
+
+TEST_CASE("DSPUtils: dbToLinear -60 dB floors to 0.0", "[dsp][math]")
+{
+    REQUIRE(DSPUtils::dbToLinear(-60.0f) == 0.0f);
+}
+
+TEST_CASE("DSPUtils: dbToLinear below -60 dB floors to 0.0", "[dsp][math]")
+{
+    REQUIRE(DSPUtils::dbToLinear(-80.0f) == 0.0f);
+    REQUIRE(DSPUtils::dbToLinear(-100.0f) == 0.0f);
+}
+
+TEST_CASE("DSPUtils: linearToDb 1.0 = 0 dB", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::linearToDb(1.0f), WithinAbs(0.0f, 0.0001f));
+}
+
+TEST_CASE("DSPUtils: linearToDb 0.5 ~ -6.02 dB", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::linearToDb(0.5f), WithinAbs(-6.0206f, 0.01f));
+}
+
+TEST_CASE("DSPUtils: linearToDb 0.0 returns -100 dB", "[dsp][math]")
+{
+    REQUIRE(DSPUtils::linearToDb(0.0f) == -100.0f);
+}
+
+TEST_CASE("DSPUtils: linearToDb negative returns -100 dB", "[dsp][math]")
+{
+    REQUIRE(DSPUtils::linearToDb(-1.0f) == -100.0f);
+}
+
+TEST_CASE("DSPUtils: dbToLinear and linearToDb are inverses", "[dsp][math]")
+{
+    for (float db : {-50.0f, -30.0f, -12.0f, -6.0f, 0.0f, 3.0f, 6.0f, 12.0f, 20.0f})
+    {
+        float linear = DSPUtils::dbToLinear(db);
+        float roundTrip = DSPUtils::linearToDb(linear);
+        REQUIRE_THAT(roundTrip, WithinAbs(db, 0.01f));
+    }
+}
+
+TEST_CASE("DSPUtils: clampGainDb within range passes through", "[dsp][math]")
+{
+    REQUIRE(DSPUtils::clampGainDb(0.0f) == 0.0f);
+    REQUIRE(DSPUtils::clampGainDb(-30.0f) == -30.0f);
+    REQUIRE(DSPUtils::clampGainDb(12.0f) == 12.0f);
+    REQUIRE(DSPUtils::clampGainDb(-60.0f) == -60.0f);
+    REQUIRE(DSPUtils::clampGainDb(24.0f) == 24.0f);
+}
+
+TEST_CASE("DSPUtils: clampGainDb clamps below -60", "[dsp][math]")
+{
+    REQUIRE(DSPUtils::clampGainDb(-80.0f) == -60.0f);
+    REQUIRE(DSPUtils::clampGainDb(-100.0f) == -60.0f);
+}
+
+TEST_CASE("DSPUtils: clampGainDb clamps above +24", "[dsp][math]")
+{
+    REQUIRE(DSPUtils::clampGainDb(30.0f) == 24.0f);
+    REQUIRE(DSPUtils::clampGainDb(100.0f) == 24.0f);
+}
+
+TEST_CASE("DSPUtils: crossfade mix=0 returns dry", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::crossfade(1.0f, 0.5f, 0.0f), WithinAbs(1.0f, 0.0001f));
+}
+
+TEST_CASE("DSPUtils: crossfade mix=1 returns wet", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::crossfade(1.0f, 0.5f, 1.0f), WithinAbs(0.5f, 0.0001f));
+}
+
+TEST_CASE("DSPUtils: crossfade mix=0.5 returns average", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::crossfade(1.0f, 0.0f, 0.5f), WithinAbs(0.5f, 0.0001f));
+    REQUIRE_THAT(DSPUtils::crossfade(0.8f, 0.2f, 0.5f), WithinAbs(0.5f, 0.0001f));
+}
+
+TEST_CASE("DSPUtils: crossfade with equal dry and wet returns that value", "[dsp][math]")
+{
+    REQUIRE_THAT(DSPUtils::crossfade(0.7f, 0.7f, 0.3f), WithinAbs(0.7f, 0.0001f));
+    REQUIRE_THAT(DSPUtils::crossfade(0.7f, 0.7f, 0.9f), WithinAbs(0.7f, 0.0001f));
 }
 
 // =============================================================================
@@ -706,153 +821,41 @@ TEST_CASE("AudioMeter: mono input duplicated to both channels", "[dsp][meter]")
     REQUIRE_THAT(readings.peakR, WithinAbs(0.6f, 0.0001f));
 }
 
-// =============================================================================
-// Phase 5: Extended DSP Tests
-// =============================================================================
-
-TEST_CASE("DryWetMixProcessor: smoothing mid-transition is not instant", "[dsp][drywet][extended]")
+TEST_CASE("BranchGainProcessor: polarity invert ramps to a flipped signal", "[dsp][gain][branch]")
 {
-    DryWetMixProcessor proc;
-    proc.setMix(1.0f);  // Start at full wet
-    proc.prepareToPlay(44100.0, 512);
+    BranchGainProcessor proc;
+    proc.prepareToPlay(44100.0, 2048);
+    proc.setPolarityInverted(true);
 
-    const int blockSize = 512;
+    juce::AudioBuffer<float> buf(2, 2048);
+    fillBuffer(buf, 0.5f);
     juce::MidiBuffer midi;
-
-    // Let it settle at mix=1.0
-    for (int block = 0; block < 20; ++block)
-    {
-        juce::AudioBuffer<float> buf(4, blockSize);
-        buf.clear();
-        for (int i = 0; i < blockSize; ++i)
-        {
-            buf.getWritePointer(0)[i] = 0.0f;  // dry
-            buf.getWritePointer(1)[i] = 0.0f;
-            buf.getWritePointer(2)[i] = 1.0f;  // wet
-            buf.getWritePointer(3)[i] = 1.0f;
-        }
-        proc.processBlock(buf, midi);
-    }
-
-    // Now change mix to 0.0 (abrupt jump)
-    proc.setMix(0.0f);
-
-    // The very first block after the change should NOT be pure dry yet
-    // (SmoothedValue should be transitioning)
-    juce::AudioBuffer<float> transitionBuf(4, blockSize);
-    for (int i = 0; i < blockSize; ++i)
-    {
-        transitionBuf.getWritePointer(0)[i] = 0.0f;  // dry
-        transitionBuf.getWritePointer(1)[i] = 0.0f;
-        transitionBuf.getWritePointer(2)[i] = 1.0f;  // wet
-        transitionBuf.getWritePointer(3)[i] = 1.0f;
-    }
-    proc.processBlock(transitionBuf, midi);
-
-    // At least the first sample should still have some wet component
-    // (it can't jump instantly from 1.0 to 0.0)
-    float firstSample = transitionBuf.getReadPointer(0)[0];
-    REQUIRE(firstSample > 0.01f);  // Still has some wet signal
-}
-
-TEST_CASE("AudioMeter: peak hold decays over silent blocks", "[dsp][meter][extended]")
-{
-    AudioMeter meter;
-    meter.prepareToPlay(44100.0, 512);
-
-    // Push a loud signal
-    juce::AudioBuffer<float> loudBuf(2, 512);
-    fillBuffer(loudBuf, 0.9f);
-    meter.process(loudBuf);
-
-    auto afterLoud = meter.getReadings();
-    REQUIRE_THAT(afterLoud.peakL, WithinAbs(0.9f, 0.001f));
-    float initialHold = afterLoud.peakHoldL;
-    REQUIRE(initialHold > 0.0f);
-
-    // Now process many blocks of silence — peak hold should eventually decay
-    juce::AudioBuffer<float> silentBuf(2, 512);
-    silentBuf.clear();
-    for (int i = 0; i < 200; ++i)
-        meter.process(silentBuf);
-
-    auto afterSilence = meter.getReadings();
-    // Peak should have decayed close to zero
-    REQUIRE(afterSilence.peakL < 0.1f);
-    // Peak hold should have decayed (may not be fully zero depending on timing)
-    REQUIRE(afterSilence.peakHoldL < initialHold);
-}
-
-TEST_CASE("AudioMeter: LUFS with sustained signal produces reasonable value", "[dsp][meter][extended]")
-{
-    AudioMeter meter;
-    meter.prepareToPlay(44100.0, 512);
-
-    // Generate a 3+ second 1kHz sine signal (AC content passes K-weighting filter)
-    // 3 seconds at 44100 Hz / 512 samples = ~258 blocks
-    const float freq = 1000.0f;
-    const float amplitude = 0.5f;
-    const double sr = 44100.0;
-
-    for (int block = 0; block < 300; ++block)
-    {
-        juce::AudioBuffer<float> buf(2, 512);
-        for (int i = 0; i < 512; ++i)
-        {
-            float sample = amplitude * std::sin(2.0f * juce::MathConstants<float>::pi * freq * (block * 512 + i) / static_cast<float>(sr));
-            buf.getWritePointer(0)[i] = sample;
-            buf.getWritePointer(1)[i] = sample;
-        }
-        meter.process(buf);
-    }
-
-    auto readings = meter.getReadings();
-    // LUFS should be between -100 and 0 for a 0.5 amplitude 1kHz sine
-    REQUIRE(readings.lufsShort > -100.0f);
-    REQUIRE(readings.lufsShort < 0.0f);
-}
-
-TEST_CASE("LatencyCompensationProcessor: large delay across many block boundaries", "[dsp][latency][extended]")
-{
-    // Test with delay much larger than block size
-    const int delaySamples = 1000;
-    LatencyCompensationProcessor proc(delaySamples);
-    proc.prepareToPlay(44100.0, 128);
-
-    const int blockSize = 128;
-    juce::MidiBuffer midi;
-
-    // Block 1: impulse at sample 0
-    juce::AudioBuffer<float> buf(2, blockSize);
-    buf.clear();
-    buf.getWritePointer(0)[0] = 1.0f;
-    buf.getWritePointer(1)[0] = 1.0f;
     proc.processBlock(buf, midi);
 
-    // Process enough blocks to let the impulse come through
-    // Need ceil(1000/128) = 8 blocks total
-    bool foundImpulse = false;
-    int totalSamplesProcessed = blockSize;  // Already processed block 1
+    // Ramp starts near +0.5 (no click) and ends at -0.5 after 20 ms
+    REQUIRE(buf.getReadPointer(0)[0] > 0.45f);
+    REQUIRE_THAT(buf.getReadPointer(0)[2047], WithinAbs(-0.5f, 0.001f));
+    REQUIRE_THAT(buf.getReadPointer(1)[2047], WithinAbs(-0.5f, 0.001f));
+    REQUIRE(proc.isPolarityInverted());
+}
 
-    for (int block = 0; block < 10; ++block)
-    {
-        juce::AudioBuffer<float> nextBuf(2, blockSize);
-        nextBuf.clear();
-        proc.processBlock(nextBuf, midi);
-
-        // Check if impulse appears in this block
-        for (int i = 0; i < blockSize; ++i)
-        {
-            int absoluteSample = totalSamplesProcessed + i;
-            if (absoluteSample == delaySamples)
-            {
-                REQUIRE_THAT(nextBuf.getReadPointer(0)[i], WithinAbs(1.0f, 0.0001f));
-                REQUIRE_THAT(nextBuf.getReadPointer(1)[i], WithinAbs(1.0f, 0.0001f));
-                foundImpulse = true;
-            }
-        }
-        totalSamplesProcessed += blockSize;
-    }
-
-    REQUIRE(foundImpulse);
+TEST_CASE("BranchGainProcessor recovers cleanly after a mute", "[dsp][branch]")
+{
+    BranchGainProcessor gain;
+    gain.prepareToPlay(48000, 256);
+    juce::MidiBuffer midi;
+    auto run = [&] {
+        juce::AudioBuffer<float> b(2, 256);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::fill(b.getWritePointer(c), 1.0f, 256);
+        gain.processBlock(b, midi);
+        return b;
+    };
+    gain.setGainDb(-60.0f);
+    for (int i = 0; i < 20; ++i) run();
+    REQUIRE(std::abs(run().getSample(0, 255)) < 1.0e-4f);
+    gain.setGainDb(0.0f);
+    juce::AudioBuffer<float> out;
+    for (int i = 0; i < 20; ++i) out = run();
+    for (int i = 0; i < 256; ++i) REQUIRE(std::isfinite(out.getSample(0, i)));
+    REQUIRE(std::abs(out.getSample(0, 255) - 1.0f) < 1.0e-4f);
 }

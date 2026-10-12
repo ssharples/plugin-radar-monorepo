@@ -9,6 +9,8 @@ vi.mock('../../components/WaveformDisplay', () => ({ WaveformDisplay: () => <div
 vi.mock('../../components/SpectrumAnalyzer', () => ({ SpectrumAnalyzer: () => <div data-testid="spectrum" /> }))
 vi.mock('../../components/PresetBrowser', () => ({ PresetModal: () => <div data-testid="preset-modal" /> }))
 vi.mock('../../components/Footer', () => ({ Footer: () => <div data-testid="footer">Footer</div> }))
+vi.mock('../../components/HeaderMenu', () => ({ HeaderMenu: () => <div data-testid="header-menu" /> }))
+vi.mock('../../components/ChainBrowser', () => ({ ChainBrowser: () => <div data-testid="chain-library" /> }))
 vi.mock('../Onboarding/OnboardingFlow', () => ({ OnboardingFlow: () => <div data-testid="onboarding-flow">Onboarding</div> }))
 vi.mock('../../stores/presetStore', () => ({
   usePresetStore: () => ({ currentPreset: null, fetchPresets: vi.fn() }),
@@ -27,14 +29,9 @@ vi.mock('../../api/juce-bridge', () => ({
   juceBridge: {
     startWaveformStream: vi.fn().mockResolvedValue({}),
     stopWaveformStream: vi.fn().mockResolvedValue({}),
+    setAnalysisSubscriptions: vi.fn().mockResolvedValue({}),
   },
 }))
-// Mock image imports
-vi.mock('../../assets/ui-bg.png', () => ({ default: 'ui-bg.png' }))
-vi.mock('../../assets/header.png', () => ({ default: 'header.png' }))
-vi.mock('../../assets/analyzer-container.png', () => ({ default: 'analyzer-container.png' }))
-vi.mock('../../assets/analyzer-display.png', () => ({ default: 'analyzer-display.png' }))
-vi.mock('../../assets/input-button-bg.png', () => ({ default: 'input-button-bg.png' }))
 
 describe('App', () => {
   beforeEach(() => {

@@ -10,7 +10,7 @@
  *
  * Captures peak values from audio buffers in a ring buffer pattern.
  * Safe to call from the audio thread (pushPreSamples/pushPostSamples).
- * Safe to call from the UI thread (getSnapshot).
+ * Safe to call from the UI thread (getPrePeaks/getPostPeaks).
  *
  * Uses a shared write index so pre (input) and post (output) peaks are
  * always time-aligned in the ring buffer. Supports latency compensation
@@ -22,13 +22,6 @@ public:
     static constexpr size_t NUM_PEAKS = 256;  // Number of peak values to store
     static constexpr int SAMPLES_PER_PEAK = 512;  // Samples averaged per peak
     static constexpr int MAX_DELAY_SAMPLES = 48000;  // Max 1 second at 48kHz
-
-    // PHASE 3: Zero-allocation snapshot struct (returned by value, no heap allocation)
-    struct PeakSnapshot
-    {
-        std::array<float, NUM_PEAKS> prePeaks;
-        std::array<float, NUM_PEAKS> postPeaks;
-    };
 
     WaveformCapture();
     ~WaveformCapture() = default;
@@ -42,8 +35,11 @@ public:
     /** Call from audio thread AFTER processing */
     void pushPostSamples(const juce::AudioBuffer<float>& buffer);
 
-    /** PHASE 3: Get snapshot of both pre/post peaks (UI thread safe, no allocation) */
-    PeakSnapshot getSnapshot() const;
+    /** Get current pre-processing peak data (UI thread safe) */
+    std::vector<float> getPrePeaks() const;
+
+    /** Get current post-processing peak data (UI thread safe) */
+    std::vector<float> getPostPeaks() const;
 
     /** Reset capture state */
     void reset();
@@ -59,7 +55,10 @@ private:
     // Shared sample accumulator — driven by pushPostSamples (the "clock")
     float preAccumulator = 0.0f;
     float postAccumulator = 0.0f;
-    int sampleCount = 0;  // Single counter shared between pre and post
+    int sampleCount = 0;
+    int preSampleCount = 0;
+    std::array<float, NUM_PEAKS * 4> pendingPrePeaks{};
+    size_t pendingPreRead = 0, pendingPreWrite = 0;
 
     // Delay line for latency compensation (stores peaks, not samples)
     static constexpr size_t MAX_DELAY_PEAKS = MAX_DELAY_SAMPLES / SAMPLES_PER_PEAK + 1;
