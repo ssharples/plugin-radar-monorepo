@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
+import { getSessionUser } from "./lib/auth";
 
 // =============================================================================
 // ADMIN ENRICHMENT TRIGGERS
@@ -13,13 +14,13 @@ import { api } from "./_generated/api";
 export const queueEnrichment = mutation({
   args: {
     pluginId: v.id("plugins"),
-    userId: v.id("users"),
+    sessionToken: v.string(),
     priority: v.optional(v.string()), // "high", "normal", "low"
   },
   handler: async (ctx, args) => {
     // Verify user is admin
-    const user = await ctx.db.get(args.userId);
-    if (!user?.isAdmin) {
+    const { userId, user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) {
       throw new Error("Unauthorized: Admin access required");
     }
     
@@ -38,7 +39,7 @@ export const queueEnrichment = mutation({
       pluginName: plugin.name,
       status: "pending",
       priority: args.priority || "normal",
-      requestedBy: args.userId,
+      requestedBy: userId,
       requestedAt: now,
     });
     
@@ -158,8 +159,11 @@ export const webhookTrigger = mutation({
     apiKey: v.string(), // Simple API key for auth
   },
   handler: async (ctx, args) => {
-    // Simple API key verification (set as env var ENRICHMENT_API_KEY)
-    const expectedKey = process.env.ENRICHMENT_API_KEY || "pluginradar-enrich-2026";
+    // API key verification (requires ENRICHMENT_API_KEY env var)
+    const expectedKey = process.env.ENRICHMENT_API_KEY;
+    if (!expectedKey) {
+      throw new Error("ENRICHMENT_API_KEY environment variable is not set");
+    }
     if (args.apiKey !== expectedKey) {
       throw new Error("Invalid API key");
     }
@@ -202,5 +206,101 @@ export const webhookTrigger = mutation({
     }
     
     return { success: false, error: "Invalid action" };
+  },
+});
+
+// =============================================================================
+// ENRICHMENT QUEUE (auto-queued unmatched plugins)
+// =============================================================================
+
+/**
+ * Claim the next pending queue item for processing (agent polls this)
+ * Picks highest priority first, then oldest.
+ */
+export const claimNextQueueItem = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Try high → normal → low priority
+    for (const priority of ["high", "normal", "low"]) {
+      const item = await ctx.db
+        .query("enrichmentQueue")
+        .withIndex("by_priority_status", (q) =>
+          q.eq("priority", priority).eq("status", "pending")
+        )
+        .first();
+
+      if (item) {
+        await ctx.db.patch(item._id, {
+          status: "processing",
+          processedAt: Date.now(),
+        });
+        return {
+          id: item._id,
+          pluginName: item.pluginName,
+          manufacturer: item.manufacturer,
+          format: item.format,
+          userCount: item.userCount,
+        };
+      }
+    }
+    return null;
+  },
+});
+
+/**
+ * Complete a queue item after enrichment (success or failure)
+ */
+export const completeQueueItem = mutation({
+  args: {
+    queueItemId: v.id("enrichmentQueue"),
+    status: v.union(v.literal("completed"), v.literal("failed")),
+    createdPluginId: v.optional(v.id("plugins")),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.queueItemId);
+    if (!item) throw new Error("Queue item not found");
+
+    const updates: Record<string, any> = {
+      status: args.status,
+      processedAt: Date.now(),
+    };
+
+    if (args.createdPluginId) {
+      updates.createdPluginId = args.createdPluginId;
+    }
+    if (args.error) {
+      updates.error = args.error;
+    }
+
+    await ctx.db.patch(args.queueItemId, updates);
+    return { success: true };
+  },
+});
+
+/**
+ * List enrichment queue items (admin dashboard)
+ */
+export const listEnrichmentQueue = query({
+  args: {
+    status: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+
+    const items = args.status
+      ? await ctx.db
+          .query("enrichmentQueue")
+          .withIndex("by_status", (idx) => idx.eq("status", args.status!))
+          .order("desc")
+          .take(limit)
+      : await ctx.db
+          .query("enrichmentQueue")
+          .order("desc")
+          .take(limit);
+
+    // Sort by userCount descending for display
+    return items.sort((a, b) => b.userCount - a.userCount);
   },
 });

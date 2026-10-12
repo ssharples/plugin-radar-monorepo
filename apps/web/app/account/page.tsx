@@ -2,10 +2,10 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
-import { User, SignOut, Heart, Bell, Package, Shield } from "@phosphor-icons/react";
+import { User, SignOut, LinkSimple, DownloadSimple, Shield, GraduationCap } from "@phosphor-icons/react";
 
 export default function AccountPage() {
   const { user, isLoading, isAuthenticated, isAdmin, login, register, logout } = useAuth();
@@ -17,6 +17,15 @@ export default function AccountPage() {
   const [error, setError] = useState("");
 
   const updatePreferences = useMutation(api.users.updatePreferences);
+  const upsertProfile = useMutation(api.userProfiles.upsertProfile);
+  const setEducatorStatusMutation = useMutation(api.pluginDirectory.setEducatorStatus);
+  const userProfile = useQuery(
+    api.userProfiles.getProfile,
+    isAuthenticated && user ? { sessionToken: localStorage.getItem("pluginradar_session") || "" } : "skip"
+  );
+
+  const [educatorBio, setEducatorBio] = useState("");
+  const [educatorSaving, setEducatorSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +53,7 @@ export default function AccountPage() {
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 lg:px-6 py-16 text-center">
-        <div className="animate-spin w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full mx-auto" />
+        <div className="animate-spin w-8 h-8 border-2 border-[#deff0a] border-t-transparent rounded-full mx-auto" />
       </div>
     );
   }
@@ -52,13 +61,13 @@ export default function AccountPage() {
   if (!isAuthenticated) {
     return (
       <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent pointer-events-none" />
 
         <div className="container mx-auto px-4 lg:px-6 py-16 relative">
           <div className="max-w-md mx-auto">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User className="w-8 h-8 text-amber-400" />
+              <div className="w-16 h-16 bg-white/10 border border-[#deff0a]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <User className="w-8 h-8 text-white" />
               </div>
               <h1
                 className="text-2xl font-bold text-stone-100 mb-2"
@@ -68,8 +77,8 @@ export default function AccountPage() {
               </h1>
               <p className="text-stone-400">
                 {mode === "login"
-                  ? "Sign in to track wishlists, set price alerts, and manage your plugin collection."
-                  : "Join PluginRadar to track your favorite plugins."}
+                  ? "Sign in to share plugin chains, browse community presets, and download ProChain."
+                  : "Join Plugin Radar to discover and share plugin chains."}
               </p>
             </div>
 
@@ -82,7 +91,7 @@ export default function AccountPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your name"
-                    className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 transition"
+                    className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-[#deff0a]/50 transition"
                   />
                 </div>
               )}
@@ -94,7 +103,7 @@ export default function AccountPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 transition"
+                  className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-[#deff0a]/50 transition"
                   required
                 />
               </div>
@@ -107,7 +116,7 @@ export default function AccountPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   minLength={6}
-                  className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 transition"
+                  className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-[#deff0a]/50 transition"
                   required
                 />
               </div>
@@ -121,14 +130,23 @@ export default function AccountPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-white/[0.06] disabled:text-stone-500 text-stone-900 font-semibold py-3 rounded-xl transition shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30"
+                className="w-full bg-white hover:bg-[#ccff00] disabled:bg-white/[0.06] disabled:text-stone-500 text-stone-900 font-semibold py-3 rounded-xl transition shadow-lg shadow-[#deff0a]/20 hover:shadow-[#deff0a]/30"
               >
                 {isSubmitting
                   ? "Loading..."
                   : mode === "login"
-                  ? "Sign In"
-                  : "Create Account"}
+                    ? "Sign In"
+                    : "Create Account"}
               </button>
+
+              {mode === "login" && (
+                <Link
+                  href="/forgot-password"
+                  className="block text-center text-sm text-stone-500 hover:text-[#deff0a] transition mt-3"
+                >
+                  Forgot your password?
+                </Link>
+              )}
             </form>
 
             <p className="text-center text-stone-400 text-sm mt-4">
@@ -137,7 +155,7 @@ export default function AccountPage() {
                   Don&apos;t have an account?{" "}
                   <button
                     onClick={() => setMode("register")}
-                    className="text-amber-400 hover:text-amber-300 transition"
+                    className="text-white hover:text-[#deff0a] transition"
                   >
                     Sign up
                   </button>
@@ -147,7 +165,7 @@ export default function AccountPage() {
                   Already have an account?{" "}
                   <button
                     onClick={() => setMode("login")}
-                    className="text-amber-400 hover:text-amber-300 transition"
+                    className="text-white hover:text-[#deff0a] transition"
                   >
                     Sign in
                   </button>
@@ -162,7 +180,7 @@ export default function AccountPage() {
 
   return (
     <div className="relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-transparent pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-6 py-10 relative">
         <p className="text-xs text-stone-500 uppercase tracking-wider mb-3">Settings</p>
@@ -179,14 +197,14 @@ export default function AccountPage() {
           {/* Profile Card */}
           <div className="glass-card rounded-xl p-6">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-amber-400" />
+              <div className="w-16 h-16 bg-white/10 border border-[#deff0a]/20 rounded-full flex items-center justify-center">
+                <User className="w-8 h-8 text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="font-semibold text-stone-100">{user?.name || "User"}</h2>
                   {isAdmin && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-xs text-amber-400">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 border border-[#deff0a]/30 rounded text-xs text-white">
                       <Shield className="w-3 h-3" weight="fill" />
                       Admin
                     </span>
@@ -206,8 +224,22 @@ export default function AccountPage() {
                 </span>
               </div>
               <div className="flex justify-between text-stone-400">
-                <span>Account tier</span>
-                <span className="text-amber-400 capitalize">{user?.tier || "free"}</span>
+                <span>License</span>
+                {user?.hasPurchased ? (
+                  <span className="text-[#deff0a]">Licensed (Perpetual)</span>
+                ) : user?.trialEndsAt && user.trialEndsAt > Date.now() ? (
+                  <span className="text-[#deff0a]">
+                    Trial — {Math.ceil((user.trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24))}d left
+                  </span>
+                ) : user?.trialEndsAt ? (
+                  <Link href="/pricing" className="text-stone-300 hover:text-[#deff0a] transition">
+                    Trial ended — Buy ProChain
+                  </Link>
+                ) : (
+                  <Link href="/pricing" className="text-stone-300 hover:text-[#deff0a] transition">
+                    Start Free Trial
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -225,25 +257,18 @@ export default function AccountPage() {
             <h3 className="font-semibold text-stone-100 mb-4">Quick Links</h3>
             <div className="space-y-2">
               <Link
-                href="/wishlist"
+                href="/chains"
                 className="flex items-center gap-3 p-3 bg-white/[0.03] hover:bg-white/[0.06] rounded-xl transition border border-transparent hover:border-white/[0.06]"
               >
-                <Heart className="w-5 h-5 text-pink-400" />
-                <span className="text-stone-200">My Wishlist</span>
+                <LinkSimple className="w-5 h-5 text-[#deff0a]" />
+                <span className="text-stone-200">My Chains</span>
               </Link>
               <Link
-                href="/alerts"
+                href="/download"
                 className="flex items-center gap-3 p-3 bg-white/[0.03] hover:bg-white/[0.06] rounded-xl transition border border-transparent hover:border-white/[0.06]"
               >
-                <Bell className="w-5 h-5 text-amber-400" />
-                <span className="text-stone-200">Price Alerts</span>
-              </Link>
-              <Link
-                href="/collection"
-                className="flex items-center gap-3 p-3 bg-white/[0.03] hover:bg-white/[0.06] rounded-xl transition border border-transparent hover:border-white/[0.06]"
-              >
-                <Package className="w-5 h-5 text-blue-400" />
-                <span className="text-stone-200">My Collection</span>
+                <DownloadSimple className="w-5 h-5 text-white" />
+                <span className="text-stone-200">Download ProChain</span>
               </Link>
             </div>
           </div>
@@ -263,7 +288,7 @@ export default function AccountPage() {
                       emailDigest: e.target.value,
                     })
                   }
-                  className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 focus:outline-none focus:border-amber-500/50 transition"
+                  className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 focus:outline-none focus:border-[#deff0a]/50 transition"
                 >
                   <option value="none">None</option>
                   <option value="daily">Daily</option>
@@ -281,7 +306,7 @@ export default function AccountPage() {
                       preferredCurrency: e.target.value,
                     })
                   }
-                  className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 focus:outline-none focus:border-amber-500/50 transition"
+                  className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 focus:outline-none focus:border-[#deff0a]/50 transition"
                 >
                   <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (&euro;)</option>
@@ -290,6 +315,146 @@ export default function AccountPage() {
               </div>
             </div>
           </div>
+
+          {/* Educator Mode */}
+          <div className="glass-card rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <GraduationCap className="w-5 h-5 text-[#deff0a]" weight="fill" />
+              <h3 className="font-semibold text-stone-100">Educator Mode</h3>
+            </div>
+            <p className="text-xs text-stone-500 mb-4">
+              Educators can annotate their shared chains with mixing explanations, difficulty levels, and teaching notes.
+            </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="block text-stone-300 font-medium text-sm">Enable Educator Mode</label>
+                  <p className="text-xs text-stone-500 mt-0.5">Show an educator badge on your chains and profile.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={user?.isEducator ?? false}
+                    onChange={async (e) => {
+                      const token = localStorage.getItem("pluginradar_session");
+                      if (!token) return;
+                      setEducatorSaving(true);
+                      try {
+                        await setEducatorStatusMutation({
+                          sessionToken: token,
+                          isEducator: e.target.checked,
+                          educatorBio: educatorBio || undefined,
+                        });
+                      } finally {
+                        setEducatorSaving(false);
+                      }
+                    }}
+                  />
+                  <div className="w-11 h-6 bg-white/[0.1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#deff0a]"></div>
+                </label>
+              </div>
+
+              {user?.isEducator && (
+                <div>
+                  <label className="block text-stone-300 text-sm mb-2">Educator Bio</label>
+                  <textarea
+                    value={educatorBio}
+                    onChange={(e) => setEducatorBio(e.target.value)}
+                    placeholder="Tell learners about your experience..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-stone-100 placeholder-stone-500 focus:outline-none focus:border-[#deff0a]/50 transition text-sm resize-none"
+                  />
+                  <button
+                    onClick={async () => {
+                      const token = localStorage.getItem("pluginradar_session");
+                      if (!token) return;
+                      setEducatorSaving(true);
+                      try {
+                        await setEducatorStatusMutation({
+                          sessionToken: token,
+                          isEducator: true,
+                          educatorBio: educatorBio || undefined,
+                        });
+                      } finally {
+                        setEducatorSaving(false);
+                      }
+                    }}
+                    disabled={educatorSaving}
+                    className="mt-2 px-4 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-stone-200 rounded-lg text-sm transition disabled:opacity-50"
+                  >
+                    {educatorSaving ? "Saving..." : "Save Bio"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Privacy Settings */}
+          {userProfile && (
+            <div className="glass-card rounded-xl p-6">
+              <h3 className="font-semibold text-stone-100 mb-4">Privacy</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-stone-300 font-medium text-sm">Show Owned Plugins</label>
+                    <p className="text-xs text-stone-500 mt-0.5">Allow others to see the plugins in your library.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={userProfile.showOwnedPlugins !== false}
+                      onChange={(e) => {
+                        const token = localStorage.getItem("pluginradar_session");
+                        if (user && token) {
+                          upsertProfile({
+                            sessionToken: token,
+                            username: userProfile.username,
+                            email: userProfile.email,
+                            phoneNumber: userProfile.phoneNumber,
+                            instagramHandle: userProfile.instagramHandle,
+                            showOwnedPlugins: e.target.checked,
+                            showPluginStats: userProfile.showPluginStats !== false,
+                          });
+                        }
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-white/[0.1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#deff0a]"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-stone-300 font-medium text-sm">Show Plugin Stats</label>
+                    <p className="text-xs text-stone-500 mt-0.5">Let others see which plugins you use the most.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={userProfile.showPluginStats !== false}
+                      onChange={(e) => {
+                        const token = localStorage.getItem("pluginradar_session");
+                        if (user && token) {
+                          upsertProfile({
+                            sessionToken: token,
+                            username: userProfile.username,
+                            email: userProfile.email,
+                            phoneNumber: userProfile.phoneNumber,
+                            instagramHandle: userProfile.instagramHandle,
+                            showOwnedPlugins: userProfile.showOwnedPlugins !== false,
+                            showPluginStats: e.target.checked,
+                          });
+                        }
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-white/[0.1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#deff0a]"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

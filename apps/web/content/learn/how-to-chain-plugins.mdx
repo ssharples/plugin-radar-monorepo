@@ -1,0 +1,77 @@
+---
+title: "How to Chain Plugins: A Beginner's Guide to Signal Flow"
+description: "Learn the fundamentals of plugin chaining — what it is, why order matters, and how to build your first serial and parallel chains for mixing and mastering."
+date: "2026-02-15"
+category: "Guides"
+slug: "how-to-chain-plugins"
+author: "ProChain Team"
+---
+
+Plugin chaining is the foundation of modern mixing and mastering. Every time you load plugins onto a channel strip in your DAW, you're building a chain — a series of processors that shape your audio from input to output. Understanding how to chain plugins effectively is what separates a muddy mix from a polished production.
+
+## What Is a Plugin Chain?
+
+A plugin chain is a sequence of audio processors connected in a specific order. Audio flows through each plugin one at a time (in a serial chain) or splits into multiple paths that process simultaneously (in a parallel chain).
+
+Think of it like water flowing through a series of filters. Each filter changes the water in some way, and the order you place them in determines the final result.
+
+## Why Order Matters
+
+The single most important concept in plugin chaining is **signal flow order**. Placing an EQ before a compressor produces a fundamentally different result than placing it after.
+
+Here's a simple example:
+
+- **EQ before compression**: The compressor reacts to the EQ'd signal. Boosting a frequency makes the compressor clamp down harder on that range.
+- **EQ after compression**: The compressor shapes dynamics first, then EQ adjusts the tonal balance of the already-compressed signal.
+
+Neither approach is "wrong" — they serve different purposes. The key is understanding what each order does so you can make intentional choices.
+
+## Building Your First Serial Chain
+
+A serial chain is the most common type. Plugins are connected one after another, like links in a chain. Here's a classic vocal chain to get you started:
+
+1. **High-pass filter** — Remove rumble and low-end noise below 80-100 Hz
+2. **Subtractive EQ** — Cut problem frequencies (nasal 800 Hz, harshness around 3-5 kHz)
+3. **Compressor** — Even out dynamics with a moderate ratio (3:1 to 4:1)
+4. **Additive EQ** — Boost presence (2-4 kHz) and air (10-12 kHz)
+5. **De-esser** — Tame sibilance after the brightness boost
+6. **Limiter or light compression** — Final dynamic control
+
+This order follows a logical flow: clean up first, control dynamics, then enhance.
+
+## Understanding Parallel Chains
+
+Parallel processing splits your signal into two or more paths, processes each differently, then blends them back together. This technique is powerful because it lets you apply heavy processing without losing the character of the original signal.
+
+**Parallel compression** (also called New York compression) is the most common example:
+
+- **Path A**: Dry signal (untouched)
+- **Path B**: Heavily compressed signal (fast attack, high ratio)
+- **Blend**: Mix Path B underneath Path A for added punch without squashing transients
+
+With ProChain, you can build parallel chains visually and adjust the blend between branches with per-branch gain controls.
+
+## Common Chain Templates by Use Case
+
+### Mixing Vocals
+EQ (cut) → Compressor → EQ (boost) → De-esser → Reverb send
+
+### Mastering
+EQ → Multiband compressor → Stereo widener → Limiter
+
+### Drum Bus
+Transient shaper → Compressor → Saturator → EQ
+
+### Bass Guitar
+High-pass filter → Compressor → Harmonic enhancer → EQ
+
+## Tips for Better Chains
+
+- **Start with fewer plugins** and add only when you hear a problem that needs solving
+- **Gain stage between plugins** — match levels so each plugin receives a healthy signal
+- **Use your ears, not your eyes** — bypass plugins frequently to confirm they're actually improving the sound
+- **Save chains you like** — building a library of go-to chains speeds up your workflow enormously
+
+## What's Next?
+
+Now that you understand the basics, try building a chain in ProChain. Start with a simple vocal or drum bus chain, experiment with plugin order, and save your results. The community chain library is full of real-world chains from other producers that you can load, study, and fork to make your own.

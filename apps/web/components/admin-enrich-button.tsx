@@ -19,7 +19,7 @@ interface AdminEnrichButtonProps {
 }
 
 export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className }: AdminEnrichButtonProps) {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, sessionToken } = useAuth();
   const [status, setStatus] = useState<"idle" | "loading" | "running" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className 
       // 1. Create job in Convex
       const result = await queueEnrichment({
         pluginId,
-        userId: user._id,
+        sessionToken: sessionToken!,
         priority: "high",
       });
 
@@ -104,7 +104,7 @@ export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className 
             : status === "loading"
             ? "bg-stone-800 text-stone-400 border border-stone-700 cursor-wait"
             : status === "running"
-            ? "bg-amber-900/50 text-amber-400 border border-amber-700 cursor-wait"
+            ? "bg-amber-900/50 text-white border border-neutral-700 cursor-wait"
             : status === "success"
             ? "bg-green-900/50 text-green-400 border border-green-700"
             : "bg-red-900/50 text-red-400 border border-red-700"
@@ -147,7 +147,7 @@ export function AdminEnrichButton({ pluginId, pluginSlug, pluginName, className 
       {message && (
         <p className={`text-xs mt-1 ${
           status === "error" ? "text-red-400" : 
-          status === "running" ? "text-amber-400" : 
+          status === "running" ? "text-white" : 
           "text-green-400"
         }`}>
           {message}

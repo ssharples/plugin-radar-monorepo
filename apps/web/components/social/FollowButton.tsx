@@ -49,7 +49,7 @@ export function FollowButton({
     return (
       <button
         onClick={handleClick}
-        className="px-4 py-2 text-sm font-semibold rounded-xl bg-amber-500 hover:bg-amber-400 text-white transition-colors shadow-lg shadow-amber-500/20"
+        className="px-4 py-2 text-sm font-semibold rounded-xl bg-white hover:bg-neutral-100 text-black transition-colors shadow-lg shadow-white/20"
       >
         Follow
       </button>

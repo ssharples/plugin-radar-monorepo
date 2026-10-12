@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getSessionUser } from "./lib/auth";
 import {
   computeSimilarityScore,
   generateReasonString,
@@ -636,7 +637,28 @@ export const getByIds = query({
           resolvedImageUrl = await ctx.storage.getUrl(plugin.imageStorageId);
         }
 
-        return { ...plugin, resolvedImageUrl };
+        // Fetch and resolve manufacturer data
+        const manufacturer = await ctx.db.get(plugin.manufacturer);
+        let manufacturerData = null;
+        if (manufacturer) {
+          let resolvedLogoUrl: string | null | undefined = manufacturer.logoUrl;
+          if (manufacturer.logoStorageId) {
+            resolvedLogoUrl = await ctx.storage.getUrl(manufacturer.logoStorageId);
+          }
+          manufacturerData = {
+            _id: manufacturer._id,
+            name: manufacturer.name,
+            slug: manufacturer.slug,
+            logoUrl: manufacturer.logoUrl,
+            resolvedLogoUrl,
+          };
+        }
+
+        return {
+          ...plugin,
+          resolvedImageUrl,
+          manufacturerData,
+        };
       })
     );
     return plugins.filter(Boolean);
@@ -649,6 +671,7 @@ export const getByIds = query({
 
 export const create = mutation({
   args: {
+    sessionToken: v.string(),
     name: v.string(),
     slug: v.string(),
     manufacturer: v.id("manufacturers"),
@@ -678,8 +701,11 @@ export const create = mutation({
     manualUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
     const now = Date.now();
-    
+
     // Check for duplicate slug
     const existing = await ctx.db
       .query("plugins")
@@ -739,6 +765,7 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    sessionToken: v.string(),
     id: v.id("plugins"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -790,7 +817,10 @@ export const update = mutation({
     isIndustryStandard: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
+    const { sessionToken: _, id, ...updates } = args;
 
     const existing = await ctx.db.get(id);
     if (!existing) {
@@ -931,8 +961,11 @@ export const upsertBySlug = mutation({
 // ============================================
 
 export const remove = mutation({
-  args: { id: v.id("plugins") },
+  args: { sessionToken: v.string(), id: v.id("plugins") },
   handler: async (ctx, args) => {
+    const { user } = await getSessionUser(ctx, args.sessionToken);
+    if (!user.isAdmin) throw new Error("Unauthorized: Admin access required");
+
     const plugin = await ctx.db.get(args.id);
     if (!plugin) throw new Error("Plugin not found");
     await ctx.db.delete(args.id);

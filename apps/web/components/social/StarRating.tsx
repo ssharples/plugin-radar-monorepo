@@ -59,7 +59,7 @@ export function StarRating({
               className={`${
                 interactive ? "cursor-pointer hover:scale-110" : "cursor-default"
               } transition-transform ${
-                filled ? "text-amber-400" : "text-stone-700"
+                filled ? "text-white" : "text-neutral-700"
               } ${starSize}`}
             >
               <StarIcon filled={filled} className="w-full h-full" />

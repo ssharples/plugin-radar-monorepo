@@ -33,7 +33,7 @@ export function UseCaseCategoryTree({
         onClick={() => onSelect("")}
         className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition ${
           selectedCategory === ""
-            ? "bg-amber-500/10 text-amber-400 font-medium"
+            ? "bg-white/10 text-white font-medium"
             : "text-stone-400 hover:text-stone-200 hover:bg-white/[0.04]"
         }`}
       >
@@ -64,9 +64,9 @@ export function UseCaseCategoryTree({
                 onClick={() => onSelect(group.value)}
                 className={`flex-1 text-left px-2 py-1.5 rounded-lg text-sm transition ${
                   isGroupSelected
-                    ? "bg-amber-500/10 text-amber-400 font-medium"
+                    ? "bg-white/10 text-white font-medium"
                     : hasChildSelected
-                      ? "text-amber-400/70"
+                      ? "text-white/70"
                       : "text-stone-400 hover:text-stone-200 hover:bg-white/[0.04]"
                 }`}
               >
@@ -83,7 +83,7 @@ export function UseCaseCategoryTree({
                     onClick={() => onSelect(uc.value)}
                     className={`w-full text-left px-3 py-1 rounded-lg text-xs transition ${
                       selectedCategory === uc.value
-                        ? "bg-amber-500/10 text-amber-400 font-medium"
+                        ? "bg-white/10 text-white font-medium"
                         : "text-stone-500 hover:text-stone-300 hover:bg-white/[0.04]"
                     }`}
                   >

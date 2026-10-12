@@ -21,7 +21,7 @@ export function ComparisonLinks({ pluginId }: { pluginId: Id<"plugins"> }) {
           <Link
             key={c._id}
             href={`/compare/${c.slug}`}
-            className="px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-emerald-500/50 rounded-lg text-stone-300 hover:text-white transition text-sm"
+            className="px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-white/50 rounded-lg text-stone-300 hover:text-white transition text-sm"
           >
             vs {c.otherPluginName}
           </Link>

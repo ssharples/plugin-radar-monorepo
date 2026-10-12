@@ -1,16 +1,19 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getSessionUser } from "./lib/auth";
 
 // ============================================
 // QUERIES
 // ============================================
 
 export const listByUser = query({
-  args: { user: v.id("users") },
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const owned = await ctx.db
       .query("ownedPlugins")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
 
     // Enrich with plugin data
@@ -33,36 +36,56 @@ export const listByUser = query({
 
 export const getForPlugin = query({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     return await ctx.db
       .query("ownedPlugins")
       .withIndex("by_user_plugin", (q) =>
-        q.eq("user", args.user).eq("plugin", args.plugin)
+        q.eq("user", userId).eq("plugin", args.plugin)
       )
       .first();
   },
 });
 
-export const count = query({
-  args: { user: v.id("users") },
+export const getOwnedPluginIds = query({
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const owned = await ctx.db
       .query("ownedPlugins")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
+      .collect();
+
+    return owned.map((o) => o.plugin);
+  },
+});
+
+export const count = query({
+  args: { sessionToken: v.string() },
+  handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    const owned = await ctx.db
+      .query("ownedPlugins")
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
     return owned.length;
   },
 });
 
 export const totalValue = query({
-  args: { user: v.id("users") },
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const owned = await ctx.db
       .query("ownedPlugins")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
 
     let total = 0;
@@ -91,7 +114,7 @@ export const totalValue = query({
 
 export const add = mutation({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
     purchasePrice: v.optional(v.number()),
     purchaseDate: v.optional(v.number()),
@@ -99,11 +122,13 @@ export const add = mutation({
     licenseKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     // Check if already owned
     const existing = await ctx.db
       .query("ownedPlugins")
       .withIndex("by_user_plugin", (q) =>
-        q.eq("user", args.user).eq("plugin", args.plugin)
+        q.eq("user", userId).eq("plugin", args.plugin)
       )
       .first();
 
@@ -118,7 +143,7 @@ export const add = mutation({
     }
 
     return await ctx.db.insert("ownedPlugins", {
-      user: args.user,
+      user: userId,
       plugin: args.plugin,
       purchasePrice: args.purchasePrice,
       purchaseDate: args.purchaseDate ?? Date.now(),
@@ -131,14 +156,16 @@ export const add = mutation({
 
 export const remove = mutation({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const existing = await ctx.db
       .query("ownedPlugins")
       .withIndex("by_user_plugin", (q) =>
-        q.eq("user", args.user).eq("plugin", args.plugin)
+        q.eq("user", userId).eq("plugin", args.plugin)
       )
       .first();
 
@@ -150,6 +177,7 @@ export const remove = mutation({
 
 export const update = mutation({
   args: {
+    sessionToken: v.string(),
     id: v.id("ownedPlugins"),
     purchasePrice: v.optional(v.number()),
     purchaseDate: v.optional(v.number()),
@@ -157,7 +185,15 @@ export const update = mutation({
     licenseKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Verify ownership
+    const owned = await ctx.db.get(args.id);
+    if (!owned || owned.user !== userId) {
+      throw new Error("Not authorized");
+    }
+
+    const { sessionToken: _, id, ...updates } = args;
 
     const filteredUpdates = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)

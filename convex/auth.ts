@@ -108,8 +108,13 @@ export const register = mutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Password strength validation (match reset validation)
+    if (args.password.length < 6) {
+      throw new Error("Password must be at least 6 characters");
+    }
+
     // Rate limit: 3 registrations per hour (generic key — no IP in Convex)
-    await checkRateLimit(ctx, `register:global`, 3, 60 * 60 * 1000);
+    await checkRateLimit(ctx, `register:${args.email}`, 3, 60 * 60 * 1000);
 
     const now = Date.now();
 
@@ -407,12 +412,39 @@ export const seedAdmin = mutation({
     email: v.string(),
     password: v.string(),
     name: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Only allow if: (a) no admin users exist yet, or (b) caller is already admin
+    const allUsers = await ctx.db.query("users").collect();
+    const adminExists = allUsers.some((u) => u.isAdmin);
+
+    if (adminExists) {
+      // Require an existing admin session to create more admins
+      if (!args.sessionToken) {
+        throw new Error("Unauthorized: Admin session required to seed additional admins");
+      }
+      const session = await ctx.db
+        .query("sessions")
+        .withIndex("by_token", (q) => q.eq("token", args.sessionToken!))
+        .first();
+      if (!session || session.expiresAt < Date.now()) {
+        throw new Error("Not authenticated");
+      }
+      const callingUser = await ctx.db.get(session.userId);
+      if (!callingUser?.isAdmin) {
+        throw new Error("Unauthorized: Admin access required");
+      }
+    }
+
+    if (args.password.length < 6) {
+      throw new Error("Password must be at least 6 characters");
+    }
+
     const now = Date.now();
     const passwordHash = await hashPassword(args.password);
 
-    // Check if admin already exists
+    // Check if user already exists
     const existing = await ctx.db
       .query("users")
       .withIndex("by_email", (q) => q.eq("email", args.email))

@@ -1,128 +1,116 @@
-"use client";
-
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 
-export function Footer() {
-  const stats = useQuery(api.stats.overview);
+const productLinks = [
+  { href: "/chains", label: "Chains" },
+  { href: "/plugins", label: "Plugins" },
+  { href: "/download", label: "Download" },
+  { href: "/free", label: "Free Plugins" },
+];
 
+const companyLinks = [
+  { href: "/about", label: "About" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+];
+
+const connectLinks = [
+  { href: "https://github.com/pluginradar", label: "GitHub", external: true },
+  { href: "https://discord.gg/pluginradar", label: "Discord", external: true },
+];
+
+export function Footer() {
   return (
     <footer className="relative mt-24">
-      {/* Top gradient divider */}
       <div className="section-line" />
 
-      <div className="container mx-auto px-4 lg:px-6 pt-12 pb-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 mb-4">
-              Chains
-            </h3>
-            <ul className="space-y-2.5">
-              <FooterLink href="/chains">Browse Chains</FooterLink>
-              <FooterLink href="/chains?category=vocals">Vocal Chains</FooterLink>
-              <FooterLink href="/chains?category=mastering">Mastering</FooterLink>
-              <FooterLink href="/chains?category=drums">Drum Bus</FooterLink>
-            </ul>
+      <div className="container mx-auto px-4 lg:px-6 py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <img
+              src="/prochain-logo.png"
+              alt="ProChain"
+              className="h-7 w-auto object-contain opacity-60 mb-3"
+            />
+            <p className="text-stone-500 text-xs leading-relaxed max-w-[200px]">
+              Chain any plugin. Share with anyone. The only chain platform that works with every plugin.
+            </p>
           </div>
+
+          {/* Product */}
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 mb-4">
-              Plugins
-            </h3>
-            <ul className="space-y-2.5">
-              <FooterLink href="/plugins">Plugin Directory</FooterLink>
-              <FooterLink href="/sales">Deals & Sales</FooterLink>
-              <FooterLink href="/free">Free Plugins</FooterLink>
-              <FooterLink href="/manufacturers">Manufacturers</FooterLink>
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 mb-4">
-              Account
-            </h3>
-            <ul className="space-y-2.5">
-              <FooterLink href="/wishlist">My Wishlist</FooterLink>
-              <FooterLink href="/collection">My Collection</FooterLink>
-              <FooterLink href="/alerts">Price Alerts</FooterLink>
-              <FooterLink href="/account">Settings</FooterLink>
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 mb-4">
+            <h4 className="text-stone-300 text-xs font-semibold uppercase tracking-wider mb-3">
               Product
-            </h3>
-            <ul className="space-y-2.5">
-              <FooterLink href="#download">Download App</FooterLink>
-              <FooterLink href="/#how-it-works">How It Works</FooterLink>
-              <FooterLink href="/compare">Comparisons</FooterLink>
-              <FooterLink href="/chains">Community</FooterLink>
+            </h4>
+            <ul className="space-y-2">
+              {productLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-stone-500 hover:text-stone-300 text-sm transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h4 className="text-stone-300 text-xs font-semibold uppercase tracking-wider mb-3">
+              Company
+            </h4>
+            <ul className="space-y-2">
+              {companyLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-stone-500 hover:text-stone-300 text-sm transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Connect */}
+          <div>
+            <h4 className="text-stone-300 text-xs font-semibold uppercase tracking-wider mb-3">
+              Connect
+            </h4>
+            <ul className="space-y-2">
+              {connectLinks.map((link) => (
+                <li key={link.label}>
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-stone-500 hover:text-stone-300 text-sm transition-colors"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
 
-        {/* Stats bar */}
-        {stats && (
-          <div className="flex flex-wrap items-center gap-6 py-4 mb-8 border-y border-white/[0.04] text-xs text-stone-600">
-            <span>
-              <span className="text-amber-400/70 font-medium tabular-nums">
-                {stats.totalPlugins?.toLocaleString() || "..."}
-              </span>{" "}
-              plugins supported
-            </span>
-            <span>
-              <span className="text-amber-400/70 font-medium tabular-nums">
-                {stats.totalManufacturers || "..."}
-              </span>{" "}
-              manufacturers
-            </span>
-            <span>
-              <span className="text-amber-400/70 font-medium tabular-nums">
-                {stats.activeSales || "..."}
-              </span>{" "}
-              active deals
-            </span>
-            <span>
-              <span className="text-emerald-400/70 font-medium tabular-nums">
-                {stats.freePlugins || "..."}
-              </span>{" "}
-              free plugins
-            </span>
-          </div>
-        )}
-
         {/* Bottom bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <img
-              src="/propane-logo.png"
-              alt="Propane"
-              className="h-6 w-auto object-contain opacity-50"
-            />
-          </div>
-          <p className="text-stone-600 text-xs">
-            Your plugins. Your chains. Shared everywhere.
+        <div className="border-t border-white/[0.06] pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-stone-600 text-[11px]">
+            &copy; {new Date().getFullYear()} ProChain. All rights reserved.
+          </p>
+          <p className="text-stone-600 text-[11px]">
+            A{" "}
+            <Link href="/" className="hover:text-stone-400 transition-colors">
+              Plugin Radar
+            </Link>{" "}
+            product
           </p>
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <li>
-      <Link
-        href={href}
-        className="text-sm text-stone-500 hover:text-amber-400/80 transition-colors duration-200"
-      >
-        {children}
-      </Link>
-    </li>
   );
 }

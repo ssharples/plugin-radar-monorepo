@@ -74,17 +74,17 @@ export default function FreePage() {
           {
             question: "Are these free plugins really free?",
             answer:
-              "Yes. Every plugin listed here is offered at no cost by the manufacturer. Some are permanently free, while others may be limited-time offers.",
+              "Yes. Every plugin listed here is offered at no cost by the manufacturer. Some are permanently free, while others may be limited-time giveaways — grab them while they last.",
           },
           {
             question: "What formats are supported?",
             answer:
-              "Most free plugins are available in VST3, AU, and AAX formats. Check each plugin's detail page for specific format availability.",
+              "Most free plugins are available in VST3, AU, and AAX formats. Check each plugin's detail page for exact format and platform availability.",
           },
           {
             question: "Do free plugins work on Mac and Windows?",
             answer:
-              "Most free plugins support both macOS and Windows. Check the plugin detail page for platform-specific compatibility.",
+              "Most free plugins support both macOS and Windows. Platform details are listed on each plugin's page.",
           },
         ]}
       />
@@ -103,8 +103,8 @@ export default function FreePage() {
             </h1>
           </div>
           <p className="text-stone-500 text-sm max-w-2xl">
-            Discover {totalCount > 0 ? totalCount.toLocaleString() : ""} free VST plugins, instruments,
-            and effects. No strings attached — download and start producing.
+            {totalCount > 0 ? `${totalCount.toLocaleString()} free` : "Free"} VST plugins, instruments, and effects
+            from top manufacturers. No trials, no paywalls — just download and produce.
           </p>
 
           {/* Stats */}
@@ -133,7 +133,7 @@ export default function FreePage() {
                   className="flex items-center gap-3 mb-5 group w-full text-left"
                 >
                   <h2
-                    className="text-lg font-semibold text-stone-200 group-hover:text-amber-400 transition"
+                    className="text-lg font-semibold text-stone-200 group-hover:text-white transition"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {getCategoryLabel(category)}

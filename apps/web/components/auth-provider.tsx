@@ -12,10 +12,15 @@ interface User {
   avatarUrl?: string;
   tier: string;
   isAdmin?: boolean;
+  isEducator?: boolean;
   createdAt: number;
   lastSeenAt: number;
   emailDigest: string;
   preferredCurrency: string;
+  showOwnedPlugins?: boolean;
+  showPluginStats?: boolean;
+  hasPurchased?: boolean;
+  trialEndsAt?: number;
 }
 
 interface AuthContextType {
@@ -34,26 +39,42 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [validatedSession, setValidatedSession] = useState<any>(null);
 
   const loginMutation = useMutation(api.auth.login);
   const registerMutation = useMutation(api.auth.register);
   const logoutMutation = useMutation(api.auth.logout);
-  const session = useQuery(
-    api.auth.verifySession,
-    sessionToken ? { sessionToken } : "skip"
-  );
+  // @ts-expect-error -- verifySession is a query used as mutation for imperative calls
+  const verifySessionMutation = useMutation(api.auth.verifySession);
 
-  // Load session from localStorage on mount
+  // Load session from localStorage on mount and verify
   useEffect(() => {
     const storedToken = localStorage.getItem("pluginradar_session");
     if (storedToken) {
       setSessionToken(storedToken);
+      verifySessionMutation({ sessionToken: storedToken })
+        .then((result) => {
+          if (result && result.userId) {
+            setValidatedSession(result);
+          } else {
+            setValidatedSession(null);
+            localStorage.removeItem("pluginradar_session");
+            setSessionToken(null);
+          }
+        })
+        .catch(() => {
+          setValidatedSession(null);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, []);
+  }, [verifySessionMutation]);
 
   // Get full user data if we have a valid session
-  const userId = session?.userId as Id<"users"> | undefined;
+  const userId = validatedSession?.userId as Id<"users"> | undefined;
   const user = useQuery(
     api.users.get,
     userId ? { id: userId } : "skip"
@@ -65,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await loginMutation({ email, password });
       localStorage.setItem("pluginradar_session", result.sessionToken);
       setSessionToken(result.sessionToken);
+      setValidatedSession(result);
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
@@ -76,9 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name?: string) => {
     setIsLoading(true);
     try {
-      const result = await registerMutation({ email, password, name });
+      const referredBy = document.cookie.match(/(?:^|; )pr_ref=([^;]*)/)?.[1];
+      const result = await registerMutation({
+        email,
+        password,
+        name,
+        ...(referredBy && { referredBy: decodeURIComponent(referredBy) }),
+      });
       localStorage.setItem("pluginradar_session", result.sessionToken);
       setSessionToken(result.sessionToken);
+      setValidatedSession(result);
     } catch (error) {
       console.error("Registration failed:", error);
       throw error;
@@ -89,19 +118,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     if (sessionToken) {
-      logoutMutation({ sessionToken }).catch(() => {});
+      logoutMutation({ sessionToken }).catch(() => { });
     }
     localStorage.removeItem("pluginradar_session");
     setSessionToken(null);
+    setValidatedSession(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user: user as User | null,
-        isLoading: isLoading || (sessionToken !== null && session === undefined),
-        isAuthenticated: !!session,
-        isAdmin: session?.isAdmin ?? false,
+        isLoading: isLoading || (sessionToken !== null && validatedSession === null),
+        isAuthenticated: !!validatedSession,
+        isAdmin: validatedSession?.isAdmin ?? false,
         sessionToken,
         login,
         register,

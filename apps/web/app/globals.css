@@ -1,15 +1,16 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-display: var(--font-display);
-  --font-mono: var(--font-sans);
+  --font-sans: var(--font-mono);
+  --font-display: var(--font-mono);
+  --font-mono: var(--font-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,38 +49,37 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-/* ===== PROPANE COLOR OVERRIDES ===== */
-/* Override Tailwind built-in amber-* with Propane copper ramp */
+/* ===== PROCHAIN MONOCHROME OVERRIDES ===== */
+/* True monochrome palette with neon accents */
 @theme {
-  --color-amber-50: #f5ede4;
-  --color-amber-100: #ebdbc9;
-  --color-amber-200: #d4b68e;
-  --color-amber-300: #c9944a;
-  --color-amber-400: #c9944a;
-  --color-amber-500: #a06830;
-  --color-amber-600: #89572a;
-  --color-amber-700: #6b4520;
-  --color-amber-800: #54361a;
-  --color-amber-900: #3d2713;
-  --color-amber-950: #2a1b0d;
+  --color-neon: #deff0a;
+  --color-neon-lime: #ccff00;
 
-  /* Override stone-* with true black neutral ramp */
-  --color-stone-50: #fafafa;
-  --color-stone-100: #ffffff;
-  --color-stone-200: #e5e5e5;
-  --color-stone-300: #d4d4d4;
-  --color-stone-400: #808080;
-  --color-stone-500: #737373;
-  --color-stone-600: #404040;
-  --color-stone-700: #323232;
-  --color-stone-800: #1a1a1a;
-  --color-stone-900: #0a0a0a;
-  --color-stone-950: #000000;
+  /* Neutral grayscale ramp */
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  --color-neutral-950: #0a0a0a;
 
-  /* Override orange-* for nav logo gradient refs */
-  --color-orange-400: #c9944a;
-  --color-orange-500: #a06830;
-  --color-orange-600: #89572a;
+  /* Accent colors for interactive elements */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
 }
 
 :root {
@@ -118,37 +118,37 @@
 }
 
 .dark {
-  --background: oklch(0 0 0);
-  --foreground: oklch(0.85 0 0);
-  --card: oklch(0.07 0 0);
-  --card-foreground: oklch(0.85 0 0);
-  --popover: oklch(0.07 0 0);
-  --popover-foreground: oklch(0.85 0 0);
-  --primary: oklch(0.55 0.10 55);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.12 0 0);
-  --secondary-foreground: oklch(0.85 0 0);
-  --muted: oklch(0.12 0 0);
-  --muted-foreground: oklch(0.50 0 0);
-  --accent: oklch(0.12 0 0);
-  --accent-foreground: oklch(0.85 0 0);
+  --background: oklch(0.05 0 0);
+  --foreground: oklch(0.92 0 0);
+  --card: oklch(0.09 0 0);
+  --card-foreground: oklch(0.92 0 0);
+  --popover: oklch(0.09 0 0);
+  --popover-foreground: oklch(0.92 0 0);
+  --primary: oklch(0.98 0 0);
+  --primary-foreground: oklch(0.05 0 0);
+  --secondary: oklch(0.15 0 0);
+  --secondary-foreground: oklch(0.92 0 0);
+  --muted: oklch(0.15 0 0);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: oklch(0.18 0 0);
+  --accent-foreground: oklch(0.98 0 0);
   --destructive: oklch(0.65 0.22 25);
-  --border: oklch(0.22 0 0);
-  --input: oklch(0.15 0 0);
-  --ring: oklch(0.40 0.06 55);
-  --chart-1: oklch(0.55 0.10 55);
-  --chart-2: oklch(0.50 0.09 55);
-  --chart-3: oklch(0.45 0.08 55);
-  --chart-4: oklch(0.40 0.07 55);
-  --chart-5: oklch(0.35 0.06 55);
-  --sidebar: oklch(0.07 0 0);
-  --sidebar-foreground: oklch(0.85 0 0);
-  --sidebar-primary: oklch(0.55 0.10 55);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.12 0 0);
-  --sidebar-accent-foreground: oklch(0.85 0 0);
-  --sidebar-border: oklch(0.22 0 0);
-  --sidebar-ring: oklch(0.40 0.06 55);
+  --border: oklch(0.18 0 0);
+  --input: oklch(0.12 0 0);
+  --ring: oklch(0.75 0 0);
+  --chart-1: oklch(0.85 0 0);
+  --chart-2: oklch(0.75 0 0);
+  --chart-3: oklch(0.65 0 0);
+  --chart-4: oklch(0.55 0 0);
+  --chart-5: oklch(0.45 0 0);
+  --sidebar: oklch(0.09 0 0);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.98 0 0);
+  --sidebar-primary-foreground: oklch(0.05 0 0);
+  --sidebar-accent: oklch(0.15 0 0);
+  --sidebar-accent-foreground: oklch(0.92 0 0);
+  --sidebar-border: oklch(0.18 0 0);
+  --sidebar-ring: oklch(0.75 0 0);
 }
 
 @layer base {
@@ -173,41 +173,62 @@ body::before {
   background-size: 256px 256px;
 }
 
-/* ===== WARM GLOW EFFECTS (Propane copper) ===== */
-.glow-amber {
-  box-shadow: 0 0 30px -5px rgba(137, 87, 42, 0.15),
-              0 0 60px -10px rgba(137, 87, 42, 0.05);
+/* ===== MONOCHROME GLOW EFFECTS (ProChain) ===== */
+.glow-glass {
+  box-shadow: 0 0 30px -5px rgba(255, 255, 255, 0.08),
+              0 0 60px -10px rgba(255, 255, 255, 0.03),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 
-.glow-amber-sm {
-  box-shadow: 0 0 15px -3px rgba(137, 87, 42, 0.12);
+.glow-glass-sm {
+  box-shadow: 0 0 15px -3px rgba(255, 255, 255, 0.06),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
-.glow-amber-hover:hover {
-  box-shadow: 0 0 40px -5px rgba(137, 87, 42, 0.2),
-              0 0 80px -10px rgba(137, 87, 42, 0.08);
+.glow-glass-hover:hover {
+  box-shadow: 0 0 40px -5px rgba(255, 255, 255, 0.12),
+              0 0 80px -10px rgba(255, 255, 255, 0.05),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  transition: box-shadow 0.3s ease;
 }
 
-/* ===== GLASS CARD ===== */
+/* ===== GLASS CARD (Enhanced Glassmorphism) ===== */
 .glass-card {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.01) 100%
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.02) 50%,
+    rgba(255, 255, 255, 0.04) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
-.glass-card-warm {
+.glass-card-subtle {
   background: linear-gradient(
     135deg,
-    rgba(137, 87, 42, 0.04) 0%,
-    rgba(255, 255, 255, 0.02) 50%,
-    rgba(137, 87, 42, 0.01) 100%
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.01) 50%,
+    rgba(255, 255, 255, 0.02) 100%
   );
-  border: 1px solid rgba(137, 87, 42, 0.08);
-  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+.glass-card-strong {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
 }
 
 /* ===== PRICE TAG ===== */
@@ -235,7 +256,7 @@ body::before {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(137, 87, 42, 0.3) 50%,
+    rgba(222, 255, 10, 0.12) 50%,
     transparent 100%
   );
 }
@@ -249,11 +270,11 @@ body::before {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(137, 87, 42, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(137, 87, 42, 0.35);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* ===== STAGGER ANIMATION ===== */
@@ -297,34 +318,162 @@ body::after {
 
 /* ===== SELECTION COLOR ===== */
 ::selection {
-  background: rgba(137, 87, 42, 0.25);
+  background: rgba(222, 255, 10, 0.25);
   color: white;
 }
 
-/* ===== GLASS CARD PROPANE ===== */
-.glass-card-propane {
+/* ===== PROCHAIN MICRO ANIMATIONS ===== */
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px -5px rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px -5px rgba(255, 255, 255, 0.2);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-shimmer {
   background: linear-gradient(
-    135deg,
-    rgba(137, 87, 42, 0.05) 0%,
-    rgba(255, 255, 255, 0.02) 50%,
-    rgba(107, 69, 32, 0.03) 100%
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
   );
-  border: 1px solid rgba(137, 87, 42, 0.1);
-  backdrop-filter: blur(16px);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
 }
 
-/* ===== CRT TEXT EFFECT (from desktop Propane) ===== */
-.crt-text {
-  text-shadow:
-    0 0 4px rgba(201, 148, 74, 0.4),
-    0 0 11px rgba(201, 148, 74, 0.2),
-    0 0 19px rgba(201, 148, 74, 0.1);
+.animate-float {
+  animation: float 4s ease-in-out infinite;
 }
 
-/* ===== PROPANE LABEL ===== */
-.propane-label {
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.4s ease-out both;
+}
+
+/* Hover lift effect */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== PROCHAIN LABEL ===== */
+.prochain-label {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   font-size: 0.65rem;
-  color: #737373;
+  font-weight: 600;
+  color: #a3a3a3;
+}
+
+/* ===== GLASS BUTTON ===== */
+.glass-button {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+
+.glass-button:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  border-color: rgba(222, 255, 10, 0.2);
+  box-shadow: 0 4px 16px rgba(222, 255, 10, 0.08);
+}
+
+.glass-button:active {
+  transform: scale(0.98);
+}
+
+/* ===== NEON UTILITIES ===== */
+.neon-button {
+  background: #deff0a;
+  color: #000;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.neon-button:hover {
+  background: #ccff00;
+  box-shadow: 0 0 20px rgba(222, 255, 10, 0.3),
+              0 0 40px rgba(222, 255, 10, 0.1);
+}
+
+.neon-button:active {
+  transform: scale(0.98);
+}
+
+.neon-text {
+  color: #deff0a;
+  text-shadow: 0 0 10px rgba(222, 255, 10, 0.4),
+               0 0 20px rgba(222, 255, 10, 0.2);
+}
+
+.neon-border-hover {
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.neon-border-hover:hover {
+  border-color: rgba(222, 255, 10, 0.3);
+  box-shadow: 0 0 15px rgba(222, 255, 10, 0.08);
+}
+
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(222, 255, 10, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(222, 255, 10, 0.3),
+                0 0 50px rgba(222, 255, 10, 0.1);
+  }
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 3s ease-in-out infinite;
 }

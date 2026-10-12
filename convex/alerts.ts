@@ -1,16 +1,19 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getSessionUser } from "./lib/auth";
 
 // ============================================
 // QUERIES
 // ============================================
 
 export const listByUser = query({
-  args: { user: v.id("users") },
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const alerts = await ctx.db
       .query("alerts")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
 
     // Enrich with plugin data
@@ -53,14 +56,15 @@ export const listByUser = query({
 
 export const getForPlugin = query({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
   },
   handler: async (ctx, args) => {
-    // Since there's no by_user_plugin index, filter by user first then by plugin
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const userAlerts = await ctx.db
       .query("alerts")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
 
     return userAlerts.filter((a) => a.plugin === args.plugin);
@@ -68,11 +72,13 @@ export const getForPlugin = query({
 });
 
 export const count = query({
-  args: { user: v.id("users") },
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     const alerts = await ctx.db
       .query("alerts")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
     return alerts.length;
@@ -85,16 +91,18 @@ export const count = query({
 
 export const create = mutation({
   args: {
-    user: v.id("users"),
+    sessionToken: v.string(),
     plugin: v.id("plugins"),
     type: v.string(), // "price_drop", "any_sale", "new_release", "update"
     priceThreshold: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
     // Check if similar alert already exists
     const userAlerts = await ctx.db
       .query("alerts")
-      .withIndex("by_user", (q) => q.eq("user", args.user))
+      .withIndex("by_user", (q) => q.eq("user", userId))
       .collect();
 
     const existing = userAlerts.find(
@@ -110,7 +118,7 @@ export const create = mutation({
     }
 
     return await ctx.db.insert("alerts", {
-      user: args.user,
+      user: userId,
       plugin: args.plugin,
       type: args.type,
       priceThreshold: args.priceThreshold,
@@ -122,12 +130,21 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    sessionToken: v.string(),
     id: v.id("alerts"),
     priceThreshold: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Verify ownership
+    const alert = await ctx.db.get(args.id);
+    if (!alert || alert.user !== userId) {
+      throw new Error("Not authorized");
+    }
+
+    const { sessionToken: _, id, ...updates } = args;
 
     const filteredUpdates = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)
@@ -138,15 +155,37 @@ export const update = mutation({
 });
 
 export const remove = mutation({
-  args: { id: v.id("alerts") },
+  args: {
+    sessionToken: v.string(),
+    id: v.id("alerts"),
+  },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Verify ownership
+    const alert = await ctx.db.get(args.id);
+    if (!alert || alert.user !== userId) {
+      throw new Error("Not authorized");
+    }
+
     await ctx.db.delete(args.id);
   },
 });
 
 export const deactivate = mutation({
-  args: { id: v.id("alerts") },
+  args: {
+    sessionToken: v.string(),
+    id: v.id("alerts"),
+  },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Verify ownership
+    const alert = await ctx.db.get(args.id);
+    if (!alert || alert.user !== userId) {
+      throw new Error("Not authorized");
+    }
+
     await ctx.db.patch(args.id, {
       isActive: false,
     });
@@ -154,8 +193,19 @@ export const deactivate = mutation({
 });
 
 export const markTriggered = mutation({
-  args: { id: v.id("alerts") },
+  args: {
+    sessionToken: v.string(),
+    id: v.id("alerts"),
+  },
   handler: async (ctx, args) => {
+    const { userId } = await getSessionUser(ctx, args.sessionToken);
+
+    // Verify ownership
+    const alert = await ctx.db.get(args.id);
+    if (!alert || alert.user !== userId) {
+      throw new Error("Not authorized");
+    }
+
     await ctx.db.patch(args.id, {
       lastTriggeredAt: Date.now(),
     });

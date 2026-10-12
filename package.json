@@ -10,6 +10,7 @@
     "dev:convex": "npx convex dev",
     "deploy": "npx convex deploy",
     "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
     "build:web": "pnpm --filter web build",
     "dev:desktop-ui": "pnpm --filter desktop-ui dev",
     "build:desktop-ui": "pnpm --filter desktop-ui build",
@@ -23,15 +24,22 @@
     "quality:mutation-config": "python3 tools/quality/run.py mutation-config"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.45",
+    "@ai-sdk/openai-compatible": "^2.0.33",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.39",
+    "@convex-dev/stripe": "^0.1.3",
+    "ai": "^6.0.91",
     "convex": "^1.31.7",
-    "exa-js": "^2.3.0"
+    "exa-js": "^2.3.0",
+    "stripe": "^20.3.1"
   },
   "devDependencies": {
+    "@types/node": "^20",
     "typescript": "^5"
   },
   "engines": {
     "node": ">=18",
     "pnpm": ">=8"
   },
-  "packageManager": "pnpm@8.15.9"
+  "packageManager": "pnpm@9.13.0"
 }

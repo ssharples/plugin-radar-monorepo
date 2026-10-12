@@ -41,3 +41,41 @@ export const getForPlugin = query({
     return enriched;
   },
 });
+
+// Get related comparisons in the same category (for "You might also compare" section)
+export const getRelatedByCategory = query({
+  args: {
+    category: v.string(),
+    excludeSlug: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 6;
+
+    const comparisons = await ctx.db
+      .query("comparisons")
+      .withIndex("by_category", (q) => q.eq("category", args.category))
+      .take(limit + 1);
+
+    const filtered = comparisons
+      .filter((c) => c.slug !== args.excludeSlug)
+      .slice(0, limit);
+
+    const enriched = await Promise.all(
+      filtered.map(async (c) => {
+        const [pluginA, pluginB] = await Promise.all([
+          ctx.db.get(c.pluginA),
+          ctx.db.get(c.pluginB),
+        ]);
+        return {
+          slug: c.slug,
+          pluginA: pluginA?.name ?? "Unknown",
+          pluginB: pluginB?.name ?? "Unknown",
+          category: c.category,
+        };
+      })
+    );
+
+    return enriched;
+  },
+});

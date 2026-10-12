@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { mutation, query, action, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // Generate upload URL for client-side uploads
 export const generateUploadUrl = mutation({
@@ -48,6 +48,23 @@ export const deleteFile = mutation({
   },
 });
 
+// Internal mutation for updating image storage IDs (no auth required, called from actions)
+export const _updateImageStorageId = internalMutation({
+  args: {
+    pluginId: v.optional(v.id("plugins")),
+    manufacturerId: v.optional(v.id("manufacturers")),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    if (args.pluginId) {
+      await ctx.db.patch(args.pluginId, { imageStorageId: args.storageId });
+    }
+    if (args.manufacturerId) {
+      await ctx.db.patch(args.manufacturerId, { logoStorageId: args.storageId });
+    }
+  },
+});
+
 // Upload image from URL (server-side action)
 export const uploadFromUrl = action({
   args: {
@@ -69,19 +86,12 @@ export const uploadFromUrl = action({
       // Upload to Convex storage
       const storageId = await ctx.storage.store(blob);
       
-      // If pluginId provided, update the plugin
-      if (args.pluginId) {
-        await ctx.runMutation(api.plugins.update, {
-          id: args.pluginId,
-          imageStorageId: storageId,
-        });
-      }
-      
-      // If manufacturerId provided, update the manufacturer logo
-      if (args.manufacturerId) {
-        await ctx.runMutation(api.manufacturers.update, {
-          id: args.manufacturerId,
-          logoStorageId: storageId,
+      // Update plugin/manufacturer image via internal mutation (no auth needed)
+      if (args.pluginId || args.manufacturerId) {
+        await ctx.runMutation(internal.storage._updateImageStorageId, {
+          pluginId: args.pluginId,
+          manufacturerId: args.manufacturerId,
+          storageId,
         });
       }
       
@@ -115,9 +125,9 @@ export const batchUploadPluginImages = action({
         const blob = await response.blob();
         const storageId = await ctx.storage.store(blob);
         
-        await ctx.runMutation(api.plugins.update, {
-          id: pluginId,
-          imageStorageId: storageId,
+        await ctx.runMutation(internal.storage._updateImageStorageId, {
+          pluginId,
+          storageId,
         });
         
         results.push({ pluginId, success: true, storageId });

@@ -59,7 +59,7 @@ export function PriceHistoryChart({ pluginId, currentPrice, msrp }: PriceHistory
           <p className="text-stone-400">{data.date}</p>
           <p className="text-stone-500 text-xs">{data.storeName}</p>
           {data.wasOnSale && (
-            <p className="text-emerald-400 text-xs mt-1">On Sale</p>
+            <p className="text-white text-xs mt-1">On Sale</p>
           )}
         </div>
       );
@@ -74,7 +74,7 @@ export function PriceHistoryChart({ pluginId, currentPrice, msrp }: PriceHistory
         {stats && (
           <div className="flex gap-4 text-sm">
             <div className="text-center">
-              <p className="text-emerald-400 font-semibold">${(stats.lowest / 100).toFixed(0)}</p>
+              <p className="text-white font-semibold">${(stats.lowest / 100).toFixed(0)}</p>
               <p className="text-stone-500 text-xs">Lowest</p>
             </div>
             <div className="text-center">
@@ -133,12 +133,12 @@ export function PriceHistoryChart({ pluginId, currentPrice, msrp }: PriceHistory
       {stats && currentPrice && (
         <div className="mt-4 pt-4 border-t border-stone-800">
           {currentPrice <= stats.lowest ? (
-            <div className="flex items-center gap-2 text-emerald-400">
+            <div className="flex items-center gap-2 text-white">
               <TrendDown className="w-5 h-5" />
               <span className="text-sm">Current price is at or near the all-time low!</span>
             </div>
           ) : currentPrice > stats.average ? (
-            <div className="flex items-center gap-2 text-orange-400">
+            <div className="flex items-center gap-2 text-white">
               <TrendUp className="w-5 h-5" />
               <span className="text-sm">
                 Current price is above average. Consider waiting for a sale.

@@ -15,11 +15,11 @@ interface OwnButtonProps {
 
 export function OwnButton({ pluginId, size = "md", showLabel = true }: OwnButtonProps) {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, sessionToken } = useAuth();
 
   const ownedPlugin = useQuery(
     api.ownedPlugins.getForPlugin,
-    user ? { user: user._id, plugin: pluginId } : "skip"
+    sessionToken ? { sessionToken, plugin: pluginId } : "skip"
   );
 
   const addToCollection = useMutation(api.ownedPlugins.add);
@@ -34,9 +34,9 @@ export function OwnButton({ pluginId, size = "md", showLabel = true }: OwnButton
     }
 
     if (isOwned) {
-      await removeFromCollection({ user: user._id, plugin: pluginId });
+      await removeFromCollection({ sessionToken: sessionToken!, plugin: pluginId });
     } else {
-      await addToCollection({ user: user._id, plugin: pluginId });
+      await addToCollection({ sessionToken: sessionToken!, plugin: pluginId });
     }
   };
 
