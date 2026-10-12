@@ -356,6 +356,15 @@ export default function ChainDetailClient({
           {/* Actions sidebar */}
           <div className="flex flex-col gap-3 lg:w-64 shrink-0">
             {/* Compatibility */}
+            {!isAuthenticated && (
+              <div className="glass-card p-4 rounded-xl">
+                <p className="text-sm font-medium text-stone-100">Can you load this chain?</p>
+                <p className="mt-1 text-xs text-stone-400 leading-relaxed">
+                  <Link href="/account" className="text-[#deff0a] hover:underline">Sign in</Link>{" "}
+                  to see which of these plugins you own, with swaps for the ones you don&apos;t.
+                </p>
+              </div>
+            )}
             {compatibility && (
               <div
                 className={`p-4 rounded-xl border ${
@@ -678,6 +687,22 @@ function SlotRow({
             <span className="text-stone-600 truncate max-w-[200px]">
               &middot; {substitution.bestSubstitute.reasons}
             </span>
+          )}
+        </div>
+      )}
+
+      {/* No swap found: point to where to get the plugin */}
+      {substitution?.status === "missing" && !substitution.bestSubstitute && (
+        <div className="ml-8 mt-1 mb-1 flex items-center gap-2 text-xs">
+          <ArrowRight className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+          <span className="text-stone-400">No close match in your plugins</span>
+          {hasMatch && (
+            <Link
+              href={`/plugins/${slot.pluginData.slug}`}
+              className="text-[#deff0a] hover:underline"
+            >
+              {slot.pluginData.isFree ? "Get it free" : "Where to buy"} &rarr;
+            </Link>
           )}
         </div>
       )}

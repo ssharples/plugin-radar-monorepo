@@ -1,12 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { MagnifyingGlass, SortAscending } from "@phosphor-icons/react";
 import { UseCaseCategoryTree } from "./UseCaseCategoryTree";
 
-const SORT_OPTIONS = [
+export const SORT_OPTIONS = [
   { value: "recent", label: "Most Recent" },
   { value: "popular", label: "Most Popular" },
+  { value: "rating", label: "Highest Rated" },
   { value: "downloads", label: "Most Downloaded" },
+];
+
+// "all" = every chain, "full" = I own every plugin, "close" = missing 2 or fewer.
+export type CompatibilityFilter = "all" | "full" | "close";
+
+const COMPAT_OPTIONS: { value: CompatibilityFilter; label: string }[] = [
+  { value: "all", label: "All chains" },
+  { value: "full", label: "I own every plugin" },
+  { value: "close", label: "Missing 2 or fewer" },
 ];
 
 const GENRE_OPTIONS = [
@@ -33,8 +44,9 @@ export function ChainBrowserSidebar({
   onGenreChange,
   sortBy,
   onSortChange,
-  showCompatible,
-  onCompatibleChange,
+  compatibility,
+  onCompatibilityChange,
+  isAuthenticated,
   educatorOnly,
   onEducatorOnlyChange,
 }: {
@@ -46,8 +58,9 @@ export function ChainBrowserSidebar({
   onGenreChange: (value: string) => void;
   sortBy: string;
   onSortChange: (value: string) => void;
-  showCompatible: boolean;
-  onCompatibleChange: (value: boolean) => void;
+  compatibility: CompatibilityFilter;
+  onCompatibilityChange: (value: CompatibilityFilter) => void;
+  isAuthenticated: boolean;
   educatorOnly?: boolean;
   onEducatorOnlyChange?: (value: boolean) => void;
 }) {
@@ -111,18 +124,43 @@ export function ChainBrowserSidebar({
       </div>
 
       {/* Compatibility filter */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">
+          Chains I Can Use
+        </h3>
+        <div className="space-y-0.5" role="radiogroup" aria-label="Chains I can use">
+          {COMPAT_OPTIONS.map((opt) => {
+            const disabled = !isAuthenticated && opt.value !== "all";
+            const selected = compatibility === opt.value;
+            return (
+              <button
+                key={opt.value}
+                role="radio"
+                aria-checked={selected}
+                disabled={disabled}
+                onClick={() => onCompatibilityChange(opt.value)}
+                className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition ${
+                  selected
+                    ? "bg-white/10 text-white font-medium"
+                    : disabled
+                      ? "text-stone-600 cursor-not-allowed"
+                      : "text-stone-400 hover:text-stone-200 hover:bg-white/[0.04]"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {!isAuthenticated && (
+          <p className="mt-2 px-3 text-xs text-stone-500 leading-relaxed">
+            <Link href="/account" className="text-[#deff0a] hover:underline">Sign in</Link> and
+            sync your plugins from ProChain to see which chains you can load.
+          </p>
+        )}
+      </div>
+
       <div className="space-y-2">
-        <label className="flex items-center gap-2 cursor-pointer group">
-          <input
-            type="checkbox"
-            checked={showCompatible}
-            onChange={(e) => onCompatibleChange(e.target.checked)}
-            className="w-4 h-4 rounded border-stone-700 bg-white/[0.04] text-[#deff0a] focus:ring-[#deff0a]/20 focus:ring-offset-0"
-          />
-          <span className="text-sm text-stone-400 group-hover:text-stone-300 transition">
-            Compatible only
-          </span>
-        </label>
         {onEducatorOnlyChange && (
           <label className="flex items-center gap-2 cursor-pointer group">
             <input
